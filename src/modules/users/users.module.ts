@@ -1,29 +1,26 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from './schemas/user.schema';
-
-// Import các Module con
+import { Customer, CustomerSchema } from './customers/schemas/customer.schema';
+import { Staff, StaffSchema } from './admin/schemas/staff.schema';
+import { UsersService } from '../users/user.Service';
 import { AdminModule } from './admin/admin.module';
-import { CustomersModule } from './customers/customers.module';
-import { AddressesModule } from './addresses/addresses.module';
-import { WishlistModule } from './wishlist/wishlist.module';
+
+const userModels = MongooseModule.forFeature([
+  {
+    name: User.name,
+    schema: UserSchema,
+    discriminators: [
+      { name: Customer.name, schema: CustomerSchema },
+      { name: Staff.name, schema: StaffSchema },
+    ],
+  },
+]);
 
 @Module({
-  imports: [
-    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
-    AdminModule,
-    CustomersModule,
-    AddressesModule,
-    WishlistModule,
-  ],
-  controllers: [],
-  providers: [],
-  exports: [
-    MongooseModule,
-    AdminModule,
-    CustomersModule,
-    AddressesModule,
-    WishlistModule,
-  ],
+  imports: [userModels, forwardRef(() => AdminModule)],
+
+  providers: [UsersService],
+  exports: [UsersService, userModels, MongooseModule],
 })
 export class UsersModule {}

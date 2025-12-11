@@ -1,4 +1,5 @@
 import { IsNotEmpty, IsString, Matches, MinLength } from 'class-validator';
+import { Match } from 'src/common/decorators/match.decorator';
 
 export class ResetPasswordDto {
   @IsNotEmpty({ message: 'Token xác thực không được để trống' })
@@ -13,5 +14,6 @@ export class ResetPasswordDto {
   newPassword: string;
 
   @IsNotEmpty({ message: 'Xác nhận mật khẩu mới không được để trống' })
+  @Match('newPassword', { message: 'Mật khẩu nhập lại không khớp ' })
   confirmNewPassword: string;
 }

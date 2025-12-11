@@ -1,28 +1,43 @@
 import {
+  Equals,
   IsBoolean,
   IsEmail,
-  IsIn,
   IsNotEmpty,
   IsString,
   Matches,
   MinLength,
 } from 'class-validator';
+import { Match } from 'src/common/decorators/match.decorator';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class RegisterDto {
+  @ApiProperty({
+    example: 'Nguyễn Văn A',
+    description: 'Họ và tên người dùng (AC1)',
+  })
   @IsNotEmpty({ message: 'Họ và tên không được để trống' })
   @IsString({ message: 'Họ và tên phải là dạng chuỗi ký tự' })
   fullName: string;
 
+  @ApiProperty({
+    example: 'customer@example.com',
+    description: 'Email duy nhất (AC3, AC4)',
+  })
   @IsNotEmpty({ message: 'Email không được để trống' })
   @IsEmail({}, { message: 'Email không hợp lệ' })
   email: string;
 
+  @ApiProperty({
+    example: '0987654321',
+    description: 'Số điện thoại VN 10 số (AC4)',
+  })
   @IsNotEmpty({ message: 'Số điện thoại không được để trống' })
   @Matches(/^(0?)(3[2-9]|5[6|8|9]|7[0|6-9]|8[0-6|8|9]|9[0-4|6-9])[0-9]{7}$/, {
     message: 'Số điện thoại không đúng định dạng Việt Nam (10 số)',
   })
   phoneNumber: string;
 
+  @ApiProperty({ example: 'Pass@1234', description: 'Mật khẩu mạnh (AC2)' })
   @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
   @MinLength(8, { message: 'Mật khẩu phải có ít nhất 8 ký tự' })
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/, {
@@ -30,11 +45,17 @@ export class RegisterDto {
   })
   password: string;
 
+  @ApiProperty({ example: 'Pass@1234', description: 'Nhập lại mật khẩu (AC2)' })
   @IsNotEmpty({ message: 'Xác nhận mật khẩu không được để trống' })
+  @Match('password', { message: 'Mật khẩu nhập lại không khớp ' })
   confirmPassword: string;
 
+  @ApiProperty({ example: true, description: 'Đồng ý điều khoản (AC6)' })
   @IsNotEmpty({ message: 'Bạn phải đồng ý với các điều khoản' })
   @IsBoolean()
-  @IsIn([true], { message: 'Bạn phải chấp nhận điều khoản để đăng ký' })
-  acceptTerms: boolean;
+  @Equals(true, {
+    message:
+      'Bạn phải đồng ý với Điều khoản sử dụng và Chính sách bảo mật (AC6)',
+  })
+  agreeToTerms: boolean;
 }
