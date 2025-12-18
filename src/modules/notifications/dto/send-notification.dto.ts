@@ -1,1 +1,5 @@
-// Mongo Schema / Service / Controller
+export class SendNotificationDto {
+  title: string;
+  message: string;
+  userId: string;
+}

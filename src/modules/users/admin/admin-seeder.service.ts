@@ -34,7 +34,8 @@ export class AdminSeederService implements OnModuleInit {
       const superAdmin = new this.staffModel({
         email: 'super.admin@hnodyssey.com',
         password: hashedPassword,
-        full_name: 'Super Admin',
+        first_Name: 'Super Admin',
+        last_Name: 'HN Odyssey',
         employee_code: 'SA001',
         department: 'SYSTEM_ADMIN',
         roles: ['CUSTOMER', 'ADMIN'],

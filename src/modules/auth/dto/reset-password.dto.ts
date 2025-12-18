@@ -1,10 +1,20 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, Matches, MinLength } from 'class-validator';
 import { Match } from 'src/common/decorators/match.decorator';
 
 export class ResetPasswordDto {
-  @IsNotEmpty({ message: 'Token xác thực không được để trống' })
+  @ApiProperty({
+    example: 'customer@example.com HOẶC 0987654321',
+    description: 'Email HOẶC Số điện thoại đã đăng ký (AC1)',
+  })
+  @IsNotEmpty({ message: 'Thông tin khôi phục không được để trống' })
+  @IsString({ message: 'Thông tin khôi phục phải là chuỗi' })
+  account: string;
+
+  @ApiProperty({ example: '123456', description: 'Mã OTP hoặc Token từ Email' })
+  @IsNotEmpty()
   @IsString()
-  token: string;
+  code: string;
 
   @IsNotEmpty({ message: 'Mật khẩu mới không được để trống' })
   @MinLength(8, { message: 'Mật khẩu phải có ít nhất 8 ký tự' })

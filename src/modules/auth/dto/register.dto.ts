@@ -12,12 +12,20 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class RegisterDto {
   @ApiProperty({
-    example: 'Nguyễn Văn A',
-    description: 'Họ và tên người dùng (AC1)',
+    example: 'Văn A',
+    description: 'Tên (và tên đệm) của người dùng',
   })
-  @IsNotEmpty({ message: 'Họ và tên không được để trống' })
-  @IsString({ message: 'Họ và tên phải là dạng chuỗi ký tự' })
-  fullName: string;
+  @IsNotEmpty({ message: 'Tên không được để trống' })
+  @IsString({ message: 'Tên phải là dạng chuỗi ký tự' })
+  firstName: string;
+
+  @ApiProperty({
+    example: 'Nguyễn',
+    description: 'Họ của người dùng',
+  })
+  @IsNotEmpty({ message: 'Họ không được để trống' })
+  @IsString({ message: 'Họ phải là dạng chuỗi ký tự' })
+  lastName: string;
 
   @ApiProperty({
     example: 'customer@example.com',
@@ -40,8 +48,8 @@ export class RegisterDto {
   @ApiProperty({ example: 'Pass@1234', description: 'Mật khẩu mạnh (AC2)' })
   @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
   @MinLength(8, { message: 'Mật khẩu phải có ít nhất 8 ký tự' })
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/, {
-    message: 'Mật khẩu phải bao gồm chữ hoa, chữ thường và số',
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/, {
+    message: 'Mật khẩu phải bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt',
   })
   password: string;
 

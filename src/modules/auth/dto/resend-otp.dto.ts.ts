@@ -8,7 +8,7 @@ export class ResendOtpDto {
   })
   @IsNotEmpty()
   @IsString()
-  target: string;
+  account: string;
 
   @ApiProperty({ example: 'REGISTER', enum: ['REGISTER', 'RESET_PASSWORD'] })
   @IsNotEmpty()

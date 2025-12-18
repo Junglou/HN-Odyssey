@@ -5,6 +5,7 @@ import { Document } from 'mongoose';
   collection: 'users',
   timestamps: true,
   discriminatorKey: 'type', // Key để phân biệt loại user
+  toJSON: { virtuals: true },
 })
 export class User {
   @Prop({ required: true, unique: true, index: true })
@@ -17,7 +18,12 @@ export class User {
   password?: string;
 
   @Prop({ required: true })
-  full_name: string;
+  first_Name: string;
+
+  @Prop({ required: true })
+  last_Name: string;
+
+  fullName: string;
 
   @Prop({ type: Object, default: {} })
   social_auth: {
@@ -40,7 +46,7 @@ export class User {
   login_attempts: number;
 
   @Prop({ type: Date, default: null })
-  lock_until: Date;
+  lock_until: Date | null;
 
   // Trường bắt buộc cho Discriminator
   type: string;
@@ -52,5 +58,14 @@ export type UserDocument = User & Document;
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
+UserSchema.virtual('fullName').get(function (this: UserDocument) {
+  return `${this.last_Name} ${this.first_Name}`;
+});
+
 // Index Text để tìm kiếm theo tên/email/sđt (US.15)
-UserSchema.index({ full_name: 'text', email: 'text', phone: 'text' });
+UserSchema.index({
+  firstName: 'text',
+  lastName: 'text',
+  email: 'text',
+  phone: 'text',
+});

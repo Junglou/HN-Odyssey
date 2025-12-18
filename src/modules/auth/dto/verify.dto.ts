@@ -8,7 +8,7 @@ export class VerifyOtpDto {
   })
   @IsNotEmpty()
   @IsString()
-  target: string;
+  account: string;
 
   @ApiProperty({ example: '123456', description: 'Mã OTP 6 số' })
   @IsNotEmpty()

@@ -15,13 +15,20 @@ import {
   RecoveryRequestSchema,
 } from './schema/recovery-request.schema';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
+import {
+  AuditLog,
+  AuditLogSchema,
+} from '../system/audit-logs/schemas/audit-log.schema';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     UsersModule,
+    NotificationsModule,
     MongooseModule.forFeature([
       { name: Verification.name, schema: VerificationSchema },
       { name: RecoveryRequest.name, schema: RecoveryRequestSchema },
+      { name: AuditLog.name, schema: AuditLogSchema },
     ]), // 2. Cấu hình JWT (Token) sử dụng registerAsync
     JwtModule.registerAsync({
       imports: [ConfigModule],

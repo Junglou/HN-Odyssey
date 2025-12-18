@@ -8,7 +8,7 @@ export class RolesGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     // 1. Lấy vai trò yêu cầu từ Decorator @Roles()
     const requiredRoles = this.reflector.get<string[]>(
-      'roles', 
+      'roles',
       context.getHandler(),
     );
 

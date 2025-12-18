@@ -1,3 +1,5 @@
+// [FIX] Thêm 'type' vào import Request để tránh lỗi TS1272 khi biên dịch
+import type { Request } from 'express';
 import {
   BadRequestException,
   Body,
@@ -5,6 +7,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Ip,
   Param,
   Post,
   Req,
@@ -30,6 +33,9 @@ import { ProcessRecoveryDto } from './dto/process-recovery.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { JwtService } from '@nestjs/jwt';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { RecoverAccountDto } from './dto/recover-account.dto';
 
 @ApiTags('Auth (Xác thực)')
 @Controller('auth')
@@ -50,7 +56,7 @@ export class AuthController {
   }
 
   //2. XÁC THỰC OTP (AC13)
-  @Post('verify')
+  @Post('verify-otp')
   @Public()
   @HttpCode(HttpStatus.OK) // Trả về 200 thay vì 201 mặc định
   @ApiOperation({ summary: 'Xác thực OTP để kích hoạt tài khoản' })
@@ -59,8 +65,17 @@ export class AuthController {
     description: 'Kích hoạt thành công, trả về Token.',
   })
   @ApiResponse({ status: 400, description: 'Mã OTP sai hoặc hết hạn.' })
-  async verifyOtp(@Body() dto: VerifyOtpDto) {
-    return this.authService.verifyOtp(dto);
+  async verifyOtp(@Body() dto: VerifyOtpDto, @Req() request: Request) {
+    // Helper lấy IP chính xác (Xử lý trường hợp qua proxy/load balancer)
+    // [FIX] Ép kiểu any cho socket để tránh lỗi TS strict
+    const ip =
+      request.headers['x-forwarded-for'] ||
+      (request.socket as any)?.remoteAddress ||
+      'Unknown';
+    const userAgent = request.headers['user-agent'] || 'Unknown';
+
+    // Truyền ip và userAgent xuống Service
+    return this.authService.verifyOtp(dto, ip as string, userAgent);
   }
 
   //3. GỬI LẠI OTP (AC12)
@@ -88,29 +103,37 @@ export class AuthController {
     status: 400,
     description: 'Sai mật khẩu, tài khoản bị khóa, chưa active.',
   })
-  async login(@Body() dto: LoginDto) {
+  async login(@Body() dto: LoginDto, @Req() req: Request, @Ip() ip: string) {
+    const userAgent = req.headers['user-agent'] || 'Unknown';
     // 1. Validate User (Check pass, status, brute-force)
     const user = await this.authService.validateUser(dto.account, dto.password);
 
     // 2. Generate Token (AC6, AC14)
-    return this.authService.login(user);
+    return this.authService.login(user, dto.rememberMe || false, ip, userAgent);
   }
 
   //5. GOOGLE LOGIN (AC1)
   @Get('google')
   @Public()
   @UseGuards(AuthGuard('google'))
-  async googleAuth(@Req() req) {}
+  async googleAuth(@Req() req: any) {}
 
   @Get('google/callback')
   @Public()
   @UseGuards(AuthGuard('google')) // AC5: Nếu cancel, Guard sẽ tự xử lý hoặc throw Unauthorized
-  async googleAuthRedirect(@Req() req, @Res() res) {
+  async googleAuthRedirect(@Req() req: any, @Res() res: any) {
     try {
+      const ip =
+        req.headers['x-forwarded-for'] ||
+        req.socket?.remoteAddress ||
+        'Unknown';
+      const userAgent = req.headers['user-agent'] || 'Unknown';
       // Gọi Service xử lý logic AC2 -> AC10
       const result = await this.authService.validateOAuthLogin(
         req.user,
         'google',
+        ip as string,
+        userAgent,
       );
 
       // AC7: Redirect về Frontend kèm Token
@@ -136,16 +159,23 @@ export class AuthController {
   @Get('facebook')
   @Public()
   @UseGuards(AuthGuard('facebook'))
-  async facebookAuth(@Req() req) {}
+  async facebookAuth(@Req() req: any) {}
 
   @Get('facebook/callback')
   @Public()
   @UseGuards(AuthGuard('facebook'))
-  async facebookAuthRedirect(@Req() req, @Res() res) {
+  async facebookAuthRedirect(@Req() req: any, @Res() res: any) {
     try {
+      const ip =
+        req.headers['x-forwarded-for'] ||
+        req.socket?.remoteAddress ||
+        'Unknown';
+      const userAgent = req.headers['user-agent'] || 'Unknown';
       const result = await this.authService.validateOAuthLogin(
         req.user,
         'facebook',
+        ip as string,
+        userAgent,
       );
 
       return res.json({
@@ -199,7 +229,8 @@ export class AuthController {
   async processRecovery(
     @Param('id') id: string,
     @Body() dto: ProcessRecoveryDto,
-    @Req() req,
+    @Req() req: any,
+    @Ip() ip: string,
   ) {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -214,8 +245,9 @@ export class AuthController {
     if (!adminId) {
       throw new BadRequestException('Token không chứa ID người dùng.');
     }
+    const userAgent = req.headers['user-agent'] || 'Unknown';
 
-    return this.authService.processRecovery(id, dto, adminId);
+    return this.authService.processRecovery(id, dto, adminId, ip, userAgent);
   }
 
   //10. REFRESH TOKEN — LẤY ACCESS TOKEN MỚI (PUBLIC)
@@ -232,5 +264,35 @@ export class AuthController {
       throw new BadRequestException('Thiếu refresh_token trong body.');
     }
     return this.authService.refreshTokens(refreshToken);
+  }
+
+  //12. QUÊN MẬT KHẨU (AC1 -> AC3)
+  @Post('forgot-password')
+  @Public() // Khách chưa login mới dùng được
+  @ApiOperation({ summary: 'Yêu cầu OTP/Link để reset mật khẩu' })
+  async forgotPassword(
+    @Body() dto: ForgotPasswordDto,
+    @Ip() ip: string, // Lấy IP tự động
+    @Req() req: Request,
+  ) {
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    return this.authService.forgotPassword(dto.account, ip, userAgent);
+  }
+
+  //12. ĐẶT LẠI MẬT KHẨU (AC5)
+  @Post('reset-password')
+  @Public()
+  @ApiOperation({ summary: 'Submit mật khẩu mới kèm OTP/Token' })
+  async resetPassword(@Body() dto: ResetPasswordDto, @Ip() ip: string) {
+    return this.authService.resetPassword(dto, ip);
+  }
+
+  //13. KHÔI PHỤC TÀI KHOẢN (Cho link Admin cấp)
+  @Post('recover-account')
+  @Public()
+  @ApiOperation({ summary: 'Submit mật khẩu và email mới (Link từ Admin)' })
+  async recoverAccount(@Body() dto: RecoverAccountDto, @Ip() ip: string) {
+    // DTO này bắt buộc có newEmail
+    return this.authService.recoverAccount(dto, ip);
   }
 }

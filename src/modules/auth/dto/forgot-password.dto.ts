@@ -8,5 +8,5 @@ export class ForgotPasswordDto {
   })
   @IsNotEmpty({ message: 'Thông tin khôi phục không được để trống' })
   @IsString({ message: 'Thông tin khôi phục phải là chuỗi' })
-  target: string; 
+  account: string;
 }
