@@ -9,6 +9,13 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AdminModule } from './modules/users/admin/admin.module';
+import { CategoriesModule } from './modules/products/categories/categories.module';
+import { AuditLogsModule } from './modules/system/audit-logs/audit-logs.module';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
+import { UploadModule } from './modules/system/upload/upload.module';
+import { ProductsModule } from './modules/products/products.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
 
 @Module({
   imports: [
@@ -24,9 +31,19 @@ import { AdminModule } from './modules/users/admin/admin.module';
       isGlobal: true,
     }),
 
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'uploads'), // Trỏ ra thư mục uploads ở root
+      serveRoot: '/uploads', // Prefix URL: http://localhost:3000/uploads/...
+    }),
+
     AuthModule,
     UsersModule,
     AdminModule,
+    CategoriesModule,
+    AuditLogsModule,
+    UploadModule,
+    ProductsModule,
+    InventoryModule,
   ],
   controllers: [AppController],
   providers: [

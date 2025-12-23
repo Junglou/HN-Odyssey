@@ -36,6 +36,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RecoverAccountDto } from './dto/recover-account.dto';
+import { UserAgent } from 'src/common/decorators/user-agent.decorator';
 
 @ApiTags('Auth (Xác thực)')
 @Controller('auth')
@@ -65,15 +66,11 @@ export class AuthController {
     description: 'Kích hoạt thành công, trả về Token.',
   })
   @ApiResponse({ status: 400, description: 'Mã OTP sai hoặc hết hạn.' })
-  async verifyOtp(@Body() dto: VerifyOtpDto, @Req() request: Request) {
-    // Helper lấy IP chính xác (Xử lý trường hợp qua proxy/load balancer)
-    // [FIX] Ép kiểu any cho socket để tránh lỗi TS strict
-    const ip =
-      request.headers['x-forwarded-for'] ||
-      (request.socket as any)?.remoteAddress ||
-      'Unknown';
-    const userAgent = request.headers['user-agent'] || 'Unknown';
-
+  async verifyOtp(
+    @Body() dto: VerifyOtpDto,
+    @Ip() ip: string,
+    @UserAgent() userAgent: string,
+  ) {
     // Truyền ip và userAgent xuống Service
     return this.authService.verifyOtp(dto, ip as string, userAgent);
   }
@@ -90,8 +87,6 @@ export class AuthController {
   //4. ĐĂNG NHẬP (US.02)
   @Post('login')
   @Public() // Login thì không cần Token
-  // @UseGuards(AuthGuard('local')) // Cách 1: Dùng Guard Local (Trả về 401 nếu sai)
-  // Tuy nhiên, để custom error message (AC3, AC5) tốt hơn, ta gọi service trực tiếp hoặc custom filter.
   // Ở đây gọi service trực tiếp để dễ debug logic Brute-force.
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng nhập hệ thống (AC1 -> AC14)' })
@@ -103,8 +98,11 @@ export class AuthController {
     status: 400,
     description: 'Sai mật khẩu, tài khoản bị khóa, chưa active.',
   })
-  async login(@Body() dto: LoginDto, @Req() req: Request, @Ip() ip: string) {
-    const userAgent = req.headers['user-agent'] || 'Unknown';
+  async login(
+    @Body() dto: LoginDto,
+    @Ip() ip: string,
+    @UserAgent() userAgent: string,
+  ) {
     // 1. Validate User (Check pass, status, brute-force)
     const user = await this.authService.validateUser(dto.account, dto.password);
 
@@ -217,7 +215,7 @@ export class AuthController {
   //8. ADMIN: LẤY DANH SÁCH YÊU CẦU (AC3)
   @Get('admin/recovery-requests')
   @Roles(Role.ADMIN)
-  // @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   async getPendingRecoveries() {
     return this.authService.getPendingRecoveries();
   }
@@ -231,6 +229,7 @@ export class AuthController {
     @Body() dto: ProcessRecoveryDto,
     @Req() req: any,
     @Ip() ip: string,
+    @UserAgent() userAgent: string,
   ) {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -245,7 +244,6 @@ export class AuthController {
     if (!adminId) {
       throw new BadRequestException('Token không chứa ID người dùng.');
     }
-    const userAgent = req.headers['user-agent'] || 'Unknown';
 
     return this.authService.processRecovery(id, dto, adminId, ip, userAgent);
   }
@@ -273,9 +271,8 @@ export class AuthController {
   async forgotPassword(
     @Body() dto: ForgotPasswordDto,
     @Ip() ip: string, // Lấy IP tự động
-    @Req() req: Request,
+    @UserAgent() userAgent: string,
   ) {
-    const userAgent = req.headers['user-agent'] || 'unknown';
     return this.authService.forgotPassword(dto.account, ip, userAgent);
   }
 
@@ -283,16 +280,24 @@ export class AuthController {
   @Post('reset-password')
   @Public()
   @ApiOperation({ summary: 'Submit mật khẩu mới kèm OTP/Token' })
-  async resetPassword(@Body() dto: ResetPasswordDto, @Ip() ip: string) {
-    return this.authService.resetPassword(dto, ip);
+  async resetPassword(
+    @Body() dto: ResetPasswordDto,
+    @Ip() ip: string,
+    @UserAgent() userAgent: string,
+  ) {
+    return this.authService.resetPassword(dto, ip, userAgent);
   }
 
   //13. KHÔI PHỤC TÀI KHOẢN (Cho link Admin cấp)
   @Post('recover-account')
   @Public()
   @ApiOperation({ summary: 'Submit mật khẩu và email mới (Link từ Admin)' })
-  async recoverAccount(@Body() dto: RecoverAccountDto, @Ip() ip: string) {
+  async recoverAccount(
+    @Body() dto: RecoverAccountDto,
+    @Ip() ip: string,
+    @UserAgent() userAgent: string,
+  ) {
     // DTO này bắt buộc có newEmail
-    return this.authService.recoverAccount(dto, ip);
+    return this.authService.recoverAccount(dto, ip, userAgent);
   }
 }

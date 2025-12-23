@@ -1,1 +1,9 @@
-// Mongo Schema / Service / Controller
+import { Request } from 'express';
+
+export interface RequestWithUser extends Request {
+  user: {
+    _id: string;
+    email: string;
+    roles: string[];
+  };
+}

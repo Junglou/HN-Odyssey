@@ -26,6 +26,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { EmailService } from '../notifications/channels/email.service';
 import { SmsService } from '../notifications/channels/sms.service';
 import { RecoverAccountDto } from './dto/recover-account.dto';
+import { AuditLogsService } from '../system/audit-logs/audit-logs.service';
 
 @Injectable()
 export class AuthService {
@@ -43,7 +44,7 @@ export class AuthService {
     private recoveryModel: Model<RecoveryRequest>,
     private readonly configService: ConfigService,
     private readonly usersService: UsersService,
-    @InjectModel(AuditLog.name) private auditLogModel: Model<AuditLog>,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   //1. ĐĂNG KÝ TÀI KHOẢN (US.01)
@@ -215,10 +216,11 @@ export class AuthService {
       );
 
       // Ghi Audit Log Verify Thành công
-      await this.auditLogModel.create({
-        actor_id: user._id,
+      this.auditLogsService.log({
         action: 'VERIFY_OTP_SUCCESS',
         collection_name: 'users',
+        actor_id: user._id,
+        target_id: user._id,
         detail: { account: dto.account },
         ip: ip,
         user_agent: userAgent,
@@ -392,7 +394,7 @@ export class AuthService {
     });
   }
 
-  // [FIX] Cập nhật tham số để nhận ip, userAgent
+  //Cập nhật tham số để nhận ip, userAgent
   async login(
     user: any,
     isRemember: boolean = false,
@@ -410,10 +412,11 @@ export class AuthService {
       { $set: { refresh_token: hashed } },
     );
 
-    await this.auditLogModel.create({
-      actor_id: user._id,
-      action: 'LOGIN_SUCCESS',
+    this.auditLogsService.log({
+      action: 'LOGIN', // Đặt tên ngắn gọn là LOGIN, mặc định is_success = true
       collection_name: 'users',
+      actor_id: user._id,
+      target_id: user._id,
       detail: {
         roles: user.roles,
         method: user.social_auth ? 'OAUTH' : 'LOCAL',
@@ -510,7 +513,7 @@ export class AuthService {
   }
 
   // 6. XỬ LÝ LOGIN OAUTH (Google/Facebook)
-  // [FIX] Cập nhật tham số để nhận ip, userAgent
+  // Cập nhật tham số để nhận ip, userAgent
   async validateOAuthLogin(
     profile: any,
     provider: 'google' | 'facebook',
@@ -533,7 +536,7 @@ export class AuthService {
       );
     }
 
-    // --- XỬ LÝ TÊN HIỂN THỊ ---
+    // XỬ LÝ TÊN HIỂN THỊ
     let finalName = displayName;
     if (!finalName || finalName === 'undefined undefined') {
       finalName = name;
@@ -566,7 +569,7 @@ export class AuthService {
       // AC4: Check xem có bị khóa không
       this.checkUserBanStatus(existingSocialUser);
       // Nếu đã tồn tại liên kết -> Đăng nhập luôn
-      // [FIX] Truyền IP/UA
+      // Truyền IP/UA
       return this.login(existingSocialUser, false, ip, userAgent);
     }
 
@@ -588,7 +591,7 @@ export class AuthService {
 
       // Fetch lại user mới nhất
       const updatedUser = await this.userModel.findById(existingEmailUser._id);
-      // [FIX] Truyền IP/UA
+      //Truyền IP/UA
       return this.login(updatedUser, false, ip, userAgent);
     }
 
@@ -657,11 +660,11 @@ export class AuthService {
 
       await newUser.save({ session });
 
-      // [FIX] Ghi Audit Log ĐÚNG VỊ TRÍ
-      await this.auditLogModel.create({
-        actor_id: newUser._id,
-        action: 'REGISTER_OAUTH_SUCCESS', // Ghi nhận đây là lần đăng ký mới
+      this.auditLogsService.log({
+        action: 'REGISTER_OAUTH',
         collection_name: 'users',
+        actor_id: newUser._id,
+        target_id: newUser._id,
         detail: { provider: provider, email: email },
         ip: ip,
         user_agent: userAgent,
@@ -802,14 +805,14 @@ export class AuthService {
 
     // GHI AUDIT LOG (AC7) - CHẠY CHO CẢ 2 TRƯỜNG HỢP
     if (actionType) {
-      await this.auditLogModel.create({
-        actor_id: adminId,
-        action: actionType,
+      this.auditLogsService.log({
+        action: actionType, // 'REJECT_RECOVERY' hoặc 'APPROVE_RECOVERY'
         collection_name: 'recovery_requests',
+        actor_id: adminId, // Admin thực hiện
+        target_id: requestId, // ID của yêu cầu bị tác động
         detail: {
-          request_id: requestId,
           target_account: request.target_account,
-          reason: dto.rejection_reason || 'Approved', // Ghi lý do nếu từ chối
+          reason: dto.rejection_reason || 'Approved',
         },
         ip: ip,
         user_agent: userAgent,
@@ -831,9 +834,10 @@ export class AuthService {
   //10. QUÊN MẬT KHẨU (US.03 - AC1, AC2, AC3, AC6)
   async forgotPassword(account: string, ip: string, userAgent: string) {
     // AC6: Ghi Log ngay lập tức (kể cả user có tồn tại hay không)
-    await this.auditLogModel.create({
+    this.auditLogsService.log({
       action: 'FORGOT_PASSWORD_REQUEST',
       collection_name: 'users',
+      actor_id: null, // Chưa login
       detail: { account: account },
       ip: ip,
       user_agent: userAgent,
@@ -901,7 +905,11 @@ export class AuthService {
   }
 
   // 11. ĐẶT LẠI MẬT KHẨU (Quên mật khẩu thường)
-  async resetPassword(dto: ResetPasswordDto, ip: string) {
+  async resetPassword(
+    dto: ResetPasswordDto,
+    ip: string,
+    userAgent: string = 'Unknown',
+  ) {
     if (dto.newPassword !== dto.confirmNewPassword) {
       throw new BadRequestException('Mật khẩu xác nhận không khớp.');
     }
@@ -934,11 +942,24 @@ export class AuthService {
     await verifyRecord.deleteOne();
 
     //Ghi Log
+    this.auditLogsService.log({
+      action: 'RESET_PASSWORD_SUCCESS',
+      collection_name: 'users',
+      actor_id: user._id,
+      target_id: user._id,
+      detail: { account: dto.account },
+      ip: ip,
+      user_agent: userAgent,
+    });
     return { message: 'Đặt lại mật khẩu thành công.' };
   }
 
   //12. KHÔI PHỤC TÀI KHOẢN (Theo link từ Admin)
-  async recoverAccount(dto: RecoverAccountDto, ip: string) {
+  async recoverAccount(
+    dto: RecoverAccountDto,
+    ip: string,
+    userAgent: string = 'Unknown',
+  ) {
     if (dto.newPassword !== dto.confirmNewPassword) {
       throw new BadRequestException('Mật khẩu xác nhận không khớp.');
     }
@@ -985,15 +1006,17 @@ export class AuthService {
     await verifyRecord.deleteOne();
 
     // 5. Audit Log riêng
-    await this.auditLogModel.create({
-      actor_id: user._id,
-      action: 'ACCOUNT_RECOVERY_SUCCESS', // Action name rõ ràng hơn
+    this.auditLogsService.log({
+      action: 'ACCOUNT_RECOVERY_SUCCESS',
       collection_name: 'users',
-      ip: ip,
+      actor_id: user._id,
+      target_id: user._id,
       detail: {
         old_email: verifyRecord.account,
         new_email: dto.newEmail,
       },
+      ip: ip,
+      user_agent: userAgent, // Hoặc truyền từ Controller
     });
 
     return { message: 'Khôi phục tài khoản thành công.' };
