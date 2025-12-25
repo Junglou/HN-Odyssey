@@ -8,6 +8,9 @@ import {
   Delete,
   Query,
   UseGuards,
+  Req,
+  Ip,
+  Headers,
 } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -16,15 +19,19 @@ import { UpdateCategoryOrderDto } from './dto/update-category-order.dto';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { Role } from '../../../common/enums/role.enum';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Public } from '../../../common/decorators/public.decorator';
+import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+import { Action, Resource } from 'src/common/enums/resource.enum';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 
 @Controller('categories')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Get('search')
+  @Public()
   async search(@Query('q') keyword: string) {
     if (!keyword || keyword.trim() === '') {
       return [];
@@ -32,56 +39,85 @@ export class CategoriesController {
     return this.categoriesService.search(keyword);
   }
 
-  @Public() 
+  @Public()
   @Get('tree-view')
   async findAll() {
-    // US.69 AC1: Lấy cây danh mục (chỉ hiện cái active)
     return this.categoriesService.getTree(false);
   }
 
   @Public()
   @Get('details/:slug')
   async findOneBySlug(@Param('slug') slug: string) {
-    // US.70: Chi tiết danh mục (cho trang Product Listing)
     return this.categoriesService.findBySlug(slug);
   }
 
+  //ADMIN API
+
   @Post('create')
-  @Roles(Role.ADMIN)
-  create(@Body() createCategoryDto: CreateCategoryDto) {
-    // US.69 AC2: Tạo mới
-    return this.categoriesService.create(createCategoryDto);
+  @RequirePermissions(Resource.CATEGORIES, Action.CREATE)
+  create(
+    @Body() createCategoryDto: CreateCategoryDto,
+    @Req() req,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent: string,
+  ) {
+    return this.categoriesService.create(
+      createCategoryDto,
+      req.user.userId,
+      ip,
+      userAgent,
+    );
   }
 
   @Get('admin/tree-view')
-  @Roles(Role.ADMIN)
+  @RequirePermissions(Resource.CATEGORIES, Action.READ)
   getAdminTree() {
-    // US.69 AC4: Admin thấy cả danh mục ẩn (Draft/Hidden)
     return this.categoriesService.getTree(true);
   }
 
   @Patch('reorder')
-  @Roles(Role.ADMIN)
-  updateOrder(@Body() updateOrderDto: UpdateCategoryOrderDto) {
-    // US.71: Kéo thả sắp xếp
-    return this.categoriesService.updateOrder(updateOrderDto);
+  @RequirePermissions(Resource.CATEGORIES, Action.UPDATE)
+  updateOrder(
+    @Body() updateOrderDto: UpdateCategoryOrderDto,
+    @Req() req,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent: string,
+  ) {
+    return this.categoriesService.updateOrder(
+      updateOrderDto,
+      req.user.userId,
+      ip,
+      userAgent,
+    );
   }
 
   @Patch('update/:id')
-  @Roles(Role.ADMIN)
+  @RequirePermissions(Resource.CATEGORIES, Action.UPDATE)
   update(
     @Param('id') id: string,
     @Body() updateCategoryDto: UpdateCategoryDto,
+    @Req() req,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent: string,
   ) {
-    // US.69 AC3: Đổi tên, di chuyển cha con
-    // US.69 AC4: Ẩn/Hiện
-    return this.categoriesService.update(id, updateCategoryDto);
+    return this.categoriesService.update(
+      id,
+      updateCategoryDto,
+      req.user.userId,
+      ip,
+      userAgent,
+    );
   }
 
   @Delete('delete/:id')
-  @Roles(Role.ADMIN)
-  remove(@Param('id') id: string) {
-    // US.69 AC5: Xóa (có kiểm tra ràng buộc con cái)
-    return this.categoriesService.remove(id);
+  @Roles(Role.MANAGER, Role.SUPER_ADMIN)
+  @RequirePermissions(Resource.CATEGORIES, Action.DELETE)
+  remove(
+    @Param('id') id: string,
+    @Req() req,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent: string,
+  ) {
+    return this.categoriesService.remove(id, req.user.userId, ip, userAgent);
   }
 }

@@ -192,13 +192,17 @@ export class ProductsService {
     // 6. Lưu vào DB
     await newProduct.save();
 
-    // 7. Ghi Audit Log
+    // 7. Ghi Audit Log (Updated theo Interface DTO)
     await this.auditLogsService.log({
       action: 'CREATE_PRODUCT',
       collection_name: 'products',
       actor_id: userId,
       target_id: newProduct._id,
-      detail: { sku: newProduct.sku, name: newProduct.name },
+      detail: {
+        sku: newProduct.sku,
+        name: newProduct.name,
+        has_variants: newProduct.has_variants,
+      },
       ip: ip,
       user_agent: userAgent,
     });
@@ -243,7 +247,7 @@ export class ProductsService {
       this.productModel
         .find(filter)
         .select(selectFields)
-        .populate('categories', 'name slug') 
+        .populate('categories', 'name slug')
         .sort(sortOption)
         .skip((page - 1) * limit)
         .limit(limit)
@@ -370,7 +374,8 @@ export class ProductsService {
     const oldStatus = product.status;
 
     // [AC2] KIỂM TRA QUYỀN
-    const isAdmin = userRoles.includes(Role.ADMIN);
+    const isAdmin =
+      userRoles.includes(Role.MANAGER) || userRoles.includes(Role.SUPER_ADMIN);
 
     // Nếu không phải Admin mà đòi Active -> Chặn
     if (!isAdmin && status === ProductStatus.ACTIVE) {
@@ -427,7 +432,7 @@ export class ProductsService {
     ip: string,
     userAgent: string,
   ) {
-    console.log('>>> DEBUG USER ID:', userId);
+    // Removed debug log for cleaner code
     const product = await this.productModel.findById(id);
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
@@ -598,15 +603,6 @@ export class ProductsService {
 
     // [TODO: PENDING US.76 AC1] KIỂM TRA RÀNG BUỘC ĐƠN HÀNG
     // Hiện tại chưa có module Order nên tạm thời bỏ qua bước này.
-    // Khi nào làm xong module Order, hãy mở comment đoạn dưới đây:
-    /*
-    const isLinkedToOrder = await this.ordersService.checkProductInOrders(id);
-    if (isLinkedToOrder) {
-      throw new BadRequestException(
-        'Sản phẩm đã có phát sinh đơn hàng, không thể xóa. Vui lòng chuyển trạng thái sang "Ẩn".'
-      );
-    }
-    */
 
     // [AC6] Xóa tất cả ảnh và video liên quan trong ổ cứng
     if (product.images && product.images.length > 0) {
@@ -622,11 +618,11 @@ export class ProductsService {
       });
     }
 
-    // Xóa DB (Giữ nguyên code cũ)
+    // Xóa DB
     const snapshot = { sku: product.sku, name: product.name };
     await this.productModel.findByIdAndDelete(id);
 
-    // Log (Giữ nguyên)
+    // Log (Updated theo DTO)
     await this.auditLogsService.log({
       action: 'DELETE_PRODUCT',
       collection_name: 'products',
@@ -659,7 +655,6 @@ export class ProductsService {
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
     // [AC3] Ràng buộc: Chỉ được chọn từ danh sách Tag đã tồn tại
-    // Gọi hàm validateTagsExist bạn vừa viết bên TagsService
     const isValid = await this.tagsService.validateTagsExist(tags);
     if (!isValid) {
       throw new BadRequestException(
@@ -686,7 +681,14 @@ export class ProductsService {
   }
 
   // [AC6] GẮN THẺ HÀNG LOẠT (BULK TAGGING)
-  async bulkAddTags(productIds: string[], tagsToAdd: string[], userId: string) {
+  // [FIX] Thêm ip và userAgent vào tham số để log chính xác hơn
+  async bulkAddTags(
+    productIds: string[],
+    tagsToAdd: string[],
+    userId: string,
+    ip: string,
+    userAgent: string,
+  ) {
     // 1. Validate tags
     const isValid = await this.tagsService.validateTagsExist(tagsToAdd);
     if (!isValid) throw new BadRequestException('Thẻ không tồn tại.');
@@ -697,7 +699,8 @@ export class ProductsService {
       { $addToSet: { tags: { $each: tagsToAdd } } },
     );
 
-    // [AC8] Ghi log tổng
+    // [AC8] Ghi log tổng (Updated theo DTO)
+    // Lưu ý: target_id null là hợp lệ vì tác động nhiều object, chi tiết xem trong detail
     await this.auditLogsService.log({
       action: 'BULK_TAGGING',
       collection_name: 'products',
@@ -706,7 +709,10 @@ export class ProductsService {
       detail: {
         products_affected: result.modifiedCount,
         tags_added: tagsToAdd,
+        target_ids: productIds, // Lưu danh sách ID bị ảnh hưởng để truy vết
       },
+      ip: ip,
+      user_agent: userAgent,
     });
 
     return {

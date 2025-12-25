@@ -14,6 +14,8 @@ import {
   BadRequestException,
   UploadedFiles,
   UseInterceptors,
+  ParseFilePipeBuilder,
+  HttpStatus,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -23,7 +25,6 @@ import {
   UpdateProductStatusDto,
 } from './dto/update-product.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { Role } from '../../../common/enums/role.enum';
 import { Public } from '../../../common/decorators/public.decorator';
@@ -34,8 +35,13 @@ import {
   fileFilter,
   limits,
 } from '../../../common/utils/file-upload.util';
+import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+import { Action, Resource } from 'src/common/enums/resource.enum';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 
 @Controller('products')
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
@@ -58,8 +64,8 @@ export class ProductsController {
   // ADMIN / STAFF API (DASHBOARD)
 
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.STAFF)
+  @UseGuards(JwtAuthGuard)
+  @RequirePermissions(Resource.PRODUCTS, Action.CREATE)
   create(
     @Body() createProductDto: CreateProductDto,
     @Req() req: RequestWithUser,
@@ -69,7 +75,8 @@ export class ProductsController {
     //Nếu là nhân viên, cưỡng chế giá về 0
     if (
       req.user.roles.includes(Role.STAFF) &&
-      !req.user.roles.includes(Role.ADMIN)
+      !req.user.roles.includes(Role.MANAGER) &&
+      !req.user.roles.includes(Role.SUPER_ADMIN)
     ) {
       createProductDto.price = 0;
       createProductDto.sale_price = 0;
@@ -90,23 +97,20 @@ export class ProductsController {
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.STAFF)
+  @RequirePermissions(Resource.PRODUCTS, Action.READ)
   findAllAdmin(@Query() query: any) {
     return this.productsService.findAll(query);
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.STAFF)
+  @RequirePermissions(Resource.PRODUCTS, Action.READ)
   findOne(@Param('id') id: string) {
     return this.productsService.findOne(id);
   }
 
   // API 1: Sửa thông tin chung
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.STAFF)
+  @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
   update(
     @Param('id') id: string,
     @Body() updateProductDto: UpdateProductDto,
@@ -125,8 +129,8 @@ export class ProductsController {
 
   // API 2: Cập nhật Trạng thái
   @Patch(':id/status')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
+  @Roles(Role.MANAGER, Role.SUPER_ADMIN)
   updateStatus(
     @Param('id') id: string,
     @Body() statusDto: UpdateProductStatusDto,
@@ -146,8 +150,7 @@ export class ProductsController {
 
   // US.77: Nhân viên gửi yêu cầu đổi giá
   @Post(':id/price-request')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.STAFF)
+  @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
   requestPrice(
     @Param('id') id: string,
     @Body() dto: UpdateProductPriceDto,
@@ -168,8 +171,8 @@ export class ProductsController {
 
   // US.77: Quản lý duyệt giá
   @Patch(':id/price-approval')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
+  @Roles(Role.MANAGER, Role.SUPER_ADMIN)
   approvePrice(
     @Param('id') id: string,
     @Body('action') action: 'approve' | 'reject',
@@ -187,8 +190,8 @@ export class ProductsController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @RequirePermissions(Resource.PRODUCTS, Action.DELETE)
+  @Roles(Role.MANAGER, Role.SUPER_ADMIN)
   remove(
     @Param('id') id: string,
     @Req() req: RequestWithUser,
@@ -199,42 +202,41 @@ export class ProductsController {
   }
 
   @Post('upload')
-  @Roles(Role.ADMIN, Role.STAFF)
+  @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
   @UseInterceptors(
     FilesInterceptor('files', 10, {
-      // Cho phép up tối đa 10 file cùng lúc
-      storage: storageConfig('products'), // Lưu vào folder 'products'
+      storage: storageConfig('products'),
       fileFilter: fileFilter,
       limits: limits,
     }),
   )
-  uploadFiles(@UploadedFiles() files: Array<Express.Multer.File>) {
-    if (!files || files.length === 0) {
-      throw new BadRequestException('Không có file nào được tải lên');
-    }
+  uploadFiles(
+    @UploadedFiles(
+      // [TỐI ƯU] Sử dụng Pipe để validate ngay lập tức
+      new ParseFilePipeBuilder()
+        .addFileTypeValidator({
+          fileType: /(jpg|jpeg|png|webp)$/, // Chỉ chấp nhận ảnh
+        })
+        .addMaxSizeValidator({
+          maxSize: 1024 * 1024 * 5, // Tối đa 5MB (AC2)
+        })
+        .build({
+          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          fileIsRequired: true,
+        }),
+    )
+    files: Array<Express.Multer.File>,
+  ) {
+    // Không cần check thủ công file.size hay fs.unlinkSync nữa
+    // Nếu code chạy vào đến đây, tức là toàn bộ file đều hợp lệ.
 
-    // [AC2] Validate chi tiết: Chặn ảnh > 5MB (Vì limit chung đang set 50MB cho video)
-    const processedFiles = files.map((file) => {
-      // Logic: Nếu là ảnh mà > 5MB thì báo lỗi
-      if (file.mimetype.startsWith('image/') && file.size > 5 * 1024 * 1024) {
-        // Xóa file vừa up lên để không rác server
-        const fs = require('fs');
-        fs.unlinkSync(file.path);
-        throw new BadRequestException(
-          `File ảnh ${file.originalname} quá lớn (> 5MB).`,
-        );
-      }
-
-      // Trả về đường dẫn tương đối để lưu vào DB
-      // Ví dụ: /uploads/products/abc-xyz.jpg
-      return {
-        originalName: file.originalname,
-        filename: file.filename,
-        path: `/uploads/products/${file.filename}`,
-        mimetype: file.mimetype,
-        size: file.size,
-      };
-    });
+    const processedFiles = files.map((file) => ({
+      originalName: file.originalname,
+      filename: file.filename,
+      path: `/uploads/products/${file.filename}`,
+      mimetype: file.mimetype,
+      size: file.size,
+    }));
 
     return {
       message: 'Tải lên thành công',
@@ -244,8 +246,7 @@ export class ProductsController {
 
   // API 3: Gắn thẻ (Tags) cho sản phẩm
   @Patch(':id/tags')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.STAFF)
+  @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
   async updateTags(
     @Param('id') id: string,
     @Body() body: { tags: string[] }, // Lưu ý: Nhận Body là Object chứa mảng tags

@@ -5,6 +5,7 @@ import {
   NotFoundException,
   UnauthorizedException,
   Logger,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Connection } from 'mongoose';
@@ -15,18 +16,19 @@ import { Customer } from '../users/customers/schemas/customer.schema';
 import { Verification } from '../auth/schema/verification.schema';
 import { RegisterDto } from './dto/register.dto';
 import { VerifyOtpDto } from '../auth/dto/verify.dto';
-import { ResendOtpDto } from './dto/resend-otp.dto.ts';
 import { CreateRecoveryDto } from './dto/create-recovery.dto';
 import { ProcessRecoveryDto } from './dto/process-recovery.dto';
 import { RecoveryRequest } from './schema/recovery-request.schema';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/user.Service';
-import { AuditLog } from '../system/audit-logs/schemas/audit-log.schema';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { EmailService } from '../notifications/channels/email.service';
 import { SmsService } from '../notifications/channels/sms.service';
 import { RecoverAccountDto } from './dto/recover-account.dto';
 import { AuditLogsService } from '../system/audit-logs/audit-logs.service';
+import { UserStatus } from 'src/common/enums/user-status.enum';
+import { ResendOtpDto } from './dto/resend-otp.dto.ts';
+import { AdminService } from '../users/admin/admin.service';
 
 @Injectable()
 export class AuthService {
@@ -48,7 +50,10 @@ export class AuthService {
   ) {}
 
   //1. ĐĂNG KÝ TÀI KHOẢN (US.01)
-  async register(dto: RegisterDto) {
+  async register(dto: RegisterDto, ip: string, userAgent: string) {
+    if (dto.phoneNumber) {
+      dto.phoneNumber = this.normalizePhoneNumber(dto.phoneNumber);
+    }
     // Kiểm tra xem số này có vừa yêu cầu đăng ký trong 60s qua không
     const existingOtp = await this.verificationModel.findOne({
       account: dto.email || dto.phoneNumber,
@@ -79,12 +84,12 @@ export class AuthService {
       throw new BadRequestException('Mật khẩu xác nhận không khớp');
     }
 
-    // BẮT ĐẦU TRANSACTION (Để đảm bảo tạo User và OTP cùng thành công)
+    // BẮT ĐẦU TRANSACTION
     const session = await this.connection.startSession();
     session.startTransaction();
 
     try {
-      // AC7: Tạo Customer mới (Status mặc định false do schema set)
+      // AC7: Tạo Customer mới
       const newCustomer = new this.customerModel({
         first_Name: dto.firstName,
         last_Name: dto.lastName,
@@ -93,14 +98,13 @@ export class AuthService {
         password: hashedPassword,
         roles: ['CUSTOMER'],
         is_active: false,
+        status: UserStatus.INACTIVE, // Set status rõ ràng
       });
       await newCustomer.save({ session });
 
       // AC10: Tạo mã OTP
       const otpCode = this.generateOtpCode();
       const expiredAt = new Date(Date.now() + 5 * 60 * 1000); // Hết hạn sau 5p
-
-      const accountTarget = dto.email || dto.phoneNumber;
 
       // Lưu OTP vào DB
       const verification = new this.verificationModel({
@@ -123,11 +127,27 @@ export class AuthService {
       }
 
       await session.commitTransaction();
+
+      // [FIX] Ghi Log Đăng ký
+      await this.auditLogsService.log({
+        action: 'REGISTER_LOCAL',
+        collection_name: 'users',
+        actor_id: newCustomer._id, // User chưa active nhưng vẫn ghi nhận ID
+        target_id: newCustomer._id,
+        detail: {
+          email: dto.email,
+          phone: dto.phoneNumber,
+          status: 'PENDING_OTP',
+        },
+        ip: ip,
+        user_agent: userAgent,
+      });
+
       return {
         message: `Đăng ký thành công. Vui lòng kiểm tra ${
           dto.email ? 'Email' : 'Tin nhắn'
         } để nhập OTP.`,
-        account: accountTarget,
+        account: dto.email || dto.phoneNumber,
       };
     } catch (error) {
       await session.abortTransaction();
@@ -137,8 +157,31 @@ export class AuthService {
     }
   }
 
+  // PRIVATE HELPER: Chuẩn hóa số điện thoại VN
+  private normalizePhoneNumber(phone: string): string {
+    if (!phone) return phone;
+
+    // 1. Loại bỏ tất cả ký tự không phải số (khoảng trắng, dấu chấm, gạch ngang, ngoặc đơn)
+    // Ví dụ: "+84 987-654-321" -> "84987654321"
+    let cleaned = phone.replace(/\D/g, '');
+
+    // 2. Chuyển đổi đầu số quốc tế (84) về đầu số 0
+    // Ví dụ: "84987..." -> "0987..."
+    if (cleaned.startsWith('84')) {
+      cleaned = '0' + cleaned.slice(2);
+    }
+
+    // Lưu ý: Nếu user nhập +84... thì bước 1 đã xóa dấu + thành 84...,
+    // bước 2 sẽ xử lý tiếp thành 0... -> Logic vẫn đúng.
+
+    return cleaned;
+  }
+
   //2. XÁC THỰC OTP (AC13)
   async verifyOtp(dto: VerifyOtpDto, ip: string, userAgent: string) {
+    if (!dto.account.includes('@')) {
+      dto.account = this.normalizePhoneNumber(dto.account);
+    }
     // Tìm bản ghi OTP
     const record = await this.verificationModel.findOne({
       account: dto.account,
@@ -194,7 +237,10 @@ export class AuthService {
         {
           $or: [{ email: dto.account }, { phone: dto.account }],
         },
-        { is_active: true }, // Kích hoạt tài khoản
+        {
+          is_active: true,
+          status: UserStatus.ACTIVE,
+        },
         { new: true },
       );
 
@@ -220,8 +266,9 @@ export class AuthService {
         action: 'VERIFY_OTP_SUCCESS',
         collection_name: 'users',
         actor_id: user._id,
+        actor_email: user.email,
         target_id: user._id,
-        detail: { account: dto.account },
+        detail: { account: dto.account, type: dto.type },
         ip: ip,
         user_agent: userAgent,
       });
@@ -233,7 +280,7 @@ export class AuthService {
         user: {
           _id: user._id,
           email: user.email,
-          full_name: user.last_Name + ' ' + user.first_Name, // Lưu ý check null nếu user chỉ có full_name
+          full_name: user.last_Name + ' ' + user.first_Name,
           roles: user.roles,
         },
       };
@@ -242,14 +289,17 @@ export class AuthService {
 
   //3. GỬI LẠI OTP (AC12)
   async resendOtp(dto: ResendOtpDto) {
+    if (!dto.account.includes('@')) {
+      dto.account = this.normalizePhoneNumber(dto.account);
+    }
     const user = await this.userModel.findOne({ email: dto.account });
     if (!user) throw new NotFoundException('Tài khoản không tồn tại.');
 
-    // Kiểm tra xem có OTP nào vừa gửi trong 1 phút qua không (Rate Limit)
+    // Rate Limit
     const lastOtp = await this.verificationModel.findOne({
       account: dto.account,
       type: dto.type,
-      createdAt: { $gt: new Date(Date.now() - 60 * 1000) }, // Mới tạo trong 60s
+      createdAt: { $gt: new Date(Date.now() - 60 * 1000) },
     });
 
     if (lastOtp) {
@@ -258,7 +308,7 @@ export class AuthService {
       );
     }
 
-    // Xóa mã cũ (nếu có)
+    // Xóa mã cũ
     await this.verificationModel.deleteMany({
       account: dto.account,
       type: dto.type,
@@ -275,7 +325,6 @@ export class AuthService {
       expired_at: expiredAt,
     });
 
-    // TODO: Gửi mail lại
     // GỬI LẠI MÃ THẬT
     const isEmail = dto.account.includes('@');
     if (isEmail) {
@@ -293,25 +342,31 @@ export class AuthService {
 
   //PRIVATE HELPERS
   private generateOtpCode(): string {
-    // Tạo 6 số ngẫu nhiên
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
-  //4. VALIDATE USER (Dùng cho LocalStrategy)
-  //Xử lý AC3, AC4, AC5 (Brute-force)
-  async validateUser(account: string, password: string) {
+  //4. VALIDATE USER (LocalStrategy)
+  async validateUser(
+    account: string,
+    password: string,
+    ip: string,
+    userAgent: string,
+  ) {
     const isEmail = account.includes('@');
-    // Validate email/phone
-    if (isEmail) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(account)) {
-        throw new BadRequestException('Email không hợp lệ');
-      }
-    } else {
+
+    if (!isEmail) {
+      // 1. Chuẩn hóa trước
+      account = this.normalizePhoneNumber(account);
+
+      // 2. Sau đó mới check Regex Phone
       const phoneRegex = /^(03|05|07|08|09)[0-9]{8}$/;
-      if (!phoneRegex.test(account)) {
+      if (!phoneRegex.test(account))
         throw new BadRequestException('Số điện thoại không hợp lệ');
-      }
+    } else {
+      // Check Regex Email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(account))
+        throw new BadRequestException('Email không hợp lệ');
     }
 
     const user = await this.usersService.findByEmailOrPhone(account);
@@ -321,54 +376,47 @@ export class AuthService {
       );
     }
 
-    // CHƯA KÍCH HOẠT
-    if (!user.is_active) {
-      throw new UnauthorizedException('Tài khoản đang chờ xác thực');
+    if (user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException('Tài khoản đã bị vô hiệu hóa.');
     }
 
-    // ĐANG BỊ KHÓA
     if (user.lock_until && user.lock_until > new Date()) {
       throw new UnauthorizedException('Tài khoản đang bị khóa tạm thời');
     }
 
-    // BRUTE FORCE
     if (user.login_attempts >= 5) {
       throw new UnauthorizedException(
         'Bạn đã nhập sai quá nhiều lần, vui lòng thử lại sau',
       );
     }
 
-    // Không có password (Google/Facebook user)
     if (!user.password) {
       throw new UnauthorizedException(
         'Tài khoản của bạn không dùng mật khẩu để đăng nhập',
       );
     }
 
-    // So sánh mật khẩu
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      await this.handleLoginFail(user);
+      await this.handleLoginFail(user, ip, userAgent);
       throw new UnauthorizedException(
         'Tài khoản hoặc mật khẩu không chính xác',
       );
     }
 
     await this.usersService.resetFailedAttempt(user.id);
-
     return user;
   }
 
-  //5. LOGIN (Tạo Token)
-  //Xử lý AC6, AC12, AC13, AC14
+  //5. LOGIN
   private async generateAccessToken(user: any) {
     const payload = {
       sub: user._id,
       email: user.email,
       roles: user.roles,
+      token_version: user.token_version || 0,
     };
-
     return this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('JWT_SECRET'),
       expiresIn: (this.configService.get<string>('JWT_EXPIRES_IN') ||
@@ -384,17 +432,18 @@ export class AuthService {
       sub: user._id,
       email: user.email,
       roles: user.roles,
+      token_version: user.token_version || 0,
     };
-
+    if (user.status !== UserStatus.ACTIVE) {
+      throw new ForbiddenException('Tài khoản của bạn đã bị khóa.');
+    }
     const expiresIn = isRemember ? '30d' : '1d';
-
     return this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       expiresIn: expiresIn as any,
     });
   }
 
-  //Cập nhật tham số để nhận ip, userAgent
   async login(
     user: any,
     isRemember: boolean = false,
@@ -404,7 +453,6 @@ export class AuthService {
     const accessToken = await this.generateAccessToken(user);
     const refreshToken = await this.generateRefreshToken(user, isRemember);
 
-    // Hash refresh token
     const hashed = await bcrypt.hash(refreshToken, 10);
 
     await this.userModel.updateOne(
@@ -413,9 +461,11 @@ export class AuthService {
     );
 
     this.auditLogsService.log({
-      action: 'LOGIN', // Đặt tên ngắn gọn là LOGIN, mặc định is_success = true
+      action: 'LOGIN',
       collection_name: 'users',
       actor_id: user._id,
+      actor_email: user.email,
+      actor_employee_code: user.employee_code || undefined,
       target_id: user._id,
       detail: {
         roles: user.roles,
@@ -440,11 +490,8 @@ export class AuthService {
   }
 
   async refreshTokens(refreshToken: string) {
-    if (!refreshToken) {
-      throw new BadRequestException('Thiếu refresh token');
-    }
+    if (!refreshToken) throw new BadRequestException('Thiếu refresh token');
 
-    // decode & verify refresh token
     let decoded;
     try {
       decoded = await this.jwtService.verifyAsync(refreshToken, {
@@ -463,13 +510,9 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token đã bị thu hồi');
     }
 
-    // Kiểm tra refresh token có khớp hash
     const isValid = await bcrypt.compare(refreshToken, user.refresh_token);
-    if (!isValid) {
-      throw new UnauthorizedException('Refresh token không khớp');
-    }
+    if (!isValid) throw new UnauthorizedException('Refresh token không khớp');
 
-    // Rotation tạo token mới
     const newAccessToken = await this.generateAccessToken(user);
     const newRefreshToken = await this.generateRefreshToken(user, false);
     const newHash = await bcrypt.hash(newRefreshToken, 10);
@@ -485,25 +528,68 @@ export class AuthService {
     };
   }
 
-  async logout(userId: string) {
+  async logout(userId: string, ip: string, userAgent: string) {
     await this.userModel.updateOne(
       { _id: userId },
       { $set: { refresh_token: null } },
     );
+
+    // [FIX] Ghi Log Logout
+    await this.auditLogsService.log({
+      action: 'LOGOUT',
+      collection_name: 'users',
+      actor_id: userId,
+      target_id: userId,
+      detail: { message: 'User logged out' },
+      ip: ip,
+      user_agent: userAgent,
+    });
+
     return { message: 'Đăng xuất thành công' };
   }
 
   //PRIVATE HELPER: Xử lý Brute-force
-  private async handleLoginFail(user: any) {
+  private async handleLoginFail(user: any, ip: string, userAgent: string) {
     const MAX_ATTEMPTS = 5;
     const LOCK_TIME_MINUTES = 30;
 
     user.login_attempts += 1;
 
+    //Ghi log mỗi lần đăng nhập sai
+    await this.auditLogsService.log({
+      action: 'LOGIN_FAILED',
+      collection_name: 'users',
+      actor_id: user._id,
+      actor_email: user.email,
+      actor_employee_code: user.employee_code,
+      target_id: user._id,
+      detail: {
+        reason: 'Wrong Password',
+        current_attempt: user.login_attempts,
+      },
+      ip: ip,
+      user_agent: userAgent,
+      is_success: false,
+    });
+
     if (user.login_attempts >= MAX_ATTEMPTS) {
       user.lock_until = new Date(Date.now() + LOCK_TIME_MINUTES * 60 * 1000);
       await user.save();
-      // AC5: Thông báo
+
+      // Log Account Locked
+      await this.auditLogsService.log({
+        action: 'ACCOUNT_LOCKED',
+        collection_name: 'users',
+        actor_id: user._id,
+        target_id: user._id,
+        detail: {
+          reason: 'Brute-force attempts',
+          failed_attempts: user.login_attempts,
+        },
+        ip: ip,
+        user_agent: userAgent,
+      });
+
       throw new BadRequestException(
         `Bạn đã nhập sai quá ${MAX_ATTEMPTS} lần. Tài khoản bị khóa ${LOCK_TIME_MINUTES} phút.`,
       );
@@ -511,32 +597,24 @@ export class AuthService {
       await user.save();
     }
   }
-
-  // 6. XỬ LÝ LOGIN OAUTH (Google/Facebook)
-  // Cập nhật tham số để nhận ip, userAgent
+  // 6. XỬ LÝ LOGIN OAUTH
   async validateOAuthLogin(
     profile: any,
     provider: 'google' | 'facebook',
     ip: string,
     userAgent: string,
   ) {
-    const { email, id, displayName, firstName, lastName, name, picture } =
-      profile;
+    const { email, id, displayName, firstName, lastName, name } = profile;
 
-    if (!id) {
+    if (!id)
       throw new BadRequestException(
-        `Lỗi bảo mật: Không tìm thấy ID từ ${provider}. Vui lòng thử lại.`,
+        `Lỗi bảo mật: Không tìm thấy ID từ ${provider}.`,
       );
-    }
-
-    // AC9: Từ chối nếu không có Email
-    if (!email) {
+    if (!email)
       throw new BadRequestException(
-        'Không thể đăng nhập vì tài khoản mạng xã hội không cung cấp Email (AC9).',
+        'Không thể đăng nhập vì tài khoản mạng xã hội không cung cấp Email.',
       );
-    }
 
-    // XỬ LÝ TÊN HIỂN THỊ
     let finalName = displayName;
     if (!finalName || finalName === 'undefined undefined') {
       finalName = name;
@@ -548,9 +626,7 @@ export class AuthService {
     ) {
       const f = firstName || '';
       const l = lastName || '';
-      if (f || l) {
-        finalName = `${f} ${l}`.trim();
-      }
+      if (f || l) finalName = `${f} ${l}`.trim();
     }
     if (
       !finalName ||
@@ -560,27 +636,19 @@ export class AuthService {
       finalName = email.split('@')[0];
     }
 
-    // AC8: Check xem tài khoản MXH này đã liên kết với User nào khác chưa?
     const querySocial = {};
     querySocial[`social_auth.${provider}_id`] = id;
     const existingSocialUser = await this.userModel.findOne(querySocial);
 
     if (existingSocialUser) {
-      // AC4: Check xem có bị khóa không
       this.checkUserBanStatus(existingSocialUser);
-      // Nếu đã tồn tại liên kết -> Đăng nhập luôn
-      // Truyền IP/UA
       return this.login(existingSocialUser, false, ip, userAgent);
     }
 
-    // AC2: Nếu chưa có liên kết -> Tìm theo Email
     const existingEmailUser = await this.userModel.findOne({ email });
 
     if (existingEmailUser) {
-      // AC4: Check ban
       this.checkUserBanStatus(existingEmailUser);
-
-      // AC10: Auto Merge (Giản lược cho MVP)
       const updateData = {};
       updateData[`social_auth.${provider}_id`] = id;
 
@@ -589,50 +657,38 @@ export class AuthService {
         { $set: updateData },
       );
 
-      // Fetch lại user mới nhất
       const updatedUser = await this.userModel.findById(existingEmailUser._id);
-      //Truyền IP/UA
       return this.login(updatedUser, false, ip, userAgent);
     }
 
     const socialPhone = profile.phone || profile.phoneNumber;
-
     if (socialPhone) {
       const existingPhoneUser = await this.userModel.findOne({
         phone: socialPhone,
       });
-
       if (existingPhoneUser) {
-        // AC10: Hệ thống không được tự động gộp -> Báo lỗi Conflict (409)
         throw new ConflictException({
           statusCode: 409,
           message:
             'Số điện thoại liên kết với MXH này đã tồn tại trên một tài khoản khác.',
           error_code: 'OAUTH_PHONE_CONFLICT',
-          details: {
-            social_email: email,
-            conflict_phone: socialPhone,
-          },
+          details: { social_email: email, conflict_phone: socialPhone },
         });
       }
     }
 
-    // AC2 (Vế 2): Email chưa tồn tại -> Tạo tài khoản mới
     const session = await this.connection.startSession();
     session.startTransaction();
     try {
       let saveFirstName = firstName;
       let saveLastName = lastName;
 
-      // Nếu profile không có sẵn firstName/lastName, tự tách từ finalName
       if (!saveFirstName || !saveLastName) {
         const nameParts = finalName.trim().split(' ');
         if (nameParts.length === 1) {
-          // Nếu tên chỉ có 1 chữ -> Set giống nhau để tránh lỗi required
           saveFirstName = nameParts[0];
           saveLastName = nameParts[0];
         } else {
-          // Logic: Chữ cuối là Tên, phần trước là Họ đệm
           saveFirstName = nameParts.pop();
           saveLastName = nameParts.join(' ');
         }
@@ -645,18 +701,14 @@ export class AuthService {
         last_Name: saveLastName,
         phone: null,
         is_active: true,
+        status: UserStatus.ACTIVE, // [FIX] Set Active
         roles: ['CUSTOMER'],
         type: 'Customer',
-        social_auth: {
-          [provider + '_id']: id,
-        },
-        password: null, // AC3
+        social_auth: { [provider + '_id']: id },
+        password: null,
       });
 
-      // Fix lỗi null phone unique index
-      if (!newUser.phone) {
-        newUser.set('phone', undefined);
-      }
+      if (!newUser.phone) newUser.set('phone', undefined);
 
       await newUser.save({ session });
 
@@ -664,6 +716,7 @@ export class AuthService {
         action: 'REGISTER_OAUTH',
         collection_name: 'users',
         actor_id: newUser._id,
+        actor_email: newUser.email,
         target_id: newUser._id,
         detail: { provider: provider, email: email },
         ip: ip,
@@ -671,9 +724,6 @@ export class AuthService {
       });
 
       await session.commitTransaction();
-
-      // Đăng nhập luôn
-      // [FIX] Truyền IP/UA
       return this.login(newUser, false, ip, userAgent);
     } catch (error) {
       await session.abortTransaction();
@@ -683,23 +733,20 @@ export class AuthService {
     }
   }
 
-  // Helper check ban (Tách ra từ hàm validateUser cũ để tái sử dụng)
   private checkUserBanStatus(user: any) {
     if (user.lock_until && user.lock_until > new Date()) {
       throw new BadRequestException('Tài khoản đang bị tạm khóa (AC4).');
     }
-    if (!user.is_active) {
-      // Với OAuth, thường là active luôn, nhưng nếu bị Admin ban thủ công:
-      // throw new BadRequestException('Tài khoản đã bị vô hiệu hóa.');
+    if (user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException('Tài khoản đã bị vô hiệu hóa.');
     }
   }
 
-  //7. GỬI YÊU CẦU KHÔI PHỤC (User - AC1, AC2)
+  //7. GỬI YÊU CẦU KHÔI PHỤC (User)
   async requestRecovery(dto: CreateRecoveryDto, filePaths: string[]) {
-    // Lưu thông tin vào DB
     const request = new this.recoveryModel({
       ...dto,
-      images: filePaths, // AC2: Đường dẫn ảnh đã upload
+      images: filePaths,
       status: 'PENDING',
     });
     await request.save();
@@ -709,20 +756,18 @@ export class AuthService {
     };
   }
 
-  //8. LẤY DANH SÁCH YÊU CẦU (Admin - AC3)
+  //8. LẤY DANH SÁCH YÊU CẦU (Admin)
   async getPendingRecoveries() {
     return this.recoveryModel
       .find({ status: 'PENDING' })
       .sort({ createdAt: 1 });
   }
 
-  // 9. XỬ LÝ YÊU CẦU (Admin - AC4, AC5, AC6, AC7)
-  // [FIX] Thêm tham số ip, userAgent
+  // 9. XỬ LÝ YÊU CẦU (Admin)
   async processRecovery(
     requestId: string,
     dto: ProcessRecoveryDto,
-    adminId: string,
-    // Nên truyền thêm IP và UserAgent từ Controller xuống để log chính xác
+    actorId: string,
     ip: string = 'Unknown',
     userAgent: string = 'Unknown',
   ) {
@@ -731,22 +776,23 @@ export class AuthService {
     if (request.status !== 'PENDING')
       throw new BadRequestException('Yêu cầu này đã được xử lý trước đó.');
 
-    // Khởi tạo biến để lưu kết quả trả về
+    const adminUser = await this.userModel.findById(actorId);
+    const adminCode = (adminUser as any)?.employee_code;
+    const adminEmail = adminUser?.email;
+
     let responseMessage = '';
     let actionType = '';
 
-    // CASE 1: TỪ CHỐI (REJECTED)
     if (dto.status === 'REJECTED') {
       if (!dto.rejection_reason)
         throw new BadRequestException('Vui lòng nhập lý do từ chối.');
 
       request.status = 'REJECTED';
       request.rejection_reason = dto.rejection_reason;
-      request.processed_by = adminId as any;
+      request.processed_by = actorId as any;
       request.processed_at = new Date();
       await request.save();
 
-      // Gửi email báo từ chối
       await this.emailService.sendRaw(
         request.contact_email,
         '[H&N Odyssey] Phản hồi yêu cầu khôi phục',
@@ -755,11 +801,7 @@ export class AuthService {
 
       responseMessage = 'Đã từ chối yêu cầu.';
       actionType = 'REJECT_RECOVERY_REQUEST';
-    }
-
-    // CASE 2: CHẤP THUẬN (APPROVED)
-    else if (dto.status === 'APPROVED') {
-      // 1. Tìm User gốc
+    } else if (dto.status === 'APPROVED') {
       const user = await this.userModel.findOne({
         $or: [
           { email: request.target_account },
@@ -767,15 +809,13 @@ export class AuthService {
         ],
       });
 
-      if (!user) {
+      if (!user)
         throw new BadRequestException(
-          'Không tìm thấy tài khoản gốc trong hệ thống (dựa trên target_account).',
+          'Không tìm thấy tài khoản gốc trong hệ thống.',
         );
-      }
 
-      // 2. Tạo Token Reset Mật khẩu (Admin Reset)
       const resetToken = this.generateRandomString(32);
-      const expiredAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+      const expiredAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
       await this.verificationModel.create({
         account: request.contact_email,
@@ -785,13 +825,11 @@ export class AuthService {
         linked_user_id: { userId: user._id },
       });
 
-      // 3. Cập nhật trạng thái Request
       request.status = 'APPROVED';
-      request.processed_by = adminId as any;
+      request.processed_by = actorId as any;
       request.processed_at = new Date();
       await request.save();
 
-      // 4. Gửi Email
       const link = `https://hn-odyssey.com/recovery-reset?token=${resetToken}&email=${request.contact_email}`;
       await this.emailService.sendResetPasswordLink(
         request.contact_email,
@@ -803,13 +841,14 @@ export class AuthService {
       actionType = 'APPROVE_RECOVERY_REQUEST';
     }
 
-    // GHI AUDIT LOG (AC7) - CHẠY CHO CẢ 2 TRƯỜNG HỢP
     if (actionType) {
       this.auditLogsService.log({
-        action: actionType, // 'REJECT_RECOVERY' hoặc 'APPROVE_RECOVERY'
+        action: actionType,
         collection_name: 'recovery_requests',
-        actor_id: adminId, // Admin thực hiện
-        target_id: requestId, // ID của yêu cầu bị tác động
+        actor_id: actorId,
+        actor_email: adminEmail,
+        actor_employee_code: adminCode,
+        target_id: requestId,
         detail: {
           target_account: request.target_account,
           reason: dto.rejection_reason || 'Approved',
@@ -822,80 +861,65 @@ export class AuthService {
     return { message: responseMessage };
   }
 
-  // Helper
   private generateRandomString(length: number) {
-    // Logic tạo chuỗi ngẫu nhiên (hoặc dùng thư viện uuid/crypto)
     return (
       Math.random().toString(36).substring(2, 15) +
       Math.random().toString(36).substring(2, 15)
     );
   }
 
-  //10. QUÊN MẬT KHẨU (US.03 - AC1, AC2, AC3, AC6)
+  //10. QUÊN MẬT KHẨU
   async forgotPassword(account: string, ip: string, userAgent: string) {
-    // AC6: Ghi Log ngay lập tức (kể cả user có tồn tại hay không)
+    if (!account.includes('@')) {
+      account = this.normalizePhoneNumber(account);
+    }
     this.auditLogsService.log({
       action: 'FORGOT_PASSWORD_REQUEST',
       collection_name: 'users',
-      actor_id: null, // Chưa login
+      actor_id: null,
       detail: { account: account },
       ip: ip,
       user_agent: userAgent,
     });
 
-    // 1. Tìm user (Email hoặc Phone)
     const user = await this.userModel.findOne({
       $or: [{ email: account }, { phone: account }],
     });
 
-    // AC2: QUAN TRỌNG - Nếu không thấy user, vẫn return Success giả
-    // Tuyệt đối không throw NotFoundException để tránh Hacker dò user
     if (!user) {
-      // Giả lập độ trễ để hacker không đoán được qua thời gian phản hồi
       await new Promise((r) => setTimeout(r, 1000));
       return {
         message: 'Nếu tài khoản tồn tại, chúng tôi đã gửi hướng dẫn khôi phục.',
       };
     }
 
-    // AC4: Thời gian hiệu lực 10 phút
     const expiredAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    // Xóa mã cũ nếu có
     await this.verificationModel.deleteMany({
       account: account,
       type: 'RESET_PASSWORD',
     });
 
-    // AC3: Phân loại Email vs Phone
     const isEmail = account.includes('@');
     let code = '';
 
     if (isEmail) {
-      // Email -> Token (Link) - Dùng chuỗi dài
       code =
         Math.random().toString(36).substring(2, 15) +
         Math.random().toString(36).substring(2, 15);
-
       const link = `https://hn-odyssey.com/reset-password?token=${code}&email=${account}`;
-
-      // Gửi Email
       this.emailService
         .sendResetPasswordLink(account, link)
         .catch((e) => this.logger.error(e));
     } else {
-      // Phone -> OTP (SMS) - Dùng 6 số
       code = Math.floor(100000 + Math.random() * 900000).toString();
-
-      // Gửi SMS
       this.smsService.sendOtp(account, code).catch((e) => this.logger.error(e));
     }
 
-    // Lưu vào DB
     await this.verificationModel.create({
       account: account,
       code: code,
-      type: 'RESET_PASSWORD', // Type riêng
+      type: 'RESET_PASSWORD',
       expired_at: expiredAt,
     });
 
@@ -904,7 +928,7 @@ export class AuthService {
     };
   }
 
-  // 11. ĐẶT LẠI MẬT KHẨU (Quên mật khẩu thường)
+  // 11. ĐẶT LẠI MẬT KHẨU
   async resetPassword(
     dto: ResetPasswordDto,
     ip: string,
@@ -914,7 +938,6 @@ export class AuthService {
       throw new BadRequestException('Mật khẩu xác nhận không khớp.');
     }
 
-    // Chỉ tìm loại RESET_PASSWORD thường
     const verifyRecord = await this.verificationModel.findOne({
       account: dto.account,
       code: dto.code,
@@ -933,19 +956,18 @@ export class AuthService {
 
     if (!user) throw new NotFoundException('User không tồn tại.');
 
-    // CHỈ ĐỔI PASS, KHÔNG CÓ LOGIC ĐỔI EMAIL Ở ĐÂY -> AN TOÀN TUYỆT ĐỐI
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(dto.newPassword, salt);
-    user.is_active = true;
+    user.status = UserStatus.ACTIVE;
 
     await user.save();
     await verifyRecord.deleteOne();
 
-    //Ghi Log
     this.auditLogsService.log({
       action: 'RESET_PASSWORD_SUCCESS',
       collection_name: 'users',
       actor_id: user._id,
+      actor_email: user.email,
       target_id: user._id,
       detail: { account: dto.account },
       ip: ip,
@@ -954,7 +976,7 @@ export class AuthService {
     return { message: 'Đặt lại mật khẩu thành công.' };
   }
 
-  //12. KHÔI PHỤC TÀI KHOẢN (Theo link từ Admin)
+  //12. KHÔI PHỤC TÀI KHOẢN (Admin Link)
   async recoverAccount(
     dto: RecoverAccountDto,
     ip: string,
@@ -964,59 +986,47 @@ export class AuthService {
       throw new BadRequestException('Mật khẩu xác nhận không khớp.');
     }
 
-    // 1. Chỉ tìm Token loại ADMIN_RESET_PASSWORD
     const verifyRecord = await this.verificationModel.findOne({
       account: dto.account,
       code: dto.code,
-      type: 'ADMIN_RESET_PASSWORD', // Fix cứng loại này
+      type: 'ADMIN_RESET_PASSWORD',
     });
 
-    if (!verifyRecord) {
+    if (!verifyRecord)
       throw new BadRequestException('Liên kết khôi phục không hợp lệ.');
-    }
-
-    if (verifyRecord.expired_at < new Date()) {
+    if (verifyRecord.expired_at < new Date())
       throw new BadRequestException('Liên kết đã hết hạn.');
-    }
 
-    // 2. Tìm User gốc từ metadata
     const userId = verifyRecord.linked_user_id?.['userId'];
     const user = await this.userModel.findById(userId);
 
     if (!user) throw new NotFoundException('Tài khoản gốc không tồn tại.');
 
-    // 3. Xử lý đổi Email (Bắt buộc check trùng)
     if (dto.newEmail !== user.email) {
       const duplicate = await this.userModel.findOne({ email: dto.newEmail });
-      if (duplicate) {
+      if (duplicate)
         throw new ConflictException(`Email ${dto.newEmail} đã được sử dụng.`);
-      }
-      user.email = dto.newEmail; // Cập nhật email mới
+      user.email = dto.newEmail;
     }
 
-    // 4. Đổi mật khẩu & Active
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(dto.newPassword, salt);
-
     user.lock_until = null;
     user.login_attempts = 0;
-    user.is_active = true;
+    user.status = UserStatus.ACTIVE;
 
     await user.save();
     await verifyRecord.deleteOne();
 
-    // 5. Audit Log riêng
     this.auditLogsService.log({
       action: 'ACCOUNT_RECOVERY_SUCCESS',
       collection_name: 'users',
       actor_id: user._id,
+      actor_email: user.email,
       target_id: user._id,
-      detail: {
-        old_email: verifyRecord.account,
-        new_email: dto.newEmail,
-      },
+      detail: { old_email: verifyRecord.account, new_email: dto.newEmail },
       ip: ip,
-      user_agent: userAgent, // Hoặc truyền từ Controller
+      user_agent: userAgent,
     });
 
     return { message: 'Khôi phục tài khoản thành công.' };

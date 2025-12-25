@@ -1,5 +1,3 @@
-// [FIX] Thêm 'type' vào import Request để tránh lỗi TS1272 khi biên dịch
-import type { Request } from 'express';
 import {
   BadRequestException,
   Body,
@@ -9,10 +7,10 @@ import {
   HttpStatus,
   Ip,
   Param,
+  ParseFilePipeBuilder,
   Post,
   Req,
   Res,
-  UnauthorizedException,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
@@ -32,28 +30,32 @@ import { Role } from '../../common/enums/role.enum';
 import { ProcessRecoveryDto } from './dto/process-recovery.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
-import { JwtService } from '@nestjs/jwt';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RecoverAccountDto } from './dto/recover-account.dto';
 import { UserAgent } from 'src/common/decorators/user-agent.decorator';
+import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+import { Action, Resource } from 'src/common/enums/resource.enum';
 
 @ApiTags('Auth (Xác thực)')
 @Controller('auth')
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class AuthController {
-  constructor(
-    private readonly authService: AuthService,
-    private readonly jwtService: JwtService,
-  ) {}
+  constructor(private readonly authService: AuthService) {}
 
   //1. ĐĂNG KÝ (US.01)
   @Post('register')
-  @Public() // API này ai cũng gọi được, không cần token
+  @Public()
   @ApiOperation({ summary: 'Đăng ký tài khoản khách hàng mới' })
   @ApiResponse({ status: 201, description: 'Đăng ký thành công, chờ OTP.' })
   @ApiResponse({ status: 409, description: 'Email/SĐT đã tồn tại.' })
-  async register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  async register(
+    @Body() dto: RegisterDto,
+    @Ip() ip: string,
+    @UserAgent() userAgent: string,
+  ) {
+    return this.authService.register(dto, ip, userAgent);
   }
 
   //2. XÁC THỰC OTP (AC13)
@@ -104,7 +106,12 @@ export class AuthController {
     @UserAgent() userAgent: string,
   ) {
     // 1. Validate User (Check pass, status, brute-force)
-    const user = await this.authService.validateUser(dto.account, dto.password);
+    const user = await this.authService.validateUser(
+      dto.account,
+      dto.password,
+      ip,
+      userAgent,
+    );
 
     // 2. Generate Token (AC6, AC14)
     return this.authService.login(user, dto.rememberMe || false, ip, userAgent);
@@ -195,60 +202,56 @@ export class AuthController {
   //AC1, AC2: Upload ảnh
   @Post('recovery-request')
   @Public()
-  @UseInterceptors(FilesInterceptor('images', 3)) // Tối đa 3 ảnh
+  @UseInterceptors(FilesInterceptor('images', 3))
   @ApiOperation({ summary: 'Gửi yêu cầu khôi phục tài khoản (kèm ảnh)' })
   async requestRecovery(
     @Body() dto: CreateRecoveryDto,
-    @UploadedFiles() files: Array<Express.Multer.File>,
+    @UploadedFiles(
+      // [NEW] Validate trực tiếp tại Controller
+      new ParseFilePipeBuilder()
+        .addFileTypeValidator({
+          fileType: /(jpg|jpeg|png)$/, // Chỉ cho phép ảnh
+        })
+        .addMaxSizeValidator({
+          maxSize: 1024 * 1024 * 5, // Tối đa 5MB (AC2)
+        })
+        .build({
+          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+        }),
+    )
+    files: Array<Express.Multer.File>,
   ) {
-    if (!files || files.length === 0) {
-      throw new BadRequestException(
-        'Vui lòng tải lên hình ảnh minh chứng (AC2).',
-      );
-    }
-    // Giả lập lưu file và lấy đường dẫn. Thực tế cần upload lên S3/Cloudinary.
+    // Logic giả lập lưu file
     const filePaths = files.map((f) => `uploads/${f.originalname}`);
-
     return this.authService.requestRecovery(dto, filePaths);
   }
 
   //8. ADMIN: LẤY DANH SÁCH YÊU CẦU (AC3)
   @Get('admin/recovery-requests')
-  @Roles(Role.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.MANAGER, Role.SUPER_ADMIN)
+  @RequirePermissions(Resource.USERS, Action.READ)
   async getPendingRecoveries() {
     return this.authService.getPendingRecoveries();
   }
 
   //9. ADMIN: DUYỆT/TỪ CHỐI (AC4, AC5)
   @Post('admin/recovery-requests/process/:id')
-  @Roles(Role.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.MANAGER, Role.SUPER_ADMIN)
+  @RequirePermissions(Resource.USERS, Action.UPDATE)
   async processRecovery(
     @Param('id') id: string,
     @Body() dto: ProcessRecoveryDto,
-    @Req() req: any,
+    @Req() req: any, // req.user đã có dữ liệu nhờ JwtAuthGuard
     @Ip() ip: string,
     @UserAgent() userAgent: string,
   ) {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Thiếu Token xác thực.');
-    }
-    const token = authHeader.substring(7);
-
-    const decodedToken = await this.jwtService.decode(token);
-
-    const adminId = decodedToken.sub;
-
-    if (!adminId) {
-      throw new BadRequestException('Token không chứa ID người dùng.');
-    }
+    // [FIX] Lấy trực tiếp từ req.user, bỏ đoạn decode thủ công
+    const adminId = req.user.userId;
 
     return this.authService.processRecovery(id, dto, adminId, ip, userAgent);
   }
 
-  //10. REFRESH TOKEN — LẤY ACCESS TOKEN MỚI (PUBLIC)
+  //10. REFRESH TOKEN — LẤY ACCESS TOKEN MỚI (PUBLIC  )
   @Post('refresh')
   @Public()
   @HttpCode(HttpStatus.OK)
@@ -299,5 +302,24 @@ export class AuthController {
   ) {
     // DTO này bắt buộc có newEmail
     return this.authService.recoverAccount(dto, ip, userAgent);
+  }
+
+  //14. ĐĂNG XUẤT (US.02 - AC14, US.06 - AC10)
+  @Post('logout')
+  // Không dùng @Public() -> Mặc định dùng JwtAuthGuard để chặn guest
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Đăng xuất (Xóa Refresh Token)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Đăng xuất thành công, Refresh Token đã bị hủy.',
+  })
+  async logout(
+    @Req() req: any,
+    @Ip() ip: string,
+    @UserAgent() userAgent: string,
+  ) {
+    // req.user được gán từ JwtStrategy sau khi qua Guard
+    const userId = req.user.userId;
+    return this.authService.logout(userId, ip, userAgent);
   }
 }

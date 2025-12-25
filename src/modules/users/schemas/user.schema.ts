@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
+import { UserStatus } from 'src/common/enums/user-status.enum';
 
 @Schema({
   collection: 'users',
@@ -33,13 +34,17 @@ export class User {
 
   @Prop({
     type: [String],
-    enum: ['CUSTOMER', 'STAFF', 'ADMIN'],
     default: ['CUSTOMER'],
   })
   roles: string[];
 
-  @Prop({ default: true })
-  is_active: boolean; // US.56: Trạng thái hoạt động
+  @Prop({ enum: UserStatus, default: UserStatus.ACTIVE })
+  status: UserStatus;
+
+  @Prop({ default: 0 })
+  token_version: number;
+  // Mỗi khi user đổi mật khẩu hoặc bị admin khóa,
+  // ta tăng số này lên 1 để vô hiệu hóa toàn bộ Token cũ.
 
   // US.02: Bảo mật đăng nhập
   @Prop({ default: 0 })
@@ -64,8 +69,8 @@ UserSchema.virtual('fullName').get(function (this: UserDocument) {
 
 // Index Text để tìm kiếm theo tên/email/sđt (US.15)
 UserSchema.index({
-  firstName: 'text',
-  lastName: 'text',
+  first_Name: 'text',
+  last_Name: 'text',
   email: 'text',
   phone: 'text',
 });

@@ -10,6 +10,7 @@ import { Attribute, AttributeDocument } from './schemas/attribute.schema';
 import { CreateAttributeDto } from './dto/create-attribute.dto';
 import { UpdateAttributeDto } from './dto/update-attribute.dto';
 import { Product, ProductDocument } from '../catalog/schemas/product.schema';
+import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
 
 // Hàm helper escape regex
 function escapeRegExp(string: string) {
@@ -23,9 +24,16 @@ export class AttributesService {
     private attributeModel: Model<AttributeDocument>,
     @InjectModel(Product.name)
     private productModel: Model<ProductDocument>,
+    private readonly auditLogsService: AuditLogsService, // [THÊM] Inject
   ) {}
 
-  async create(createAttributeDto: CreateAttributeDto) {
+  // 1. TẠO THUỘC TÍNH
+  async create(
+    createAttributeDto: CreateAttributeDto,
+    actorId: string,
+    ip: string,
+    userAgent: string,
+  ) {
     const { name, values } = createAttributeDto;
     const escapedName = escapeRegExp(name);
 
@@ -43,7 +51,24 @@ export class AttributesService {
       values: values || [],
     });
 
-    return newAttr.save();
+    const savedAttr = await newAttr.save();
+
+    // [THÊM] Ghi Log
+    await this.auditLogsService.log({
+      action: 'CREATE_ATTRIBUTE',
+      collection_name: 'attributes',
+      actor_id: actorId,
+      target_id: savedAttr._id,
+      detail: {
+        name: savedAttr.name,
+        values: savedAttr.values,
+        description: savedAttr.description,
+      },
+      ip,
+      user_agent: userAgent,
+    });
+
+    return savedAttr;
   }
 
   async findAll() {
@@ -56,9 +81,19 @@ export class AttributesService {
     return attr;
   }
 
-  async update(id: string, updateDto: UpdateAttributeDto) {
+  // 2. CẬP NHẬT
+  async update(
+    id: string,
+    updateDto: UpdateAttributeDto,
+    actorId: string,
+    ip: string,
+    userAgent: string,
+  ) {
     const attr = await this.attributeModel.findById(id);
     if (!attr) throw new NotFoundException('Không tìm thấy thuộc tính');
+
+    // Lưu data cũ để so sánh
+    const oldData = attr.toObject();
 
     // Check trùng tên nếu đổi tên
     if (updateDto.name && updateDto.name !== attr.name) {
@@ -83,15 +118,36 @@ export class AttributesService {
       attr.is_active = updateDto.is_active;
     }
 
-    return attr.save();
+    const updatedAttr = await attr.save();
+
+    // [THÊM] Ghi Log (Kèm Data Diff)
+    await this.auditLogsService.log({
+      action: 'UPDATE_ATTRIBUTE',
+      collection_name: 'attributes',
+      actor_id: actorId,
+      target_id: attr._id,
+      detail: {
+        attribute_name: attr.name,
+        changes: {
+          old_values: oldData.values,
+          new_values: updatedAttr.values,
+          old_name:
+            oldData.name !== updatedAttr.name ? oldData.name : undefined,
+        },
+      },
+      ip,
+      user_agent: userAgent,
+    });
+
+    return updatedAttr;
   }
 
-  async remove(id: string) {
+  // 3. XÓA
+  async remove(id: string, actorId: string, ip: string, userAgent: string) {
     const attr = await this.attributeModel.findById(id);
     if (!attr) throw new NotFoundException('Không tìm thấy thuộc tính');
 
     // 1. Kiểm tra xem có sản phẩm nào đang dùng thuộc tính này không?
-    // Ta check trong 'specs.name' (thông số) hoặc 'variants.attributes.k' (biến thể)
     const isUsed = await this.productModel.exists({
       $or: [
         { 'specs.name': attr.name },
@@ -101,12 +157,40 @@ export class AttributesService {
 
     // 2. Nếu đang dùng -> Chặn xóa
     if (isUsed) {
+      // [THÊM] Có thể log cảnh báo việc admin cố xóa (Optional)
+      await this.auditLogsService.log({
+        action: 'DELETE_ATTRIBUTE_FAILED',
+        collection_name: 'attributes',
+        actor_id: actorId,
+        target_id: id,
+        detail: { reason: 'Attribute is in use by products', name: attr.name },
+        is_success: false,
+        ip,
+        user_agent: userAgent,
+      });
+
       throw new BadRequestException(
         `Thuộc tính '${attr.name}' đang được sử dụng trong các sản phẩm. Không thể xóa vĩnh viễn. Vui lòng chuyển trạng thái sang 'Ẩn' (Inactive) thay vì xóa.`,
       );
     }
 
     // 3. Nếu không dùng -> Xóa
-    return this.attributeModel.findByIdAndDelete(id);
+    await this.attributeModel.findByIdAndDelete(id);
+
+    // [THÊM] Ghi Log Xóa thành công
+    await this.auditLogsService.log({
+      action: 'DELETE_ATTRIBUTE',
+      collection_name: 'attributes',
+      actor_id: actorId,
+      target_id: id,
+      detail: {
+        name: attr.name,
+        values: attr.values,
+      },
+      ip,
+      user_agent: userAgent,
+    });
+
+    return { message: 'Đã xóa thuộc tính thành công' };
   }
 }

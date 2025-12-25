@@ -16,6 +16,7 @@ import { join } from 'path';
 import { UploadModule } from './modules/system/upload/upload.module';
 import { ProductsModule } from './modules/products/products.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
+import { RolesModule } from './modules/users/roles/roles.module';
 
 @Module({
   imports: [
@@ -44,20 +45,21 @@ import { InventoryModule } from './modules/inventory/inventory.module';
     UploadModule,
     ProductsModule,
     InventoryModule,
+    RolesModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
-    // Đăng ký JwtAuthGuard cho toàn bộ ứng dụng (trừ các route @Public())
-    {
-      provide: APP_GUARD,
-      useClass: JwtAuthGuard,
-    },
-    // Đăng ký RolesGuard để kiểm tra phân quyền sau khi JWT đã xác thực
-    {
-      provide: APP_GUARD,
-      useClass: RolesGuard,
-    },
+    // // Đăng ký JwtAuthGuard cho toàn bộ ứng dụng (trừ các route @Public())
+    // {
+    //   provide: APP_GUARD,
+    //   useClass: JwtAuthGuard,
+    // },
+    // // Đăng ký RolesGuard để kiểm tra phân quyền sau khi JWT đã xác thực
+    // {
+    //   provide: APP_GUARD,
+    //   useClass: RolesGuard,
+    // },
   ],
 })
 export class AppModule {}

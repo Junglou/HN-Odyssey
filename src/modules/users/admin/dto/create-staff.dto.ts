@@ -8,7 +8,7 @@ import {
   IsArray,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { Role } from '../../../../common/enums/role.enum'; 
+import { Role } from '../../../../common/enums/role.enum';
 
 export class CreateStaffDto {
   @ApiProperty({
@@ -19,15 +19,23 @@ export class CreateStaffDto {
   @IsNotEmpty()
   email: string;
 
-  @ApiProperty({ description: 'Mã nhân viên (UNIQUE)', example: 'S001' })
+  @ApiProperty({ description: 'Họ (Last Name)', example: 'Trần' })
   @IsString()
   @IsNotEmpty()
-  employeeCode: string;
+  lastName: string;
 
-  @ApiProperty({ description: 'Họ và tên đầy đủ', example: 'Trần Văn A' })
+  @ApiProperty({ description: 'Tên (First Name)', example: 'Văn A' })
   @IsString()
   @IsNotEmpty()
-  fullName: string;
+  firstName: string;
+
+  @ApiProperty({ description: 'Số điện thoại VN', example: '0987654321' })
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/(84|0[3|5|7|8|9])+([0-9]{8})\b/, {
+    message: 'Số điện thoại không đúng định dạng Việt Nam.',
+  })
+  phone: string;
 
   @ApiProperty({
     description:
@@ -46,10 +54,14 @@ export class CreateStaffDto {
   @ApiProperty({
     description:
       'Vai trò của nhân viên trong hệ thống (ADMIN/STAFF/KHO). Phải là mảng.',
-    example: [Role.STAFF, Role.ADMIN],
+    example: [Role.STAFF, Role.MANAGER, Role.SUPER_ADMIN],
   })
   @IsArray()
-  @IsEnum(Role, { each: true, message: 'Vai trò không hợp lệ.' })
+  @IsString({ each: true })
   @IsNotEmpty()
   roles: Role[];
+
+  @IsNotEmpty()
+  @IsString()
+  department: string;
 }

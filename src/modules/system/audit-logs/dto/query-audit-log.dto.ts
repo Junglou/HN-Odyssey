@@ -23,29 +23,39 @@ export class QueryAuditLogDto {
 
   @IsOptional()
   @IsString()
-  action?: string; // Lọc theo hành động (VD: LOGIN)
+  action?: string;
 
   @IsOptional()
   @IsString()
-  collection_name?: string; // Lọc theo bảng (VD: users)
+  collection_name?: string;
 
   @IsOptional()
   @IsString()
-  actor_id?: string; // Lọc xem nhân viên A đã làm gì
+  actor_id?: string;
+
+  // --- MỚI: Thêm 2 trường này để tìm kiếm tiện hơn ---
+  @IsOptional()
+  @IsString()
+  actor_employee_code?: string; // Tìm theo mã NV (VD: EMP001)
 
   @IsOptional()
   @IsString()
-  target_id?: string; // Lọc lịch sử của 1 đơn hàng cụ thể
+  actor_email?: string; // Tìm theo email
+  // --------------------------------------------------
+
+  @IsOptional()
+  @IsString()
+  target_id?: string;
 
   @IsOptional()
   @IsDateString()
-  from_date?: string; // Từ ngày
+  from_date?: string;
 
   @IsOptional()
   @IsDateString()
-  to_date?: string; // Đến ngày
+  to_date?: string;
 
   @IsOptional()
   @IsBooleanString()
-  is_success?: string; // Lọc log lỗi hay thành công
+  is_success?: string;
 }

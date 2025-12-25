@@ -5,6 +5,8 @@ import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@nestjs/jwt';
 import { User } from '../schemas/user.schema';
 import { Staff } from './schemas/staff.schema';
+import { Role as RoleEnum } from 'src/common/enums/role.enum'; // Import Role Enum
+import { UserStatus } from 'src/common/enums/user-status.enum'; // Import Status Enum
 
 @Injectable()
 export class AdminSeederService implements OnModuleInit {
@@ -15,10 +17,10 @@ export class AdminSeederService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // Kiểm tra xem đã có Admin nào tồn tại chưa (dựa trên Role)
+    // Kiểm tra xem đã có Admin nào tồn tại chưa (dựa trên Role Enum)
     const adminCount = await this.userModel
       .countDocuments({
-        roles: 'ADMIN',
+        roles: RoleEnum.SUPER_ADMIN,
       })
       .exec();
 
@@ -30,22 +32,26 @@ export class AdminSeederService implements OnModuleInit {
       // 1. Hash mật khẩu mặc định an toàn
       const hashedPassword = await this.hashPassword('SuperPassword@123');
 
-      // 2. Tạo tài khoản Admin
+      // 2. Tạo tài khoản Admin chuẩn format mới
+
       const superAdmin = new this.staffModel({
         email: 'super.admin@hnodyssey.com',
         password: hashedPassword,
         first_Name: 'Super Admin',
         last_Name: 'HN Odyssey',
-        employee_code: 'SA001',
-        department: 'SYSTEM_ADMIN',
-        roles: ['CUSTOMER', 'ADMIN'],
+        employee_code: 'HOSA-04-1-0001',
+        department: 'vận hành',
+        roles: [RoleEnum.SUPER_ADMIN],
         type: 'Staff',
-        is_active: true,
+        status: UserStatus.ACTIVE,
+        token_version: 0,
+        metadata: { createdBy: 'SYSTEM_SEEDER' },
       });
+
       await superAdmin.save();
 
       console.log(
-        '=> [SEEDER] Tạo Admin gốc thành công: super.admin@hnodyssey.com',
+        '=> [SEEDER] Tạo Admin gốc thành công: super.admin@hnodyssey.com | Pass: SuperPassword@123',
       );
     }
   }

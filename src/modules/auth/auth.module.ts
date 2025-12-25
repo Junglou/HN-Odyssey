@@ -20,6 +20,7 @@ import {
   AuditLogSchema,
 } from '../system/audit-logs/schemas/audit-log.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { Role, RoleSchema } from '../users/roles/schemas/role.schema';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       { name: Verification.name, schema: VerificationSchema },
       { name: RecoveryRequest.name, schema: RecoveryRequestSchema },
       { name: AuditLog.name, schema: AuditLogSchema },
+      { name: Role.name, schema: RoleSchema },
     ]), // 2. Cấu hình JWT (Token) sử dụng registerAsync
     JwtModule.registerAsync({
       imports: [ConfigModule],

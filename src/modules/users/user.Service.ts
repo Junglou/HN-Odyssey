@@ -36,13 +36,13 @@ export class UsersService {
 
   async increaseFailedAttempt(userId: string) {
     return this.userModel.findByIdAndUpdate(userId, {
-      $inc: { failedAttempts: 1 },
+      $inc: { login_attempts: 1 },
     });
   }
 
   async resetFailedAttempt(userId: string) {
     return this.userModel.findByIdAndUpdate(userId, {
-      failedAttempts: 0,
+      login_attempts: 0,
     });
   }
 }
