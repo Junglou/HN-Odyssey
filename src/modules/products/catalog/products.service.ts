@@ -119,7 +119,7 @@ export class ProductsService {
 
     // VALIDATION BIẾN THỂ (AC1 & AC2)
     if (variants.length > 0) {
-      // 2.1. Kiểm tra trùng SKU trong chính danh sách gửi lên (Internal Duplicates)
+      // 2.1. Kiểm tra trùng SKU trong chính danh sách gửi lên
       const variantSkus = variants.map((v) => v.sku);
       if (new Set(variantSkus).size !== variantSkus.length) {
         throw new BadRequestException(
@@ -137,7 +137,7 @@ export class ProductsService {
         );
       }
 
-      // Tạo chuỗi key chuẩn để so sánh (Ví dụ: "Màu,Size")
+      // Tạo chuỗi key chuẩn để so sánh
       const standardKeys = firstVariantAttrs
         .map((a) => a.k)
         .sort()
@@ -158,6 +158,8 @@ export class ProductsService {
             `Lỗi cấu trúc biến thể (SKU: ${variant.sku}): Các biến thể phải có cùng nhóm thuộc tính.`,
           );
         }
+        variant.price = 0;
+        variant.sale_price = 0;
       }
     }
 
@@ -170,6 +172,12 @@ export class ProductsService {
     // 4. Tính toán Specs
     const specs = this.calculateSpecs(variants);
 
+    // Xử lý sanitize description trước khi đưa vào model
+    let cleanDescription = createProductDto.description;
+    if (cleanDescription) {
+      cleanDescription = this.sanitizeContent(cleanDescription);
+    }
+
     // 5. Khởi tạo Model
     const newProduct = new this.productModel({
       ...createProductDto,
@@ -177,22 +185,19 @@ export class ProductsService {
         (id) => new Types.ObjectId(id),
       ),
       slug,
-      status: ProductStatus.DRAFT, // Mặc định là Nháp
+      status: ProductStatus.DRAFT,
       has_variants: variants.length > 0,
       specs,
       created_by: userId,
+      description: cleanDescription,
+      price: 0,
+      sale_price: 0,
     });
-
-    if (createProductDto.description) {
-      createProductDto.description = this.sanitizeContent(
-        createProductDto.description,
-      ); // Lọc mã độc trước khi lưu
-    }
 
     // 6. Lưu vào DB
     await newProduct.save();
 
-    // 7. Ghi Audit Log (Updated theo Interface DTO)
+    // 7. Ghi Audit Log
     await this.auditLogsService.log({
       action: 'CREATE_PRODUCT',
       collection_name: 'products',
@@ -202,6 +207,7 @@ export class ProductsService {
         sku: newProduct.sku,
         name: newProduct.name,
         has_variants: newProduct.has_variants,
+        initial_price: 0, // Log rõ là giá khởi tạo bằng 0
       },
       ip: ip,
       user_agent: userAgent,

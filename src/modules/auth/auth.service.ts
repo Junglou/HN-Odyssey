@@ -28,7 +28,7 @@ import { RecoverAccountDto } from './dto/recover-account.dto';
 import { AuditLogsService } from '../system/audit-logs/audit-logs.service';
 import { UserStatus } from 'src/common/enums/user-status.enum';
 import { ResendOtpDto } from './dto/resend-otp.dto.ts';
-import { AdminService } from '../users/admin/admin.service';
+import { randomBytes } from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -861,11 +861,10 @@ export class AuthService {
     return { message: responseMessage };
   }
 
-  private generateRandomString(length: number) {
-    return (
-      Math.random().toString(36).substring(2, 15) +
-      Math.random().toString(36).substring(2, 15)
-    );
+  private generateRandomString(length: number): string {
+    return randomBytes(Math.ceil(length / 2))
+      .toString('hex') // Chuyển sang chuỗi hex (0-9, a-f)
+      .slice(0, length); // Cắt đúng độ dài yêu cầu (phòng trường hợp length là số lẻ)
   }
 
   //10. QUÊN MẬT KHẨU
@@ -904,9 +903,7 @@ export class AuthService {
     let code = '';
 
     if (isEmail) {
-      code =
-        Math.random().toString(36).substring(2, 15) +
-        Math.random().toString(36).substring(2, 15);
+      code = this.generateRandomString(32);
       const link = `https://hn-odyssey.com/reset-password?token=${code}&email=${account}`;
       this.emailService
         .sendResetPasswordLink(account, link)
