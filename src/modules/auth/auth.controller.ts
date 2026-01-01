@@ -37,6 +37,8 @@ import { UserAgent } from 'src/common/decorators/user-agent.decorator';
 import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import type { IUser } from 'src/common/interfaces/user.interface';
 
 @ApiTags('Auth (Xác thực)')
 @Controller('auth')
@@ -241,14 +243,11 @@ export class AuthController {
   async processRecovery(
     @Param('id') id: string,
     @Body() dto: ProcessRecoveryDto,
-    @Req() req: any, // req.user đã có dữ liệu nhờ JwtAuthGuard
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @UserAgent() userAgent: string,
   ) {
-    // [FIX] Lấy trực tiếp từ req.user, bỏ đoạn decode thủ công
-    const adminId = req.user.userId;
-
-    return this.authService.processRecovery(id, dto, adminId, ip, userAgent);
+    return this.authService.processRecovery(id, dto, user._id, ip, userAgent);
   }
 
   //10. REFRESH TOKEN — LẤY ACCESS TOKEN MỚI (PUBLIC  )
@@ -314,12 +313,10 @@ export class AuthController {
     description: 'Đăng xuất thành công, Refresh Token đã bị hủy.',
   })
   async logout(
-    @Req() req: any,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @UserAgent() userAgent: string,
   ) {
-    // req.user được gán từ JwtStrategy sau khi qua Guard
-    const userId = req.user.userId;
-    return this.authService.logout(userId, ip, userAgent);
+    return this.authService.logout(user._id, ip, userAgent);
   }
 }

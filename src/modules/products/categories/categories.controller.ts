@@ -24,6 +24,8 @@ import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import type { IUser } from 'src/common/interfaces/user.interface';
 
 @Controller('categories')
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
@@ -57,13 +59,13 @@ export class CategoriesController {
   @RequirePermissions(Resource.CATEGORIES, Action.CREATE)
   create(
     @Body() createCategoryDto: CreateCategoryDto,
-    @Req() req,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @Headers('user-agent') userAgent: string,
   ) {
     return this.categoriesService.create(
       createCategoryDto,
-      req.user.userId,
+      user._id,
       ip,
       userAgent,
     );
@@ -79,13 +81,13 @@ export class CategoriesController {
   @RequirePermissions(Resource.CATEGORIES, Action.UPDATE)
   updateOrder(
     @Body() updateOrderDto: UpdateCategoryOrderDto,
-    @Req() req,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @Headers('user-agent') userAgent: string,
   ) {
     return this.categoriesService.updateOrder(
       updateOrderDto,
-      req.user.userId,
+      user._id,
       ip,
       userAgent,
     );
@@ -96,14 +98,14 @@ export class CategoriesController {
   update(
     @Param('id') id: string,
     @Body() updateCategoryDto: UpdateCategoryDto,
-    @Req() req,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @Headers('user-agent') userAgent: string,
   ) {
     return this.categoriesService.update(
       id,
       updateCategoryDto,
-      req.user.userId,
+      user._id,
       ip,
       userAgent,
     );
@@ -114,10 +116,10 @@ export class CategoriesController {
   @RequirePermissions(Resource.CATEGORIES, Action.DELETE)
   remove(
     @Param('id') id: string,
-    @Req() req,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @Headers('user-agent') userAgent: string,
   ) {
-    return this.categoriesService.remove(id, req.user.userId, ip, userAgent);
+    return this.categoriesService.remove(id, user._id, ip, userAgent);
   }
 }

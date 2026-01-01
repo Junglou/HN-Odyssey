@@ -2,11 +2,10 @@ import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { StockService } from './stock.service';
 import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Public } from 'src/common/decorators/public.decorator';
 
 @Controller('inventory/stock')
-// @UseGuards(JwtAuthGuard) // Bật lên khi cần bảo mật
+@UseGuards(JwtAuthGuard)
 export class StockController {
   constructor(private readonly stockService: StockService) {}
 

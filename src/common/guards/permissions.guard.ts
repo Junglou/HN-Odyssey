@@ -14,7 +14,8 @@ import {
   RoleDocument,
 } from 'src/modules/users/roles/schemas/role.schema';
 import { Role as RoleEnum } from 'src/common/enums/role.enum';
-import { Action } from 'src/common/enums/resource.enum'; // Import Action Enum chuẩn
+import { Action } from 'src/common/enums/resource.enum';
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -26,6 +27,14 @@ export class PermissionsGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic) {
+      return true; // Nếu là Public -> Cho qua luôn, không check user/permission
+    }
     const requiredPermission = this.reflector.getAllAndOverride<{
       resource: string;
       action: string;

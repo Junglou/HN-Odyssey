@@ -17,9 +17,21 @@ import { UploadModule } from './modules/system/upload/upload.module';
 import { ProductsModule } from './modules/products/products.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { RolesModule } from './modules/users/roles/roles.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { SalesModule } from './modules/sales/sales.module';
+import { RedisModule } from '@nestjs-modules/ioredis';
 
 @Module({
   imports: [
+    RedisModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        type: 'single',
+        url: configService.get<string>('REDIS_URL') || 'redis://localhost:6379',
+      }),
+      inject: [ConfigService],
+    }),
+
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -31,6 +43,8 @@ import { RolesModule } from './modules/users/roles/roles.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+
+    ScheduleModule.forRoot(),
 
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'uploads'), // Trỏ ra thư mục uploads ở root
@@ -46,6 +60,7 @@ import { RolesModule } from './modules/users/roles/roles.module';
     ProductsModule,
     InventoryModule,
     RolesModule,
+    SalesModule,
   ],
   controllers: [AppController],
   providers: [

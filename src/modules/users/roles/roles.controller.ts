@@ -6,7 +6,6 @@ import {
   Param,
   Patch,
   Post,
-  Req,
   Ip,
   Headers,
   UseGuards,
@@ -21,6 +20,8 @@ import { RequirePermissions } from 'src/common/decorators/permissions.decorator'
 import { Action, Resource } from 'src/common/enums/resource.enum';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { CreateRoleDto } from './dto/create-role.dto';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import type { IUser } from 'src/common/interfaces/user.interface';
 
 @Controller('admin/roles')
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
@@ -33,11 +34,11 @@ export class RolesController {
   @RequirePermissions(Resource.SETTINGS, Action.CREATE)
   create(
     @Body() dto: CreateRoleDto,
-    @Req() req,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @Headers('user-agent') userAgent: string,
   ) {
-    return this.rolesService.create(dto, req.user.userId, ip, userAgent);
+    return this.rolesService.create(dto, user._id, ip, userAgent);
   }
 
   // 2. DANH SÁCH
@@ -59,17 +60,11 @@ export class RolesController {
   update(
     @Param('id') id: string,
     @Body() updateRoleDto: UpdateRoleDto,
-    @Req() req,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @Headers('user-agent') userAgent: string,
   ) {
-    return this.rolesService.update(
-      id,
-      updateRoleDto,
-      req.user.userId,
-      ip,
-      userAgent,
-    );
+    return this.rolesService.update(id, updateRoleDto, user._id, ip, userAgent);
   }
 
   // 5. XÓA
@@ -77,10 +72,10 @@ export class RolesController {
   @RequirePermissions(Resource.SETTINGS, Action.DELETE)
   remove(
     @Param('id') id: string,
-    @Req() req,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @Headers('user-agent') userAgent: string,
   ) {
-    return this.rolesService.remove(id, req.user.userId, ip, userAgent);
+    return this.rolesService.remove(id, user._id, ip, userAgent);
   }
 }

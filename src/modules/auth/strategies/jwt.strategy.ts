@@ -53,7 +53,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     // 3. Return Roles lấy từ DB để đảm bảo tính mới nhất
     return {
-      userId: payload.sub,
+      _id: payload.sub,
       email: payload.email,
       roles: user.roles, // Mảng string ['SUPER_ADMIN', 'CUSTOMER']
     };

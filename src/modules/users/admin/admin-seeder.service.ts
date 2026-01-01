@@ -39,7 +39,7 @@ export class AdminSeederService implements OnModuleInit {
         password: hashedPassword,
         first_Name: 'Super Admin',
         last_Name: 'HN Odyssey',
-        employee_code: 'HOSA-04-1-0001',
+        employee_code: 'EMP000000',
         department: 'vận hành',
         roles: [RoleEnum.SUPER_ADMIN],
         type: 'Staff',

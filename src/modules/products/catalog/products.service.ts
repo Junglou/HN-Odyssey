@@ -27,16 +27,12 @@ import { TagsService } from '../tags/tags.service';
 import { Role } from 'src/common/enums/role.enum';
 import sanitizeHtml from 'sanitize-html';
 
-// import { OrdersService } from '../../sales/orders/orders.service';
-
 @Injectable()
 export class ProductsService {
   constructor(
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
     private readonly auditLogsService: AuditLogsService,
     private readonly tagsService: TagsService,
-    // [TODO] Inject OrdersService sau khi hoàn thành Module Sales
-    // @Inject(forwardRef(() => OrdersService)) private ordersService: OrdersService,
   ) {}
 
   // HELPER METHODS
@@ -45,6 +41,8 @@ export class ProductsService {
     return defaultSlugify(name, { lower: true, strict: true, locale: 'vi' });
   }
 
+  //Check SKU toàn hệ thống (kể cả active hay deleted) để đảm bảo an toàn tuyệt đối
+  // Nếu đã Soft Delete và đổi tên SKU rồi thì check này vẫn pass.
   private async checkSkuExists(sku: string, excludeId?: string): Promise<void> {
     const query: any = {
       $or: [{ sku: sku }, { 'variants.sku': sku }],
@@ -55,7 +53,7 @@ export class ProductsService {
     const exists = await this.productModel.findOne(query).select('_id').lean();
     if (exists) {
       throw new ConflictException(
-        `Mã SKU '${sku}' đã tồn tại (Sản phẩm hoặc Biến thể)`,
+        `Mã SKU '${sku}' đã tồn tại (Có thể nằm trong sản phẩm đã xóa hoặc ẩn)`,
       );
     }
   }
@@ -96,7 +94,7 @@ export class ProductsService {
         'img',
         'h1',
         'h2',
-      ]), // Cho phép ảnh, tiêu đề
+      ]),
       allowedAttributes: {
         ...sanitizeHtml.defaults.allowedAttributes,
         '*': ['style', 'class'],
@@ -109,17 +107,39 @@ export class ProductsService {
   async create(
     createProductDto: CreateProductDto,
     userId: string,
+    userRoles: Role[],
     ip: string,
     userAgent: string,
   ) {
-    // 1. Kiểm tra trùng SKU của sản phẩm cha
+    // 1. Kiểm tra trùng SKU (Product level)
     await this.checkSkuExists(createProductDto.sku);
 
     const variants = createProductDto.variants || [];
 
-    // VALIDATION BIẾN THỂ (AC1 & AC2)
+    //Phân quyền nhập liệu:
+    // Nếu là STAFF (và không phải Manager/Admin) -> Bắt buộc Giá = 0 (Chờ duyệt giá sau)
+    const isStaff =
+      userRoles.includes(Role.STAFF) &&
+      !userRoles.includes(Role.MANAGER) &&
+      !userRoles.includes(Role.SUPER_ADMIN);
+
+    if (isStaff) {
+      // Ép giá sản phẩm cha về 0
+      createProductDto.price = 0;
+      createProductDto.sale_price = 0;
+
+      // Ép giá toàn bộ biến thể về 0
+      if (variants.length > 0) {
+        variants.forEach((v) => {
+          v.price = 0;
+          v.sale_price = 0;
+        });
+      }
+    }
+
+    // 2. VALIDATION BIẾN THỂ (Nếu có)
     if (variants.length > 0) {
-      // 2.1. Kiểm tra trùng SKU trong chính danh sách gửi lên
+      // Check trùng SKU trong nội bộ danh sách biến thể
       const variantSkus = variants.map((v) => v.sku);
       if (new Set(variantSkus).size !== variantSkus.length) {
         throw new BadRequestException(
@@ -127,27 +147,24 @@ export class ProductsService {
         );
       }
 
-      // 2.2. Lấy cấu trúc thuộc tính của biến thể đầu tiên làm chuẩn
+      // Check giới hạn số lượng thuộc tính (Max 3: VD Màu, Size, Chất liệu)
       const firstVariantAttrs = variants[0].attributes;
-
-      // RULE 1: Giới hạn tối đa 3 nhóm thuộc tính
       if (firstVariantAttrs.length > 3) {
         throw new BadRequestException(
-          'Hệ thống chỉ hỗ trợ tối đa 3 nhóm thuộc tính phân loại (Ví dụ: Màu, Size, Chất liệu)',
+          'Hệ thống chỉ hỗ trợ tối đa 3 nhóm thuộc tính phân loại',
         );
       }
 
-      // Tạo chuỗi key chuẩn để so sánh
+      // Check tính nhất quán của thuộc tính (Các biến thể phải có cùng keys)
       const standardKeys = firstVariantAttrs
         .map((a) => a.k)
         .sort()
         .join(',');
 
       for (const variant of variants) {
-        // 2.3. Kiểm tra trùng SKU với Database
+        // Check trùng SKU biến thể với DB
         await this.checkSkuExists(variant.sku);
 
-        // RULE 2: Đảm bảo cấu trúc đồng nhất
         const currentKeys = variant.attributes
           .map((a) => a.k)
           .sort()
@@ -158,46 +175,43 @@ export class ProductsService {
             `Lỗi cấu trúc biến thể (SKU: ${variant.sku}): Các biến thể phải có cùng nhóm thuộc tính.`,
           );
         }
-        variant.price = 0;
-        variant.sale_price = 0;
       }
     }
 
-    // 3. Tự động tạo Slug & Kiểm tra trùng
+    // 3. Tạo Slug & Sanitize HTML
     const slug =
       createProductDto.slug || this.createSlug(createProductDto.name);
     const slugExists = await this.productModel.exists({ slug });
     if (slugExists) throw new ConflictException('Đường dẫn (Slug) đã tồn tại');
 
-    // 4. Tính toán Specs
     const specs = this.calculateSpecs(variants);
 
-    // Xử lý sanitize description trước khi đưa vào model
     let cleanDescription = createProductDto.description;
     if (cleanDescription) {
       cleanDescription = this.sanitizeContent(cleanDescription);
     }
 
-    // 5. Khởi tạo Model
+    // 4. Khởi tạo Model
     const newProduct = new this.productModel({
       ...createProductDto,
       categories: createProductDto.category_ids.map(
         (id) => new Types.ObjectId(id),
       ),
       slug,
-      status: ProductStatus.DRAFT,
+      status: ProductStatus.DRAFT, // Mặc định tạo mới là DRAFT
       has_variants: variants.length > 0,
       specs,
-      created_by: userId,
+      created_by: new Types.ObjectId(userId),
+      is_deleted: false,
       description: cleanDescription,
-      price: 0,
-      sale_price: 0,
+      price: createProductDto.price,
+      sale_price: createProductDto.sale_price,
+      variants: variants,
     });
 
-    // 6. Lưu vào DB
     await newProduct.save();
 
-    // 7. Ghi Audit Log
+    // 5. Ghi Audit Log
     await this.auditLogsService.log({
       action: 'CREATE_PRODUCT',
       collection_name: 'products',
@@ -206,8 +220,8 @@ export class ProductsService {
       detail: {
         sku: newProduct.sku,
         name: newProduct.name,
-        has_variants: newProduct.has_variants,
-        initial_price: 0, // Log rõ là giá khởi tạo bằng 0
+        is_staff_created: isStaff,
+        initial_price: newProduct.price,
       },
       ip: ip,
       user_agent: userAgent,
@@ -221,12 +235,12 @@ export class ProductsService {
     const limit = Number(query.limit) || 20;
     const { keyword, category_id, status, sort = 'newest' } = query;
 
-    const filter: any = {};
+    const filter: any = {
+      is_deleted: false,
+    };
 
-    // 2. Lọc theo Status
     if (status) filter.status = status;
 
-    // 3. Xử lý Category ID an toàn (Tránh crash nếu id sai format)
     if (category_id) {
       if (Types.ObjectId.isValid(category_id)) {
         filter.categories = new Types.ObjectId(category_id as string);
@@ -235,17 +249,14 @@ export class ProductsService {
       }
     }
 
-    // 4. Tìm kiếm Full-text (Yêu cầu DB đã đánh index text cho trường name/description)
     if (keyword && keyword.trim() !== '') {
       filter.$text = { $search: keyword.trim() };
     }
 
-    // 5. Xử lý Sort
     let sortOption: any = { created_at: -1 };
     if (sort === 'price_asc') sortOption = { price: 1 };
     if (sort === 'price_desc') sortOption = { price: -1 };
 
-    // Select fields để tối ưu performance (bỏ bớt các trường nặng như description chi tiết nếu không cần)
     const selectFields =
       'name sku price sale_price thumbnail slug categories status stock rating_average created_at';
 
@@ -257,7 +268,42 @@ export class ProductsService {
         .sort(sortOption)
         .skip((page - 1) * limit)
         .limit(limit)
-        .lean(), // .lean() giúp query nhanh hơn do trả về plain object
+        .lean(),
+      this.productModel.countDocuments(filter),
+    ]);
+
+    return {
+      data: products,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async findPendingPriceRequests(query: any) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Chỉ tìm sản phẩm chưa xóa
+    const filter = {
+      pending_price_change: { $ne: null },
+      is_deleted: false,
+    };
+
+    const [products, total] = await Promise.all([
+      this.productModel
+        .find(filter)
+        .select('name sku price sale_price pending_price_change thumbnail')
+        .populate('pending_price_change.requester_id', 'name email')
+        .sort({ 'pending_price_change.requested_at': -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .exec(),
       this.productModel.countDocuments(filter),
     ]);
 
@@ -276,16 +322,56 @@ export class ProductsService {
     if (!Types.ObjectId.isValid(id))
       throw new BadRequestException('ID không hợp lệ');
     const product = await this.productModel
-      .findById(id)
+      .findOne({ _id: id, is_deleted: false })
       .populate('categories', 'name slug')
       .lean();
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
+    if (product.gallery && product.gallery.length > 0) {
+      product.gallery.sort((a, b) => a.display_order - b.display_order);
+    }
     return product;
+  }
+
+  async findRelated(id: string, limit: number = 5) {
+    // 1. Lấy thông tin sản phẩm gốc để biết Category của nó
+    const product = await this.productModel
+      .findById(id)
+      .select('categories price');
+    if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
+
+    // 2. Tìm các sản phẩm khác có cùng ít nhất 1 category
+    const relatedProducts = await this.productModel
+      .find({
+        _id: { $ne: product._id },
+        categories: { $in: product.categories },
+        status: ProductStatus.ACTIVE,
+        is_deleted: false,
+        price: { $lt: product.price * 0.5 },
+      })
+      .select('name sku price sale_price thumbnail slug rating_average')
+      .limit(limit)
+      .lean();
+
+    // Nếu không tìm thấy (ví dụ danh mục chỉ có 1 sp), có thể fallback lấy sản phẩm mới nhất
+    if (relatedProducts.length === 0) {
+      return this.productModel
+        .find({
+          _id: { $ne: product._id },
+          status: ProductStatus.ACTIVE,
+          is_deleted: false,
+        })
+        .sort({ created_at: -1 })
+        .select('name sku price sale_price thumbnail slug rating_average')
+        .limit(limit)
+        .lean();
+    }
+
+    return relatedProducts;
   }
 
   async findBySlug(slug: string) {
     const product = await this.productModel
-      .findOne({ slug, status: ProductStatus.ACTIVE })
+      .findOne({ slug, status: ProductStatus.ACTIVE, is_deleted: false })
       .populate('categories', 'name slug')
       .lean();
 
@@ -297,7 +383,7 @@ export class ProductsService {
     return product;
   }
 
-  //UPDATE THÔNG TIN
+  // UPDATE THÔNG TIN
   async update(
     id: string,
     updateDto: UpdateProductDto,
@@ -305,19 +391,23 @@ export class ProductsService {
     ip: string,
     userAgent: string,
   ) {
-    const product = await this.productModel.findById(id);
+    const product = await this.productModel.findOne({
+      _id: id,
+      is_deleted: false,
+    });
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
-    // Check trùng SKU nếu có thay đổi
+    // Check trùng SKU
     if (updateDto.sku && updateDto.sku !== product.sku) {
       await this.checkSkuExists(updateDto.sku, id);
     }
 
-    // Check trùng Tên sản phẩm
+    // Check trùng Tên
     if (updateDto.name && updateDto.name !== product.name) {
       const nameExists = await this.productModel.exists({
         name: updateDto.name,
         _id: { $ne: id },
+        is_deleted: false,
       });
       if (nameExists) throw new ConflictException('Tên sản phẩm đã tồn tại');
     }
@@ -336,7 +426,6 @@ export class ProductsService {
       delete updateDto.category_ids;
     }
 
-    // Check trùng Slug
     if (updateDto.slug && updateDto.slug !== product.slug) {
       const exists = await this.productModel.exists({
         slug: updateDto.slug,
@@ -346,13 +435,12 @@ export class ProductsService {
     }
 
     if (updateDto.description) {
-      updateDto.description = this.sanitizeContent(updateDto.description); // Lọc mã độc trước khi lưu
+      updateDto.description = this.sanitizeContent(updateDto.description);
     }
 
     Object.assign(product, updateDto);
     await product.save();
 
-    // Log Update Info
     await this.auditLogsService.log({
       action: 'UPDATE_PRODUCT_INFO',
       collection_name: 'products',
@@ -365,7 +453,7 @@ export class ProductsService {
     return product;
   }
 
-  //UPDATE TRẠNG THÁI
+  // UPDATE TRẠNG THÁI
   async updateStatus(
     id: string,
     statusDto: UpdateProductStatusDto,
@@ -375,22 +463,22 @@ export class ProductsService {
     userAgent: string,
   ) {
     const { status } = statusDto;
-    const product = await this.productModel.findById(id);
+    const product = await this.productModel.findOne({
+      _id: id,
+      is_deleted: false,
+    });
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
     const oldStatus = product.status;
 
-    // [AC2] KIỂM TRA QUYỀN
     const isAdmin =
       userRoles.includes(Role.MANAGER) || userRoles.includes(Role.SUPER_ADMIN);
 
-    // Nếu không phải Admin mà đòi Active -> Chặn
     if (!isAdmin && status === ProductStatus.ACTIVE) {
       throw new BadRequestException(
         'Bạn không có quyền kích hoạt bán. Vui lòng chọn trạng thái "Chờ duyệt" để Quản lý kiểm tra.',
       );
     }
 
-    // [AC7] KIỂM TRA DỮ LIỆU
     if (status === ProductStatus.ACTIVE) {
       if (
         product.price <= 0 &&
@@ -416,7 +504,6 @@ export class ProductsService {
     product.status = status;
     await product.save();
 
-    // Log Status Change
     await this.auditLogsService.log({
       action: 'UPDATE_PRODUCT_STATUS',
       collection_name: 'products',
@@ -430,7 +517,7 @@ export class ProductsService {
     return product;
   }
 
-  //REQUEST PRICE
+  // REQUEST PRICE
   async requestPriceUpdate(
     id: string,
     dto: UpdateProductPriceDto,
@@ -438,26 +525,21 @@ export class ProductsService {
     ip: string,
     userAgent: string,
   ) {
-    // Removed debug log for cleaner code
-    const product = await this.productModel.findById(id);
+    const product = await this.productModel.findOne({
+      _id: id,
+      is_deleted: false,
+    });
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
-    //Xử lý inputSalePrice để tránh lỗi undefined
     const inputSalePrice = dto.sale_price ?? 0;
-
-    // [AC3] Validation: Giá KM phải nhỏ hơn Giá bán (Sản phẩm cha)
     if (inputSalePrice > 0 && inputSalePrice >= dto.price) {
       throw new BadRequestException(
         'Giá khuyến mãi phải nhỏ hơn giá niêm yết (Sản phẩm chính)',
       );
     }
 
-    //Định nghĩa kiểu mảng rõ ràng
     const pendingVariants: PendingVariantPrice[] = [];
-
-    // [AC3 & AC6] Validation cho các biến thể
     if (dto.variants && dto.variants.length > 0) {
-      // Kiểm tra xem sản phẩm có biến thể thật không
       if (!product.has_variants) {
         throw new BadRequestException(
           'Sản phẩm này không có biến thể để sửa giá',
@@ -465,7 +547,6 @@ export class ProductsService {
       }
 
       for (const vDto of dto.variants) {
-        // Check xem SKU có tồn tại trong sản phẩm này không
         const existVariant = product.variants.find((v) => v.sku === vDto.sku);
         if (!existVariant) {
           throw new BadRequestException(
@@ -473,7 +554,6 @@ export class ProductsService {
           );
         }
 
-        // Check logic giá
         const variantSalePrice = vDto.sale_price ?? 0;
         if (variantSalePrice > 0 && variantSalePrice >= vDto.price) {
           throw new BadRequestException(
@@ -489,7 +569,6 @@ export class ProductsService {
       }
     }
 
-    // [AC4] Cấu hình thời gian
     const startDate = dto.sale_start_date
       ? new Date(dto.sale_start_date)
       : undefined;
@@ -501,20 +580,18 @@ export class ProductsService {
       );
     }
 
-    // [AC1] Lưu vào trạng thái chờ duyệt (Pending)
     product.pending_price_change = {
       price: dto.price,
       sale_price: inputSalePrice,
       sale_start_date: startDate,
       sale_end_date: endDate,
       variants: pendingVariants,
-      requester_id: userId,
+      requester_id: new Types.ObjectId(userId),
       requested_at: new Date(),
     };
 
     await product.save();
 
-    // [AC8] Log lịch sử
     await this.auditLogsService.log({
       action: 'REQUEST_PRICE_UPDATE',
       collection_name: 'products',
@@ -535,7 +612,7 @@ export class ProductsService {
     };
   }
 
-  //APPROVE PRICE
+  // APPROVE PRICE
   async approvePriceChange(
     id: string,
     isApproved: boolean,
@@ -543,7 +620,10 @@ export class ProductsService {
     ip: string,
     userAgent: string,
   ) {
-    const product = await this.productModel.findById(id);
+    const product = await this.productModel.findOne({
+      _id: id,
+      is_deleted: false,
+    });
     if (!product) throw new NotFoundException('SP không tồn tại');
     if (!product.pending_price_change) {
       throw new BadRequestException(
@@ -554,15 +634,11 @@ export class ProductsService {
     const pending = product.pending_price_change;
 
     if (isApproved) {
-      // 1. Áp dụng giá cho Sản phẩm cha
       product.price = pending.price;
       product.sale_price = pending.sale_price;
-
-      //Cast sang 'any' hoặc 'Date' để tránh lỗi gán undefined vào field Date
       product.sale_start_date = pending.sale_start_date as any;
       product.sale_end_date = pending.sale_end_date as any;
 
-      // 2. Áp dụng giá cho Biến thể (AC6)
       if (pending.variants && pending.variants.length > 0) {
         pending.variants.forEach((pV) => {
           const variantIndex = product.variants.findIndex(
@@ -576,11 +652,9 @@ export class ProductsService {
       }
     }
 
-    // Xóa trạng thái pending sau khi xử lý
     product.pending_price_change = null;
     await product.save();
 
-    // [AC8] Log chi tiết: Ai duyệt, Thời gian nào
     await this.auditLogsService.log({
       action: isApproved ? 'APPROVE_PRICE' : 'REJECT_PRICE',
       collection_name: 'products',
@@ -602,54 +676,55 @@ export class ProductsService {
     };
   }
 
-  //DELETE
+  //SOFT DELETE
   async remove(id: string, userId: string, ip: string, userAgent: string) {
-    const product = await this.productModel.findById(id);
+    const product = await this.productModel.findOne({
+      _id: id,
+      is_deleted: false,
+    });
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
-    // [TODO: PENDING US.76 AC1] KIỂM TRA RÀNG BUỘC ĐƠN HÀNG
-    // Hiện tại chưa có module Order nên tạm thời bỏ qua bước này.
+    // [Soft Delete]
+    product.is_deleted = true;
+    product.deleted_at = new Date();
+    product.status = ProductStatus.INACTIVE;
 
-    // [AC6] Xóa tất cả ảnh và video liên quan trong ổ cứng
-    if (product.images && product.images.length > 0) {
-      product.images.forEach((img) => this.deletePhysicalFile(img));
-    }
-    if (product.thumbnail) this.deletePhysicalFile(product.thumbnail);
-    if (product.video) this.deletePhysicalFile(product.video);
+    //Đổi SKU và Slug để giải phóng mã cho sản phẩm mới
+    // Nếu không đổi, khi tạo sản phẩm mới cùng SKU sẽ bị báo lỗi Conflict
+    const timestamp = Date.now();
+    product.sku = `${product.sku}_DEL_${timestamp}`;
+    product.slug = `${product.slug}-deleted-${timestamp}`;
 
-    // Xóa ảnh của biến thể
-    if (product.variants) {
-      product.variants.forEach((v) => {
-        if (v.image) this.deletePhysicalFile(v.image);
-      });
-    }
+    //KHÔNG XÓA FILE VẬT LÝ và KHÔNG XÓA CỨNG DB
+    // Để đảm bảo lịch sử đơn hàng vẫn xem được ảnh sản phẩm (nếu cần)
+    // và admin có thể khôi phục lại dữ liệu nếu xóa nhầm.
 
-    // Xóa DB
-    const snapshot = { sku: product.sku, name: product.name };
-    await this.productModel.findByIdAndDelete(id);
+    await product.save();
 
-    // Log (Updated theo DTO)
+    // Log
     await this.auditLogsService.log({
       action: 'DELETE_PRODUCT',
       collection_name: 'products',
       actor_id: userId,
       target_id: id,
       detail: {
-        deleted_product: snapshot,
-        reason: 'Hard delete requested by Admin',
+        reason: 'Soft delete requested by Admin',
+        new_sku: product.sku,
       },
       ip: ip,
       user_agent: userAgent,
     });
-    return { message: 'Đã xóa sản phẩm và toàn bộ dữ liệu file liên quan' };
+
+    return { message: 'Đã chuyển sản phẩm vào thùng rác (Soft Delete)' };
   }
 
-  // [AC6] API hỗ trợ xóa lẻ file (Optional - Nếu Frontend gọi xóa từng ảnh)
+  // API hỗ trợ xóa lẻ file
   async removeMediaFile(filePath: string) {
     this.deletePhysicalFile(filePath);
     return { message: 'Đã xóa file vật lý' };
   }
 
+  // Các hàm Tags giữ nguyên
   async updateTags(
     id: string,
     tags: string[],
@@ -657,22 +732,23 @@ export class ProductsService {
     ip: string,
     userAgent: string,
   ) {
-    const product = await this.productModel.findById(id);
+    const product = await this.productModel.findOne({
+      _id: id,
+      is_deleted: false,
+    });
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
-    // [AC3] Ràng buộc: Chỉ được chọn từ danh sách Tag đã tồn tại
     const isValid = await this.tagsService.validateTagsExist(tags);
     if (!isValid) {
       throw new BadRequestException(
-        'Phát hiện thẻ không hợp lệ (không tồn tại trong hệ thống). Vui lòng kiểm tra lại.',
+        'Phát hiện thẻ không hợp lệ (không tồn tại trong hệ thống).',
       );
     }
 
     const oldTags = product.tags;
-    product.tags = tags; // Ghi đè danh sách mới (Xử lý cả gán và gỡ)
+    product.tags = tags;
     await product.save();
 
-    // [AC8] Ghi Log
     await this.auditLogsService.log({
       action: 'UPDATE_PRODUCT_TAGS',
       collection_name: 'products',
@@ -686,8 +762,6 @@ export class ProductsService {
     return product;
   }
 
-  // [AC6] GẮN THẺ HÀNG LOẠT (BULK TAGGING)
-  // [FIX] Thêm ip và userAgent vào tham số để log chính xác hơn
   async bulkAddTags(
     productIds: string[],
     tagsToAdd: string[],
@@ -695,18 +769,14 @@ export class ProductsService {
     ip: string,
     userAgent: string,
   ) {
-    // 1. Validate tags
     const isValid = await this.tagsService.validateTagsExist(tagsToAdd);
     if (!isValid) throw new BadRequestException('Thẻ không tồn tại.');
 
-    // 2. Update hàng loạt (Dùng $addToSet để tránh trùng thẻ cũ)
     const result = await this.productModel.updateMany(
-      { _id: { $in: productIds } },
+      { _id: { $in: productIds }, is_deleted: false },
       { $addToSet: { tags: { $each: tagsToAdd } } },
     );
 
-    // [AC8] Ghi log tổng (Updated theo DTO)
-    // Lưu ý: target_id null là hợp lệ vì tác động nhiều object, chi tiết xem trong detail
     await this.auditLogsService.log({
       action: 'BULK_TAGGING',
       collection_name: 'products',
@@ -715,7 +785,7 @@ export class ProductsService {
       detail: {
         products_affected: result.modifiedCount,
         tags_added: tagsToAdd,
-        target_ids: productIds, // Lưu danh sách ID bị ảnh hưởng để truy vết
+        target_ids: productIds,
       },
       ip: ip,
       user_agent: userAgent,
@@ -729,10 +799,7 @@ export class ProductsService {
   private deletePhysicalFile(relativePath: string) {
     if (!relativePath) return;
     try {
-      // Chuyển đường dẫn tương đối (/uploads/...) thành tuyệt đối
-      // Giả sử thư mục gốc project là nơi chạy lệnh start
       const absolutePath = path.join(process.cwd(), relativePath);
-
       if (fs.existsSync(absolutePath)) {
         fs.unlinkSync(absolutePath);
         console.log(`[FILE] Deleted: ${absolutePath}`);

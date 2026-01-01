@@ -8,9 +8,9 @@ import {
   Delete,
   Query,
   UseGuards,
-  Req, 
-  Ip, 
-  Headers, 
+  Req,
+  Ip,
+  Headers,
 } from '@nestjs/common';
 import { TagsService } from './tags.service';
 import { CreateTagDto } from './dto/create-tag.dto';
@@ -25,6 +25,8 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
 import { Public } from 'src/common/decorators/public.decorator';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import type { IUser } from 'src/common/interfaces/user.interface';
 
 @Controller('tags')
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
@@ -35,16 +37,11 @@ export class TagsController {
   @RequirePermissions(Resource.TAGS, Action.CREATE)
   create(
     @Body() createTagDto: CreateTagDto,
-    @Req() req,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @Headers('user-agent') userAgent: string,
   ) {
-    return this.tagsService.create(
-      createTagDto,
-      req.user.userId,
-      ip,
-      userAgent,
-    );
+    return this.tagsService.create(createTagDto, user._id, ip, userAgent);
   }
 
   @Get()
@@ -58,17 +55,11 @@ export class TagsController {
   update(
     @Param('id') id: string,
     @Body() updateTagDto: UpdateTagDto,
-    @Req() req,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @Headers('user-agent') userAgent: string,
   ) {
-    return this.tagsService.update(
-      id,
-      updateTagDto,
-      req.user.userId,
-      ip,
-      userAgent,
-    );
+    return this.tagsService.update(id, updateTagDto, user._id, ip, userAgent);
   }
 
   @Delete(':id')
@@ -76,11 +67,11 @@ export class TagsController {
   @RequirePermissions(Resource.TAGS, Action.DELETE)
   remove(
     @Param('id') id: string,
-    @Req() req,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @Headers('user-agent') userAgent: string,
   ) {
-    return this.tagsService.remove(id, req.user.userId, ip, userAgent);
+    return this.tagsService.remove(id, user._id, ip, userAgent);
   }
 
   @Post('merge')
@@ -88,14 +79,14 @@ export class TagsController {
   @RequirePermissions(Resource.TAGS, Action.UPDATE)
   merge(
     @Body() mergeDto: MergeTagsDto,
-    @Req() req,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @Headers('user-agent') userAgent: string,
   ) {
     return this.tagsService.mergeTags(
       mergeDto.targetTagId,
       mergeDto.sourceTagId,
-      req.user.userId,
+      user._id,
       ip,
       userAgent,
     );

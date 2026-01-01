@@ -8,14 +8,11 @@ import {
   Delete,
   Query,
   UseGuards,
-  Req,
   Ip,
   Headers as HttpHeaders,
-  BadRequestException,
   UploadedFiles,
   UseInterceptors,
-  ParseFilePipeBuilder,
-  HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -28,17 +25,16 @@ import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { Role } from '../../../common/enums/role.enum';
 import { Public } from '../../../common/decorators/public.decorator';
-import type { RequestWithUser } from '../../../common/interfaces/request-with-user.interface';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import {
-  storageConfig,
-  fileFilter,
-  limits,
-} from '../../../common/utils/file-upload.util';
 import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import type { IUser } from 'src/common/interfaces/user.interface';
+import * as fs from 'fs';
+import * as path from 'path';
+import sharp from 'sharp';
 
 @Controller('products')
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
@@ -50,7 +46,6 @@ export class ProductsController {
   @Public()
   @Get('store/list')
   findAllPublic(@Query() query: any) {
-    // Override: Khách chỉ xem được hàng ACTIVE
     query.status = 'ACTIVE';
     return this.productsService.findAll(query);
   }
@@ -61,36 +56,26 @@ export class ProductsController {
     return this.productsService.findBySlug(slug);
   }
 
+  @Public()
+  @Get('store/related/:id')
+  findRelated(@Param('id') id: string) {
+    return this.productsService.findRelated(id);
+  }
+
   // ADMIN / STAFF API (DASHBOARD)
 
   @Post()
-  @UseGuards(JwtAuthGuard)
   @RequirePermissions(Resource.PRODUCTS, Action.CREATE)
   create(
     @Body() createProductDto: CreateProductDto,
-    @Req() req: RequestWithUser,
+    @CurrentUser() user: IUser, 
     @Ip() ip: string,
     @HttpHeaders('user-agent') userAgent: string,
   ) {
-    //Nếu là nhân viên, cưỡng chế giá về 0
-    if (
-      req.user.roles.includes(Role.STAFF) &&
-      !req.user.roles.includes(Role.MANAGER) &&
-      !req.user.roles.includes(Role.SUPER_ADMIN)
-    ) {
-      createProductDto.price = 0;
-      createProductDto.sale_price = 0;
-      if (createProductDto.variants) {
-        createProductDto.variants.forEach((v) => {
-          v.price = 0;
-          v.sale_price = 0;
-        });
-      }
-    }
-
     return this.productsService.create(
       createProductDto,
-      req.user._id,
+      user._id,
+      user.roles, 
       ip,
       userAgent,
     );
@@ -102,47 +87,52 @@ export class ProductsController {
     return this.productsService.findAll(query);
   }
 
+  @Get('price-requests/pending')
+  @RequirePermissions(Resource.PRODUCTS, Action.READ)
+  @Roles(Role.MANAGER, Role.SUPER_ADMIN)
+  findPendingPriceRequests(@Query() query: any) {
+    return this.productsService.findPendingPriceRequests(query);
+  }
+
   @Get(':id')
   @RequirePermissions(Resource.PRODUCTS, Action.READ)
   findOne(@Param('id') id: string) {
     return this.productsService.findOne(id);
   }
 
-  // API 1: Sửa thông tin chung
   @Patch(':id')
   @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
   update(
     @Param('id') id: string,
     @Body() updateProductDto: UpdateProductDto,
-    @Req() req: RequestWithUser,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @HttpHeaders('user-agent') userAgent: string,
   ) {
     return this.productsService.update(
       id,
       updateProductDto,
-      req.user._id,
+      user._id,
       ip,
       userAgent,
     );
   }
 
-  // API 2: Cập nhật Trạng thái
   @Patch(':id/status')
   @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
   @Roles(Role.MANAGER, Role.SUPER_ADMIN)
   updateStatus(
     @Param('id') id: string,
     @Body() statusDto: UpdateProductStatusDto,
-    @Req() req: RequestWithUser,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @HttpHeaders('user-agent') userAgent: string,
   ) {
     return this.productsService.updateStatus(
       id,
       statusDto,
-      req.user._id,
-      req.user.roles as Role[],
+      user._id,
+      user.roles, 
       ip,
       userAgent,
     );
@@ -154,16 +144,14 @@ export class ProductsController {
   requestPrice(
     @Param('id') id: string,
     @Body() dto: UpdateProductPriceDto,
-    @Req() req: RequestWithUser,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @HttpHeaders('user-agent') userAgent: string,
   ) {
     return this.productsService.requestPriceUpdate(
       id,
       dto,
-      (req.user as any).userId ||
-        (req.user as any)._id ||
-        (req.user as any).sub,
+      user._id,
       ip,
       userAgent,
     );
@@ -176,14 +164,14 @@ export class ProductsController {
   approvePrice(
     @Param('id') id: string,
     @Body('action') action: 'approve' | 'reject',
-    @Req() req: RequestWithUser,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @HttpHeaders('user-agent') userAgent: string,
   ) {
     return this.productsService.approvePriceChange(
       id,
       action === 'approve',
-      req.user._id,
+      user._id,
       ip,
       userAgent,
     );
@@ -194,71 +182,84 @@ export class ProductsController {
   @Roles(Role.MANAGER, Role.SUPER_ADMIN)
   remove(
     @Param('id') id: string,
-    @Req() req: RequestWithUser,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @HttpHeaders('user-agent') userAgent: string,
   ) {
-    return this.productsService.remove(id, req.user._id, ip, userAgent);
+    return this.productsService.remove(id, user._id, ip, userAgent);
   }
 
   @Post('upload')
   @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
   @UseInterceptors(
-    FilesInterceptor('files', 10, {
-      storage: storageConfig('products'),
-      fileFilter: fileFilter,
-      limits: limits,
-    }),
+    FilesInterceptor('files'), 
   )
-  uploadFiles(
-    @UploadedFiles(
-      // [TỐI ƯU] Sử dụng Pipe để validate ngay lập tức
-      new ParseFilePipeBuilder()
-        .addFileTypeValidator({
-          fileType: /(jpg|jpeg|png|webp)$/, // Chỉ chấp nhận ảnh
-        })
-        .addMaxSizeValidator({
-          maxSize: 1024 * 1024 * 5, // Tối đa 5MB (AC2)
-        })
-        .build({
-          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
-          fileIsRequired: true,
-        }),
-    )
+  async uploadFiles(
+    @UploadedFiles()
     files: Array<Express.Multer.File>,
   ) {
-    // Không cần check thủ công file.size hay fs.unlinkSync nữa
-    // Nếu code chạy vào đến đây, tức là toàn bộ file đều hợp lệ.
+    if (!files || files.length === 0)
+      throw new BadRequestException('Không có file nào được tải lên');
+    const processedFiles: any[] = [];
+    const uploadDir = path.join(process.cwd(), 'uploads/products');
 
-    const processedFiles = files.map((file) => ({
-      originalName: file.originalname,
-      filename: file.filename,
-      path: `/uploads/products/${file.filename}`,
-      mimetype: file.mimetype,
-      size: file.size,
-    }));
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    for (const file of files) {
+      // Tạo tên file ngẫu nhiên
+      const filename = `prod-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+      const ext = path.extname(file.originalname).toLowerCase();
+
+      // 1. Lưu ảnh gốc (High Quality)
+      const originalPath = path.join(uploadDir, `${filename}${ext}`);
+      await sharp(file.buffer).toFile(originalPath);
+
+      // 2. Tạo ảnh Thumbnail (200x200)
+      const thumbPath = path.join(uploadDir, `${filename}-thumb${ext}`);
+      await sharp(file.buffer)
+        .resize(200, 200, { fit: 'cover' })
+        .toFile(thumbPath);
+
+      // 3. Tạo ảnh Medium (800px width - auto height)
+      const mediumPath = path.join(uploadDir, `${filename}-medium${ext}`);
+      await sharp(file.buffer)
+        .resize(800, null, { withoutEnlargement: true })
+        .toFile(mediumPath);
+
+      //Push vào mảng đã khai báo type
+      processedFiles.push({
+        originalName: file.originalname,
+        filename: `${filename}${ext}`,
+        path: `/uploads/products/${filename}${ext}`,
+        thumbnail: `/uploads/products/${filename}-thumb${ext}`,
+        medium: `/uploads/products/${filename}-medium${ext}`,
+        mimetype: file.mimetype,
+        size: file.size,
+        type: 'IMAGE',
+      });
+    }
 
     return {
-      message: 'Tải lên thành công',
+      message: 'Tải lên và xử lý ảnh thành công',
       data: processedFiles,
     };
   }
 
-  // API 3: Gắn thẻ (Tags) cho sản phẩm
   @Patch(':id/tags')
   @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
   async updateTags(
     @Param('id') id: string,
-    @Body() body: { tags: string[] }, // Lưu ý: Nhận Body là Object chứa mảng tags
-    @Req() req: RequestWithUser,
+    @Body() body: { tags: string[] },
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @HttpHeaders('user-agent') userAgent: string,
   ) {
-    // Gọi sang service
     return this.productsService.updateTags(
       id,
       body.tags,
-      req.user._id,
+      user._id,
       ip,
       userAgent,
     );

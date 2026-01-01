@@ -1,10 +1,39 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Schema as MongooseSchema } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { ProductStatus } from '../../../../common/enums/product-status.enum';
 import { ProductVariant, ProductVariantSchema } from './product-variant.schema';
 import { Category } from '../../categories/schemas/category.schema';
 
 export type ProductDocument = Product & Document;
+
+@Schema({ _id: false })
+export class ProductMedia {
+  @Prop({ required: true })
+  url: string; // Link ảnh/video
+
+  @Prop({
+    required: true,
+    enum: ['IMAGE', 'VIDEO', '360_VIEW'],
+    default: 'IMAGE',
+  })
+  type: string; // AC4 (Video), AC10 (360 độ)
+
+  @Prop()
+  thumbnail?: string; // AC1: Thumbnail cho video
+
+  @Prop()
+  alt?: string; // AC12: SEO Text
+
+  @Prop()
+  color?: string; // AC6: Mapping màu sắc (VD: "Đỏ")
+
+  @Prop({ default: 0 })
+  display_order: number;
+
+  // [BỔ SUNG] Thêm trường này để khớp với kết quả từ Controller upload
+  @Prop()
+  medium?: string;
+}
 
 @Schema({ _id: false })
 export class ProductSeo {
@@ -52,8 +81,8 @@ export class PendingPriceChange {
   @Prop({ type: [PendingVariantPrice], default: [] })
   variants?: PendingVariantPrice[];
 
-  @Prop({ required: true })
-  requester_id: string;
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
+  requester_id: Types.ObjectId;
 
   @Prop({ default: Date.now })
   requested_at: Date;
@@ -80,6 +109,24 @@ export class Product {
   @Prop()
   brand: string;
 
+  @Prop({ type: [ProductMedia], default: [] }) // Bỏ Mixed, dùng Schema class trực tiếp
+  gallery: ProductMedia[];
+
+  @Prop({ type: [String], default: [] })
+  images: string[];
+
+  @Prop()
+  video: string;
+
+  @Prop({ default: null })
+  max_purchase_qty?: number; 
+
+  @Prop({ default: 1 })
+  min_purchase_qty: number;
+
+  @Prop({ default: false })
+  is_member_only: boolean; // AC14: Chỉ dành cho thành viên
+
   //PHÂN LOẠI & TAGS
   @Prop({
     type: [{ type: MongooseSchema.Types.ObjectId, ref: 'Category' }],
@@ -94,25 +141,18 @@ export class Product {
   @Prop({ type: [ProductAttributeParams], default: [] })
   specs: ProductAttributeParams[]; // VD: [{ name: "Màu", values: ["Đỏ", "Xanh"] }]
 
-  //MEDIA (US.73)
-  @Prop({ type: [String], default: [] })
-  images: string[];
-
   @Prop()
   thumbnail: string;
 
-  @Prop()
-  video: string;
-
   //GIÁ & KHUYẾN MÃI (US.75)
   @Prop({ required: true, default: 0 })
-  price: number; 
+  price: number;
 
   @Prop({ default: 0 })
-  sale_price: number; 
+  sale_price: number;
 
   @Prop()
-  sale_start_date: Date; 
+  sale_start_date: Date;
 
   @Prop()
   sale_end_date: Date;
@@ -161,7 +201,7 @@ export class Product {
   @Prop({ default: 0 })
   sold_count: number;
 
-  @Prop({ default: 0, index: true })
+  @Prop({ default: 0 })
   rating_average: number;
 
   @Prop({ default: 0 })
@@ -170,11 +210,33 @@ export class Product {
   // Trường lưu dữ liệu chờ duyệt giá
   @Prop({ type: PendingPriceChange, default: null })
   pending_price_change: PendingPriceChange | null;
+
+  @Prop({ default: false, index: true })
+  is_deleted: boolean;
+
+  @Prop({ default: null })
+  deleted_at: Date;
 }
 
 export const ProductSchema = SchemaFactory.createForClass(Product);
 
-// Indexing
+//Virtual Property: Tính toán giá Active dựa trên giờ Server
+ProductSchema.virtual('current_active_price').get(function (this: Product) {
+  const now = new Date();
+  if (
+    this.sale_price > 0 &&
+    this.sale_start_date &&
+    this.sale_end_date &&
+    now >= this.sale_start_date &&
+    now <= this.sale_end_date
+  ) {
+    return this.sale_price;
+  }
+  return this.price;
+});
+
+ProductSchema.set('toJSON', { virtuals: true });
+ProductSchema.set('toObject', { virtuals: true });
 ProductSchema.index({ status: 1, price: 1 });
 ProductSchema.index({ categories: 1, status: 1 });
 ProductSchema.index({ tags: 1, status: 1 });

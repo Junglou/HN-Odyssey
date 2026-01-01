@@ -55,10 +55,10 @@ export class AdminService {
     createdById: string,
     ip: string,
     userAgent: string,
-    currentUserRole: string,
+    currentUserRoles: RoleEnum[],
   ) {
     // 1. Logic kiểm tra phân cấp
-    if (currentUserRole !== RoleEnum.SUPER_ADMIN) {
+    if (!currentUserRoles.includes(RoleEnum.SUPER_ADMIN)) {
       const isCreatingHighPrivilege = dto.roles.some(
         (r) => r === RoleEnum.SUPER_ADMIN || r === RoleEnum.MANAGER,
       );
@@ -163,7 +163,7 @@ export class AdminService {
     id: string,
     dto: UpdateStaffDto,
     currentUserId: string,
-    currentUserRole: string,
+    currentUserRoles: RoleEnum[],
     ip: string,
     userAgent: string,
   ) {
@@ -171,7 +171,7 @@ export class AdminService {
     if (!user) throw new NotFoundException('Nhân sự không tồn tại.');
 
     // CHECK QUYỀN
-    if (dto.roles && currentUserRole !== RoleEnum.SUPER_ADMIN) {
+    if (dto.roles && !currentUserRoles.includes(RoleEnum.SUPER_ADMIN)) {
       const isPromotingToAdmin = dto.roles.some(
         (r) => r === RoleEnum.SUPER_ADMIN,
       );

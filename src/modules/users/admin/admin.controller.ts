@@ -6,7 +6,6 @@ import {
   Delete,
   Param,
   Query,
-  Req,
   UseGuards,
   Ip,
   Headers as HttpHeaders,
@@ -26,6 +25,10 @@ import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
 
+// [NEW] Import Interface & Decorator chuẩn
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import type { IUser } from 'src/common/interfaces/user.interface';
+
 @Controller('admin/users')
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class AdminController {
@@ -40,18 +43,16 @@ export class AdminController {
   @RequirePermissions(Resource.USERS, Action.CREATE)
   async createStaff(
     @Body() dto: CreateStaffDto,
-    @Req() req,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @HttpHeaders('user-agent') userAgent: string,
   ) {
-    const createdBy = req.user.userId;
-    const currentUserRole = req.user.roles;
     return this.adminService.createStaff(
       dto,
-      createdBy,
+      user._id,
       ip,
       userAgent,
-      currentUserRole,
+      user.roles,
     );
   }
 
@@ -70,18 +71,15 @@ export class AdminController {
   async updateStaff(
     @Param('id') id: string,
     @Body() dto: UpdateStaffDto,
-    @Req() req,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @HttpHeaders('user-agent') userAgent: string,
   ) {
-    const currentUserId = req.user.userId;
-    const currentUserRole = req.user.roles;
-
     return this.adminService.updateStaff(
       id,
       dto,
-      currentUserId,
-      currentUserRole,
+      user._id,
+      user.roles,
       ip,
       userAgent,
     );
@@ -93,12 +91,11 @@ export class AdminController {
   @RequirePermissions(Resource.USERS, Action.DELETE)
   async deleteStaff(
     @Param('id') id: string,
-    @Req() req,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @HttpHeaders('user-agent') userAgent: string,
   ) {
-    const currentUserId = req.user.userId;
-    return this.adminService.softDeleteStaff(id, currentUserId, ip, userAgent);
+    return this.adminService.softDeleteStaff(id, user._id, ip, userAgent);
   }
 
   // 5. ĐỔI TRẠNG THÁI (US.56 AC2)
@@ -108,20 +105,14 @@ export class AdminController {
   async changeStatus(
     @Param('id') id: string,
     @Body() dto: ChangeStatusDto,
-    @Req() req,
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @HttpHeaders('user-agent') userAgent: string,
   ) {
-    return this.adminService.changeStatus(
-      id,
-      dto,
-      req.user.userId,
-      ip,
-      userAgent,
-    );
+    return this.adminService.changeStatus(id, dto, user._id, ip, userAgent);
   }
 
-  // 6. LẤY CHI TIẾT (Để phục vụ US.53 AC5 - Pre-fill form)
+  // 6. LẤY CHI TIẾT
   @Get(':id')
   @Roles(Role.SUPER_ADMIN, Role.MANAGER)
   @RequirePermissions(Resource.USERS, Action.READ)
