@@ -100,6 +100,29 @@ export class Product {
   @Prop({ required: true, unique: true, index: true })
   slug: string;
 
+  //Lưu danh sách các slug cũ để Redirect 301
+  @Prop({ type: [String], default: [], index: true })
+  old_slugs: string[];
+
+  @Prop({ default: 0 })
+  soldCount: number; // Để tính badge Best Seller
+
+  @Prop()
+  metaTitle: string; // AC14: Advanced SEO
+
+  @Prop()
+  metaDescription: string; // AC14: Advanced SEO
+
+  // AC1: Giá khuyến mãi & Gốc
+  @Prop()
+  originalPrice: number;
+
+  @Prop()
+  salePrice: number;
+
+  @Prop({ type: Date })
+  saleEndDate: Date;
+
   @Prop({ type: String })
   description: string;
 
@@ -119,7 +142,7 @@ export class Product {
   video: string;
 
   @Prop({ default: null })
-  max_purchase_qty?: number; 
+  max_purchase_qty?: number;
 
   @Prop({ default: 1 })
   min_purchase_qty: number;
@@ -220,18 +243,70 @@ export class Product {
 
 export const ProductSchema = SchemaFactory.createForClass(Product);
 
-//Virtual Property: Tính toán giá Active dựa trên giờ Server
+//Tinh chỉnh logic hiển thị Badge
+ProductSchema.virtual('badges').get(function (this: Product) {
+  const badges: { type: string; label: string }[] = [];
+
+  // 1. Badge Hết hàng
+  if (this.stock <= 0) {
+    badges.push({ type: 'OUT_OF_STOCK', label: 'Hết hàng' });
+    return badges; // Ưu tiên cao nhất
+  }
+
+  // 2. Badge New (Sản phẩm tạo trong vòng 7 ngày)
+  const isNew =
+    new Date().getTime() - (this['created_at']?.getTime() || 0) <
+    7 * 24 * 60 * 60 * 1000;
+  if (isNew) badges.push({ type: 'NEW', label: 'Mới' });
+
+  // 3. Badge Sale -XX%
+  if (this.sale_price > 0 && this.sale_price < this.price) {
+    // Kiểm tra ngày hiệu lực sale
+    const now = new Date();
+    if (
+      !this.sale_start_date ||
+      !this.sale_end_date ||
+      (now >= this.sale_start_date && now <= this.sale_end_date)
+    ) {
+      //Sử dụng Math.floor để làm tròn xuống và chặn trần 99%
+      let percent = Math.floor(
+        ((this.price - this.sale_price) / this.price) * 100,
+      );
+
+      // Nếu tính ra 100% (do làm tròn) nhưng giá vẫn > 0 -> set cứng 99%
+      if (percent >= 100 && this.sale_price > 0) {
+        percent = 99;
+      }
+
+      // Chỉ hiện badge nếu giảm giá ít nhất 1%
+      if (percent > 0) {
+        badges.push({ type: 'SALE', label: `-${percent}%` });
+      }
+    }
+  }
+
+  // 4. Badge Best Seller (Ví dụ bán > 1000 cái)
+  if (this.sold_count > 1000)
+    badges.push({ type: 'BEST_SELLER', label: 'Bán chạy' });
+
+  return badges;
+});
+
 ProductSchema.virtual('current_active_price').get(function (this: Product) {
+  // Trường hợp 1: Có ngày cụ thể
   const now = new Date();
-  if (
-    this.sale_price > 0 &&
-    this.sale_start_date &&
-    this.sale_end_date &&
-    now >= this.sale_start_date &&
-    now <= this.sale_end_date
-  ) {
+  if (this.sale_price > 0 && this.sale_start_date && this.sale_end_date) {
+    if (now >= this.sale_start_date && now <= this.sale_end_date) {
+      return this.sale_price;
+    }
+    return this.price; // Hết hạn sale
+  }
+
+  // Trường hợp 2: Không set ngày -> Sale vĩnh viễn (FIX)
+  if (this.sale_price > 0 && this.sale_price < this.price) {
     return this.sale_price;
   }
+
   return this.price;
 });
 
@@ -241,3 +316,5 @@ ProductSchema.index({ status: 1, price: 1 });
 ProductSchema.index({ categories: 1, status: 1 });
 ProductSchema.index({ tags: 1, status: 1 });
 ProductSchema.index({ rating_average: -1 });
+ProductSchema.index({ name: 'text', tags: 'text' });
+ProductSchema.index({ old_slugs: 1 });

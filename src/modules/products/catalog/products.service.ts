@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -26,6 +28,11 @@ import * as path from 'path';
 import { TagsService } from '../tags/tags.service';
 import { Role } from 'src/common/enums/role.enum';
 import sanitizeHtml from 'sanitize-html';
+import {
+  Category,
+  CategoryDocument,
+} from '../categories/schemas/category.schema';
+import { FilterProductDto, SortOption } from './dto/filter-product.dto';
 
 @Injectable()
 export class ProductsService {
@@ -33,6 +40,7 @@ export class ProductsService {
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
     private readonly auditLogsService: AuditLogsService,
     private readonly tagsService: TagsService,
+    @InjectModel(Category.name) private categoryModel: Model<CategoryDocument>,
   ) {}
 
   // HELPER METHODS
@@ -370,17 +378,42 @@ export class ProductsService {
   }
 
   async findBySlug(slug: string) {
+    // 1. Tìm Slug hiện tại
     const product = await this.productModel
       .findOne({ slug, status: ProductStatus.ACTIVE, is_deleted: false })
       .populate('categories', 'name slug')
       .lean();
 
-    if (!product) {
-      throw new NotFoundException(
-        'Sản phẩm không tìm thấy hoặc chưa được mở bán',
+    if (product) {
+      return product; // Tìm thấy đúng link -> Trả về bình thường
+    }
+
+    // 2.Nếu không thấy, tìm trong lịch sử old_slugs
+    const movedProduct = await this.productModel
+      .findOne({
+        old_slugs: slug,
+        status: ProductStatus.ACTIVE,
+        is_deleted: false,
+      })
+      .select('slug') // Chỉ cần lấy slug mới
+      .lean();
+
+    if (movedProduct) {
+      // Tìm thấy sản phẩm, nhưng link khách truy cập là link cũ
+      // Throw Exception đặc biệt để Controller bắt được và trả về Header 301
+      throw new HttpException(
+        {
+          message: 'Moved Permanently',
+          new_slug: movedProduct.slug, // Trả về slug mới cho FE
+        },
+        HttpStatus.MOVED_PERMANENTLY, // Mã lỗi 301
       );
     }
-    return product;
+
+    // 3. Không thấy đâu cả -> 404
+    throw new NotFoundException(
+      'Sản phẩm không tìm thấy hoặc chưa được mở bán',
+    );
   }
 
   // UPDATE THÔNG TIN
@@ -400,6 +433,44 @@ export class ProductsService {
     // Check trùng SKU
     if (updateDto.sku && updateDto.sku !== product.sku) {
       await this.checkSkuExists(updateDto.sku, id);
+    }
+
+    //Xử lý thay đổi Slug
+    if (updateDto.slug && updateDto.slug !== product.slug) {
+      // 1. Check trùng slug mới
+      const exists = await this.productModel.exists({
+        slug: updateDto.slug,
+        _id: { $ne: id },
+      });
+      if (exists) throw new ConflictException('Slug đã trùng');
+
+      // 2. Đẩy slug hiện tại vào lịch sử old_slugs
+      if (!product.old_slugs) product.old_slugs = [];
+      product.old_slugs.push(product.slug);
+
+      // 3. Cập nhật slug mới
+      product.slug = updateDto.slug;
+    }
+
+    // Nếu user đổi tên mà KHÔNG truyền slug -> Tự generate slug mới từ tên mới
+    else if (
+      updateDto.name &&
+      updateDto.name !== product.name &&
+      !updateDto.slug
+    ) {
+      const newSlug = this.createSlug(updateDto.name);
+      if (newSlug !== product.slug) {
+        // Check trùng
+        const exists = await this.productModel.exists({
+          slug: newSlug,
+          _id: { $ne: id },
+        });
+        if (!exists) {
+          if (!product.old_slugs) product.old_slugs = [];
+          product.old_slugs.push(product.slug);
+          product.slug = newSlug;
+        }
+      }
     }
 
     // Check trùng Tên
@@ -439,6 +510,7 @@ export class ProductsService {
     }
 
     Object.assign(product, updateDto);
+    delete updateDto.slug;
     await product.save();
 
     await this.auditLogsService.log({
@@ -807,5 +879,122 @@ export class ProductsService {
     } catch (error) {
       console.error(`[FILE] Error deleting file: ${relativePath}`, error);
     }
+  }
+
+  //Hàm findByCategory hoàn chỉnh
+  async findByCategory(dto: FilterProductDto) {
+    const { categorySlug, sort } = dto;
+    const page = dto.page || 1;
+    const limit = dto.limit || 20;
+
+    // 1. Tìm Category hiện tại
+    const category = await this.categoryModel
+      .findOne({ slug: categorySlug })
+      .lean();
+    if (!category) throw new NotFoundException('Danh mục không tồn tại');
+
+    // 2. Logic Cha-Con: Lấy cả ID của con cháu
+    // Giả sử Category Schema có trường 'path' hoặc 'parent'
+    // Cách đơn giản nhất là tìm tất cả category có parent là ID này
+    const allCategories = await this.getAllChildCategories(category._id);
+    const categoryIds = [category._id, ...allCategories];
+
+    // 3. Query
+    const query: any = {
+      categories: { $in: categoryIds },
+      status: ProductStatus.ACTIVE,
+      is_deleted: false,
+    };
+
+    // 4. Sort (AC8)
+    let sortOptions: any = {};
+    switch (sort) {
+      case SortOption.PRICE_ASC:
+        sortOptions = { sale_price: 1, price: 1 };
+        break;
+      case SortOption.PRICE_DESC:
+        sortOptions = { sale_price: -1, price: -1 };
+        break;
+      case SortOption.BEST_SELLER:
+        sortOptions = { sold_count: -1 };
+        break;
+      default:
+        sortOptions = { created_at: -1 };
+    }
+
+    const skip = (page - 1) * limit;
+
+    const subCategories = await this.categoryModel
+      .find({ parent_id: category._id })
+      .select('name slug image') // Lấy ảnh để hiển thị grid danh mục
+      .lean();
+
+    // 5. Execute
+    const [products, total] = await Promise.all([
+      this.productModel
+        .find(query)
+        // AC1: Select đủ field hiển thị Card
+        .select(
+          'name slug price sale_price sale_start_date sale_end_date thumbnail rating_average review_count sold_count stock created_at',
+        )
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(limit), // Không dùng lean() để giữ Virtuals (Badges)
+      this.productModel.countDocuments(query),
+    ]);
+
+    // AC4: Build Breadcrumbs
+    const breadcrumbs = await this.buildBreadcrumbs(category);
+
+    return {
+      data: products, // Sẽ tự động có field 'badges' và 'final_price' do Virtuals
+      meta: {
+        total,
+        page,
+        lastPage: Math.ceil(total / limit),
+        sub_categories: subCategories,
+        category: {
+          name: category.name,
+          description: category.description, 
+          banner: category.image, 
+        },
+        breadcrumbs: breadcrumbs, 
+      },
+    };
+  }
+
+  //Helper lấy danh mục con đệ quy (AC2)
+  private async getAllChildCategories(
+    parentId: Types.ObjectId,
+  ): Promise<Types.ObjectId[]> {
+    const children = await this.categoryModel
+      .find({ parent_id: parentId })
+      .select('_id')
+      .lean();
+    let results = children.map((c) => c._id);
+    for (const child of children) {
+      const subChildren = await this.getAllChildCategories(child._id);
+      results = results.concat(subChildren);
+    }
+    return results;
+  }
+
+  //Helper tạo Breadcrumb (AC4)
+  private async buildBreadcrumbs(category: any) {
+    const crumbs: { name: string; slug: string }[] = [];
+    let current = category;
+
+    // Vòng lặp truy ngược lên cha
+    while (current) {
+      crumbs.unshift({ name: current.name, slug: current.slug });
+      if (current.parent_id) {
+        current = await this.categoryModel.findById(current.parent_id).lean();
+      } else {
+        current = null;
+      }
+    }
+    // Thêm trang chủ vào đầu
+    crumbs.unshift({ name: 'Trang chủ', slug: '' });
+    return crumbs;
   }
 }

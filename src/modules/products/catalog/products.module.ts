@@ -7,12 +7,14 @@ import { CategoriesModule } from '../categories/categories.module';
 import { AuditLogsModule } from 'src/modules/system/audit-logs/audit-logs.module';
 import { TagsModule } from '../tags/tags.module';
 import { Role, RoleSchema } from 'src/modules/users/roles/schemas/role.schema';
+import { Category, CategorySchema } from '../categories/schemas/category.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Product.name, schema: ProductSchema },
       { name: Role.name, schema: RoleSchema },
+      { name: Category.name, schema: CategorySchema },
     ]),
     // [TODO] Sẽ mở comment khi Module Order hoàn thành
     // forwardRef(() => OrdersModule),

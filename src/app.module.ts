@@ -20,6 +20,7 @@ import { RolesModule } from './modules/users/roles/roles.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SalesModule } from './modules/sales/sales.module';
 import { RedisModule } from '@nestjs-modules/ioredis';
+import { SearchModule } from './modules/search/search.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { RedisModule } from '@nestjs-modules/ioredis';
     InventoryModule,
     RolesModule,
     SalesModule,
+    SearchModule,
   ],
   controllers: [AppController],
   providers: [

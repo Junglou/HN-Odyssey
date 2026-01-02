@@ -13,6 +13,8 @@ import {
   UploadedFiles,
   UseInterceptors,
   BadRequestException,
+  Res,
+  HttpStatus,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -35,6 +37,7 @@ import type { IUser } from 'src/common/interfaces/user.interface';
 import * as fs from 'fs';
 import * as path from 'path';
 import sharp from 'sharp';
+import { FilterProductDto } from './dto/filter-product.dto';
 
 @Controller('products')
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
@@ -45,15 +48,38 @@ export class ProductsController {
 
   @Public()
   @Get('store/list')
-  findAllPublic(@Query() query: any) {
-    query.status = 'ACTIVE';
-    return this.productsService.findAll(query);
+  findAllPublic(@Query() query: FilterProductDto) {
+    // Nếu có categorySlug -> Gọi hàm chuyên dụng cho US2
+    if (query.categorySlug) {
+      return this.productsService.findByCategory(query);
+    }
+
+    // Nếu không có slug (VD: trang "Tất cả sản phẩm") -> Gọi hàm thường
+    // Cần ép kiểu query về any để gán status active
+    const findAllQuery = { ...query, status: 'ACTIVE' };
+    return this.productsService.findAll(findAllQuery);
   }
 
   @Public()
   @Get('store/details/:slug')
-  findOneBySlug(@Param('slug') slug: string) {
-    return this.productsService.findBySlug(slug);
+  async findOneBySlug(@Param('slug') slug: string, @Res() res) {
+    try {
+      const product = await this.productsService.findBySlug(slug);
+      return res.status(HttpStatus.OK).json(product);
+    } catch (error) {
+      // Bắt lỗi 301 để Redirect
+      if (error.getStatus() === HttpStatus.MOVED_PERMANENTLY) {
+        const response = error.getResponse();
+        const newSlug = response['new_slug'];
+
+        // Trả về Header Location (Quan trọng cho Google SEO)
+        return res.redirect(
+          HttpStatus.MOVED_PERMANENTLY,
+          `/api/products/store/details/${newSlug}`,
+        );
+      }
+      throw error;
+    }
   }
 
   @Public()
@@ -68,14 +94,14 @@ export class ProductsController {
   @RequirePermissions(Resource.PRODUCTS, Action.CREATE)
   create(
     @Body() createProductDto: CreateProductDto,
-    @CurrentUser() user: IUser, 
+    @CurrentUser() user: IUser,
     @Ip() ip: string,
     @HttpHeaders('user-agent') userAgent: string,
   ) {
     return this.productsService.create(
       createProductDto,
       user._id,
-      user.roles, 
+      user.roles,
       ip,
       userAgent,
     );
@@ -132,7 +158,7 @@ export class ProductsController {
       id,
       statusDto,
       user._id,
-      user.roles, 
+      user.roles,
       ip,
       userAgent,
     );
@@ -191,9 +217,7 @@ export class ProductsController {
 
   @Post('upload')
   @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
-  @UseInterceptors(
-    FilesInterceptor('files'), 
-  )
+  @UseInterceptors(FilesInterceptor('files'))
   async uploadFiles(
     @UploadedFiles()
     files: Array<Express.Multer.File>,
@@ -263,5 +287,30 @@ export class ProductsController {
       ip,
       userAgent,
     );
+  }
+
+  @Get(':slug')
+  async getDetail(@Param('slug') slug: string, @Res() res) {
+    try {
+      const product = await this.productsService.findBySlug(slug);
+      return res.status(HttpStatus.OK).json(product);
+    } catch (error) {
+      if (error.getStatus() === HttpStatus.MOVED_PERMANENTLY) {
+        const response = error.getResponse();
+        const newSlug = response['new_slug'];
+        // Set Header Location để Google Bot biết đường link mới
+        return res.redirect(
+          HttpStatus.MOVED_PERMANENTLY,
+          `/products/${newSlug}`,
+        );
+
+        // Nếu làm SPA (React/Next), trả về JSON để FE tự push router:
+        // return res.status(HttpStatus.MOVED_PERMANENTLY).json({
+        //    redirect: true,
+        //    new_url: `/products/${newSlug}`
+        // });
+      }
+      throw error;
+    }
   }
 }
