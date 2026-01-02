@@ -16,6 +16,7 @@ import {
   ReviewReportDocument,
 } from './schemas/review-report.schema';
 import { ReportReviewDto } from './dto/report-review.dto';
+import { Department } from 'src/common/enums/department.enum';
 
 @Injectable()
 export class ReviewsService {
@@ -28,7 +29,12 @@ export class ReviewsService {
     private reviewReportModel: Model<ReviewReportDocument>,
   ) {}
 
-  async create(userId: string, dto: CreateReviewDto) {
+  async create(
+    userId: string,
+    dto: CreateReviewDto,
+    ip?: string,
+    userAgent?: string,
+  ) {
     const order = await this.orderModel.findOne({
       _id: dto.orderId,
       user_id: new Types.ObjectId(userId),
@@ -76,6 +82,21 @@ export class ReviewsService {
     });
 
     this.updateProductRating(dto.productId);
+
+    await this.auditLogsService.log({
+      action: 'CREATE_REVIEW',
+      collection_name: 'reviews',
+      department: Department.CSKH,
+      actor_id: userId,
+      target_id: review._id,
+      detail: {
+        product_id: dto.productId,
+        rating: dto.rating,
+        has_media: dto.media && dto.media.length > 0,
+      },
+      ip: ip || 'Unknown',
+      user_agent: userAgent || 'Unknown',
+    });
 
     return review;
   }
@@ -268,6 +289,7 @@ export class ReviewsService {
         collection_name: 'reviews',
         actor_id: adminId,
         target_id: review._id,
+        department: Department.CSKH,
         detail: { new_status: status },
         ip: ip || 'Unknown',
         user_agent: userAgent || 'Unknown',
@@ -281,7 +303,13 @@ export class ReviewsService {
     return this.reviewModel.find({ status: 'PENDING' }).sort({ createdAt: 1 });
   }
 
-  async reportReview(userId: string, reviewId: string, dto: ReportReviewDto) {
+  async reportReview(
+    userId: string,
+    reviewId: string,
+    dto: ReportReviewDto,
+    ip?: string,
+    userAgent?: string,
+  ) {
     // 1. Kiểm tra Review có tồn tại không
     const review = await this.reviewModel.findById(reviewId);
     if (!review) throw new NotFoundException('Đánh giá không tồn tại');
@@ -301,6 +329,20 @@ export class ReviewsService {
       review_id: new Types.ObjectId(reviewId),
       reporter_id: new Types.ObjectId(userId),
       reason: dto.reason,
+    });
+
+    await this.auditLogsService.log({
+      action: 'REPORT_REVIEW',
+      collection_name: 'review_reports',
+      department: Department.CSKH,
+      actor_id: userId,
+      target_id: report._id,
+      detail: {
+        review_id: reviewId,
+        reason: dto.reason,
+      },
+      ip: ip || 'Unknown',
+      user_agent: userAgent || 'Unknown',
     });
 
     return { message: 'Cảm ơn bạn đã báo cáo. Chúng tôi sẽ xem xét sớm nhất.' };

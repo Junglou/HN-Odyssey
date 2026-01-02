@@ -52,7 +52,7 @@ export class ReviewsController {
     }
 
     // userId thường đã là string rồi, không cần toString() nếu không chắc chắn
-    return this.reviewsService.create(userId.toString(), dto);
+    return this.reviewsService.create(userId.toString(), dto, ip, userAgent);
   }
 
   @Public()
@@ -67,7 +67,7 @@ export class ReviewsController {
   async approve(
     @Param('id') id: string,
     @Body('status') status: 'APPROVED' | 'HIDDEN',
-    @CurrentUser() user: any, 
+    @CurrentUser() user: any,
   ) {
     return this.reviewsService.approveReview(id, status);
   }
@@ -80,7 +80,7 @@ export class ReviewsController {
   }
 
   @Post(':id/report')
-  @UseGuards(JwtAuthGuard) 
+  @UseGuards(JwtAuthGuard)
   async report(
     @Param('id') id: string,
     @Body() dto: ReportReviewDto,
@@ -98,7 +98,7 @@ export class ReviewsController {
       throw new BadRequestException('Vui lòng chọn ảnh/video để tải lên');
     }
 
-    const processedFiles: any[] = []; 
+    const processedFiles: any[] = [];
     const uploadDir = path.join(process.cwd(), 'uploads/reviews');
 
     if (!fs.existsSync(uploadDir)) {
@@ -126,20 +126,19 @@ export class ReviewsController {
           type: 'IMAGE',
         });
       } else if (isVideo) {
-
         fs.writeFileSync(filePath, file.buffer);
 
         processedFiles.push({
           url: `/uploads/reviews/${filename}${ext}`,
           type: 'VIDEO',
-          thumbnail: null, 
+          thumbnail: null,
         });
       }
     }
 
     return {
       message: 'Upload thành công',
-      data: processedFiles, 
+      data: processedFiles,
     };
   }
 

@@ -12,6 +12,7 @@ import { User, UserDocument } from '../schemas/user.schema';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { AuditLogsService } from '../../system/audit-logs/audit-logs.service';
+import { Department } from 'src/common/enums/department.enum';
 
 @Injectable()
 export class RolesService {
@@ -49,6 +50,7 @@ export class RolesService {
       collection_name: 'roles',
       actor_id: actorId,
       target_id: savedRole._id,
+      department: Department.MANAGEMENT,
       detail: {
         name: savedRole.name,
         slug: savedRole.slug,
@@ -124,6 +126,7 @@ export class RolesService {
       collection_name: 'roles',
       actor_id: actorId,
       target_id: role._id,
+      department: Department.MANAGEMENT,
       detail: {
         updated_role: role.slug,
         changes: dto,
@@ -162,6 +165,7 @@ export class RolesService {
       collection_name: 'roles',
       actor_id: actorId,
       target_id: id,
+      department: Department.MANAGEMENT,
       detail: { role_name: role.name, role_slug: role.slug },
       ip,
       user_agent: userAgent,

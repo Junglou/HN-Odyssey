@@ -11,6 +11,7 @@ import { CreateAttributeDto } from './dto/create-attribute.dto';
 import { UpdateAttributeDto } from './dto/update-attribute.dto';
 import { Product, ProductDocument } from '../catalog/schemas/product.schema';
 import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
+import { Department } from 'src/common/enums/department.enum';
 
 // Hàm helper escape regex
 function escapeRegExp(string: string) {
@@ -59,6 +60,7 @@ export class AttributesService {
       collection_name: 'attributes',
       actor_id: actorId,
       target_id: savedAttr._id,
+      department: Department.SALE_MARKETING,
       detail: {
         name: savedAttr.name,
         values: savedAttr.values,
@@ -126,6 +128,7 @@ export class AttributesService {
       collection_name: 'attributes',
       actor_id: actorId,
       target_id: attr._id,
+      department: Department.SALE_MARKETING,
       detail: {
         attribute_name: attr.name,
         changes: {
@@ -163,6 +166,7 @@ export class AttributesService {
         collection_name: 'attributes',
         actor_id: actorId,
         target_id: id,
+        department: Department.SALE_MARKETING,
         detail: { reason: 'Attribute is in use by products', name: attr.name },
         is_success: false,
         ip,
@@ -183,6 +187,7 @@ export class AttributesService {
       collection_name: 'attributes',
       actor_id: actorId,
       target_id: id,
+      department: Department.SALE_MARKETING,
       detail: {
         name: attr.name,
         values: attr.values,

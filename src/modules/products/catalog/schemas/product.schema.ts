@@ -317,4 +317,3 @@ ProductSchema.index({ categories: 1, status: 1 });
 ProductSchema.index({ tags: 1, status: 1 });
 ProductSchema.index({ rating_average: -1 });
 ProductSchema.index({ name: 'text', tags: 'text' });
-ProductSchema.index({ old_slugs: 1 });

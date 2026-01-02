@@ -13,6 +13,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { Product } from 'src/modules/products/catalog/schemas/product.schema';
 import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
 import { ProductStatus } from 'src/common/enums/product-status.enum';
+import { Department } from 'src/common/enums/department.enum';
 
 @Injectable()
 export class OrdersService {
@@ -68,7 +69,7 @@ export class OrdersService {
         queryCriteria.user_id = new Types.ObjectId(data.userId);
         hasIdentity = true;
       } else if (data.guestSessionId) {
-        queryCriteria.session_id = data.guestSessionId; 
+        queryCriteria.session_id = data.guestSessionId;
         hasIdentity = true;
       }
       // [FIX AC5] Xóa bỏ phiên "Mua ngay" cũ (Áp dụng cả User & Guest)
@@ -144,12 +145,12 @@ export class OrdersService {
         .session(session);
 
       //Tạo đơn tạm
-      const holdExpiresAt = new Date(Date.now() + 15 * 60000); 
+      const holdExpiresAt = new Date(Date.now() + 15 * 60000);
 
       const tempOrder = new this.orderModel({
         order_code: `BUYNOW-${Date.now()}`,
         user_id: data.userId ? new Types.ObjectId(data.userId) : null,
-        session_id: data.userId ? undefined : data.guestSessionId, 
+        session_id: data.userId ? undefined : data.guestSessionId,
         items: [
           {
             product_id: product._id,
@@ -174,6 +175,20 @@ export class OrdersService {
       const token = `checkout_token_${tempOrder._id}`;
       await this.redis.set(token, tempOrder._id.toString(), 'EX', 900);
 
+      await this.auditLogsService.log({
+        action: 'INIT_BUY_NOW_SESSION',
+        collection_name: 'orders',
+        department: Department.SALE_MARKETING,
+        actor_id: data.userId || undefined,
+        target_id: tempOrder._id,
+        detail: {
+          product_id: data.productId,
+          quantity: data.quantity,
+          session_id: data.guestSessionId,
+          hold_expires_at: holdExpiresAt,
+        },
+      });
+
       //Lấy danh sách Upsell (Bán chéo) - AC15
       const upsellProducts = await this.productModel
         .find({
@@ -182,7 +197,7 @@ export class OrdersService {
           status: ProductStatus.ACTIVE,
           stock: { $gt: 0 },
         })
-        .sort({ price: 1 }) 
+        .sort({ price: 1 })
         .limit(2)
         .select('name thumbnail price sale_price slug')
         .lean();
@@ -230,7 +245,7 @@ export class OrdersService {
       // Cập nhật thông tin giao hàng & Chuyển trạng thái
       order.shipping_info = dto.shippingInfo;
       order.payment.method = dto.paymentMethod;
-      order.status = 'PENDING'; 
+      order.status = 'PENDING';
 
       //Cập nhật giá sau giảm
       order.total_amount = finalTotal;
@@ -345,6 +360,7 @@ export class OrdersService {
         action: 'CREATE_ORDER_FAILED',
         collection_name: 'orders',
         actor_id: userId,
+        department: Department.SALE_MARKETING,
         detail: { error: error.message },
         is_success: false,
         ip: ip,
@@ -408,6 +424,7 @@ export class OrdersService {
       collection_name: 'orders',
       actor_id: adminId,
       target_id: order._id,
+      department: Department.SALE_MARKETING,
       detail: {
         new_status: status,
         order_code: order.order_code,
@@ -426,11 +443,13 @@ export class OrdersService {
       collection_name: 'orders',
       actor_id: userId,
       target_id: order._id,
+      department: Department.SALE_MARKETING,
       detail: {
         order_code: order.order_code,
         total: order.total_amount,
         item_count: order.items.length,
         source: source,
+        // payment_method: order.payment?.method, // Log thêm phương thức thanh toán
       },
       is_success: true,
       ip: ip,

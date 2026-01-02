@@ -19,6 +19,7 @@ import defaultSlugify from 'slugify';
 import sanitizeHtml from 'sanitize-html';
 import { Product, ProductDocument } from '../catalog/schemas/product.schema';
 import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
+import { Department } from 'src/common/enums/department.enum';
 
 @Injectable()
 export class CategoriesService {
@@ -128,6 +129,7 @@ export class CategoriesService {
       collection_name: 'categories',
       actor_id: actorId,
       target_id: savedCategory._id,
+      department: Department.SALE_MARKETING,
       detail: {
         name: savedCategory.name,
         slug: savedCategory.slug,
@@ -299,6 +301,7 @@ export class CategoriesService {
       collection_name: 'categories',
       actor_id: actorId,
       target_id: category._id,
+      department: Department.SALE_MARKETING,
       detail: {
         name: category.name,
         changes: {
@@ -344,6 +347,7 @@ export class CategoriesService {
       collection_name: 'categories',
       actor_id: actorId,
       target_id: id,
+      department: Department.SALE_MARKETING,
       detail: {
         name: category ? category.name : 'Unknown',
         slug: category ? category.slug : 'Unknown',
@@ -394,6 +398,7 @@ export class CategoriesService {
         collection_name: 'categories',
         actor_id: actorId,
         target_id: null,
+        department: Department.SALE_MARKETING,
         detail: { count: operations.length },
         ip,
         user_agent: userAgent,

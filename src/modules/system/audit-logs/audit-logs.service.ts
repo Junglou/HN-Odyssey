@@ -4,6 +4,7 @@ import { Model, Types } from 'mongoose';
 import { AuditLog } from './schemas/audit-log.schema';
 import { QueryAuditLogDto } from './dto/query-audit-log.dto';
 import { User, UserDocument } from 'src/modules/users/schemas/user.schema';
+import { Department } from 'src/common/enums/department.enum';
 
 export interface CreateAuditLogDto {
   action: string;
@@ -12,6 +13,7 @@ export interface CreateAuditLogDto {
   actor_employee_code?: string;
   actor_email?: string;
   target_id?: string | Types.ObjectId | null;
+  department: Department | string;
   detail?: any;
   is_success?: boolean;
   error_reason?: string;
@@ -60,6 +62,7 @@ export class AuditLogsService {
         collection_name,
         actor_id,
         target_id,
+        department,
         is_success = true,
         error_reason,
         ip,
@@ -100,6 +103,7 @@ export class AuditLogsService {
         actor_employee_code,
         actor_email,
         target_id: targetObjectId,
+        department,
         detail: safeDetail,
         is_success,
         error_reason: is_success ? undefined : error_reason,

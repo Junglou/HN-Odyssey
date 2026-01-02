@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema, Types } from 'mongoose';
+import { Department } from 'src/common/enums/department.enum';
 
 export type AuditLogDocument = AuditLog & Document;
 
@@ -44,6 +45,13 @@ export class AuditLog {
 
   @Prop()
   user_agent: string;
+
+  @Prop({
+    required: true,
+    enum: Department, // Validate dữ liệu phải nằm trong Enum
+    index: true, // Index cực quan trọng để View chạy nhanh
+  })
+  department: string;
 }
 
 const AuditLogSchema = SchemaFactory.createForClass(AuditLog);

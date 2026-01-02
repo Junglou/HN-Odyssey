@@ -13,6 +13,7 @@ import { TagScope } from '../../../common/enums/tag-scope.enum';
 import defaultSlugify from 'slugify';
 import { Product, ProductDocument } from '../catalog/schemas/product.schema';
 import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
+import { Department } from 'src/common/enums/department.enum';
 
 function escapeRegExp(string: string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -23,7 +24,7 @@ export class TagsService {
   constructor(
     @InjectModel(Tag.name) private tagModel: Model<TagDocument>,
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
-    private readonly auditLogsService: AuditLogsService, 
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   // AC1: Lấy danh sách
@@ -38,7 +39,7 @@ export class TagsService {
     return tag;
   }
 
-  // AC2: Tạo mới 
+  // AC2: Tạo mới
   async create(
     createTagDto: CreateTagDto,
     actorId: string,
@@ -82,6 +83,7 @@ export class TagsService {
       collection_name: 'tags',
       actor_id: actorId,
       target_id: savedTag._id,
+      department: Department.SALE_MARKETING,
       detail: { name: savedTag.name, scope: savedTag.scope },
       ip,
       user_agent: userAgent,
@@ -141,6 +143,7 @@ export class TagsService {
       collection_name: 'tags',
       actor_id: actorId,
       target_id: savedTag._id,
+      department: Department.SALE_MARKETING,
       detail: {
         name_changed: nameChanged,
         old_name: oldName,
@@ -165,6 +168,7 @@ export class TagsService {
         collection_name: 'tags',
         actor_id: actorId,
         target_id: id,
+        department: Department.SALE_MARKETING,
         detail: { reason: 'Tag is in use', usage_count: tag.usage_count },
         is_success: false,
         ip,
@@ -184,6 +188,7 @@ export class TagsService {
       collection_name: 'tags',
       actor_id: actorId,
       target_id: id,
+      department: Department.SALE_MARKETING,
       detail: { name: tag.name },
       ip,
       user_agent: userAgent,
@@ -192,7 +197,7 @@ export class TagsService {
     return { message: 'Đã xóa thẻ thành công' };
   }
 
-  // AC6: Gộp Thẻ 
+  // AC6: Gộp Thẻ
   async mergeTags(
     targetTagId: string,
     sourceTagId: string,
@@ -241,10 +246,11 @@ export class TagsService {
       collection_name: 'tags',
       actor_id: actorId,
       target_id: target._id,
+      department: Department.SALE_MARKETING,
       detail: {
         source_tag: source.name,
         target_tag: target.name,
-        products_updated: result.modifiedCount, 
+        products_updated: result.modifiedCount,
         usage_merged: source.usage_count,
       },
       ip,

@@ -11,6 +11,7 @@ import { UpdateCartItemDto, RemoveCartItemDto } from './dto/update-cart.dto';
 import { Product } from 'src/modules/products/catalog/schemas/product.schema';
 import { ProductStatus } from 'src/common/enums/product-status.enum';
 import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
+import { Department } from 'src/common/enums/department.enum';
 
 @Injectable()
 export class CartService {
@@ -167,6 +168,7 @@ export class CartService {
       collection_name: 'carts',
       actor_id: userId ? userId : undefined,
       target_id: resultCartId,
+      department: Department.SALE_MARKETING,
       detail: {
         product_id: dto.productId,
         sku: dto.variantSku,
@@ -232,6 +234,22 @@ export class CartService {
     if (itemIndex > -1) {
       cart.items[itemIndex].quantity = dto.quantity;
       await cart.save();
+
+      await this.auditLogsService.log({
+        action: 'UPDATE_CART_ITEM',
+        collection_name: 'carts',
+        department: Department.SALE_MARKETING,
+        actor_id: userId || undefined,
+        target_id: cart._id,
+        detail: {
+          product_id: dto.productId,
+          sku: dto.variantSku,
+          new_quantity: dto.quantity,
+          session_id: !userId ? dto['guestSessionId'] : undefined,
+        },
+        ip,
+        user_agent: userAgent,
+      });
     }
     return { message: 'Updated' };
   }
@@ -253,6 +271,21 @@ export class CartService {
           sku: dto.variantSku,
         },
       },
+    });
+
+    await this.auditLogsService.log({
+      action: 'REMOVE_CART_ITEM',
+      collection_name: 'carts',
+      department: Department.SALE_MARKETING,
+      actor_id: userId || undefined,
+      target_id: null, // Không query ID giỏ hàng để tiết kiệm resource
+      detail: {
+        product_id: dto.productId,
+        sku: dto.variantSku,
+        session_id: !userId ? dto['guestSessionId'] : undefined,
+      },
+      ip,
+      user_agent: userAgent,
     });
     return { message: 'Removed' };
   }
@@ -353,6 +386,20 @@ export class CartService {
 
     // Xóa giỏ hàng Guest cũ
     await this.cartModel.deleteOne({ _id: guestCart._id });
+
+    await this.auditLogsService.log({
+      action: 'MERGE_GUEST_CART',
+      collection_name: 'carts',
+      department: Department.SALE_MARKETING,
+      actor_id: userId,
+      target_id: memberCart._id,
+      detail: {
+        guest_session_id: guestSessionId,
+        merged_items_count: guestCart.items.length,
+      },
+      ip,
+      user_agent: userAgent,
+    });
 
     return memberCart;
   }

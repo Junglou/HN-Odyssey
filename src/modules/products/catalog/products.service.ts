@@ -33,6 +33,7 @@ import {
   CategoryDocument,
 } from '../categories/schemas/category.schema';
 import { FilterProductDto, SortOption } from './dto/filter-product.dto';
+import { Department } from 'src/common/enums/department.enum';
 
 @Injectable()
 export class ProductsService {
@@ -225,6 +226,7 @@ export class ProductsService {
       collection_name: 'products',
       actor_id: userId,
       target_id: newProduct._id,
+      department: Department.SALE_MARKETING,
       detail: {
         sku: newProduct.sku,
         name: newProduct.name,
@@ -518,6 +520,7 @@ export class ProductsService {
       collection_name: 'products',
       actor_id: userId,
       target_id: product._id,
+      department: Department.SALE_MARKETING,
       detail: { changes: updateDto },
       ip: ip,
       user_agent: userAgent,
@@ -581,6 +584,7 @@ export class ProductsService {
       collection_name: 'products',
       actor_id: userId,
       target_id: product._id,
+      department: Department.SALE_MARKETING,
       detail: { old_status: oldStatus, new_status: status },
       ip: ip,
       user_agent: userAgent,
@@ -669,6 +673,7 @@ export class ProductsService {
       collection_name: 'products',
       actor_id: userId,
       target_id: id,
+      department: Department.SALE_MARKETING,
       detail: {
         message: 'Gửi yêu cầu đổi giá',
         new_price: dto.price,
@@ -732,6 +737,7 @@ export class ProductsService {
       collection_name: 'products',
       actor_id: userId,
       target_id: id,
+      department: Department.SALE_MARKETING,
       detail: {
         result: isApproved ? 'APPROVED' : 'REJECTED',
         requester_id: pending.requester_id,
@@ -779,6 +785,7 @@ export class ProductsService {
       collection_name: 'products',
       actor_id: userId,
       target_id: id,
+      department: Department.SALE_MARKETING,
       detail: {
         reason: 'Soft delete requested by Admin',
         new_sku: product.sku,
@@ -826,6 +833,7 @@ export class ProductsService {
       collection_name: 'products',
       actor_id: userId,
       target_id: id,
+      department: Department.SALE_MARKETING,
       detail: { old_tags: oldTags, new_tags: tags },
       ip: ip,
       user_agent: userAgent,
@@ -854,6 +862,7 @@ export class ProductsService {
       collection_name: 'products',
       actor_id: userId,
       target_id: null,
+      department: Department.SALE_MARKETING,
       detail: {
         products_affected: result.modifiedCount,
         tags_added: tagsToAdd,
@@ -955,10 +964,10 @@ export class ProductsService {
         sub_categories: subCategories,
         category: {
           name: category.name,
-          description: category.description, 
-          banner: category.image, 
+          description: category.description,
+          banner: category.image,
         },
-        breadcrumbs: breadcrumbs, 
+        breadcrumbs: breadcrumbs,
       },
     };
   }

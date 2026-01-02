@@ -18,6 +18,7 @@ import { Staff } from './schemas/staff.schema';
 import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
 import { UserStatus } from 'src/common/enums/user-status.enum';
 import { Role as RoleEnum } from 'src/common/enums/role.enum';
+import { Department } from 'src/common/enums/department.enum';
 
 @Injectable()
 export class AdminService {
@@ -138,6 +139,7 @@ export class AdminService {
       actor_id: createdById,
       target_id: savedUser._id,
       actor_employee_code: savedUser.employee_code,
+      department: Department.MANAGEMENT,
       detail: {
         email: savedUser.email,
         roles: savedUser.roles,
@@ -234,6 +236,7 @@ export class AdminService {
       collection_name: 'users',
       actor_id: currentUserId,
       target_id: user._id,
+      department: Department.MANAGEMENT,
       detail: {
         employee_code: user.employee_code,
         changes: diff,
@@ -272,6 +275,7 @@ export class AdminService {
       collection_name: 'users',
       actor_id: currentUserId,
       target_id: id,
+      department: Department.MANAGEMENT,
       detail: {
         employee_code: (user as any).employee_code,
         old_status: oldStatus,
@@ -400,6 +404,7 @@ export class AdminService {
       collection_name: 'users',
       actor_id: actorId,
       target_id: user._id,
+      department: Department.MANAGEMENT,
       detail: {
         employee_code: (user as any).employee_code,
         reason: dto.reason,
