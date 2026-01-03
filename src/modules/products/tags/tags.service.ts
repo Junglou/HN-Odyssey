@@ -77,13 +77,12 @@ export class TagsService {
 
     const savedTag = await newTag.save();
 
-    // [LOG]
     await this.auditLogsService.log({
       action: 'CREATE_TAG',
       collection_name: 'tags',
       actor_id: actorId,
       target_id: savedTag._id,
-      department: Department.SALE_MARKETING,
+      department: Department.MARKETING,
       detail: { name: savedTag.name, scope: savedTag.scope },
       ip,
       user_agent: userAgent,
@@ -143,7 +142,7 @@ export class TagsService {
       collection_name: 'tags',
       actor_id: actorId,
       target_id: savedTag._id,
-      department: Department.SALE_MARKETING,
+      department: Department.MARKETING,
       detail: {
         name_changed: nameChanged,
         old_name: oldName,
@@ -168,7 +167,7 @@ export class TagsService {
         collection_name: 'tags',
         actor_id: actorId,
         target_id: id,
-        department: Department.SALE_MARKETING,
+        department: Department.MARKETING,
         detail: { reason: 'Tag is in use', usage_count: tag.usage_count },
         is_success: false,
         ip,
@@ -188,7 +187,7 @@ export class TagsService {
       collection_name: 'tags',
       actor_id: actorId,
       target_id: id,
-      department: Department.SALE_MARKETING,
+      department: Department.MARKETING,
       detail: { name: tag.name },
       ip,
       user_agent: userAgent,
@@ -246,7 +245,7 @@ export class TagsService {
       collection_name: 'tags',
       actor_id: actorId,
       target_id: target._id,
-      department: Department.SALE_MARKETING,
+      department: Department.MARKETING,
       detail: {
         source_tag: source.name,
         target_tag: target.name,

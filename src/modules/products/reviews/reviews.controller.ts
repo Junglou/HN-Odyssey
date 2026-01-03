@@ -32,7 +32,6 @@ export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
 
   // AC: Gửi đánh giá (User phải đăng nhập)
-  // [UPDATE] Thêm Ip và UserAgent để log spam review
   @Post()
   @UseGuards(JwtAuthGuard)
   async create(
@@ -42,16 +41,13 @@ export class ReviewsController {
     @UserAgent() userAgent: string,
   ) {
     //Log xem cấu trúc user thực tế là gì
-    console.log('DEBUG User from Guard:', user);
+    //console.log('DEBUG User from Guard:', user);
 
-    //Lấy ID an toàn: Check cả userId (do Strategy map) và _id (nếu là raw user)
     const userId = user.userId || user._id || user.sub;
 
     if (!userId) {
       throw new Error('User ID not found in Request');
     }
-
-    // userId thường đã là string rồi, không cần toString() nếu không chắc chắn
     return this.reviewsService.create(userId.toString(), dto, ip, userAgent);
   }
 
@@ -63,7 +59,7 @@ export class ReviewsController {
 
   @Put(':id/approve')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN, Role.MANAGER)
+  @Roles(Role.SUPER_ADMIN)
   async approve(
     @Param('id') id: string,
     @Body('status') status: 'APPROVED' | 'HIDDEN',
@@ -74,7 +70,7 @@ export class ReviewsController {
 
   @Get('admin/pending')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN, Role.MANAGER)
+  @Roles(Role.SUPER_ADMIN)
   async getPending() {
     return this.reviewsService.getPendingReviews();
   }

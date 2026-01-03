@@ -17,7 +17,7 @@ import { User, UserDocument } from '../schemas/user.schema';
 import { Staff } from './schemas/staff.schema';
 import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
 import { UserStatus } from 'src/common/enums/user-status.enum';
-import { Role as RoleEnum } from 'src/common/enums/role.enum';
+import { Role, Role as RoleEnum } from 'src/common/enums/role.enum';
 import { Department } from 'src/common/enums/department.enum';
 
 @Injectable()
@@ -56,16 +56,16 @@ export class AdminService {
     createdById: string,
     ip: string,
     userAgent: string,
-    currentUserRoles: RoleEnum[],
+    currentUserRoles: string[], 
   ) {
-    // 1. Logic kiểm tra phân cấp
-    if (!currentUserRoles.includes(RoleEnum.SUPER_ADMIN)) {
-      const isCreatingHighPrivilege = dto.roles.some(
-        (r) => r === RoleEnum.SUPER_ADMIN || r === RoleEnum.MANAGER,
-      );
-      if (isCreatingHighPrivilege) {
+    // Nếu người tạo KHÔNG PHẢI là Super Admin
+    if (!currentUserRoles.includes(Role.SUPER_ADMIN)) {
+      // Thì không được phép gán role Super Admin cho người mới
+      const isTryingToCreateAdmin = dto.roles.includes(Role.SUPER_ADMIN);
+
+      if (isTryingToCreateAdmin) {
         throw new ForbiddenException(
-          'Manager chỉ được phép tạo tài khoản Staff thường.',
+          'Bạn không có quyền tạo tài khoản Super Admin. Vui lòng liên hệ cấp trên.',
         );
       }
     }

@@ -60,7 +60,7 @@ export class AttributesService {
       collection_name: 'attributes',
       actor_id: actorId,
       target_id: savedAttr._id,
-      department: Department.SALE_MARKETING,
+      department: Department.WAREHOUSE,
       detail: {
         name: savedAttr.name,
         values: savedAttr.values,
@@ -128,7 +128,7 @@ export class AttributesService {
       collection_name: 'attributes',
       actor_id: actorId,
       target_id: attr._id,
-      department: Department.SALE_MARKETING,
+      department: Department.WAREHOUSE,
       detail: {
         attribute_name: attr.name,
         changes: {
@@ -166,7 +166,7 @@ export class AttributesService {
         collection_name: 'attributes',
         actor_id: actorId,
         target_id: id,
-        department: Department.SALE_MARKETING,
+        department: Department.WAREHOUSE,
         detail: { reason: 'Attribute is in use by products', name: attr.name },
         is_success: false,
         ip,
@@ -187,7 +187,7 @@ export class AttributesService {
       collection_name: 'attributes',
       actor_id: actorId,
       target_id: id,
-      department: Department.SALE_MARKETING,
+      department: Department.WAREHOUSE,
       detail: {
         name: attr.name,
         values: attr.values,

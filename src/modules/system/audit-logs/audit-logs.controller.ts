@@ -16,7 +16,7 @@ export class AuditLogsController {
 
   @Get()
   @Roles(Role.SUPER_ADMIN)
-  @RequirePermissions(Resource.SETTINGS, Action.READ)
+  @RequirePermissions(Resource.SYSTEM, Action.READ)
   async getAuditLogs(@Query() query: QueryAuditLogDto) {
     return this.auditLogsService.findAll(query);
   }

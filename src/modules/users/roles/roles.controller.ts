@@ -22,6 +22,7 @@ import { UpdateRoleDto } from './dto/update-role.dto';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import type { IUser } from 'src/common/interfaces/user.interface';
+import { PERMISSION_METADATA } from 'src/common/constants/permissions-metadata.constant';
 
 @Controller('admin/roles')
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
@@ -31,7 +32,7 @@ export class RolesController {
 
   // 1. TẠO MỚI
   @Post()
-  @RequirePermissions(Resource.SETTINGS, Action.CREATE)
+  @RequirePermissions(Resource.SYSTEM, Action.CREATE)
   create(
     @Body() dto: CreateRoleDto,
     @CurrentUser() user: IUser,
@@ -43,7 +44,7 @@ export class RolesController {
 
   // 2. DANH SÁCH
   @Get()
-  @RequirePermissions(Resource.SETTINGS, Action.READ)
+  @RequirePermissions(Resource.SYSTEM, Action.READ)
   findAll() {
     return this.rolesService.findAll();
   }
@@ -56,7 +57,7 @@ export class RolesController {
 
   // 4. CẬP NHẬT
   @Patch(':id')
-  @RequirePermissions(Resource.SETTINGS, Action.UPDATE)
+  @RequirePermissions(Resource.SYSTEM, Action.UPDATE)
   update(
     @Param('id') id: string,
     @Body() updateRoleDto: UpdateRoleDto,
@@ -69,7 +70,7 @@ export class RolesController {
 
   // 5. XÓA
   @Delete(':id')
-  @RequirePermissions(Resource.SETTINGS, Action.DELETE)
+  @RequirePermissions(Resource.SYSTEM, Action.DELETE)
   remove(
     @Param('id') id: string,
     @CurrentUser() user: IUser,
@@ -77,5 +78,14 @@ export class RolesController {
     @Headers('user-agent') userAgent: string,
   ) {
     return this.rolesService.remove(id, user._id, ip, userAgent);
+  }
+
+  @Get('metadata/permissions')
+  @Roles(Role.SUPER_ADMIN)
+  getPermissionMetadata() {
+    return {
+      message: 'Lấy danh sách quyền hạn thành công',
+      data: PERMISSION_METADATA,
+    };
   }
 }

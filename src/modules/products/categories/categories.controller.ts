@@ -112,7 +112,7 @@ export class CategoriesController {
   }
 
   @Delete('delete/:id')
-  @Roles(Role.MANAGER, Role.SUPER_ADMIN)
+  @Roles(Role.SUPER_ADMIN)
   @RequirePermissions(Resource.CATEGORIES, Action.DELETE)
   remove(
     @Param('id') id: string,

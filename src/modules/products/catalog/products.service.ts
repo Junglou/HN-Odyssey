@@ -116,23 +116,20 @@ export class ProductsService {
   async create(
     createProductDto: CreateProductDto,
     userId: string,
-    userRoles: Role[],
+    userRoles: string[],
     ip: string,
     userAgent: string,
   ) {
-    // 1. Kiểm tra trùng SKU (Product level)
+    // 1. Kiểm tra trùng SKU 
     await this.checkSkuExists(createProductDto.sku);
 
     const variants = createProductDto.variants || [];
 
-    //Phân quyền nhập liệu:
-    // Nếu là STAFF (và không phải Manager/Admin) -> Bắt buộc Giá = 0 (Chờ duyệt giá sau)
-    const isStaff =
-      userRoles.includes(Role.STAFF) &&
-      !userRoles.includes(Role.MANAGER) &&
-      !userRoles.includes(Role.SUPER_ADMIN);
+    // Logic: Nếu KHÔNG PHẢI Super Admin -> Bắt buộc Giá = 0
+    // Bất kể là Trưởng kho hay Nhân viên kho, tạo mới đều cần bước duyệt giá sau này.
+    const isSuperAdmin = userRoles.includes(Role.SUPER_ADMIN);
 
-    if (isStaff) {
+    if (!isSuperAdmin) {
       // Ép giá sản phẩm cha về 0
       createProductDto.price = 0;
       createProductDto.sale_price = 0;
@@ -146,9 +143,9 @@ export class ProductsService {
       }
     }
 
-    // 2. VALIDATION BIẾN THỂ (Nếu có)
+    // 2. VALIDATION BIẾN THỂ 
     if (variants.length > 0) {
-      // Check trùng SKU trong nội bộ danh sách biến thể
+      // Check trùng SKU nội bộ
       const variantSkus = variants.map((v) => v.sku);
       if (new Set(variantSkus).size !== variantSkus.length) {
         throw new BadRequestException(
@@ -156,7 +153,7 @@ export class ProductsService {
         );
       }
 
-      // Check giới hạn số lượng thuộc tính (Max 3: VD Màu, Size, Chất liệu)
+      // Check Max 3 thuộc tính
       const firstVariantAttrs = variants[0].attributes;
       if (firstVariantAttrs.length > 3) {
         throw new BadRequestException(
@@ -164,14 +161,14 @@ export class ProductsService {
         );
       }
 
-      // Check tính nhất quán của thuộc tính (Các biến thể phải có cùng keys)
+      // Check tính nhất quán Keys
       const standardKeys = firstVariantAttrs
         .map((a) => a.k)
         .sort()
         .join(',');
 
       for (const variant of variants) {
-        // Check trùng SKU biến thể với DB
+        // Check trùng SKU với DB
         await this.checkSkuExists(variant.sku);
 
         const currentKeys = variant.attributes
@@ -187,7 +184,7 @@ export class ProductsService {
       }
     }
 
-    // 3. Tạo Slug & Sanitize HTML
+    // 3. Tạo Slug & Sanitize 
     const slug =
       createProductDto.slug || this.createSlug(createProductDto.name);
     const slugExists = await this.productModel.exists({ slug });
@@ -207,7 +204,7 @@ export class ProductsService {
         (id) => new Types.ObjectId(id),
       ),
       slug,
-      status: ProductStatus.DRAFT, // Mặc định tạo mới là DRAFT
+      status: ProductStatus.DRAFT,
       has_variants: variants.length > 0,
       specs,
       created_by: new Types.ObjectId(userId),
@@ -226,11 +223,11 @@ export class ProductsService {
       collection_name: 'products',
       actor_id: userId,
       target_id: newProduct._id,
-      department: Department.SALE_MARKETING,
+      department: Department.WAREHOUSE,
       detail: {
         sku: newProduct.sku,
         name: newProduct.name,
-        is_staff_created: isStaff,
+        is_price_reset: !isSuperAdmin,
         initial_price: newProduct.price,
       },
       ip: ip,
@@ -520,7 +517,7 @@ export class ProductsService {
       collection_name: 'products',
       actor_id: userId,
       target_id: product._id,
-      department: Department.SALE_MARKETING,
+      department: Department.WAREHOUSE,
       detail: { changes: updateDto },
       ip: ip,
       user_agent: userAgent,
@@ -533,59 +530,76 @@ export class ProductsService {
     id: string,
     statusDto: UpdateProductStatusDto,
     userId: string,
-    userRoles: Role[],
+    userRoles: string[],
     ip: string,
     userAgent: string,
   ) {
     const { status } = statusDto;
+
+    // 1. Tìm sản phẩm
     const product = await this.productModel.findOne({
       _id: id,
       is_deleted: false,
     });
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
+
     const oldStatus = product.status;
+    const isSuperAdmin = userRoles.includes(Role.SUPER_ADMIN);
 
-    const isAdmin =
-      userRoles.includes(Role.MANAGER) || userRoles.includes(Role.SUPER_ADMIN);
-
-    if (!isAdmin && status === ProductStatus.ACTIVE) {
-      throw new BadRequestException(
-        'Bạn không có quyền kích hoạt bán. Vui lòng chọn trạng thái "Chờ duyệt" để Quản lý kiểm tra.',
-      );
-    }
-
+    // 2. CHECK QUYỀN KÍCH HOẠT (ACTIVE)
+    // Nếu muốn Active, phải vượt qua các bài test về dữ liệu
     if (status === ProductStatus.ACTIVE) {
+      // Rule 2: Validate Giá bán (Quan trọng nhất)
+      // Vì lúc tạo, nhân viên bị ép giá = 0, nên nếu chưa sửa giá mà đòi Active -> CHẶN NGAY.
       if (
         product.price <= 0 &&
         (!product.variants || product.variants.length === 0)
       ) {
-        throw new BadRequestException('Sản phẩm phải có giá bán > 0');
-      }
-      if (product.has_variants) {
-        const validVariant = product.variants.some(
-          (v) => v.active && v.price > 0,
+        throw new BadRequestException(
+          'Sản phẩm chưa có giá bán (Giá = 0). Vui lòng cập nhật giá trước khi kích hoạt.',
         );
-        if (!validVariant)
-          throw new BadRequestException('Cần ít nhất 1 biến thể có giá bán');
       }
+
+      // Rule 3: Validate Biến thể (Nếu có)
+      if (product.has_variants) {
+        // Phải có ít nhất 1 biến thể đang Active và có giá > 0
+        const validVariant = product.variants.some(
+          (v) => v.price > 0, // (v.active check sau nếu schema có)
+        );
+        if (!validVariant) {
+          throw new BadRequestException(
+            'Sản phẩm biến thể cần ít nhất 1 phiên bản có giá bán hợp lệ.',
+          );
+        }
+      }
+
+      // Rule 4: Validate Hình ảnh (Bắt buộc phải có ảnh mới được bán)
       if (
         !product.thumbnail &&
         (!product.images || product.images.length === 0)
       ) {
-        throw new BadRequestException('Sản phẩm phải có hình ảnh');
+        throw new BadRequestException(
+          'Sản phẩm chưa có hình ảnh. Không thể kích hoạt bán.',
+        );
       }
     }
 
+    // 3. Cập nhật & Lưu
     product.status = status;
     await product.save();
 
+    // 4. Ghi Audit Log (Đúng chuẩn WAREHOUSE)
     await this.auditLogsService.log({
       action: 'UPDATE_PRODUCT_STATUS',
       collection_name: 'products',
       actor_id: userId,
       target_id: product._id,
-      department: Department.SALE_MARKETING,
-      detail: { old_status: oldStatus, new_status: status },
+      department: Department.WAREHOUSE,
+      detail: {
+        sku: product.sku,
+        old_status: oldStatus,
+        new_status: status,
+      },
       ip: ip,
       user_agent: userAgent,
     });
@@ -673,7 +687,7 @@ export class ProductsService {
       collection_name: 'products',
       actor_id: userId,
       target_id: id,
-      department: Department.SALE_MARKETING,
+      department: Department.WAREHOUSE,
       detail: {
         message: 'Gửi yêu cầu đổi giá',
         new_price: dto.price,
@@ -737,7 +751,7 @@ export class ProductsService {
       collection_name: 'products',
       actor_id: userId,
       target_id: id,
-      department: Department.SALE_MARKETING,
+      department: Department.WAREHOUSE,
       detail: {
         result: isApproved ? 'APPROVED' : 'REJECTED',
         requester_id: pending.requester_id,
@@ -785,7 +799,7 @@ export class ProductsService {
       collection_name: 'products',
       actor_id: userId,
       target_id: id,
-      department: Department.SALE_MARKETING,
+      department: Department.WAREHOUSE,
       detail: {
         reason: 'Soft delete requested by Admin',
         new_sku: product.sku,
@@ -833,7 +847,7 @@ export class ProductsService {
       collection_name: 'products',
       actor_id: userId,
       target_id: id,
-      department: Department.SALE_MARKETING,
+      department: Department.WAREHOUSE,
       detail: { old_tags: oldTags, new_tags: tags },
       ip: ip,
       user_agent: userAgent,
@@ -862,7 +876,7 @@ export class ProductsService {
       collection_name: 'products',
       actor_id: userId,
       target_id: null,
-      department: Department.SALE_MARKETING,
+      department: Department.WAREHOUSE,
       detail: {
         products_affected: result.modifiedCount,
         tags_added: tagsToAdd,

@@ -86,7 +86,7 @@ export class ReviewsService {
     await this.auditLogsService.log({
       action: 'CREATE_REVIEW',
       collection_name: 'reviews',
-      department: Department.CSKH,
+      department: Department.SUPPORT,
       actor_id: userId,
       target_id: review._id,
       detail: {
@@ -289,7 +289,7 @@ export class ReviewsService {
         collection_name: 'reviews',
         actor_id: adminId,
         target_id: review._id,
-        department: Department.CSKH,
+        department: Department.SUPPORT,
         detail: { new_status: status },
         ip: ip || 'Unknown',
         user_agent: userAgent || 'Unknown',
@@ -334,7 +334,7 @@ export class ReviewsService {
     await this.auditLogsService.log({
       action: 'REPORT_REVIEW',
       collection_name: 'review_reports',
-      department: Department.CSKH,
+      department: Department.SUPPORT,
       actor_id: userId,
       target_id: report._id,
       detail: {

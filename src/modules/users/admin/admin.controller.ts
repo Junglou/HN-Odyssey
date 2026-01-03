@@ -24,12 +24,10 @@ import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.servi
 import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
-
-// [NEW] Import Interface & Decorator chuẩn
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import type { IUser } from 'src/common/interfaces/user.interface';
 
-@Controller('admin/users')
+@Controller('admin/users/staff')
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class AdminController {
   constructor(
@@ -38,8 +36,8 @@ export class AdminController {
   ) {}
 
   // 1. TẠO MỚI
-  @Post('staff')
-  @Roles(Role.SUPER_ADMIN, Role.MANAGER)
+  @Post()
+  @Roles(Role.SUPER_ADMIN)
   @RequirePermissions(Resource.USERS, Action.CREATE)
   async createStaff(
     @Body() dto: CreateStaffDto,
@@ -58,7 +56,7 @@ export class AdminController {
 
   // 2. DANH SÁCH
   @Get()
-  @Roles(Role.SUPER_ADMIN, Role.MANAGER)
+  @Roles(Role.SUPER_ADMIN)
   @RequirePermissions(Resource.USERS, Action.READ)
   async getStaffList(@Query() query: QueryStaffDto) {
     return this.adminService.findAllStaff(query);
@@ -66,7 +64,7 @@ export class AdminController {
 
   // 3. CẬP NHẬT
   @Patch(':id')
-  @Roles(Role.SUPER_ADMIN, Role.MANAGER)
+  @Roles(Role.SUPER_ADMIN)
   @RequirePermissions(Resource.USERS, Action.UPDATE)
   async updateStaff(
     @Param('id') id: string,
@@ -100,7 +98,7 @@ export class AdminController {
 
   // 5. ĐỔI TRẠNG THÁI (US.56 AC2)
   @Patch(':id/status')
-  @Roles(Role.SUPER_ADMIN, Role.MANAGER)
+  @Roles(Role.SUPER_ADMIN)
   @RequirePermissions(Resource.USERS, Action.UPDATE)
   async changeStatus(
     @Param('id') id: string,
@@ -114,7 +112,7 @@ export class AdminController {
 
   // 6. LẤY CHI TIẾT
   @Get(':id')
-  @Roles(Role.SUPER_ADMIN, Role.MANAGER)
+  @Roles(Role.SUPER_ADMIN)
   @RequirePermissions(Resource.USERS, Action.READ)
   async getStaffDetail(@Param('id') id: string) {
     return this.adminService.findOneStaff(id);

@@ -5,6 +5,7 @@ import { AuditLog } from './schemas/audit-log.schema';
 import { QueryAuditLogDto } from './dto/query-audit-log.dto';
 import { User, UserDocument } from 'src/modules/users/schemas/user.schema';
 import { Department } from 'src/common/enums/department.enum';
+import { Resource } from 'src/common/enums/resource.enum';
 
 export interface CreateAuditLogDto {
   action: string;
@@ -29,6 +30,75 @@ export class AuditLogsService {
     @InjectModel(AuditLog.name) private readonly auditLogModel: Model<AuditLog>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
   ) {}
+
+  private mapResourceToDepartment(resource: string): string {
+    if (!resource) return Department.MANAGEMENT;
+
+    // Chuyển về chữ hoa để so sánh an toàn
+    const r = resource.toUpperCase();
+
+    // 1. NHÓM KHO VẬN (WAREHOUSE)
+    const warehouseResources = [
+      Resource.INVENTORY,
+      Resource.TRANSFERS,
+      Resource.SUPPLIERS,
+      Resource.SHIPPING,
+    ].map((x) => x.toString());
+
+    if (warehouseResources.includes(r)) {
+      return Department.WAREHOUSE;
+    }
+
+    // 2. NHÓM MARKETING & CATALOG
+    const marketingResources = [
+      Resource.PRODUCTS,
+      Resource.CATEGORIES,
+      Resource.ATTRIBUTES,
+      Resource.PROMOTIONS,
+      Resource.BLOG,
+      Resource.NOTIFICATIONS,
+      Resource.LOYALTY,
+    ].map((x) => x.toString());
+
+    if (marketingResources.includes(r)) {
+      return Department.MARKETING;
+    }
+
+    // 3. NHÓM KINH DOANH (SALES)
+    const salesResources = [
+      Resource.ORDERS,
+      Resource.RETURNS,
+      Resource.TRADE_IN,
+      Resource.CUSTOMERS,
+    ].map((x) => x.toString());
+
+    if (salesResources.includes(r)) {
+      return Department.SALES;
+    }
+
+    // 4. NHÓM DỊCH VỤ KHÁCH HÀNG (SUPPORT)
+    const supportResources = [
+      Resource.SUPPORT,
+      Resource.WARRANTY,
+      Resource.REVIEWS,
+    ].map((x) => x.toString());
+
+    if (supportResources.includes(r)) {
+      return Department.SUPPORT;
+    }
+
+    // 5. NHÓM KẾ TOÁN (ACCOUNTING)
+    const accountingResources = [Resource.REPORTS, Resource.PAYMENT].map((x) =>
+      x.toString(),
+    );
+
+    if (accountingResources.includes(r)) {
+      return Department.ACCOUNTING;
+    }
+
+    // Mặc định: SYSTEM, USERS, ROLES, AUDIT_LOGS, DASHBOARD -> MANAGEMENT
+    return Department.MANAGEMENT;
+  }
 
   private readonly SENSITIVE_KEYS = [
     'password',
@@ -95,6 +165,15 @@ export class AuditLogsService {
       // 2. Làm sạch dữ liệu nhạy cảm
       const safeDetail = this.sanitizeDetail(data.detail || {});
 
+      let finalDepartment = data.department;
+      if (!finalDepartment && data.collection_name) {
+        // Giả sử collection_name chính là Resource key
+        finalDepartment = this.mapResourceToDepartment(data.collection_name);
+      }
+
+      // Fallback về Management nếu vẫn null
+      if (!finalDepartment) finalDepartment = Department.MANAGEMENT;
+
       // 3. Lưu vào DB
       await this.auditLogModel.create({
         action,
@@ -103,7 +182,7 @@ export class AuditLogsService {
         actor_employee_code,
         actor_email,
         target_id: targetObjectId,
-        department,
+        department: finalDepartment,
         detail: safeDetail,
         is_success,
         error_reason: is_success ? undefined : error_reason,
@@ -169,6 +248,10 @@ export class AuditLogsService {
     // Filter theo trạng thái
     if (is_success !== undefined) {
       filter.is_success = String(is_success) === 'true';
+    }
+
+    if (query.department) {
+      filter.department = query.department;
     }
 
     if (actor_employee_code) {

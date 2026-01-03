@@ -7,7 +7,6 @@ import {
   Param,
   Delete,
   UseGuards,
-  Req,
   Ip,
   Headers,
 } from '@nestjs/common';
@@ -82,7 +81,7 @@ export class AttributesController {
 
   // 5. XÓA
   @Delete(':id')
-  @Roles(Role.MANAGER, Role.SUPER_ADMIN)
+  @Roles(Role.SUPER_ADMIN)
   @RequirePermissions(Resource.ATTRIBUTES, Action.DELETE)
   remove(
     @Param('id') id: string,

@@ -54,7 +54,7 @@ export class CreateStaffDto {
   @ApiProperty({
     description:
       'Vai trò của nhân viên trong hệ thống (ADMIN/STAFF/KHO). Phải là mảng.',
-    example: [Role.STAFF, Role.MANAGER, Role.SUPER_ADMIN],
+    example: ['SALES_STAFF', 'WAREHOUSE_MANAGER', Role.SUPER_ADMIN],
   })
   @IsArray()
   @IsString({ each: true })

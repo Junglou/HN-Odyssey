@@ -115,7 +115,7 @@ export class ProductsController {
 
   @Get('price-requests/pending')
   @RequirePermissions(Resource.PRODUCTS, Action.READ)
-  @Roles(Role.MANAGER, Role.SUPER_ADMIN)
+  @Roles(Role.SUPER_ADMIN)
   findPendingPriceRequests(@Query() query: any) {
     return this.productsService.findPendingPriceRequests(query);
   }
@@ -146,7 +146,7 @@ export class ProductsController {
 
   @Patch(':id/status')
   @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
-  @Roles(Role.MANAGER, Role.SUPER_ADMIN)
+  @Roles(Role.SUPER_ADMIN)
   updateStatus(
     @Param('id') id: string,
     @Body() statusDto: UpdateProductStatusDto,
@@ -186,7 +186,7 @@ export class ProductsController {
   // US.77: Quản lý duyệt giá
   @Patch(':id/price-approval')
   @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
-  @Roles(Role.MANAGER, Role.SUPER_ADMIN)
+  @Roles(Role.SUPER_ADMIN)
   approvePrice(
     @Param('id') id: string,
     @Body('action') action: 'approve' | 'reject',
@@ -205,7 +205,7 @@ export class ProductsController {
 
   @Delete(':id')
   @RequirePermissions(Resource.PRODUCTS, Action.DELETE)
-  @Roles(Role.MANAGER, Role.SUPER_ADMIN)
+  @Roles(Role.SUPER_ADMIN)
   remove(
     @Param('id') id: string,
     @CurrentUser() user: IUser,

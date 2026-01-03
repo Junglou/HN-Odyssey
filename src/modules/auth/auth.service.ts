@@ -99,7 +99,7 @@ export class AuthService {
         password: hashedPassword,
         roles: ['CUSTOMER'],
         is_active: false,
-        status: UserStatus.INACTIVE, // Set status rõ ràng
+        status: UserStatus.INACTIVE,
       });
       await newCustomer.save({ session });
 
@@ -129,13 +129,13 @@ export class AuthService {
 
       await session.commitTransaction();
 
-      // [FIX] Ghi Log Đăng ký
+      // Ghi Log Đăng ký
       await this.auditLogsService.log({
         action: 'REGISTER_LOCAL',
         collection_name: 'users',
-        actor_id: newCustomer._id, // User chưa active nhưng vẫn ghi nhận ID
+        actor_id: newCustomer._id,
         target_id: newCustomer._id,
-        department: Department.CSKH,
+        department: Department.SUPPORT,
         detail: {
           email: dto.email,
           phone: dto.phoneNumber,
@@ -270,7 +270,7 @@ export class AuthService {
         actor_id: user._id,
         actor_email: user.email,
         target_id: user._id,
-        department: Department.CSKH,
+        department: Department.SUPPORT,
         detail: { account: dto.account, type: dto.type },
         ip: ip,
         user_agent: userAgent,
@@ -470,7 +470,7 @@ export class AuthService {
       actor_email: user.email,
       actor_employee_code: user.employee_code || undefined,
       target_id: user._id,
-      department: Department.CSKH,
+      department: Department.SUPPORT,
       detail: {
         roles: user.roles,
         method: user.social_auth ? 'OAUTH' : 'LOCAL',
@@ -544,7 +544,7 @@ export class AuthService {
       collection_name: 'users',
       actor_id: userId,
       target_id: userId,
-      department: Department.CSKH,
+      department: Department.SUPPORT,
       detail: { message: 'User logged out' },
       ip: ip,
       user_agent: userAgent,
@@ -568,7 +568,7 @@ export class AuthService {
       actor_email: user.email,
       actor_employee_code: user.employee_code,
       target_id: user._id,
-      department: Department.CSKH,
+      department: Department.SUPPORT,
       detail: {
         reason: 'Wrong Password',
         current_attempt: user.login_attempts,
@@ -588,7 +588,7 @@ export class AuthService {
         collection_name: 'users',
         actor_id: user._id,
         target_id: user._id,
-        department: Department.CSKH,
+        department: Department.SUPPORT,
         detail: {
           reason: 'Brute-force attempts',
           failed_attempts: user.login_attempts,
@@ -725,7 +725,7 @@ export class AuthService {
         actor_id: newUser._id,
         actor_email: newUser.email,
         target_id: newUser._id,
-        department: Department.CSKH,
+        department: Department.SUPPORT,
         detail: { provider: provider, email: email },
         ip: ip,
         user_agent: userAgent,
@@ -857,7 +857,7 @@ export class AuthService {
         actor_email: adminEmail,
         actor_employee_code: adminCode,
         target_id: requestId,
-        department: Department.CSKH,
+        department: Department.SUPPORT,
         detail: {
           target_account: request.target_account,
           reason: dto.rejection_reason || 'Approved',
@@ -885,7 +885,7 @@ export class AuthService {
       action: 'FORGOT_PASSWORD_REQUEST',
       collection_name: 'users',
       actor_id: null,
-      department: Department.CSKH,
+      department: Department.SUPPORT,
       detail: { account: account },
       ip: ip,
       user_agent: userAgent,
@@ -976,7 +976,7 @@ export class AuthService {
       actor_id: user._id,
       actor_email: user.email,
       target_id: user._id,
-      department: Department.CSKH,
+      department: Department.SUPPORT,
       detail: { account: dto.account },
       ip: ip,
       user_agent: userAgent,
@@ -1032,7 +1032,7 @@ export class AuthService {
       actor_id: user._id,
       actor_email: user.email,
       target_id: user._id,
-      department: Department.CSKH,
+      department: Department.SUPPORT,
       detail: { old_email: verifyRecord.account, new_email: dto.newEmail },
       ip: ip,
       user_agent: userAgent,

@@ -168,7 +168,7 @@ export class CartService {
       collection_name: 'carts',
       actor_id: userId ? userId : undefined,
       target_id: resultCartId,
-      department: Department.SALE_MARKETING,
+      department: Department.SALES,
       detail: {
         product_id: dto.productId,
         sku: dto.variantSku,
@@ -238,7 +238,7 @@ export class CartService {
       await this.auditLogsService.log({
         action: 'UPDATE_CART_ITEM',
         collection_name: 'carts',
-        department: Department.SALE_MARKETING,
+        department: Department.SALES,
         actor_id: userId || undefined,
         target_id: cart._id,
         detail: {
@@ -276,7 +276,7 @@ export class CartService {
     await this.auditLogsService.log({
       action: 'REMOVE_CART_ITEM',
       collection_name: 'carts',
-      department: Department.SALE_MARKETING,
+      department: Department.SALES,
       actor_id: userId || undefined,
       target_id: null, // Không query ID giỏ hàng để tiết kiệm resource
       detail: {
@@ -390,7 +390,7 @@ export class CartService {
     await this.auditLogsService.log({
       action: 'MERGE_GUEST_CART',
       collection_name: 'carts',
-      department: Department.SALE_MARKETING,
+      department: Department.SALES,
       actor_id: userId,
       target_id: memberCart._id,
       detail: {

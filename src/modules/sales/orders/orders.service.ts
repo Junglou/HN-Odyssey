@@ -72,7 +72,7 @@ export class OrdersService {
         queryCriteria.session_id = data.guestSessionId;
         hasIdentity = true;
       }
-      // [FIX AC5] Xóa bỏ phiên "Mua ngay" cũ (Áp dụng cả User & Guest)
+      //Xóa bỏ phiên "Mua ngay" cũ (Áp dụng cả User & Guest)
       if (hasIdentity) {
         const oldTempOrders = await this.orderModel
           .find(queryCriteria)
@@ -178,7 +178,7 @@ export class OrdersService {
       await this.auditLogsService.log({
         action: 'INIT_BUY_NOW_SESSION',
         collection_name: 'orders',
-        department: Department.SALE_MARKETING,
+        department: Department.SALES,
         actor_id: data.userId || undefined,
         target_id: tempOrder._id,
         detail: {
@@ -360,7 +360,7 @@ export class OrdersService {
         action: 'CREATE_ORDER_FAILED',
         collection_name: 'orders',
         actor_id: userId,
-        department: Department.SALE_MARKETING,
+        department: Department.SALES,
         detail: { error: error.message },
         is_success: false,
         ip: ip,
@@ -424,7 +424,7 @@ export class OrdersService {
       collection_name: 'orders',
       actor_id: adminId,
       target_id: order._id,
-      department: Department.SALE_MARKETING,
+      department: Department.SALES,
       detail: {
         new_status: status,
         order_code: order.order_code,
@@ -443,7 +443,7 @@ export class OrdersService {
       collection_name: 'orders',
       actor_id: userId,
       target_id: order._id,
-      department: Department.SALE_MARKETING,
+      department: Department.SALES,
       detail: {
         order_code: order.order_code,
         total: order.total_amount,

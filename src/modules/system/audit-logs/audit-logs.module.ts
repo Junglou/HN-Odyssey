@@ -5,6 +5,7 @@ import { AuditLogsService } from './audit-logs.service';
 import { AuditLog, AuditLogSchema } from './schemas/audit-log.schema';
 import { Role, RoleSchema } from 'src/modules/users/roles/schemas/role.schema';
 import { User, UserSchema } from 'src/modules/users/schemas/user.schema';
+import { AuditLogsViewSetup } from './audit-logs-view.setup';
 
 @Global()
 @Module({
@@ -16,7 +17,7 @@ import { User, UserSchema } from 'src/modules/users/schemas/user.schema';
     ]),
   ],
   controllers: [AuditLogsController],
-  providers: [AuditLogsService],
+  providers: [AuditLogsService, AuditLogsViewSetup],
   exports: [AuditLogsService],
 })
 export class AuditLogsModule {}

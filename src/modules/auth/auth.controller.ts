@@ -209,7 +209,7 @@ export class AuthController {
   async requestRecovery(
     @Body() dto: CreateRecoveryDto,
     @UploadedFiles(
-      // [NEW] Validate trực tiếp tại Controller
+      //Validate trực tiếp tại Controller
       new ParseFilePipeBuilder()
         .addFileTypeValidator({
           fileType: /(jpg|jpeg|png)$/, // Chỉ cho phép ảnh
@@ -230,7 +230,7 @@ export class AuthController {
 
   //8. ADMIN: LẤY DANH SÁCH YÊU CẦU (AC3)
   @Get('admin/recovery-requests')
-  @Roles(Role.MANAGER, Role.SUPER_ADMIN)
+  @Roles(Role.SUPER_ADMIN)
   @RequirePermissions(Resource.USERS, Action.READ)
   async getPendingRecoveries() {
     return this.authService.getPendingRecoveries();
@@ -238,7 +238,7 @@ export class AuthController {
 
   //9. ADMIN: DUYỆT/TỪ CHỐI (AC4, AC5)
   @Post('admin/recovery-requests/process/:id')
-  @Roles(Role.MANAGER, Role.SUPER_ADMIN)
+  @Roles(Role.SUPER_ADMIN)
   @RequirePermissions(Resource.USERS, Action.UPDATE)
   async processRecovery(
     @Param('id') id: string,
@@ -272,7 +272,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Yêu cầu OTP/Link để reset mật khẩu' })
   async forgotPassword(
     @Body() dto: ForgotPasswordDto,
-    @Ip() ip: string, // Lấy IP tự động
+    @Ip() ip: string,
     @UserAgent() userAgent: string,
   ) {
     return this.authService.forgotPassword(dto.account, ip, userAgent);

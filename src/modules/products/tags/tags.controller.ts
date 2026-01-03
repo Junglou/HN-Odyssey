@@ -34,7 +34,7 @@ export class TagsController {
   constructor(private readonly tagsService: TagsService) {}
 
   @Post()
-  @RequirePermissions(Resource.TAGS, Action.CREATE)
+  @RequirePermissions(Resource.ATTRIBUTES, Action.CREATE)
   create(
     @Body() createTagDto: CreateTagDto,
     @CurrentUser() user: IUser,
@@ -51,7 +51,7 @@ export class TagsController {
   }
 
   @Patch(':id')
-  @RequirePermissions(Resource.TAGS, Action.UPDATE)
+  @RequirePermissions(Resource.ATTRIBUTES, Action.UPDATE)
   update(
     @Param('id') id: string,
     @Body() updateTagDto: UpdateTagDto,
@@ -63,8 +63,8 @@ export class TagsController {
   }
 
   @Delete(':id')
-  @Roles(Role.MANAGER, Role.SUPER_ADMIN)
-  @RequirePermissions(Resource.TAGS, Action.DELETE)
+  @Roles(Role.SUPER_ADMIN)
+  @RequirePermissions(Resource.ATTRIBUTES, Action.DELETE)
   remove(
     @Param('id') id: string,
     @CurrentUser() user: IUser,
@@ -75,8 +75,8 @@ export class TagsController {
   }
 
   @Post('merge')
-  @Roles(Role.MANAGER, Role.SUPER_ADMIN)
-  @RequirePermissions(Resource.TAGS, Action.UPDATE)
+  @Roles(Role.SUPER_ADMIN)
+  @RequirePermissions(Resource.ATTRIBUTES, Action.UPDATE)
   merge(
     @Body() mergeDto: MergeTagsDto,
     @CurrentUser() user: IUser,

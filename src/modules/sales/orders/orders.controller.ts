@@ -39,7 +39,7 @@ export class OrdersController {
   // API dành cho Admin/Shipper
   @Patch(':id/status')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(Role.SUPER_ADMIN)
   async updateStatus(
     @Param('id') id: string,
     @Body('status') status: string,

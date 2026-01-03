@@ -129,7 +129,7 @@ export class CategoriesService {
       collection_name: 'categories',
       actor_id: actorId,
       target_id: savedCategory._id,
-      department: Department.SALE_MARKETING,
+      department: Department.WAREHOUSE,
       detail: {
         name: savedCategory.name,
         slug: savedCategory.slug,
@@ -301,7 +301,7 @@ export class CategoriesService {
       collection_name: 'categories',
       actor_id: actorId,
       target_id: category._id,
-      department: Department.SALE_MARKETING,
+      department: Department.WAREHOUSE,
       detail: {
         name: category.name,
         changes: {
@@ -347,7 +347,7 @@ export class CategoriesService {
       collection_name: 'categories',
       actor_id: actorId,
       target_id: id,
-      department: Department.SALE_MARKETING,
+      department: Department.WAREHOUSE,
       detail: {
         name: category ? category.name : 'Unknown',
         slug: category ? category.slug : 'Unknown',
@@ -398,7 +398,7 @@ export class CategoriesService {
         collection_name: 'categories',
         actor_id: actorId,
         target_id: null,
-        department: Department.SALE_MARKETING,
+        department: Department.WAREHOUSE,
         detail: { count: operations.length },
         ip,
         user_agent: userAgent,

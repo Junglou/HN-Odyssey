@@ -5,8 +5,10 @@ import {
   Min,
   IsDateString,
   IsBooleanString,
+  IsEnum,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { Department } from 'src/common/enums/department.enum';
 
 export class QueryAuditLogDto {
   @IsOptional()
@@ -33,7 +35,6 @@ export class QueryAuditLogDto {
   @IsString()
   actor_id?: string;
 
-  // --- MỚI: Thêm 2 trường này để tìm kiếm tiện hơn ---
   @IsOptional()
   @IsString()
   actor_employee_code?: string; // Tìm theo mã NV (VD: EMP001)
@@ -41,7 +42,6 @@ export class QueryAuditLogDto {
   @IsOptional()
   @IsString()
   actor_email?: string; // Tìm theo email
-  // --------------------------------------------------
 
   @IsOptional()
   @IsString()
@@ -58,4 +58,8 @@ export class QueryAuditLogDto {
   @IsOptional()
   @IsBooleanString()
   is_success?: string;
+
+  @IsOptional()
+  @IsEnum(Department)
+  department?: Department;
 }
