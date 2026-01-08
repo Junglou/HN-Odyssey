@@ -41,6 +41,7 @@ export class RolesService {
       ...dto,
       slug,
       is_system: false,
+      is_active: dto.is_active !== undefined ? dto.is_active : true,
     });
     const savedRole = await newRole.save();
 

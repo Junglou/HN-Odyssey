@@ -14,7 +14,7 @@ export class AuditLog {
   actor_id?: Types.ObjectId;
 
   @Prop({ required: false, index: true })
-  actor_employee_code?: string; // Vd: EMP001
+  actor_employee_code?: string; 
 
   @Prop({ required: false })
   actor_email?: string;
@@ -48,8 +48,8 @@ export class AuditLog {
 
   @Prop({
     required: true,
-    enum: Department, // Validate dữ liệu phải nằm trong Enum
-    index: true, // Index cực quan trọng để View chạy nhanh
+    enum: Department,
+    index: true,
   })
   department: string;
 }

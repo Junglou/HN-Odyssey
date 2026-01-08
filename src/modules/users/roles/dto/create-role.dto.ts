@@ -9,6 +9,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Action, Resource } from '../../../../common/enums/resource.enum';
+import { RoleLevel } from 'src/common/enums/role-level.enum';
 
 class PermissionDto {
   @IsEnum(Resource)
@@ -31,6 +32,10 @@ export class CreateRoleDto {
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
+
+  @IsOptional()
+  @IsEnum(RoleLevel)
+  level?: RoleLevel; 
 
   @IsArray()
   @ValidateNested({ each: true })

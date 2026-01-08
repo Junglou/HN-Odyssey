@@ -1,17 +1,24 @@
+import { Type } from 'class-transformer';
 import {
   IsOptional,
   IsString,
   IsNumberString,
   IsEnum,
+  IsInt,
+  Min,
 } from 'class-validator';
 
 export class QueryStaffDto {
   @IsOptional()
-  @IsNumberString()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
   page?: number;
 
   @IsOptional()
-  @IsNumberString()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
   limit?: number;
 
   @IsOptional()
@@ -23,7 +30,6 @@ export class QueryStaffDto {
   role?: string;
 
   @IsOptional()
-  // Lưu ý: Query param thường gửi lên dạng string, cần transform ở Controller hoặc dùng BooleanString
   is_active?: boolean;
 
   @IsOptional()

@@ -106,6 +106,10 @@ export class AuditLogsService {
     'access_token',
     'refresh_token',
     'cc_number',
+    'cvv',
+    'bank_account',
+    'secret',
+    'apiKey',
   ];
 
   private sanitizeDetail(data: any): any {

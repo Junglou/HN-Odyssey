@@ -9,6 +9,7 @@ import {
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Role } from '../../../../common/enums/role.enum';
+import { Department } from 'src/common/enums/department.enum';
 
 export class CreateStaffDto {
   @ApiProperty({
@@ -62,6 +63,7 @@ export class CreateStaffDto {
   roles: Role[];
 
   @IsNotEmpty()
+  @IsEnum(Department, { message: 'Phòng ban không hợp lệ.' })
   @IsString()
   department: string;
 }

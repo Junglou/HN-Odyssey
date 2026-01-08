@@ -73,4 +73,5 @@ UserSchema.index({
   last_Name: 'text',
   email: 'text',
   phone: 'text',
+  employee_code: 'text',
 });

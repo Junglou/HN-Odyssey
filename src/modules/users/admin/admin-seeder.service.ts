@@ -7,6 +7,7 @@ import { Role } from 'src/modules/users/roles/schemas/role.schema';
 import { UserStatus } from 'src/common/enums/user-status.enum';
 import { Resource, Action } from 'src/common/enums/resource.enum';
 import { Department } from 'src/common/enums/department.enum';
+import { RoleLevel } from 'src/common/enums/role-level.enum';
 
 @Injectable()
 export class AdminSeederService implements OnModuleInit {
@@ -22,13 +23,15 @@ export class AdminSeederService implements OnModuleInit {
     await this.seedStaffs();
   }
 
-  // 1. TẠO CÁC ROLE MẪU 
+  // 1. TẠO CÁC ROLE MẪU
   private async seedRoles() {
     const roles = [
       {
         name: 'Super Admin',
         slug: 'SUPER_ADMIN',
         description: 'Quản trị viên tối cao (Full quyền hệ thống)',
+        level: RoleLevel.BOARD,
+        is_active: true,
         is_system: true,
         permissions: [
           { resource: Resource.SYSTEM, actions: [Action.MANAGE] },
@@ -45,15 +48,14 @@ export class AdminSeederService implements OnModuleInit {
         slug: 'WAREHOUSE_MANAGER',
         description:
           'Quản lý tồn kho, nhập xuất và nhà cung cấp (Không sửa thông tin sản phẩm)',
+        level: RoleLevel.MANAGEMENT,
+        is_active: true,
         permissions: [
-          //Kho chỉ được XEM thông tin sản phẩm để biết đường nhập hàng
           { resource: Resource.PRODUCTS, actions: [Action.READ] },
           { resource: Resource.CATEGORIES, actions: [Action.READ] },
-
-          // Quyền chính của kho: Quản lý số lượng và vận chuyển
-          { resource: Resource.INVENTORY, actions: [Action.MANAGE] }, // Tồn kho & Kiểm kê
-          { resource: Resource.TRANSFERS, actions: [Action.MANAGE] }, // Nhập/Xuất kho
-          { resource: Resource.SUPPLIERS, actions: [Action.MANAGE] }, // Nhà cung cấp
+          { resource: Resource.INVENTORY, actions: [Action.MANAGE] },
+          { resource: Resource.TRANSFERS, actions: [Action.MANAGE] },
+          { resource: Resource.SUPPLIERS, actions: [Action.MANAGE] },
           { resource: Resource.SHIPPING, actions: [Action.MANAGE] },
         ],
       },
@@ -61,13 +63,12 @@ export class AdminSeederService implements OnModuleInit {
         name: 'Marketing Leader',
         slug: 'MARKETING_LEADER',
         description: 'Quản lý Catalog sản phẩm, chiến dịch và nội dung',
+        level: RoleLevel.MANAGEMENT,
+        is_active: true,
         permissions: [
-          //Marketing nắm quyền sinh sát thông tin sản phẩm
           { resource: Resource.PRODUCTS, actions: [Action.MANAGE] },
           { resource: Resource.CATEGORIES, actions: [Action.MANAGE] },
           { resource: Resource.ATTRIBUTES, actions: [Action.MANAGE] },
-
-          // Các quyền Marketing khác
           { resource: Resource.PROMOTIONS, actions: [Action.MANAGE] },
           { resource: Resource.BLOG, actions: [Action.MANAGE] },
           { resource: Resource.NOTIFICATIONS, actions: [Action.MANAGE] },
@@ -78,12 +79,11 @@ export class AdminSeederService implements OnModuleInit {
         name: 'Nhân viên bán hàng (Sales Staff)',
         slug: 'SALES_STAFF',
         description: 'Xử lý đơn hàng, đổi trả và tư vấn khách hàng',
+        level: RoleLevel.STAFF,
+        is_active: true,
         permissions: [
-          // Được xem sản phẩm và tồn kho để tư vấn
           { resource: Resource.PRODUCTS, actions: [Action.READ] },
           { resource: Resource.INVENTORY, actions: [Action.READ] },
-
-          // Quyền chính về đơn hàng
           {
             resource: Resource.ORDERS,
             actions: [
@@ -111,6 +111,8 @@ export class AdminSeederService implements OnModuleInit {
         name: 'CSKH (Support)',
         slug: 'SUPPORT_STAFF',
         description: 'Hỗ trợ khách hàng qua Chat và Bảo hành',
+        level: RoleLevel.STAFF,
+        is_active: true,
         permissions: [
           { resource: Resource.SUPPORT, actions: [Action.MANAGE] },
           {
@@ -128,31 +130,39 @@ export class AdminSeederService implements OnModuleInit {
         name: 'Kế toán (Accountant)',
         slug: 'ACCOUNTANT',
         description: 'Xem báo cáo doanh thu và đối soát',
+        level: RoleLevel.STAFF,
+        is_active: true,
         permissions: [
           { resource: Resource.ORDERS, actions: [Action.READ] },
-          { resource: Resource.REPORTS, actions: [Action.READ, Action.EXPORT] },
-          { resource: Resource.PAYMENT, actions: [Action.READ, Action.EXPORT] },
+          {
+            resource: Resource.REPORTS,
+            actions: [Action.READ, Action.EXPORT],
+          },
+          {
+            resource: Resource.PAYMENT,
+            actions: [Action.READ, Action.EXPORT],
+          },
           { resource: Resource.DASHBOARD, actions: [Action.READ] },
         ],
       },
     ];
 
     for (const role of roles) {
-      const exists = await this.roleModel.findOne({ slug: role.slug });
-      if (!exists) {
-        await this.roleModel.create(role);
-        this.logger.log(`[SEED] Created Role: ${role.name}`);
-      }
+      await this.roleModel.updateOne(
+        { slug: role.slug },
+        { $set: role },
+        { upsert: true },
+      );
+      this.logger.log(`[SEED] Synced Role: ${role.name}`);
     }
   }
 
-  // 2. TẠO NHÂN VIÊN MẪU (Giữ nguyên, chỉ cần đảm bảo Department đúng)
+  // 2. TẠO NHÂN VIÊN MẪU
   private async seedStaffs() {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash('HnOdyssey@2025', salt);
 
     const staffs = [
-      // 1. BAN QUẢN TRỊ
       {
         email: 'admin@hnodyssey.com',
         firstName: 'Admin',
@@ -160,57 +170,52 @@ export class AdminSeederService implements OnModuleInit {
         phone: '0909000001',
         department: Department.MANAGEMENT,
         roles: ['SUPER_ADMIN'],
-        employee_code: 'EMP001',
+        employee_code: 'SA-1-1-0000',
       },
-      // 2. KHO VẬN
       {
         email: 'kho.truong@hnodyssey.com',
-        firstName: 'Nguyễn',
-        lastName: 'Văn Kho',
+        firstName: 'Văn Kho',
+        lastName: 'Nguyễn',
         phone: '0909000003',
         department: Department.WAREHOUSE,
         roles: ['WAREHOUSE_MANAGER'],
-        employee_code: 'WH001',
+        employee_code: 'NVK-3-2-0000',
       },
-      // 3. KINH DOANH (SALES)
       {
         email: 'sales.lead@hnodyssey.com',
-        firstName: 'Phạm',
-        lastName: 'Doanh Số',
+        firstName: 'Doanh Số',
+        lastName: 'Phạm',
         phone: '0909000005',
         department: Department.SALES,
         roles: ['SALES_STAFF'],
-        employee_code: 'SALE001',
+        employee_code: 'PDS-2-3-0000',
       },
-      // 4. MARKETING
       {
         email: 'mkt.lead@hnodyssey.com',
-        firstName: 'Vũ',
-        lastName: 'Sáng Tạo',
+        firstName: 'Sáng Tạo',
+        lastName: 'Vũ',
         phone: '0909000007',
         department: Department.MARKETING,
         roles: ['MARKETING_LEADER'],
-        employee_code: 'MKT001',
+        employee_code: 'VST-4-2-0000',
       },
-      // 5. CSKH
       {
         email: 'support.01@hnodyssey.com',
-        firstName: 'Hoàng',
-        lastName: 'Thân Thiện',
+        firstName: 'Thân Thiện',
+        lastName: 'Hoàng',
         phone: '0909000008',
         department: Department.SUPPORT,
         roles: ['SUPPORT_STAFF'],
-        employee_code: 'CS001',
+        employee_code: 'HTT-6-3-0000',
       },
-      // 6. KẾ TOÁN
       {
         email: 'ketoan@hnodyssey.com',
-        firstName: 'Trịnh',
-        lastName: 'Thủ Quỹ',
+        firstName: 'Thủ Quỹ',
+        lastName: 'Trịnh',
         phone: '0909000009',
         department: Department.ACCOUNTING,
         roles: ['ACCOUNTANT'],
-        employee_code: 'ACC001',
+        employee_code: 'TTQ-5-3-0000',
       },
     ];
 
@@ -226,7 +231,9 @@ export class AdminSeederService implements OnModuleInit {
           status: UserStatus.ACTIVE,
           token_version: 0,
         });
-        this.logger.log(`[SEED] Created Staff: ${s.email} (${s.department})`);
+        this.logger.log(
+          `[SEED] Created Staff: ${s.email} (${s.employee_code})`,
+        );
       }
     }
   }

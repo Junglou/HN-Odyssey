@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import { Resource, Action } from '../../../../common/enums/resource.enum';
 import { IsBoolean, IsEnum, IsOptional } from 'class-validator';
+import { RoleLevel } from 'src/common/enums/role-level.enum';
 
 export type RoleDocument = Role & Document;
 
@@ -26,6 +27,9 @@ export class Role {
   @Prop()
   description: string;
 
+  @Prop({ required: true, enum: RoleLevel, default: RoleLevel.STAFF })
+  level: number;
+
   // AC2: Ma trận phân quyền (Lưu danh sách permission)
   @Prop({ type: [Permission], default: [] })
   permissions: Permission[];
@@ -34,6 +38,7 @@ export class Role {
   @Prop({ default: false })
   is_system: boolean;
 
+  @Prop({ default: true })
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
