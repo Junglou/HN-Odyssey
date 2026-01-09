@@ -34,6 +34,7 @@ import {
 } from '../categories/schemas/category.schema';
 import { FilterProductDto, SortOption } from './dto/filter-product.dto';
 import { Department } from 'src/common/enums/department.enum';
+import { Order } from 'src/modules/sales/orders/schemas/order.schema';
 
 @Injectable()
 export class ProductsService {
@@ -42,6 +43,7 @@ export class ProductsService {
     private readonly auditLogsService: AuditLogsService,
     private readonly tagsService: TagsService,
     @InjectModel(Category.name) private categoryModel: Model<CategoryDocument>,
+    @InjectModel(Order.name) private orderModel: Model<Order>,
   ) {}
 
   // HELPER METHODS
@@ -120,7 +122,7 @@ export class ProductsService {
     ip: string,
     userAgent: string,
   ) {
-    // 1. Kiểm tra trùng SKU 
+    // 1. Kiểm tra trùng SKU
     await this.checkSkuExists(createProductDto.sku);
 
     const variants = createProductDto.variants || [];
@@ -143,7 +145,7 @@ export class ProductsService {
       }
     }
 
-    // 2. VALIDATION BIẾN THỂ 
+    // 2. VALIDATION BIẾN THỂ
     if (variants.length > 0) {
       // Check trùng SKU nội bộ
       const variantSkus = variants.map((v) => v.sku);
@@ -184,7 +186,7 @@ export class ProductsService {
       }
     }
 
-    // 3. Tạo Slug & Sanitize 
+    // 3. Tạo Slug & Sanitize
     const slug =
       createProductDto.slug || this.createSlug(createProductDto.name);
     const slugExists = await this.productModel.exists({ slug });
@@ -423,43 +425,37 @@ export class ProductsService {
     ip: string,
     userAgent: string,
   ) {
-    const product = await this.productModel.findOne({
-      _id: id,
-      is_deleted: false,
-    });
+    const product = await this.productModel.findById(id);
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
+
+    // 1. GIA CỐ BẢO MẬT (AC4: Không cho sửa giá/status tại đây)
+    delete updateDto['price'];
+    delete updateDto['sale_price'];
+    delete updateDto['status'];
+    delete updateDto['pending_price_change'];
 
     // Check trùng SKU
     if (updateDto.sku && updateDto.sku !== product.sku) {
       await this.checkSkuExists(updateDto.sku, id);
     }
 
-    //Xử lý thay đổi Slug
+    // Xử lý Slug, Name trùng lặp
     if (updateDto.slug && updateDto.slug !== product.slug) {
-      // 1. Check trùng slug mới
       const exists = await this.productModel.exists({
         slug: updateDto.slug,
         _id: { $ne: id },
       });
       if (exists) throw new ConflictException('Slug đã trùng');
-
-      // 2. Đẩy slug hiện tại vào lịch sử old_slugs
       if (!product.old_slugs) product.old_slugs = [];
       product.old_slugs.push(product.slug);
-
-      // 3. Cập nhật slug mới
       product.slug = updateDto.slug;
-    }
-
-    // Nếu user đổi tên mà KHÔNG truyền slug -> Tự generate slug mới từ tên mới
-    else if (
+    } else if (
       updateDto.name &&
       updateDto.name !== product.name &&
       !updateDto.slug
     ) {
       const newSlug = this.createSlug(updateDto.name);
       if (newSlug !== product.slug) {
-        // Check trùng
         const exists = await this.productModel.exists({
           slug: newSlug,
           _id: { $ne: id },
@@ -472,12 +468,10 @@ export class ProductsService {
       }
     }
 
-    // Check trùng Tên
     if (updateDto.name && updateDto.name !== product.name) {
       const nameExists = await this.productModel.exists({
         name: updateDto.name,
         _id: { $ne: id },
-        is_deleted: false,
       });
       if (nameExists) throw new ConflictException('Tên sản phẩm đã tồn tại');
     }
@@ -496,18 +490,11 @@ export class ProductsService {
       delete updateDto.category_ids;
     }
 
-    if (updateDto.slug && updateDto.slug !== product.slug) {
-      const exists = await this.productModel.exists({
-        slug: updateDto.slug,
-        _id: { $ne: id },
-      });
-      if (exists) throw new ConflictException('Slug đã trùng');
-    }
-
     if (updateDto.description) {
       updateDto.description = this.sanitizeContent(updateDto.description);
     }
 
+    // Assign an toàn
     Object.assign(product, updateDto);
     delete updateDto.slug;
     await product.save();
@@ -770,45 +757,47 @@ export class ProductsService {
 
   //SOFT DELETE
   async remove(id: string, userId: string, ip: string, userAgent: string) {
-    const product = await this.productModel.findOne({
-      _id: id,
-      is_deleted: false,
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('ID sản phẩm không hợp lệ');
+    }
+
+    // 1. Tìm sản phẩm để lấy thông tin log
+    const product = await this.productModel.findById(id);
+    if (!product) {
+      throw new NotFoundException('Sản phẩm không tồn tại');
+    }
+
+    // 2. Kiểm tra ràng buộc đơn hàng (AC1: Mọi trạng thái đơn)
+    const hasOrders = await this.orderModel.exists({
+      'items.product_id': new Types.ObjectId(id),
     });
-    if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
-    // [Soft Delete]
-    product.is_deleted = true;
-    product.deleted_at = new Date();
-    product.status = ProductStatus.INACTIVE;
+    if (hasOrders) {
+      throw new BadRequestException(
+        'Sản phẩm đã có phát sinh đơn hàng, không thể xóa. Vui lòng chuyển sang trạng thái Ngừng kinh doanh.',
+      );
+    }
 
-    //Đổi SKU và Slug để giải phóng mã cho sản phẩm mới
-    // Nếu không đổi, khi tạo sản phẩm mới cùng SKU sẽ bị báo lỗi Conflict
-    const timestamp = Date.now();
-    product.sku = `${product.sku}_DEL_${timestamp}`;
-    product.slug = `${product.slug}-deleted-${timestamp}`;
+    // 3. Xóa vĩnh viễn (AC4)
+    await this.productModel.findByIdAndDelete(id);
 
-    //KHÔNG XÓA FILE VẬT LÝ và KHÔNG XÓA CỨNG DB
-    // Để đảm bảo lịch sử đơn hàng vẫn xem được ảnh sản phẩm (nếu cần)
-    // và admin có thể khôi phục lại dữ liệu nếu xóa nhầm.
-
-    await product.save();
-
-    // Log
+    // 4. Log (AC5)
     await this.auditLogsService.log({
-      action: 'DELETE_PRODUCT',
+      action: 'HARD_DELETE_PRODUCT',
       collection_name: 'products',
       actor_id: userId,
       target_id: id,
       department: Department.WAREHOUSE,
       detail: {
-        reason: 'Soft delete requested by Admin',
-        new_sku: product.sku,
+        product_name: product.name,
+        sku: product.sku,
+        deleted_at: new Date(),
       },
       ip: ip,
       user_agent: userAgent,
     });
 
-    return { message: 'Đã chuyển sản phẩm vào thùng rác (Soft Delete)' };
+    return { message: 'Đã xóa vĩnh viễn sản phẩm và dữ liệu liên quan.' };
   }
 
   // API hỗ trợ xóa lẻ file

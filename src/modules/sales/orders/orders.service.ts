@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
-import { Model, Connection, Types } from 'mongoose';
+import { Model, Connection, Types, FilterQuery } from 'mongoose';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { Order } from './schemas/order.schema';
@@ -14,6 +14,10 @@ import { Product } from 'src/modules/products/catalog/schemas/product.schema';
 import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
 import { ProductStatus } from 'src/common/enums/product-status.enum';
 import { Department } from 'src/common/enums/department.enum';
+import { FilterOrderDto } from './dto/filter-order.dto';
+import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { EmailService } from 'src/modules/notifications/channels/email.service';
+import { PdfService } from './pdf.service';
 
 @Injectable()
 export class OrdersService {
@@ -24,7 +28,127 @@ export class OrdersService {
     @InjectConnection() private connection: Connection,
     @InjectRedis() private readonly redis: Redis,
     private readonly auditLogsService: AuditLogsService,
+    private readonly emailService: EmailService,
+    private readonly pdfService: PdfService,
   ) {}
+
+  // US.121: DANH SÁCH ĐƠN HÀNG
+  async findAll(query: FilterOrderDto) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 10;
+    const { search, status, fromDate, toDate, sort } = query;
+
+    const pipeline: any[] = [];
+
+    // 1. GIAI ĐOẠN SEARCH (Quan trọng: $search phải luôn đứng đầu pipeline)
+    if (search && search.trim().length > 0) {
+      pipeline.push({
+        $search: {
+          index: 'default', // Tên index tạo trên Atlas
+          compound: {
+            should: [
+              {
+                text: {
+                  query: search,
+                  path: 'order_code',
+                  score: { boost: { value: 5 } }, // Ưu tiên khớp mã đơn nhất
+                },
+              },
+              {
+                text: {
+                  query: search,
+                  path: ['shipping_info.phone', 'guest_info.phone'],
+                  score: { boost: { value: 3 } }, // Ưu tiên SĐT 
+                },
+              },
+              {
+                text: {
+                  query: search,
+                  path: 'shipping_info.name',
+                  fuzzy: { maxEdits: 1 }, // Cho phép sai chính tả tên nhẹ
+                },
+              },
+            ],
+            minimumShouldMatch: 1,
+          },
+        },
+      });
+    }
+
+    // 2. GIAI ĐOẠN MATCH (Lọc Status, Date...)
+    const matchStage: any = { status: { $ne: 'TEMPORARY' } };
+
+    if (status) matchStage.status = status;
+    if (fromDate || toDate) {
+      matchStage.createdAt = {};
+      if (fromDate) matchStage.createdAt.$gte = new Date(fromDate);
+      if (toDate) matchStage.createdAt.$lte = new Date(toDate);
+    }
+
+    // Nếu không search thì push matchStage bình thường
+    // Nếu có search, matchStage sẽ lọc TRÊN KẾT QUẢ search -> Hiệu năng cực cao
+    pipeline.push({ $match: matchStage });
+
+    // 3. GIAI ĐOẠN SORT
+    let sortStage: any = {};
+    if (sort) {
+      const [key, val] = sort.split(':');
+      sortStage[key] = val === 'desc' ? -1 : 1;
+    } else {
+      // Logic cũ: Priority lên đầu
+      sortStage = { sort_weight: 1, createdAt: -1 };
+    }
+
+    const skip = (page - 1) * limit;
+
+    // 4. GIAI ĐOẠN FACET 
+    pipeline.push({
+      $facet: {
+        data: [
+          {
+            $addFields: {
+              sort_weight: {
+                $cond: {
+                  if: { $eq: ['$status', 'PRIORITY'] },
+                  then: 1,
+                  else: 2,
+                },
+              },
+            },
+          },
+          { $sort: sortStage },
+          { $skip: skip },
+          { $limit: limit },
+          { $project: { sort_weight: 0 } },
+        ],
+        totalCount: [{ $count: 'count' }],
+      },
+    });
+
+    const [result] = await this.orderModel.aggregate(pipeline);
+
+    const data = result.data;
+    const total = result.totalCount[0]?.count || 0;
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        last_page: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  //US.122: CHI TIẾT ĐƠN HÀNG
+  async findOne(id: string) {
+    const order = await this.orderModel
+      .findById(id)
+      .populate('user_id', 'name email phone avatar first_name last_name')
+      .exec();
+    if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
+    return order;
+  }
 
   // 1. Thêm Helper giả lập tính Voucher (Hoặc Inject VoucherService thật vào đây)
   private async applyVoucher(
@@ -189,7 +313,7 @@ export class OrdersService {
         },
       });
 
-      //Lấy danh sách Upsell (Bán chéo) - AC15
+      //Lấy danh sách Upsell - AC15
       const upsellProducts = await this.productModel
         .find({
           categories: { $in: product.categories },
@@ -218,7 +342,7 @@ export class OrdersService {
     ip: string,
     userAgent: string,
   ) {
-    //MUA NGAY (Đã giữ hàng trước đó)
+    // TRƯỜNG HỢP 1: MUA NGAY (BUY_NOW)
     if (dto.source === 'BUY_NOW') {
       if (!dto.checkoutSessionToken)
         throw new BadRequestException('Thiếu Token');
@@ -230,7 +354,7 @@ export class OrdersService {
         );
 
       const order = await this.orderModel.findById(orderId);
-      // Nếu order không còn là TEMPORARY (VD: Cron job đã hủy do hết hạn), báo lỗi
+
       if (!order || order.status !== 'TEMPORARY') {
         throw new BadRequestException(
           'Đơn hàng không hợp lệ hoặc đã hết hạn giữ hàng',
@@ -242,15 +366,27 @@ export class OrdersService {
         dto.voucherCode,
       );
 
-      // Cập nhật thông tin giao hàng & Chuyển trạng thái
       order.shipping_info = dto.shippingInfo;
+      if (!order.guest_info) {
+        order.guest_info = {
+          name: dto.shippingInfo.name,
+          phone: dto.shippingInfo.phone,
+          email: dto.shippingInfo.email,
+        };
+      } else if (dto.shippingInfo.email) {
+        order.guest_info.email = dto.shippingInfo.email;
+      }
       order.payment.method = dto.paymentMethod;
       order.status = 'PENDING';
-
-      //Cập nhật giá sau giảm
       order.total_amount = finalTotal;
       order['discount_amount'] = discount;
       order['voucher_code'] = dto.voucherCode || '';
+      order.timeline.push({
+        status: 'PENDING',
+        timestamp: new Date(),
+        actor: 'Khách hàng (Web)',
+        note: 'Đơn hàng được tạo thành công (Mua ngay)',
+      });
 
       await order.save();
       await this.redis.del(dto.checkoutSessionToken);
@@ -259,24 +395,36 @@ export class OrdersService {
       return order;
     }
 
-    //MUA TỪ GIỎ HÀNG (Cần Transaction)
+    // TRƯỜNG HỢP 2: MUA TỪ GIỎ HÀNG (CART)
     const session = await this.connection.startSession();
     session.startTransaction();
 
     try {
-      const cartQuery = userId
-        ? { user_id: new Types.ObjectId(userId) }
-        : { session_id: dto.guestSessionId };
+      // 1. Tạo Query tìm giỏ hàng chuẩn xác
+      const cartQuery: any = {};
 
-      const cart = await this.cartModel.findOne(cartQuery).session(session);
-      if (!cart || cart.items.length === 0) {
-        throw new BadRequestException('Giỏ hàng trống');
+      if (userId) {
+        cartQuery.user_id = new Types.ObjectId(userId);
+      } else if (dto.guestSessionId) {
+        cartQuery.session_id = dto.guestSessionId;
+      } else {
+        throw new BadRequestException(
+          'Không xác định được danh tính người mua (Thiếu Guest ID hoặc User ID)',
+        );
       }
 
-      //Khai báo kiểu any[] rõ ràng để TypeScript không báo lỗi
+      // 2. Tìm giỏ hàng
+      const cart = await this.cartModel.findOne(cartQuery).session(session);
+
+      //Đã thêm lại đoạn check này để tránh Crash Server
+      if (!cart || !cart.items || cart.items.length === 0) {
+        throw new BadRequestException('Giỏ hàng trống hoặc không tồn tại');
+      }
+
       const orderItems: any[] = [];
       let totalAmount = 0;
 
+      // 3. Duyệt item và trừ tồn kho
       for (const item of cart.items) {
         const product = await this.productModel
           .findById(item.product_id)
@@ -291,14 +439,12 @@ export class OrdersService {
         if (!variant.active)
           throw new BadRequestException(`Phân loại ${item.sku} ngừng bán`);
 
-        // Member check
         if (product.is_member_only && !userId) {
           throw new BadRequestException(
             `Sản phẩm ${product.name} chỉ dành cho thành viên.`,
           );
         }
 
-        // Limit check
         if (
           product.max_purchase_qty &&
           item.quantity > product.max_purchase_qty
@@ -308,7 +454,6 @@ export class OrdersService {
           );
         }
 
-        // Stock check
         if (variant.stock < item.quantity) {
           throw new BadRequestException(
             `Sản phẩm ${product.name} (${item.sku}) chỉ còn ${variant.stock}`,
@@ -328,7 +473,7 @@ export class OrdersService {
 
         totalAmount += finalPrice * item.quantity;
 
-        // Trừ kho ngay lập tức
+        // Trừ kho
         await this.productModel
           .updateOne(
             { _id: product._id, 'variants.sku': item.sku },
@@ -337,18 +482,36 @@ export class OrdersService {
           .session(session);
       }
 
+      // 4. Tạo đơn hàng mới
       const newOrder = new this.orderModel({
         order_code: `ORD-${Date.now()}`,
         user_id: userId ? new Types.ObjectId(userId) : null,
+        guest_info: dto.shippingInfo.email
+          ? {
+              name: dto.shippingInfo.name,
+              phone: dto.shippingInfo.phone,
+              email: dto.shippingInfo.email,
+            }
+          : undefined,
         items: orderItems,
         shipping_info: dto.shippingInfo,
         payment: { method: dto.paymentMethod, status: 'PENDING' },
         total_amount: totalAmount,
         status: 'PENDING',
-        hold_expires_at: new Date(Date.now() + 15 * 60000), // Vẫn set timeout 15p cho đơn thường
+        hold_expires_at: new Date(Date.now() + 15 * 60000),
+        timeline: [
+          {
+            status: 'PENDING',
+            timestamp: new Date(),
+            actor: 'Khách hàng (Web)',
+            note: 'Đơn hàng được tạo từ Giỏ hàng',
+          },
+        ],
       });
 
+      // 5. Xóa giỏ hàng sau khi tạo đơn thành công
       await this.cartModel.deleteOne({ _id: cart._id }).session(session);
+
       await newOrder.save({ session });
       await session.commitTransaction();
 
@@ -434,6 +597,291 @@ export class OrdersService {
     });
 
     return order;
+  }
+
+  //US.123: CẬP NHẬT TRẠNG THÁI (STATE MACHINE)
+  async updateStatusAdvanced(
+    id: string,
+    dto: UpdateOrderStatusDto,
+    actorId: string,
+    actorName: string,
+    ip: string,
+    userAgent: string,
+  ) {
+    const session = await this.connection.startSession();
+    session.startTransaction(); // 1. Bắt đầu giao dịch
+
+    try {
+      // 2. Truyền session vào query tìm kiếm
+      const order = await this.orderModel.findById(id).session(session);
+      if (!order) throw new NotFoundException('Đơn hàng không tìm thấy');
+
+      const oldStatus = order.status;
+      const newStatus = dto.status;
+
+      // AC6: Chặn sửa khi đã đóng
+      if (['COMPLETED', 'CANCELLED'].includes(oldStatus) && !dto.is_override) {
+        throw new BadRequestException(
+          'Đơn hàng đã đóng. Cần quyền Ghi đè (Override) để mở lại.',
+        );
+      }
+
+      // AC1 & AC4: Validate State Transition với Logic Ghi đè an toàn
+      if (dto.is_override) {
+        // Nếu chọn Ghi đè, BẮT BUỘC phải có lý do
+        if (!dto.reason || dto.reason.trim() === '') {
+          throw new BadRequestException(
+            'Bắt buộc nhập lý do khi thực hiện Ghi đè quy trình (Override Workflow).',
+          );
+        }
+        // Bỏ qua validateStateTransition -> Cho phép nhảy cóc
+      } else {
+        // Nếu đi luồng thường, bắt buộc phải đúng quy trình
+        this.validateStateTransition(oldStatus, newStatus);
+      }
+
+      // AC2: Xử lý Ưu tiên
+      if (newStatus === 'PRIORITY' && oldStatus !== 'PENDING') {
+        throw new BadRequestException(
+          'Chỉ đơn chờ xử lý mới được chuyển sang Ưu tiên',
+        );
+      }
+
+      // AC5: Ràng buộc dữ liệu khi vận chuyển
+      if (newStatus === 'SHIPPING') {
+        if (!dto.shipping_provider || !dto.tracking_code) {
+          throw new BadRequestException(
+            'Vui lòng nhập Đơn vị vận chuyển và Mã vận đơn',
+          );
+        }
+        order.shipping_info.provider = dto.shipping_provider;
+        order.shipping_info.tracking_code = dto.tracking_code;
+      }
+
+      // AC3: Xử lý Hủy 
+      if (newStatus === 'CANCELLED' && oldStatus !== 'CANCELLED') {
+        await this.restoreStock(order, session);
+        order.cancel_reason = dto.reason || 'Hủy bởi nhân viên';
+      }
+
+      // 2. Trường hợp KHÔI PHỤC ĐƠN ĐÃ HỦY
+      if (oldStatus === 'CANCELLED' && newStatus !== 'CANCELLED') {
+        // Kiểm tra xem còn hàng để trừ không
+        for (const item of order.items) {
+          const product = await this.productModel
+            .findById(item.product_id)
+            .session(session);
+          if (!product) {
+            throw new BadRequestException(
+              `Không thể khôi phục đơn: Sản phẩm ${item.product_name} đã bị xóa vĩnh viễn khỏi hệ thống.`,
+            );
+          }
+          const variant = product.variants.find((v) => v.sku === item.sku);
+
+          if (!variant || variant.stock < item.quantity) {
+            throw new BadRequestException(
+              `Không thể khôi phục đơn. Sản phẩm ${item.product_name} (${item.sku}) không đủ tồn kho (Hiện có: ${variant ? variant.stock : 0}).`,
+            );
+          }
+          // Thực hiện trừ kho
+          await this.productModel
+            .updateOne(
+              { _id: item.product_id, 'variants.sku': item.sku },
+              { $inc: { 'variants.$.stock': -item.quantity } },
+            )
+            .session(session);
+        }
+      }
+      // Cập nhật
+      order.status = newStatus;
+      if (newStatus === 'COMPLETED') order.payment.status = 'PAID';
+
+      // Nếu khôi phục đơn hủy, reset lý do hủy
+      if (oldStatus === 'CANCELLED' && newStatus !== 'CANCELLED') {
+        order.cancel_reason = undefined;
+      }
+      // AC4 & AC7: Ghi Timeline & Internal Note
+      if (dto.note) order.internal_note = dto.note;
+
+      order.timeline.push({
+        status: newStatus,
+        timestamp: new Date(),
+        actor: actorName,
+        note:
+          dto.reason || dto.note || `Chuyển từ ${oldStatus} sang ${newStatus}`,
+      });
+
+      // 3. Lưu với session
+      await order.save({ session });
+
+      // 4. Xác nhận giao dịch thành công
+      await session.commitTransaction();
+
+      // Ghi log sau khi commit thành công để đảm bảo dữ liệu đã an toàn
+      await this.auditLogsService.log({
+        action: dto.is_override
+          ? 'OVERRIDE_ORDER_STATUS'
+          : 'UPDATE_ORDER_STATUS',
+        collection_name: 'orders',
+        actor_id: actorId,
+        target_id: order._id,
+        department: Department.SALES,
+        detail: {
+          order_code: order.order_code,
+          old_status: oldStatus,
+          new_status: newStatus,
+          reason: dto.reason || null,
+          is_override: dto.is_override || false,
+          note: dto.note || null,
+          tracking_code: dto.tracking_code || null,
+        },
+        ip: ip,
+        user_agent: userAgent,
+        is_success: true,
+      });
+
+      return order;
+    } catch (error) {
+      // 5. Nếu có lỗi, hoàn tác mọi thay đổi (kể cả hoàn kho)
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      // 6. Kết thúc phiên làm việc
+      session.endSession();
+    }
+  }
+
+  //US.124: IN HÓA ĐƠN / PHIẾU GIAO HÀNG
+  async generatePrintData(id: string, type: 'INVOICE' | 'PACKING_SLIP') {
+    const order = await this.findOne(id);
+
+    // AC5: Ràng buộc trạng thái
+    if (
+      type === 'INVOICE' &&
+      ['PENDING', 'CANCELLED', 'TEMPORARY'].includes(order.status)
+    ) {
+      throw new BadRequestException('Đơn hàng chưa đủ điều kiện xuất hóa đơn');
+    }
+
+    // AC8: Tăng biến đếm số lần in
+    // Chỉ tăng khi in Hóa đơn (Invoice), phiếu giao hàng có thể in lại thoải mái tùy nghiệp vụ
+    if (type === 'INVOICE') {
+      order.print_count = (order.print_count || 0) + 1;
+      await order.save();
+    }
+
+    // Trả về data cấu trúc để Frontend render PDF hoặc dùng thư viện tạo PDF tại đây
+    return {
+      type,
+      print_date: new Date(),
+      is_copy: order.print_count > 1, // Nếu in > 1 lần là bản sao
+      order_info: {
+        code: order.order_code,
+        created_at: order['createdAt'],
+        customer: order.shipping_info,
+      },
+      items: order.items.map((i) => ({
+        name: i.product_name,
+        qty: i.quantity,
+        // Nếu là Packing Slip thì ẩn giá (AC2)
+        price: type === 'INVOICE' ? i.price : undefined,
+        total: type === 'INVOICE' ? i.price * i.quantity : undefined,
+      })),
+      financials:
+        type === 'INVOICE'
+          ? {
+              subtotal: order.total_amount + order.discount_amount,
+              discount: order.discount_amount,
+              total: order.total_amount,
+            }
+          : undefined,
+    };
+  }
+
+  // 2. Thêm hàm gửi Email (AC3)
+  async sendInvoiceEmail(id: string) {
+    const order = await this.orderModel.findById(id).populate('user_id');
+    if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
+
+    const recipientEmail =
+      order.shipping_info?.email || // 1. Tìm trong thông tin giao hàng 
+      order.guest_info?.email || // 2. Tìm trong thông tin khách vãng lai
+      (order.user_id as any)?.email;
+    if (!recipientEmail) {
+      throw new BadRequestException(
+        'Đơn hàng này không có địa chỉ email liên kết',
+      );
+    }
+
+    try {
+      // 1. Tạo file PDF từ PdfService
+      const pdfBuffer = await this.pdfService.generateInvoice(order);
+
+      // 2. Gửi mail kèm Buffer
+      await this.emailService.sendInvoice(recipientEmail, order, pdfBuffer);
+
+      // 3. Log lại
+      await this.auditLogsService.log({
+        action: 'SEND_INVOICE_EMAIL',
+        collection_name: 'orders',
+        target_id: order._id,
+        department: Department.SALES,
+        detail: { email: recipientEmail, has_attachment: true },
+        is_success: true,
+      });
+
+      return {
+        success: true,
+        message: `Đã gửi hóa đơn (kèm PDF) đến ${recipientEmail}`,
+      };
+    } catch (error) {
+      console.error('Lỗi gửi mail/tạo PDF:', error);
+      throw new BadRequestException('Gửi email thất bại: ' + error.message);
+    }
+  }
+
+  // 3. Thêm hàm lấy dữ liệu in hàng loạt (AC4)
+  async generateBulkPrintData(ids: string[], type: 'INVOICE' | 'PACKING_SLIP') {
+    const results: any[] = [];
+    for (const id of ids) {
+      try {
+        const data = await this.generatePrintData(id, type);
+        results.push(data);
+      } catch (e) {
+        // Bỏ qua lỗi hoặc log lại nếu 1 đơn trong list bị lỗi
+        console.error(`Lỗi in đơn ${id}:`, e.message);
+      }
+    }
+    return results;
+  }
+
+  //HELPER METHODS
+  private validateStateTransition(oldS: string, newS: string) {
+    const flows = {
+      PENDING: ['PRIORITY', 'CONFIRMED', 'CANCELLED'],
+      PRIORITY: ['CONFIRMED', 'CANCELLED'],
+      CONFIRMED: ['SHIPPING', 'CANCELLED'], // Đã xác nhận -> Vận chuyển hoặc Hủy
+      SHIPPING: ['COMPLETED', 'CANCELLED'], // Có thể hoàn hàng
+      COMPLETED: [], // End state
+      CANCELLED: [], // End state
+    };
+
+    if (!flows[oldS] || !flows[oldS].includes(newS)) {
+      throw new BadRequestException(
+        `Không thể chuyển trạng thái từ ${oldS} sang ${newS} theo quy trình chuẩn.`,
+      );
+    }
+  }
+
+  private async restoreStock(order: Order, session: any) {
+    for (const item of order.items) {
+      await this.productModel
+        .updateOne(
+          { _id: item.product_id, 'variants.sku': item.sku },
+          { $inc: { 'variants.$.stock': item.quantity } },
+        )
+        .session(session);
+    }
   }
 
   // Helper

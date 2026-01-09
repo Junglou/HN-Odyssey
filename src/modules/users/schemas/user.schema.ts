@@ -63,8 +63,13 @@ export type UserDocument = User & Document;
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
-UserSchema.virtual('fullName').get(function (this: UserDocument) {
-  return `${this.last_Name} ${this.first_Name}`;
+UserSchema.virtual('fullName').get(function () {
+  // 1. Nếu có đủ họ tên
+  if (this.first_Name && this.last_Name) {
+    return `${this.first_Name} ${this.last_Name}`;
+  }
+  // 2. Nếu không có gì cả, trả về email (bỏ phần @domain đi cho gọn) hoặc string rỗng
+  return this.email ? this.email.split('@')[0] : '';
 });
 
 // Index Text để tìm kiếm theo tên/email/sđt (US.15)

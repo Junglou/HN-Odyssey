@@ -1,4 +1,5 @@
 import {
+  IsEmail,
   IsNotEmpty,
   IsObject,
   IsOptional,
@@ -12,6 +13,9 @@ class ShippingInfoDto {
   @IsNotEmpty() phone: string;
   @IsNotEmpty() address: string;
   @IsNotEmpty() city_code: string;
+  @IsOptional()
+  @IsEmail()
+  email?: string;
 }
 
 export class CreateOrderDto {
@@ -20,7 +24,7 @@ export class CreateOrderDto {
   source: 'CART' | 'BUY_NOW';
 
   @IsOptional()
-  checkoutSessionToken?: string; 
+  checkoutSessionToken?: string;
 
   @IsObject()
   @ValidateNested()
@@ -35,7 +39,7 @@ export class CreateOrderDto {
 
   @IsOptional()
   @IsString()
-  voucherCode?: string; 
+  voucherCode?: string;
 
   @IsOptional()
   @IsString()

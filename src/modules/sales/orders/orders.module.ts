@@ -9,6 +9,10 @@ import {
   Product,
   ProductSchema,
 } from 'src/modules/products/catalog/schemas/product.schema';
+import { NotificationsModule } from 'src/modules/notifications/notifications.module';
+import { PdfService } from './pdf.service';
+import { OrdersCronService } from './orders.cron';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
   imports: [
@@ -17,9 +21,12 @@ import {
       { name: Product.name, schema: ProductSchema },
       { name: Cart.name, schema: CartSchema },
     ]),
-    AuditLogsModule, 
+    AuditLogsModule,
+    NotificationsModule,
+    JwtModule.register({}),
   ],
   controllers: [OrdersController],
-  providers: [OrdersService],
+  providers: [OrdersService, PdfService, OrdersCronService],
+  exports: [OrdersService],
 })
 export class OrdersModule {}
