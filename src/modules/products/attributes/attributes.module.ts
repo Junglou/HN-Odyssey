@@ -5,6 +5,7 @@ import { AttributesController } from './attributes.controller';
 import { Attribute, AttributeSchema } from './schemas/attribute.schema';
 import { Product, ProductSchema } from '../catalog/schemas/product.schema';
 import { Role, RoleSchema } from 'src/modules/users/roles/schemas/role.schema';
+import { SearchModule } from 'src/modules/search/search.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { Role, RoleSchema } from 'src/modules/users/roles/schemas/role.schema';
       { name: Product.name, schema: ProductSchema },
       { name: Role.name, schema: RoleSchema },
     ]),
+    SearchModule,
   ],
   controllers: [AttributesController],
   providers: [AttributesService],

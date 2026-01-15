@@ -77,7 +77,6 @@ export class ReviewsService {
       rating: dto.rating,
       content: dto.content,
       media: dto.media,
-      // status: 'PENDING',
       status: 'APPROVED',
     });
 
@@ -140,7 +139,7 @@ export class ReviewsService {
       limit = 10,
       star,
       has_media,
-      sort_by = 'newest', // Mặc định là newest
+      sort_by = 'newest', 
       variant_sku,
     } = query;
 
@@ -208,11 +207,11 @@ export class ReviewsService {
             // Lookup để populate user info (Thay cho .populate)
             {
               $lookup: {
-                from: 'users', // Tên collection User trong DB (thường là số nhiều)
+                from: 'users', 
                 localField: 'user_id',
                 foreignField: '_id',
                 as: 'user',
-                pipeline: [{ $project: { full_name: 1, avatar: 1 } }], // Chỉ lấy field cần thiết
+                pipeline: [{ $project: { full_name: 1, avatar: 1 } }], 
               },
             },
             // Unwind mảng user (vì lookup trả về mảng)
@@ -228,7 +227,7 @@ export class ReviewsService {
     const reviewsDocs = result.data;
     const total = result.totalCount[0]?.count || 0;
 
-    // 4. Mapping tên biến thể (Giữ nguyên logic cũ của bạn vì nó tối ưu)
+    // 4. Mapping tên biến thể 
     const product = await this.productModel
       .findById(productId)
       .select('variants')
@@ -237,7 +236,7 @@ export class ReviewsService {
     const variantMap = new Map<string, string>();
     if (product && product.variants) {
       product.variants.forEach((v) => {
-        const variantName = v.attributes.map((attr) => attr.v).join(' / ');
+        const variantName = v.attributes.map((attr) => attr.value).join(' / ');
         variantMap.set(v.sku, variantName);
       });
     }
@@ -390,7 +389,7 @@ export class ReviewsService {
       },
       {
         $group: {
-          _id: '$rating', // Group theo số sao (1, 2, 3, 4, 5)
+          _id: '$rating', 
           count: { $sum: 1 },
         },
       },

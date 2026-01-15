@@ -38,24 +38,30 @@ import * as fs from 'fs';
 import * as path from 'path';
 import sharp from 'sharp';
 import { FilterProductDto } from './dto/filter-product.dto';
+import { ProductFilterService } from '../products-filter.service';
 
 @Controller('products')
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly productFilterService: ProductFilterService,
+  ) {}
 
   // PUBLIC API (STOREFRONT)
+
+  @Get('filters')
+  @Public()
+  async getFilters(@Query() query: FilterProductDto) {
+    return this.productFilterService.getSmartFiltersForCategory(query);
+  }
 
   @Public()
   @Get('store/list')
   findAllPublic(@Query() query: FilterProductDto) {
-    // Nếu có categorySlug -> Gọi hàm chuyên dụng cho US2
     if (query.categorySlug) {
       return this.productsService.findByCategory(query);
     }
-
-    // Nếu không có slug (VD: trang "Tất cả sản phẩm") -> Gọi hàm thường
-    // Cần ép kiểu query về any để gán status active
     const findAllQuery = { ...query, status: 'ACTIVE' };
     return this.productsService.findAll(findAllQuery);
   }

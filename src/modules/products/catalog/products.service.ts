@@ -7,14 +7,17 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { FilterQuery, Model, Types } from 'mongoose';
 import {
   Product,
   ProductDocument,
   ProductAttributeParams,
   PendingVariantPrice,
 } from './schemas/product.schema';
-import { CreateProductDto } from './dto/create-product.dto';
+import {
+  CreateProductDto,
+  CreateProductVariantDto,
+} from './dto/create-product.dto';
 import {
   UpdateProductDto,
   UpdateProductPriceDto,
@@ -35,6 +38,12 @@ import {
 import { FilterProductDto, SortOption } from './dto/filter-product.dto';
 import { Department } from 'src/common/enums/department.enum';
 import { Order } from 'src/modules/sales/orders/schemas/order.schema';
+import { CategoriesService } from '../categories/categories.service';
+import {
+  Attribute,
+  AttributeDocument,
+} from '../attributes/schemas/attribute.schema';
+import { AttributeType } from 'src/common/enums/attribute-type.enum';
 
 @Injectable()
 export class ProductsService {
@@ -44,9 +53,90 @@ export class ProductsService {
     private readonly tagsService: TagsService,
     @InjectModel(Category.name) private categoryModel: Model<CategoryDocument>,
     @InjectModel(Order.name) private orderModel: Model<Order>,
+    private readonly categoriesService: CategoriesService,
+    @InjectModel(Attribute.name)
+    private attributeModel: Model<AttributeDocument>,
   ) {}
 
   // HELPER METHODS
+  private async validateAttributesExist(variants: CreateProductVariantDto[]) {
+    if (!variants || variants.length === 0) return;
+
+    // 1. Lấy tất cả code và value từ input
+    const inputAttributes = new Map<string, Set<string>>();
+    variants.forEach((v) => {
+      v.attributes.forEach((attr) => {
+        let valuesSet = inputAttributes.get(attr.code);
+        if (!valuesSet) {
+          valuesSet = new Set<string>();
+          inputAttributes.set(attr.code, valuesSet);
+        }
+        valuesSet.add(attr.value);
+      });
+    });
+
+    // 2. Query DB để check
+    const codes = Array.from(inputAttributes.keys());
+    const dbAttributes = await this.attributeModel
+      .find({ code: { $in: codes } })
+      .lean();
+
+    if (dbAttributes.length !== codes.length) {
+      const foundCodes = dbAttributes.map((a) => a.code);
+      const missing = codes.filter((c) => !foundCodes.includes(c));
+      throw new BadRequestException(
+        `Thuộc tính không tồn tại: ${missing.join(', ')}`,
+      );
+    }
+
+    // 3. Check kỹ hơn xem Value có nằm trong danh sách cho phép không
+    for (const dbAttr of dbAttributes) {
+      if (
+        dbAttr.display_type === AttributeType.BUTTON ||
+        dbAttr.display_type === AttributeType.TEXT ||
+        dbAttr.display_type === AttributeType.COLOR_SWATCH
+      ) {
+        const inputValues = inputAttributes.get(dbAttr.code);
+        const validValues = dbAttr.values.map((v) => v.value);
+
+        // [FIX LỖI 2]: Kiểm tra tồn tại trước khi loop (Optional Chaining hoặc If)
+        if (inputValues) {
+          inputValues.forEach((iv) => {
+            if (!validValues.includes(iv)) {
+              throw new BadRequestException(
+                `Giá trị '${iv}' không hợp lệ cho thuộc tính '${dbAttr.name}'`,
+              );
+            }
+          });
+        }
+      }
+    }
+  }
+
+  // Helper: Làm phẳng danh sách thuộc tính từ Biến thể -> Product cha
+  private flattenAttributes(variants: any[]): any[] {
+    if (!variants || variants.length === 0) return [];
+
+    const attrMap = new Map<string, any>();
+
+    variants.forEach((variant) => {
+      if (variant.attributes) {
+        variant.attributes.forEach((attr) => {
+          // Tạo key unique để tránh trùng lặp (VD: color_red)
+          const key = `${attr.code}_${attr.value}`;
+          if (!attrMap.has(key)) {
+            attrMap.set(key, {
+              code: attr.code,
+              value: attr.value,
+              unit: attr.unit,
+            });
+          }
+        });
+      }
+    });
+
+    return Array.from(attrMap.values());
+  }
 
   private createSlug(name: string): string {
     return defaultSlugify(name, { lower: true, strict: true, locale: 'vi' });
@@ -71,18 +161,17 @@ export class ProductsService {
 
   private calculateSpecs(variants: any[]): ProductAttributeParams[] {
     if (!variants || variants.length === 0) return [];
-
     const map = new Map<string, Set<string>>();
 
     variants.forEach((variant) => {
       if (variant.attributes) {
         variant.attributes.forEach((attr) => {
-          if (!map.has(attr.k)) {
-            map.set(attr.k, new Set());
+          if (!map.has(attr.code)) {
+            map.set(attr.code, new Set());
           }
-          const valuesSet = map.get(attr.k);
+          const valuesSet = map.get(attr.code);
           if (valuesSet) {
-            valuesSet.add(attr.v);
+            valuesSet.add(attr.value);
           }
         });
       }
@@ -91,11 +180,10 @@ export class ProductsService {
     const specs: ProductAttributeParams[] = [];
     map.forEach((valuesSet, key) => {
       specs.push({
-        name: key,
+        name: key, // Lưu ý: name ở đây sẽ là code (vd: color). Frontend tự map ra Label.
         values: Array.from(valuesSet),
       });
     });
-
     return specs;
   }
 
@@ -165,7 +253,7 @@ export class ProductsService {
 
       // Check tính nhất quán Keys
       const standardKeys = firstVariantAttrs
-        .map((a) => a.k)
+        .map((a) => a.code)
         .sort()
         .join(',');
 
@@ -174,7 +262,7 @@ export class ProductsService {
         await this.checkSkuExists(variant.sku);
 
         const currentKeys = variant.attributes
-          .map((a) => a.k)
+          .map((a) => a.code)
           .sort()
           .join(',');
 
@@ -186,6 +274,20 @@ export class ProductsService {
       }
     }
 
+    //Tự động gán sale_price = price
+    if (!createProductDto.sale_price || createProductDto.sale_price === 0) {
+      createProductDto.sale_price = createProductDto.price;
+    }
+
+    // Xử lý tương tự cho Biến thể (Variants)
+    if (createProductDto.variants) {
+      createProductDto.variants.forEach((v) => {
+        if (!v.sale_price || v.sale_price === 0) {
+          v.sale_price = v.price;
+        }
+      });
+    }
+
     // 3. Tạo Slug & Sanitize
     const slug =
       createProductDto.slug || this.createSlug(createProductDto.name);
@@ -193,6 +295,8 @@ export class ProductsService {
     if (slugExists) throw new ConflictException('Đường dẫn (Slug) đã tồn tại');
 
     const specs = this.calculateSpecs(variants);
+
+    const flatAttributes = this.flattenAttributes(variants);
 
     let cleanDescription = createProductDto.description;
     if (cleanDescription) {
@@ -209,6 +313,7 @@ export class ProductsService {
       status: ProductStatus.DRAFT,
       has_variants: variants.length > 0,
       specs,
+      attributes: flatAttributes,
       created_by: new Types.ObjectId(userId),
       is_deleted: false,
       description: cleanDescription,
@@ -386,7 +491,7 @@ export class ProductsService {
       .lean();
 
     if (product) {
-      return product; // Tìm thấy đúng link -> Trả về bình thường
+      return product;
     }
 
     // 2.Nếu không thấy, tìm trong lịch sử old_slugs
@@ -407,7 +512,7 @@ export class ProductsService {
           message: 'Moved Permanently',
           new_slug: movedProduct.slug, // Trả về slug mới cho FE
         },
-        HttpStatus.MOVED_PERMANENTLY, // Mã lỗi 301
+        HttpStatus.MOVED_PERMANENTLY,
       );
     }
 
@@ -477,8 +582,11 @@ export class ProductsService {
     }
 
     if (updateDto.variants) {
+      await this.validateAttributesExist(updateDto.variants);
       product.has_variants = updateDto.variants.length > 0;
       product.specs = this.calculateSpecs(updateDto.variants);
+
+      product.attributes = this.flattenAttributes(updateDto.variants);
     }
 
     if (updateDto.category_ids) {
@@ -550,9 +658,7 @@ export class ProductsService {
       // Rule 3: Validate Biến thể (Nếu có)
       if (product.has_variants) {
         // Phải có ít nhất 1 biến thể đang Active và có giá > 0
-        const validVariant = product.variants.some(
-          (v) => v.price > 0, // (v.active check sau nếu schema có)
-        );
+        const validVariant = product.variants.some((v) => v.price > 0);
         if (!validVariant) {
           throw new BadRequestException(
             'Sản phẩm biến thể cần ít nhất 1 phiên bản có giá bán hợp lệ.',
@@ -575,7 +681,7 @@ export class ProductsService {
     product.status = status;
     await product.save();
 
-    // 4. Ghi Audit Log (Đúng chuẩn WAREHOUSE)
+    // 4. Ghi Audit Log
     await this.auditLogsService.log({
       action: 'UPDATE_PRODUCT_STATUS',
       collection_name: 'products',
@@ -713,6 +819,10 @@ export class ProductsService {
 
     if (isApproved) {
       product.price = pending.price;
+      product.sale_price =
+        pending.sale_price && pending.sale_price > 0
+          ? pending.sale_price
+          : pending.price;
       product.sale_price = pending.sale_price;
       product.sale_start_date = pending.sale_start_date as any;
       product.sale_end_date = pending.sale_end_date as any;
@@ -724,7 +834,8 @@ export class ProductsService {
           );
           if (variantIndex !== -1) {
             product.variants[variantIndex].price = pV.price;
-            product.variants[variantIndex].sale_price = pV.sale_price;
+            product.variants[variantIndex].sale_price =
+              pV.sale_price > 0 ? pV.sale_price : pV.price;
           }
         });
       }
@@ -895,7 +1006,7 @@ export class ProductsService {
 
   //Hàm findByCategory hoàn chỉnh
   async findByCategory(dto: FilterProductDto) {
-    const { categorySlug, sort } = dto;
+    const { categorySlug, sort, attributes } = dto;
     const page = dto.page || 1;
     const limit = dto.limit || 20;
 
@@ -906,9 +1017,9 @@ export class ProductsService {
     if (!category) throw new NotFoundException('Danh mục không tồn tại');
 
     // 2. Logic Cha-Con: Lấy cả ID của con cháu
-    // Giả sử Category Schema có trường 'path' hoặc 'parent'
-    // Cách đơn giản nhất là tìm tất cả category có parent là ID này
-    const allCategories = await this.getAllChildCategories(category._id);
+    const allCategories = await this.categoriesService.getAllChildCategories(
+      category._id,
+    );
     const categoryIds = [category._id, ...allCategories];
 
     // 3. Query
@@ -917,6 +1028,36 @@ export class ProductsService {
       status: ProductStatus.ACTIVE,
       is_deleted: false,
     };
+
+    if (attributes) {
+      const attributeFilters: FilterQuery<Product>[] = [];
+
+      for (const [code, valuesStr] of Object.entries(attributes)) {
+        if (!valuesStr) continue;
+
+        const values = valuesStr
+          .split(',')
+          .map((v) => v.trim())
+          .filter((v) => v);
+
+        if (values.length > 0) {
+          // Dùng $elemMatch để đảm bảo đúng cặp code-value trong mảng attributes
+          attributeFilters.push({
+            attributes: {
+              $elemMatch: {
+                code: code,
+                value: { $in: values }, // Logic OR trong cùng nhóm (Red HOẶC Blue)
+              },
+            },
+          });
+        }
+      }
+
+      if (attributeFilters.length > 0) {
+        // Logic AND giữa các nhóm (Màu VÀ Size)
+        query.$and = attributeFilters;
+      }
+    }
 
     // 4. Sort (AC8)
     let sortOptions: any = {};
@@ -951,7 +1092,7 @@ export class ProductsService {
         )
         .sort(sortOptions)
         .skip(skip)
-        .limit(limit), // Không dùng lean() để giữ Virtuals (Badges)
+        .limit(limit), 
       this.productModel.countDocuments(query),
     ]);
 
@@ -959,7 +1100,7 @@ export class ProductsService {
     const breadcrumbs = await this.buildBreadcrumbs(category);
 
     return {
-      data: products, // Sẽ tự động có field 'badges' và 'final_price' do Virtuals
+      data: products, 
       meta: {
         total,
         page,
@@ -975,29 +1116,14 @@ export class ProductsService {
     };
   }
 
-  //Helper lấy danh mục con đệ quy (AC2)
-  private async getAllChildCategories(
-    parentId: Types.ObjectId,
-  ): Promise<Types.ObjectId[]> {
-    const children = await this.categoryModel
-      .find({ parent_id: parentId })
-      .select('_id')
-      .lean();
-    let results = children.map((c) => c._id);
-    for (const child of children) {
-      const subChildren = await this.getAllChildCategories(child._id);
-      results = results.concat(subChildren);
-    }
-    return results;
-  }
-
   //Helper tạo Breadcrumb (AC4)
   private async buildBreadcrumbs(category: any) {
     const crumbs: { name: string; slug: string }[] = [];
     let current = category;
+    let depth = 0;
 
     // Vòng lặp truy ngược lên cha
-    while (current) {
+    while (current && depth < 10) {
       crumbs.unshift({ name: current.name, slug: current.slug });
       if (current.parent_id) {
         current = await this.categoryModel.findById(current.parent_id).lean();

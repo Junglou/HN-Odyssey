@@ -3,13 +3,13 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 @Schema({ _id: true })
 export class VariantAttribute {
   @Prop({ required: true })
-  k: string; // Key. Ví dụ: "color" hoặc "Màu sắc" (lấy từ Attribute name)
+  code: string;
 
   @Prop({ required: true })
-  v: string; // Value. Ví dụ: "Đỏ"
+  value: string;
 
   @Prop()
-  u?: string; // Unit (nếu có). Ví dụ: "cm"
+  unit?: string;
 }
 
 @Schema({ _id: true, timestamps: false })
@@ -33,7 +33,6 @@ export class ProductVariant {
   @Prop()
   image: string;
 
-  // Định nghĩa các thuộc tính: [{k: "Màu", v: "Đỏ"}, {k: "Size", v: "M"}]
   @Prop({ type: [VariantAttribute], default: [] })
   attributes: VariantAttribute[];
 

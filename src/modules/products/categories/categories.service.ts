@@ -430,4 +430,24 @@ export class CategoriesService {
       };
     });
   }
+
+  async getAllChildCategories(
+    parentId: Types.ObjectId,
+  ): Promise<Types.ObjectId[]> {
+    // Tìm các con trực tiếp
+    const children = await this.categoryModel
+      .find({ parent_id: parentId })
+      .select('_id')
+      .lean();
+
+    let results = children.map((c) => c._id);
+
+    // Đệ quy để tìm cháu chắt
+    for (const child of children) {
+      const subChildren = await this.getAllChildCategories(child._id);
+      results = results.concat(subChildren);
+    }
+
+    return results;
+  }
 }

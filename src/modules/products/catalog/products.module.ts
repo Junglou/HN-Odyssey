@@ -15,6 +15,11 @@ import {
   Order,
   OrderSchema,
 } from 'src/modules/sales/orders/schemas/order.schema';
+import {
+  Attribute,
+  AttributeSchema,
+} from '../attributes/schemas/attribute.schema';
+import { ProductFilterService } from '../products-filter.service';
 
 @Module({
   imports: [
@@ -23,13 +28,14 @@ import {
       { name: Role.name, schema: RoleSchema },
       { name: Category.name, schema: CategorySchema },
       { name: Order.name, schema: OrderSchema },
+      { name: Attribute.name, schema: AttributeSchema },
     ]),
     CategoriesModule,
     AuditLogsModule,
     TagsModule,
   ],
   controllers: [ProductsController],
-  providers: [ProductsService],
+  providers: [ProductsService, ProductFilterService],
   exports: [ProductsService],
 })
 export class ProductsCatalogModule {}

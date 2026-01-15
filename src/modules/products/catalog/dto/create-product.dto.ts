@@ -25,14 +25,22 @@ class ProductDimensionsDto {
 class SeoConfigDto {
   @IsOptional() @IsString() meta_title?: string;
   @IsOptional() @IsString() meta_description?: string;
-  @IsOptional() @IsString() meta_keywords?: string; // Bổ sung từ khóa
+  @IsOptional() @IsString() meta_keywords?: string;
 }
 
-// 3. DTO cho thuộc tính biến thể (US.74)
-class VariantAttributeDto {
-  @IsNotEmpty() @IsString() k: string; // Key: "Color"
-  @IsNotEmpty() @IsString() v: string; // Value: "Red"
-  @IsOptional() @IsString() u?: string; // Unit: "cm" (Bổ sung cho khớp Schema)
+// 3.DTO cho thuộc tính biến thể (US.74)
+export class VariantAttributeDto {
+  @IsNotEmpty()
+  @IsString()
+  code: string; // VD: "color" 
+
+  @IsNotEmpty()
+  @IsString()
+  value: string; // VD: "red"
+
+  @IsOptional()
+  @IsString()
+  unit?: string; 
 }
 
 // 4. DTO tạo Biến thể
@@ -53,22 +61,22 @@ export class CreateProductVariantDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
-  sale_price?: number; // Bổ sung giá KM cho biến thể
+  sale_price?: number;
 
   @IsNotEmpty()
   @IsNumber()
   @Min(0)
-  stock: number; // Tồn kho là bắt buộc với biến thể
+  stock: number; // Tồn kho riêng từng biến thể
 
   @IsOptional() @IsString() image?: string; // URL ảnh riêng
-  @IsOptional() @IsNumber() image_index?: number; // Index ảnh trong mảng images cha (Tiện ích)
+  @IsOptional() @IsNumber() image_index?: number; // Index ảnh trong mảng images cha
 
   @IsOptional() @IsBoolean() active?: boolean;
 }
 
 // 5. DTO chính - Tạo Sản phẩm
 export class CreateProductDto {
-  //US.72 AC1: Thông tin cơ bản
+  // US.72 AC1: Thông tin cơ bản
   @IsNotEmpty({ message: 'Tên sản phẩm là bắt buộc' })
   @IsString()
   name: string;
@@ -82,11 +90,11 @@ export class CreateProductDto {
   sku: string;
 
   @IsOptional() @IsString() slug?: string;
-  @IsOptional() @IsString() description?: string; 
+  @IsOptional() @IsString() description?: string;
   @IsOptional() @IsString() short_description?: string;
   @IsOptional() @IsString() brand?: string;
 
-  //US.72 AC1: Danh mục & Tags
+  // US.72 AC1: Danh mục & Tags
   @IsNotEmpty({ message: 'Sản phẩm phải thuộc ít nhất 1 danh mục' })
   @IsArray()
   @IsMongoId({ each: true, message: 'ID danh mục không hợp lệ' })
@@ -94,12 +102,12 @@ export class CreateProductDto {
 
   @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
 
-  //US.73: Media
+  // US.73: Media
   @IsOptional() @IsArray() @IsString({ each: true }) images?: string[];
   @IsOptional() @IsString() thumbnail?: string;
   @IsOptional() @IsString() video?: string;
 
-  //US.75: Giá & Khuyến mãi
+  // US.75: Giá & Khuyến mãi (Giá chung cho SP đơn giản)
   @IsOptional() @IsNumber() @Min(0) price?: number;
 
   @IsOptional()
@@ -115,23 +123,23 @@ export class CreateProductDto {
   @IsDateString()
   sale_end_date?: string;
 
-  //US.74: Biến thể
+  // US.74: Biến thể
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateProductVariantDto)
   variants?: CreateProductVariantDto[];
 
-  //US.78: Tồn kho & Cấu hình
+  // US.78: Tồn kho & Cấu hình
   @IsOptional() @IsNumber() @Min(0) weight?: number;
 
-  @IsOptional() @IsNumber() @Min(0) stock?: number; 
+  @IsOptional() @IsNumber() @Min(0) stock?: number; // Tổng tồn kho (nếu là sp đơn giản)
   @IsOptional() @IsNumber() @Min(0) min_stock?: number;
   @IsOptional() @IsNumber() @Min(0) max_stock?: number;
 
   @IsOptional()
   @IsBoolean()
-  allow_backorder?: boolean; // Cho phép bán khi hết hàng
+  allow_backorder?: boolean;
 
   @IsOptional()
   @ValidateNested()

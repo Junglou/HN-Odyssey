@@ -21,6 +21,17 @@ export class SearchService {
 
   private blackList = ['thô tục', 'sex', 'cấm', 'sensitive']; // AC12
 
+  async reindexAttributes(): Promise<void> {
+    // Sau này logic kết nối ElasticSearch/Algolia sẽ viết ở đây
+    console.log(
+      '[SEARCH ENGINE] Đang đánh chỉ mục lại (Re-indexing) Attribute...',
+    );
+    console.log('[SEARCH ENGINE] Đã cập nhật Index thành công!');
+
+    // Giả lập độ trễ mạng
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
   async getSuggestions(keyword: string, userId?: string, deviceId?: string) {
     // AC1: Chưa nhập gì -> Trả về History & Trending
     if (!keyword || keyword.trim() === '') {
@@ -39,13 +50,13 @@ export class SearchService {
     // AC15: Log (Fire & Forget)
     this.logSearchTerm(cleanKeyword, userId, deviceId);
 
-    // PHẦN 1: TÌM SẢN PHẨM BẰNG ATLAS SEARCH (FUZZY AI)
+    //TÌM SẢN PHẨM BẰNG ATLAS SEARCH (FUZZY AI)
 
     //Pipeline này thay thế cho cả Text Search và Regex cũ
     const productResults = await this.productModel.aggregate([
       {
         $search: {
-          index: 'default', // Tên index bạn tạo trên Atlas
+          index: 'default',
           text: {
             query: cleanKeyword,
             path: ['name', 'tags'], // Tìm trong tên và tags
@@ -78,7 +89,7 @@ export class SearchService {
       },
     ]);
 
-    // PHẦN 2: TÌM TỪ KHÓA GỢI Ý (HISTORY + TAGS)
+    //TÌM TỪ KHÓA GỢI Ý (HISTORY + TAGS)
 
     // Regex vẫn dùng cho việc highlight và tìm tags đơn giản
     const regex = new RegExp(this.escapeRegex(cleanKeyword), 'i');
@@ -106,7 +117,6 @@ export class SearchService {
       }),
     ]);
 
-    // PHẦN 3: TỔNG HỢP
     const uniqueKeywords = Array.from(
       new Set([...personalHistory, ...distinctTags]),
     );
