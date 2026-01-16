@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types, Schema as MongooseSchema } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 @Schema({ _id: false })
 class CartItem {
@@ -7,7 +7,7 @@ class CartItem {
   product_id: Types.ObjectId;
 
   @Prop({ required: true })
-  sku: string; // SKU biến thể
+  sku: string;
 
   @Prop({ required: true, min: 1 })
   quantity: number;
@@ -15,19 +15,22 @@ class CartItem {
   @Prop({ type: Date, default: Date.now })
   selected_at: Date;
 }
-
 const CartItemSchema = SchemaFactory.createForClass(CartItem);
 
-@Schema({ timestamps: { createdAt: true, updatedAt: true } })
+@Schema({ timestamps: true })
 export class Cart extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', index: true })
+  @Prop({ type: Types.ObjectId, ref: 'User', index: true })
   user_id?: Types.ObjectId;
 
   @Prop({ index: true })
-  session_id?: string; // Dùng cho guest (lưu trong cookie/local storage)
+  session_id?: string;
 
   @Prop({ type: [CartItemSchema], default: [] })
   items: CartItem[];
+
+  //Lưu mã giảm giá đang áp dụng tạm thời
+  @Prop({ default: null })
+  applied_coupon?: string;
 
   @Prop({ expires: '30d' })
   updatedAt: Date;

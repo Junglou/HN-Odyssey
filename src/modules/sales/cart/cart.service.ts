@@ -3,15 +3,20 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { ClientSession, Connection, Model, Types } from 'mongoose';
 import { Cart } from './schemas/cart.schema';
 import { AddToCartDto } from './dto/add-to-cart.dto';
-import { UpdateCartItemDto, RemoveCartItemDto } from './dto/update-cart.dto';
+import {
+  UpdateCartItemDto,
+  RemoveCartItemDto,
+  ChangeVariantDto,
+} from './dto/update-cart.dto';
 import { Product } from 'src/modules/products/catalog/schemas/product.schema';
 import { ProductStatus } from 'src/common/enums/product-status.enum';
 import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
 import { Department } from 'src/common/enums/department.enum';
+import { PromotionEngineService } from 'src/modules/marketing/promotions/promotion-engine.service';
 
 @Injectable()
 export class CartService {
@@ -19,180 +24,406 @@ export class CartService {
     @InjectModel(Cart.name) private cartModel: Model<Cart>,
     @InjectModel(Product.name) private productModel: Model<Product>,
     private readonly auditLogsService: AuditLogsService,
+    private readonly promotionEngine: PromotionEngineService,
+    @InjectConnection() private readonly connection: Connection,
   ) {}
 
-  // AC16: Hiệu năng & Race Condition Handling
-  async addToCart(
+  //GET CART & CALCULATE REAL-TIME
+  async getCart(userId: string | null, guestSessionId?: string) {
+    const filter = userId
+      ? { user_id: new Types.ObjectId(userId) }
+      : { session_id: guestSessionId };
+
+    const cart = await this.cartModel
+      .findOne(filter)
+      .populate('items.product_id');
+
+    if (!cart) return { items: [], summary: this.getEmptySummary() };
+
+    const validatedItems: any[] = [];
+    const warnings: string[] = [];
+    let isCartModified = false;
+
+    // Duyệt qua từng item để validate
+    for (const item of cart.items) {
+      // Ép kiểu product_id sang Product Document vì đã populate
+      const product = item.product_id as unknown as Product;
+
+      // 1. Check Sản phẩm tồn tại & Active
+      if (
+        !product ||
+        product.status !== ProductStatus.ACTIVE ||
+        (product as any).isDeleted
+      ) {
+        warnings.push(
+          `Sản phẩm "${product?.name || 'Unknown'}" đã ngừng kinh doanh.`,
+        );
+        isCartModified = true;
+        continue;
+      }
+
+      // 2. Check Biến thể
+      const variant = product.variants.find((v) => v.sku === item.sku);
+      if (!variant) {
+        warnings.push(
+          `Phân loại hàng của "${product.name}" không còn tồn tại.`,
+        );
+        isCartModified = true;
+        continue;
+      }
+
+      // 3. Check Tồn kho & Số lượng
+      let finalQty = item.quantity;
+      if (variant.stock < finalQty) {
+        finalQty = variant.stock;
+        warnings.push(
+          `Sản phẩm "${product.name} - ${item.sku}" chỉ còn ${variant.stock} món.`,
+        );
+        isCartModified = true;
+      }
+
+      if (variant.stock === 0) {
+        warnings.push(`Sản phẩm "${product.name} - ${item.sku}" đã hết hàng.`);
+        finalQty = 0; // Đánh dấu 0 để FE disable
+      }
+
+      // 4. Lấy giá (Ưu tiên giá Sale)
+      const unitPrice =
+        variant.sale_price > 0 ? variant.sale_price : variant.price;
+      const originalPrice = variant.price;
+
+      // 5. Xử lý hình ảnh
+      const variantImage = variant.image || product.thumbnail;
+
+      validatedItems.push({
+        productId: (product as any)._id,
+        productName: product.name,
+        productSlug: product.slug,
+        thumbnail: variantImage,
+        sku: item.sku,
+        attributes: variant.attributes,
+        quantity: finalQty,
+        stock: variant.stock,
+        unitPrice: unitPrice,
+        originalPrice: originalPrice,
+        subtotal: finalQty * unitPrice,
+        maxPurchase: product.max_purchase_qty || 999,
+        isError: finalQty === 0 || finalQty > variant.stock,
+      });
+    }
+
+    // Nếu dữ liệu giỏ hàng bẩn (sp xóa, quá tồn kho), tự động làm sạch DB
+    if (isCartModified) {
+      cart.items = cart.items.filter((i) => {
+        const validItem = validatedItems.find(
+          (v) =>
+            v.productId.toString() === (i.product_id as any)._id.toString() &&
+            v.sku === i.sku,
+        );
+
+        if (validItem) {
+          i.quantity = validItem.quantity;
+          return i.quantity > 0;
+        }
+        return false;
+      });
+      await cart.save();
+    }
+
+    // Tính toán tổng tiền
+    const summary = await this.calculateSummary(
+      validatedItems,
+      cart.applied_coupon,
+    );
+
+    return {
+      cartId: cart._id,
+      items: validatedItems,
+      summary,
+      warnings,
+    };
+  }
+
+  private async calculateSummary(items: any[], couponCode?: string) {
+    //TÍNH COMBO (AC10)
+    const { items: itemsWithCombo, totalDiscount: comboDiscount } =
+      await this.promotionEngine.applyCombos(items);
+
+    // Tính Subtotal dựa trên giá gốc
+    const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
+
+    //TÍNH VOUCHER (AC4)
+    let voucherDiscount = 0;
+    if (couponCode === 'TEST10') {
+      // Trừ đi số tiền đã giảm qua combo trước khi tính voucher (tùy logic business)
+      voucherDiscount = (subtotal - comboDiscount) * 0.1;
+    }
+
+    const totalDiscount = comboDiscount + voucherDiscount;
+
+    return {
+      subtotal,
+      discount: totalDiscount, // Tổng giảm (Combo + Voucher)
+      shippingFee: 0,
+      grandTotal: Math.max(0, subtotal - totalDiscount),
+      itemCount: items.reduce((sum, item) => sum + item.quantity, 0),
+      // Có thể trả thêm itemsWithCombo nếu muốn hiển thị giá từng món đã giảm
+    };
+  }
+
+  private getEmptySummary() {
+    return { subtotal: 0, discount: 0, grandTotal: 0, itemCount: 0 };
+  }
+
+  async clearCart(userId: string | null, guestSessionId: string) {
+    const filter = userId
+      ? { user_id: new Types.ObjectId(userId) }
+      : { session_id: guestSessionId };
+
+    const cart = await this.cartModel.findOne(filter);
+    if (cart) {
+      const itemCountBeforeClear = cart.items.length;
+      cart.items = [];
+      (cart.applied_coupon as any) = null;
+
+      await cart.save();
+
+      if (itemCountBeforeClear > 0) {
+        this.auditLogsService.log({
+          action: 'CLEAR_CART',
+          collection_name: 'carts',
+          actor_id: userId || undefined,
+          target_id: cart._id,
+          department: Department.SALES,
+          detail: {
+            session_id: guestSessionId,
+            cleared_item_count: itemCountBeforeClear,
+          },
+        });
+      }
+    }
+
+    return { items: [], summary: this.getEmptySummary() };
+  }
+
+  //CHANGE VARIANT
+  async changeVariant(
     userId: string | null,
-    dto: AddToCartDto,
+    dto: ChangeVariantDto,
     ip: string,
     userAgent: string,
   ) {
-    // 1. Validate Sản phẩm & Tồn kho
-    const product = await this.productModel.findById(dto.productId);
-    let resultCartId;
-
-    if (!product || product.status !== ProductStatus.ACTIVE) {
-      throw new NotFoundException(
-        'Sản phẩm không tồn tại hoặc ngừng kinh doanh',
-      );
-    }
-
-    if (product.is_member_only && !userId) {
-      throw new BadRequestException(
-        'Sản phẩm này dành riêng cho thành viên. Vui lòng đăng nhập để thêm vào giỏ.',
-      );
-    }
-
-    const variant = product.variants.find((v) => v.sku === dto.variantSku);
-    if (!variant) {
-      throw new BadRequestException('Phân loại hàng không hợp lệ');
-    }
-
-    if (!variant.active || variant.stock === 0) {
-      throw new BadRequestException('Sản phẩm này tạm thời hết hàng');
-    }
-
-    // Check nhanh tồn kho
-    if (dto.quantity > variant.stock) {
-      throw new BadRequestException(`Kho chỉ còn ${variant.stock} sản phẩm`);
-    }
-
     const filter = userId
       ? { user_id: new Types.ObjectId(userId) }
       : { session_id: dto.guestSessionId };
 
-    //AC13: Validate Max Purchase Quantity (Giới hạn mua)
-    if (product.max_purchase_qty && product.max_purchase_qty > 0) {
-      // Nếu số lượng khách muốn thêm đã lớn hơn giới hạn -> Chặn luôn
-      if (dto.quantity > product.max_purchase_qty) {
-        throw new BadRequestException(
-          `Sản phẩm này giới hạn mua tối đa ${product.max_purchase_qty} cái/lần.`,
-        );
-      }
+    const cart = await this.cartModel.findOne(filter);
+    if (!cart) throw new NotFoundException('Giỏ hàng trống');
 
-      //Check Min Purchase Quantity (US.AC13)
-      const minQty = product.min_purchase_qty || 1;
-      if (dto.quantity < minQty) {
-        throw new BadRequestException(
-          `Sản phẩm này yêu cầu mua tối thiểu ${minQty} cái.`,
-        );
-      }
+    const oldItemIndex = cart.items.findIndex(
+      (i) =>
+        i.product_id.toString() === dto.productId &&
+        i.sku === dto.oldVariantSku,
+    );
+    if (oldItemIndex === -1)
+      throw new NotFoundException('Sản phẩm không có trong giỏ');
 
-      // Nếu sản phẩm đã có trong giỏ -> Phải cộng cả số lượng cũ để check
-      const existingCart = await this.cartModel.findOne(
-        userId ? { user_id: userId } : { session_id: dto.guestSessionId },
+    const qtyToMove = cart.items[oldItemIndex].quantity;
+
+    const product = await this.productModel.findById(dto.productId);
+    if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
+
+    const newVariant = product.variants.find(
+      (v) => v.sku === dto.newVariantSku,
+    );
+
+    if (!newVariant || !newVariant.active)
+      throw new BadRequestException('Biến thể mới không khả dụng');
+    if (newVariant.stock < qtyToMove)
+      throw new BadRequestException(
+        `Biến thể mới chỉ còn ${newVariant.stock} sản phẩm`,
       );
-      if (existingCart) {
-        const existingItem = existingCart.items.find(
-          (i) =>
-            i.product_id.toString() === dto.productId &&
-            i.sku === dto.variantSku,
-        );
-        if (
-          existingItem &&
-          existingItem.quantity + dto.quantity > product.max_purchase_qty
-        ) {
-          throw new BadRequestException(
-            `Bạn đã có ${existingItem.quantity} sản phẩm trong giỏ. Giới hạn tối đa là ${product.max_purchase_qty}.`,
-          );
-        }
-      }
-    }
 
-    // 2.SẢN PHẨM ĐÃ CÓ TRONG GIỎ -> CỘNG DỒN (Atomic Update)
-    const updatedCart = await this.cartModel.findOneAndUpdate(
-      {
-        ...filter,
-        'items.product_id': new Types.ObjectId(dto.productId),
-        'items.sku': dto.variantSku,
-      },
-      {
-        $inc: { 'items.$.quantity': dto.quantity },
-        $set: { 'items.$.selected_at': new Date() },
-      },
-      { new: true },
+    const existingNewItemIndex = cart.items.findIndex(
+      (i) =>
+        i.product_id.toString() === dto.productId &&
+        i.sku === dto.newVariantSku,
     );
 
-    if (updatedCart) {
-      // AC3: Validate lại tồn kho sau khi cộng dồn
-      // Vì MongoDB $inc không check limit, nên ta phải check thủ công sau khi update
-      const item = updatedCart.items.find((i) => i.sku === dto.variantSku);
+    if (existingNewItemIndex > -1) {
+      // CASE A: Đã có -> Cộng dồn
+      const newTotalQty = cart.items[existingNewItemIndex].quantity + qtyToMove;
 
-      if (item && item.quantity > variant.stock) {
-        //Nếu vượt quá tồn kho, trừ ngược lại ngay lập tức
-        await this.cartModel.updateOne(
-          { ...filter, 'items.sku': dto.variantSku },
-          { $inc: { 'items.$.quantity': -dto.quantity } },
-        );
+      if (newTotalQty > newVariant.stock) {
         throw new BadRequestException(
-          `Tổng số lượng mua vượt quá tồn kho (Còn lại: ${variant.stock})`,
+          `Không thể gộp. Tổng số lượng (${newTotalQty}) vượt quá tồn kho.`,
         );
       }
-
-      return {
-        message: 'Updated existing item',
-        totalItems: this.countItems(updatedCart),
-        cartId: updatedCart._id,
-      };
+      cart.items[existingNewItemIndex].quantity = newTotalQty;
+      cart.items.splice(oldItemIndex, 1);
+    } else {
+      // CASE B: Chưa có -> Đổi SKU
+      cart.items[oldItemIndex].sku = dto.newVariantSku;
     }
 
-    // 3.SẢN PHẨM CHƯA CÓ -> THÊM MỚI
-    const newCart = await this.cartModel.findOneAndUpdate(
-      filter,
-      {
-        $setOnInsert: userId
-          ? { user_id: userId }
-          : { session_id: dto.guestSessionId },
-        $push: {
-          items: {
-            product_id: new Types.ObjectId(dto.productId),
-            sku: dto.variantSku,
-            quantity: dto.quantity,
-            selected_at: new Date(),
-          },
-        },
-      },
-      { upsert: true, new: true },
-    );
+    await cart.save();
 
-    // AC14: Validate giới hạn số lượng item trong giỏ (Max 50)
-    if (newCart.items.length > 50) {
-      //Xóa item vừa thêm vào
-      await this.cartModel.updateOne(filter, { $pop: { items: 1 } });
-      throw new BadRequestException('Giỏ hàng đã đầy (Tối đa 50 sản phẩm)');
-    }
-
-    await this.auditLogsService.log({
-      action: 'ADD_TO_CART',
+    this.auditLogsService.log({
+      action: 'CHANGE_CART_VARIANT',
       collection_name: 'carts',
-      actor_id: userId ? userId : undefined,
-      target_id: resultCartId,
+      actor_id: userId || undefined,
+      target_id: cart._id,
       department: Department.SALES,
       detail: {
         product_id: dto.productId,
-        sku: dto.variantSku,
-        quantity: dto.quantity,
-        price_snapshot:
-          variant.sale_price > 0 ? variant.sale_price : variant.price,
+        old_sku: dto.oldVariantSku,
+        new_sku: dto.newVariantSku,
         session_id: dto.guestSessionId,
       },
       ip: ip,
       user_agent: userAgent,
     });
 
-    return {
-      message: 'Added new item',
-      totalItems: this.countItems(newCart),
-      cartId: newCart._id,
-    };
+    //Truyền undefined thay vì null
+    return this.getCart(userId, dto.guestSessionId);
   }
 
-  // AC: Helper đếm tổng số lượng
-  private countItems(cart: Cart) {
-    return cart.items.reduce((sum, i) => sum + i.quantity, 0);
+  //ADD TO CART
+  async addToCart(
+    userId: string | null,
+    dto: AddToCartDto,
+    ip: string,
+    userAgent: string,
+  ) {
+    const session: ClientSession = await this.connection.startSession();
+    session.startTransaction();
+
+    try {
+      // 1. Lấy thông tin Sản phẩm (Có Session để đảm bảo tính nhất quán)
+      const product = await this.productModel
+        .findById(dto.productId)
+        .session(session);
+
+      //VALIDATION SẢN PHẨM
+      if (!product || product.status !== ProductStatus.ACTIVE) {
+        throw new NotFoundException(
+          'Sản phẩm không tồn tại hoặc ngừng kinh doanh',
+        );
+      }
+
+      if (product.is_member_only && !userId) {
+        throw new BadRequestException(
+          'Vui lòng đăng nhập để mua sản phẩm này.',
+        );
+      }
+
+      const variant = product.variants.find((v) => v.sku === dto.variantSku);
+      if (!variant)
+        throw new BadRequestException('Phân loại hàng không hợp lệ');
+
+      if (!variant.active || variant.stock === 0)
+        throw new BadRequestException('Sản phẩm này tạm thời hết hàng');
+
+      // Check sơ bộ số lượng request vs tồn kho
+      if (dto.quantity > variant.stock)
+        throw new BadRequestException(`Kho chỉ còn ${variant.stock} sản phẩm`);
+
+      //XỬ LÝ GIỎ HÀNG
+      const filter = userId
+        ? { user_id: new Types.ObjectId(userId) }
+        : { session_id: dto.guestSessionId };
+
+      // Lấy giỏ hàng hiện tại (hoặc null nếu chưa có)
+      let cart = await this.cartModel.findOne(filter).session(session);
+
+      // Nếu chưa có giỏ -> Tạo mới (Trong RAM, chưa save)
+      if (!cart) {
+        cart = new this.cartModel({
+          ...filter,
+          items: [],
+        });
+      }
+
+      // Tìm xem sản phẩm đã có trong giỏ chưa
+      const itemIndex = cart.items.findIndex(
+        (i) =>
+          i.product_id.toString() === dto.productId && i.sku === dto.variantSku,
+      );
+
+      let newQuantity = dto.quantity;
+
+      if (itemIndex > -1) {
+        // CASE A: Đã có -> Cộng dồn
+        newQuantity += cart.items[itemIndex].quantity;
+        cart.items[itemIndex].quantity = newQuantity;
+        cart.items[itemIndex].selected_at = new Date();
+      } else {
+        // CASE B: Chưa có -> Push mới
+        // Check giới hạn 50 món (AC14)
+        if (cart.items.length >= 50) {
+          throw new BadRequestException('Giỏ hàng đã đầy (Tối đa 50 sản phẩm)');
+        }
+        cart.items.push({
+          product_id: new Types.ObjectId(dto.productId),
+          sku: dto.variantSku,
+          quantity: dto.quantity,
+          selected_at: new Date(),
+        } as any);
+      }
+
+      //VALIDATE LOGIC TỔNG HỢP (AC3 & AC5)
+      // Kiểm tra tổng số lượng sau khi cộng dồn so với Tồn kho
+      if (newQuantity > variant.stock) {
+        throw new BadRequestException(
+          `Tổng số lượng mua vượt quá tồn kho (Kho: ${variant.stock}, Giỏ: ${newQuantity})`,
+        );
+      }
+
+      // Validate Max Purchase Qty (AC14 - biến thể Purchase Constraints)
+      if (product.max_purchase_qty && product.max_purchase_qty > 0) {
+        if (newQuantity > product.max_purchase_qty) {
+          throw new BadRequestException(
+            `Sản phẩm này giới hạn mua tối đa ${product.max_purchase_qty} cái (Giỏ hàng của bạn đang có: ${newQuantity}).`,
+          );
+        }
+
+        // Min quantity chỉ check trên lượng mua thêm (dto) hoặc tổng thể
+        const minQty = product.min_purchase_qty || 1;
+        if (newQuantity < minQty) {
+          throw new BadRequestException(
+            `Cần mua tối thiểu ${minQty} sản phẩm.`,
+          );
+        }
+      }
+      await cart.save({ session });
+      await session.commitTransaction();
+
+      this.auditLogsService.log({
+        action: 'ADD_TO_CART',
+        collection_name: 'carts',
+        actor_id: userId || undefined,
+        target_id: cart._id,
+        department: Department.SALES,
+        detail: {
+          product_id: dto.productId,
+          sku: dto.variantSku,
+          quantity: dto.quantity,
+          session_id: dto.guestSessionId,
+        },
+        ip,
+        user_agent: userAgent,
+      });
+
+      return this.getCart(userId, dto.guestSessionId);
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   }
 
+  //UPDATE ITEM QUANTITY
   async updateItem(
     userId: string | null,
     dto: UpdateCartItemDto,
@@ -209,13 +440,10 @@ export class CartService {
     const product = await this.productModel.findById(dto.productId);
     if (!product) throw new NotFoundException('Sản phẩm không còn tồn tại');
 
-    //BỔ SUNG CHECK MAX PURCHASE QTY
-    if (product.max_purchase_qty && product.max_purchase_qty > 0) {
-      if (dto.quantity > product.max_purchase_qty) {
-        throw new BadRequestException(
-          `Sản phẩm này giới hạn mua tối đa ${product.max_purchase_qty} cái.`,
-        );
-      }
+    if (product.max_purchase_qty && dto.quantity > product.max_purchase_qty) {
+      throw new BadRequestException(
+        `Sản phẩm này giới hạn mua tối đa ${product.max_purchase_qty} cái.`,
+      );
     }
 
     const variant = product.variants.find((v) => v.sku === dto.variantSku);
@@ -245,15 +473,15 @@ export class CartService {
           product_id: dto.productId,
           sku: dto.variantSku,
           new_quantity: dto.quantity,
-          session_id: !userId ? dto['guestSessionId'] : undefined,
         },
         ip,
         user_agent: userAgent,
       });
     }
-    return { message: 'Updated' };
+    return this.getCart(userId, dto.guestSessionId);
   }
 
+  // ACTION: REMOVE ITEM
   async removeItem(
     userId: string | null,
     dto: RemoveCartItemDto,
@@ -278,18 +506,20 @@ export class CartService {
       collection_name: 'carts',
       department: Department.SALES,
       actor_id: userId || undefined,
-      target_id: null, // Không query ID giỏ hàng để tiết kiệm resource
+      target_id: null,
       detail: {
         product_id: dto.productId,
         sku: dto.variantSku,
-        session_id: !userId ? dto['guestSessionId'] : undefined,
+        session_id: dto.guestSessionId,
       },
       ip,
       user_agent: userAgent,
     });
-    return { message: 'Removed' };
+
+    return this.getCart(userId, dto.guestSessionId);
   }
 
+  //MERGE GUEST CART (Login)
   async mergeGuestCart(
     userId: string,
     guestSessionId: string,
@@ -302,7 +532,10 @@ export class CartService {
     const guestCart = await this.cartModel.findOne({
       session_id: guestSessionId,
     });
-    if (!guestCart || guestCart.items.length === 0) return;
+    //check giỏ hàng null trước khi truy cập items
+    if (!guestCart || guestCart.items.length === 0) {
+      return this.getCart(userId, undefined);
+    }
 
     // 2. Lấy (hoặc tạo) giỏ hàng Member
     let memberCart = await this.cartModel.findOne({
@@ -315,29 +548,20 @@ export class CartService {
       });
     }
 
-    // 3.Lấy danh sách Product ID để query 1 lần
     const productIds = guestCart.items.map((i) => i.product_id);
     const products = await this.productModel
       .find({ _id: { $in: productIds } })
       .lean();
 
-    // 4. Duyệt qua từng item của Guest để merge
     for (const guestItem of guestCart.items) {
-      // Tìm thông tin sản phẩm từ list đã query
       const product = products.find(
         (p) => p._id.toString() === guestItem.product_id.toString(),
       );
-
-      // Nếu sản phẩm đã bị xóa hoặc ngừng kinh doanh -> Bỏ qua
       if (!product || product.status !== ProductStatus.ACTIVE) continue;
 
-      // Tìm biến thể tương ứng
       const variant = product.variants.find((v) => v.sku === guestItem.sku);
-
-      // Nếu biến thể lỗi hoặc hết hàng -> Bỏ qua
       if (!variant || !variant.active || variant.stock <= 0) continue;
 
-      // Tìm xem Member đã có món này trong giỏ chưa
       const existingIndex = memberCart.items.findIndex(
         (mItem) =>
           mItem.product_id.toString() === guestItem.product_id.toString() &&
@@ -346,12 +570,10 @@ export class CartService {
 
       let finalQuantity = guestItem.quantity;
 
-      //Đã có trong giỏ -> Cộng dồn
       if (existingIndex > -1) {
         finalQuantity += memberCart.items[existingIndex].quantity;
       }
 
-      //Validate Logic giới hạn số lượng
       if (
         product.max_purchase_qty &&
         finalQuantity > product.max_purchase_qty
@@ -359,19 +581,14 @@ export class CartService {
         finalQuantity = product.max_purchase_qty;
       }
 
-      // 2. Cắt theo Tồn kho thực tế
       if (finalQuantity > variant.stock) {
         finalQuantity = variant.stock;
       }
 
-      // 3. Update vào Member Cart
       if (existingIndex > -1) {
-        // Cập nhật số lượng mới đã validate
         memberCart.items[existingIndex].quantity = finalQuantity;
-        // Cập nhật thời gian chọn mới nhất
         memberCart.items[existingIndex].selected_at = new Date();
       } else {
-        // Thêm mới (Cẩn thận clone object để tránh lỗi reference)
         memberCart.items.push({
           product_id: guestItem.product_id,
           sku: guestItem.sku,
@@ -381,10 +598,7 @@ export class CartService {
       }
     }
 
-    // 5. Lưu và Dọn dẹp
     await memberCart.save();
-
-    // Xóa giỏ hàng Guest cũ
     await this.cartModel.deleteOne({ _id: guestCart._id });
 
     await this.auditLogsService.log({
@@ -393,14 +607,11 @@ export class CartService {
       department: Department.SALES,
       actor_id: userId,
       target_id: memberCart._id,
-      detail: {
-        guest_session_id: guestSessionId,
-        merged_items_count: guestCart.items.length,
-      },
+      detail: { merged_items: guestCart.items.length },
       ip,
       user_agent: userAgent,
     });
 
-    return memberCart;
+    return this.getCart(userId, undefined);
   }
 }

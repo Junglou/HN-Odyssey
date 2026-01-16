@@ -8,6 +8,7 @@ import {
   ProductSchema,
 } from 'src/modules/products/catalog/schemas/product.schema';
 import { AuditLogsModule } from 'src/modules/system/audit-logs/audit-logs.module';
+import { PromotionsModule } from 'src/modules/marketing/promotions/promotions.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { AuditLogsModule } from 'src/modules/system/audit-logs/audit-logs.module
       { name: Product.name, schema: ProductSchema }, 
     ]),
     AuditLogsModule,
+    PromotionsModule,
   ],
   controllers: [CartController],
   providers: [CartService],

@@ -18,6 +18,7 @@ import { FilterOrderDto } from './dto/filter-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { EmailService } from 'src/modules/notifications/channels/email.service';
 import { PdfService } from './pdf.service';
+import { PromotionEngineService } from 'src/modules/marketing/promotions/promotion-engine.service';
 
 @Injectable()
 export class OrdersService {
@@ -30,6 +31,7 @@ export class OrdersService {
     private readonly auditLogsService: AuditLogsService,
     private readonly emailService: EmailService,
     private readonly pdfService: PdfService,
+    private readonly promotionEngine: PromotionEngineService,
   ) {}
 
   // US.121: DANH SÁCH ĐƠN HÀNG
@@ -58,7 +60,7 @@ export class OrdersService {
                 text: {
                   query: search,
                   path: ['shipping_info.phone', 'guest_info.phone'],
-                  score: { boost: { value: 3 } }, // Ưu tiên SĐT 
+                  score: { boost: { value: 3 } }, // Ưu tiên SĐT
                 },
               },
               {
@@ -101,7 +103,7 @@ export class OrdersService {
 
     const skip = (page - 1) * limit;
 
-    // 4. GIAI ĐOẠN FACET 
+    // 4. GIAI ĐOẠN FACET
     pipeline.push({
       $facet: {
         data: [
@@ -161,7 +163,8 @@ export class OrdersService {
     // Giả lập logic: Mã "WELCOME" giảm 10%, tối đa 50k
     let discount = 0;
     if (voucherCode === 'WELCOME') {
-      discount = Math.min(originalTotal * 0.1, 50000);
+      const rawDiscount = originalTotal * 0.1;
+      discount = Math.min(Math.round(rawDiscount), 50000);
     }
 
     // Đảm bảo không giảm quá giá trị đơn hàng
@@ -260,6 +263,19 @@ export class OrdersService {
         throw new BadRequestException(`Hết hàng. Kho chỉ còn ${variant.stock}`);
       }
 
+      const rawItem = {
+        productId: product._id,
+        sku: variant.sku,
+        quantity: data.quantity,
+        unitPrice: variant.sale_price > 0 ? variant.sale_price : variant.price,
+      };
+
+      const { items: processedItems } = await this.promotionEngine.applyCombos([
+        rawItem,
+      ]);
+      const finalItem = processedItems[0];
+      const finalPrice = finalItem.discountedPrice || finalItem.unitPrice;
+
       //Trừ kho tạm thời (Hard Reserve)
       await this.productModel
         .updateOne(
@@ -280,13 +296,12 @@ export class OrdersService {
             product_id: product._id,
             sku: variant.sku,
             product_name: product.name,
-            price: variant.sale_price > 0 ? variant.sale_price : variant.price,
+            price: finalPrice,
             quantity: data.quantity,
           },
         ],
-        total_amount:
-          (variant.sale_price > 0 ? variant.sale_price : variant.price) *
-          data.quantity,
+        total_amount: finalPrice * data.quantity,
+        discount_amount: (rawItem.unitPrice - finalPrice) * data.quantity,
         status: 'TEMPORARY',
         hold_expires_at: holdExpiresAt,
         payment: { method: 'UNKNOWN', status: 'PENDING' },
@@ -416,15 +431,15 @@ export class OrdersService {
       // 2. Tìm giỏ hàng
       const cart = await this.cartModel.findOne(cartQuery).session(session);
 
-      //Đã thêm lại đoạn check này để tránh Crash Server
       if (!cart || !cart.items || cart.items.length === 0) {
         throw new BadRequestException('Giỏ hàng trống hoặc không tồn tại');
       }
 
       const orderItems: any[] = [];
-      let totalAmount = 0;
+      // Biến này chỉ dùng để check giá gốc tạm thời, sẽ được tính lại sau khi chạy Combo
+      let tempTotalAmount = 0;
 
-      // 3. Duyệt item và trừ tồn kho
+      // 3. Duyệt item và trừ tồn kho (GIỮ NGUYÊN LOGIC VALIDATION & STOCK)
       for (const item of cart.items) {
         const product = await this.productModel
           .findById(item.product_id)
@@ -467,11 +482,12 @@ export class OrdersService {
           product_id: product._id,
           sku: variant.sku,
           product_name: product.name,
-          price: finalPrice,
+          price: finalPrice, 
           quantity: item.quantity,
+          original_price: finalPrice, 
         });
 
-        totalAmount += finalPrice * item.quantity;
+        tempTotalAmount += finalPrice * item.quantity;
 
         // Trừ kho
         await this.productModel
@@ -480,6 +496,40 @@ export class OrdersService {
             { $inc: { 'variants.$.stock': -item.quantity } },
           )
           .session(session);
+      }
+
+      const itemsForPromo = orderItems.map((i) => ({
+        productId: i.product_id,
+        sku: i.sku,
+        quantity: i.quantity,
+        unitPrice: i.price, // Giá gốc/sale lẻ hiện tại
+      }));
+
+      // Gọi PromotionEngine để xem có Combo nào áp dụng không (Buy X Get Y, v.v.)
+      const { items: discountedItems, totalDiscount } =
+        await this.promotionEngine.applyCombos(itemsForPromo);
+
+      // Cập nhật lại giá trong orderItems dựa trên kết quả trả về
+      let finalOrderTotal = 0;
+
+      for (const item of orderItems) {
+        // Tìm item tương ứng trong danh sách đã tính giảm giá
+        const promoItem = discountedItems.find(
+          (d) =>
+            d.productId.toString() === item.product_id.toString() &&
+            d.sku === item.sku,
+        );
+
+        if (promoItem) {
+          // Lấy giá đã giảm (nếu có), nếu không thì giữ nguyên unitPrice
+          const actualPrice = promoItem.discountedPrice || promoItem.unitPrice;
+          item.price = actualPrice; // Cập nhật giá bán thực tế vào đơn hàng
+
+          // (Optional)có thể lưu thêm field: applied_combo: promoItem.appliedCombo
+        }
+
+        // Cộng dồn tổng tiền chính xác
+        finalOrderTotal += item.price * item.quantity;
       }
 
       // 4. Tạo đơn hàng mới
@@ -496,7 +546,8 @@ export class OrdersService {
         items: orderItems,
         shipping_info: dto.shippingInfo,
         payment: { method: dto.paymentMethod, status: 'PENDING' },
-        total_amount: totalAmount,
+        total_amount: finalOrderTotal, 
+        discount_amount: totalDiscount,
         status: 'PENDING',
         hold_expires_at: new Date(Date.now() + 15 * 60000),
         timeline: [
@@ -658,7 +709,7 @@ export class OrdersService {
         order.shipping_info.tracking_code = dto.tracking_code;
       }
 
-      // AC3: Xử lý Hủy 
+      // AC3: Xử lý Hủy
       if (newStatus === 'CANCELLED' && oldStatus !== 'CANCELLED') {
         await this.restoreStock(order, session);
         order.cancel_reason = dto.reason || 'Hủy bởi nhân viên';
@@ -804,7 +855,7 @@ export class OrdersService {
     if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
 
     const recipientEmail =
-      order.shipping_info?.email || // 1. Tìm trong thông tin giao hàng 
+      order.shipping_info?.email || // 1. Tìm trong thông tin giao hàng
       order.guest_info?.email || // 2. Tìm trong thông tin khách vãng lai
       (order.user_id as any)?.email;
     if (!recipientEmail) {
