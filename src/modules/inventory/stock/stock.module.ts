@@ -13,6 +13,6 @@ import {
   ],
   controllers: [StockController],
   providers: [StockService],
-  exports: [StockService], 
+  exports: [StockService],
 })
 export class StockModule {}

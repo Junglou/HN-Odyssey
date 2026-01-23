@@ -12,13 +12,13 @@ import { TagScope } from '../../../../common/enums/tag-scope.enum';
 export class CreateTagDto {
   @IsNotEmpty({ message: 'Tên thẻ không được để trống' })
   @IsString()
-  @MinLength(2, { message: 'Tên thẻ tối thiểu 2 ký tự' }) 
-  @MaxLength(50, { message: 'Tên thẻ tối đa 50 ký tự' }) 
+  @MinLength(2, { message: 'Tên thẻ tối thiểu 2 ký tự' })
+  @MaxLength(50, { message: 'Tên thẻ tối đa 50 ký tự' })
   @Matches(/^[^<>/\\]+$/, { message: 'Tên thẻ không được chứa ký tự đặc biệt' }) // AC8: Chống XSS
   name: string;
 
   @IsEnum(TagScope, { message: 'Phạm vi thẻ không hợp lệ' })
-  scope: TagScope; 
+  scope: TagScope;
 
   @IsOptional()
   @IsString()

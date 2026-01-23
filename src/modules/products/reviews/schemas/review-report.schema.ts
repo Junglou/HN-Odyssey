@@ -15,7 +15,7 @@ export class ReviewReport extends Document {
   reason: string;
 
   @Prop({ default: 'PENDING', enum: ['PENDING', 'RESOLVED', 'IGNORED'] })
-  status: string; 
+  status: string;
 }
 
 export const ReviewReportSchema = SchemaFactory.createForClass(ReviewReport);

@@ -6,6 +6,16 @@ import { CreateComboDto } from './dto/create-combo.dto';
 import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
 import { Department } from 'src/common/enums/department.enum';
 
+// 1. Định nghĩa Interface cho Item trong giỏ hàng (Để tránh dùng any)
+interface CartItemInput {
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+  discountedPrice?: number;
+  appliedCombo?: string;
+  [key: string]: any; // Cho phép các trường khác nếu có
+}
+
 @Injectable()
 export class PromotionEngineService {
   constructor(
@@ -13,10 +23,11 @@ export class PromotionEngineService {
     private readonly auditLogsService: AuditLogsService,
   ) {}
 
+  // 2. Thay any[] bằng CartItemInput[]
   async applyCombos(
-    cartItems: any[],
-  ): Promise<{ items: any[]; totalDiscount: number }> {
-    // 1. Lấy tất cả Combo đang chạy
+    cartItems: CartItemInput[],
+  ): Promise<{ items: CartItemInput[]; totalDiscount: number }> {
+    // Lấy tất cả Combo đang chạy
     const now = new Date();
     const activeCombos = await this.comboModel.find({
       active: true,
@@ -25,20 +36,24 @@ export class PromotionEngineService {
     });
 
     let totalDiscount = 0;
-    // Clone items để không ảnh hưởng dữ liệu gốc
-    const processedItems = JSON.parse(JSON.stringify(cartItems));
 
-    // 2. Logic tìm Combo (Đơn giản hóa cho trường hợp Mua 2 giảm 10%)
+    // 3. Clone items an toàn và ép kiểu rõ ràng
+    const processedItems = JSON.parse(
+      JSON.stringify(cartItems),
+    ) as CartItemInput[];
+
+    // Logic tìm Combo (Đơn giản hóa cho trường hợp Mua 2 giảm 10%)
     for (const combo of activeCombos) {
       if (combo.type === ComboType.BUY_X_GET_Y) {
+        // 4. Chuẩn hóa ID của combo về string để so sánh
+        const comboProductIds = combo.product_ids.map((id) => id.toString());
+
         // Tìm các item trong giỏ khớp với sản phẩm trong Combo
         const matchedItems = processedItems.filter((item) =>
-          combo.product_ids
-            .map((id) => id.toString())
-            .includes(item.productId.toString()),
+          comboProductIds.includes(item.productId.toString()),
         );
 
-        // Tính tổng số lượng các món khớp
+        // Tính tổng số lượng các món khớp (Lỗi reduce đã được fix nhờ Interface)
         const totalQty = matchedItems.reduce(
           (sum, item) => sum + item.quantity,
           0,

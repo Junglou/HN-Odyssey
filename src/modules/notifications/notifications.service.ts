@@ -4,11 +4,12 @@ import { SendNotificationDto } from './dto/send-notification.dto';
 @Injectable()
 export class NotificationsService {
   // Placeholder function
-  async create(createNotificationDto: SendNotificationDto) {
+  create(createNotificationDto: SendNotificationDto) {
+    console.log(createNotificationDto);
     return 'This action adds a new notification';
   }
 
-  async findAll() {
+  findAll() {
     return `This action returns all notifications`;
   }
 }

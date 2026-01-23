@@ -5,6 +5,7 @@ import {
   IsMongoId,
   IsNotEmpty,
   IsNumber,
+  IsNumberString,
   IsOptional,
   IsString,
   Max,
@@ -18,12 +19,12 @@ class ReviewMediaDto {
   url: string;
 
   @IsString()
-  @IsEnum(['IMAGE', 'VIDEO']) 
+  @IsEnum(['IMAGE', 'VIDEO'])
   type: string;
 
   @IsString()
   @IsOptional()
-  thumbnail?: string; 
+  thumbnail?: string;
 }
 
 export class CreateReviewDto {
@@ -33,7 +34,7 @@ export class CreateReviewDto {
 
   @IsMongoId()
   @IsNotEmpty()
-  orderId: string; 
+  orderId: string;
 
   @IsString()
   @IsNotEmpty()
@@ -53,4 +54,23 @@ export class CreateReviewDto {
   @ValidateNested({ each: true })
   @Type(() => ReviewMediaDto)
   media?: ReviewMediaDto[];
+}
+
+export class ReviewQueryParam {
+  @IsOptional()
+  @IsNumberString()
+  page?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  limit?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsEnum(['newest', 'oldest', 'highest_rating', 'lowest_rating'])
+  sort?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  rating?: string;
 }

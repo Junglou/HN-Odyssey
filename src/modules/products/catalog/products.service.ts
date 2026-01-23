@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { FilterQuery, Model, Types } from 'mongoose';
+import { FilterQuery, Model, SortOrder, Types } from 'mongoose';
 import {
   Product,
   ProductDocument,
@@ -44,6 +44,12 @@ import {
   AttributeDocument,
 } from '../attributes/schemas/attribute.schema';
 import { AttributeType } from 'src/common/enums/attribute-type.enum';
+import {
+  CategorySimple,
+  ProductAttribute,
+  ProductQueryParam,
+  VariantInput,
+} from 'src/common/interfaces/product.interface';
 
 @Injectable()
 export class ProductsService {
@@ -114,7 +120,7 @@ export class ProductsService {
   }
 
   // Helper: Làm phẳng danh sách thuộc tính từ Biến thể -> Product cha
-  private flattenAttributes(variants: any[]): any[] {
+  private flattenAttributes(variants: VariantInput[]): any[] {
     if (!variants || variants.length === 0) return [];
 
     const attrMap = new Map<string, any>();
@@ -122,7 +128,7 @@ export class ProductsService {
     variants.forEach((variant) => {
       if (variant.attributes) {
         variant.attributes.forEach((attr) => {
-          // Tạo key unique để tránh trùng lặp (VD: color_red)
+          // Tạo key unique để tránh trùng lặp
           const key = `${attr.code}_${attr.value}`;
           if (!attrMap.has(key)) {
             attrMap.set(key, {
@@ -145,7 +151,7 @@ export class ProductsService {
   //Check SKU toàn hệ thống (kể cả active hay deleted) để đảm bảo an toàn tuyệt đối
   // Nếu đã Soft Delete và đổi tên SKU rồi thì check này vẫn pass.
   private async checkSkuExists(sku: string, excludeId?: string): Promise<void> {
-    const query: any = {
+    const query: FilterQuery<ProductDocument> = {
       $or: [{ sku: sku }, { 'variants.sku': sku }],
     };
     if (excludeId) {
@@ -159,7 +165,7 @@ export class ProductsService {
     }
   }
 
-  private calculateSpecs(variants: any[]): ProductAttributeParams[] {
+  private calculateSpecs(variants: VariantInput[]): ProductAttributeParams[] {
     if (!variants || variants.length === 0) return [];
     const map = new Map<string, Set<string>>();
 
@@ -180,7 +186,7 @@ export class ProductsService {
     const specs: ProductAttributeParams[] = [];
     map.forEach((valuesSet, key) => {
       specs.push({
-        name: key, // Lưu ý: name ở đây sẽ là code (vd: color). Frontend tự map ra Label.
+        name: key,
         values: Array.from(valuesSet),
       });
     });
@@ -344,12 +350,14 @@ export class ProductsService {
     return newProduct;
   }
 
-  async findAll(query: any) {
+  async findAll(query: ProductQueryParam) {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 20;
+
+    // Destructuring an toàn vì đã có type
     const { keyword, category_id, status, sort = 'newest' } = query;
 
-    const filter: any = {
+    const filter: FilterQuery<ProductDocument> = {
       is_deleted: false,
     };
 
@@ -357,17 +365,17 @@ export class ProductsService {
 
     if (category_id) {
       if (Types.ObjectId.isValid(category_id)) {
-        filter.categories = new Types.ObjectId(category_id as string);
+        filter.categories = new Types.ObjectId(category_id);
       } else {
         filter.categories = new Types.ObjectId();
       }
     }
 
-    if (keyword && keyword.trim() !== '') {
+    if (keyword && typeof keyword === 'string' && keyword.trim() !== '') {
       filter.$text = { $search: keyword.trim() };
     }
 
-    let sortOption: any = { created_at: -1 };
+    let sortOption: Record<string, 1 | -1> = { created_at: -1 };
     if (sort === 'price_asc') sortOption = { price: 1 };
     if (sort === 'price_desc') sortOption = { price: -1 };
 
@@ -397,7 +405,7 @@ export class ProductsService {
     };
   }
 
-  async findPendingPriceRequests(query: any) {
+  async findPendingPriceRequests(query: ProductQueryParam) {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 10;
     const skip = (page - 1) * limit;
@@ -533,7 +541,7 @@ export class ProductsService {
     const product = await this.productModel.findById(id);
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
-    // 1. GIA CỐ BẢO MẬT (AC4: Không cho sửa giá/status tại đây)
+    // 1. GIA CỐ BẢO MẬT
     delete updateDto['price'];
     delete updateDto['sale_price'];
     delete updateDto['status'];
@@ -585,16 +593,19 @@ export class ProductsService {
       await this.validateAttributesExist(updateDto.variants);
       product.has_variants = updateDto.variants.length > 0;
       product.specs = this.calculateSpecs(updateDto.variants);
-
-      product.attributes = this.flattenAttributes(updateDto.variants);
+      product.attributes = this.flattenAttributes(
+        updateDto.variants,
+      ) as unknown as ProductAttribute[];
     }
 
     if (updateDto.category_ids) {
       if (updateDto.category_ids.length === 0)
         throw new BadRequestException('Cần ít nhất 1 danh mục');
-      product.categories = updateDto.category_ids.map(
-        (id) => new Types.ObjectId(id),
-      ) as any;
+
+      const categoryIds = updateDto.category_ids.map(
+        (cid) => new Types.ObjectId(cid),
+      );
+      product.categories = categoryIds as unknown as typeof product.categories;
       delete updateDto.category_ids;
     }
 
@@ -639,7 +650,6 @@ export class ProductsService {
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
     const oldStatus = product.status;
-    const isSuperAdmin = userRoles.includes(Role.SUPER_ADMIN);
 
     // 2. CHECK QUYỀN KÍCH HOẠT (ACTIVE)
     // Nếu muốn Active, phải vượt qua các bài test về dữ liệu
@@ -823,9 +833,15 @@ export class ProductsService {
         pending.sale_price && pending.sale_price > 0
           ? pending.sale_price
           : pending.price;
-      product.sale_price = pending.sale_price;
-      product.sale_start_date = pending.sale_start_date as any;
-      product.sale_end_date = pending.sale_end_date as any;
+
+      // FIX: Dùng kỹ thuật "unknown -> Date" để bypass lỗi type undefined và unsafe any
+      product.sale_start_date = pending.sale_start_date
+        ? new Date(pending.sale_start_date)
+        : (null as unknown as Date);
+
+      product.sale_end_date = pending.sale_end_date
+        ? new Date(pending.sale_end_date)
+        : (null as unknown as Date);
 
       if (pending.variants && pending.variants.length > 0) {
         pending.variants.forEach((pV) => {
@@ -891,6 +907,10 @@ export class ProductsService {
 
     // 3. Xóa vĩnh viễn (AC4)
     await this.productModel.findByIdAndDelete(id);
+    // // 3. THỰC HIỆN SOFT DELETE (Thay vì hard delete như cũ)
+    // product.is_deleted = true;
+    // product.status = ProductStatus.DRAFT; // Reset về Draft hoặc Archived
+    // await product.save();
 
     // 4. Log (AC5)
     await this.auditLogsService.log({
@@ -1016,21 +1036,21 @@ export class ProductsService {
       .lean();
     if (!category) throw new NotFoundException('Danh mục không tồn tại');
 
-    // 2. Logic Cha-Con: Lấy cả ID của con cháu
+    // 2. Logic Cha-Con
     const allCategories = await this.categoriesService.getAllChildCategories(
       category._id,
     );
     const categoryIds = [category._id, ...allCategories];
 
-    // 3. Query
-    const query: any = {
+    // 3. FIX: Query type an toàn
+    const query: FilterQuery<ProductDocument> = {
       categories: { $in: categoryIds },
       status: ProductStatus.ACTIVE,
       is_deleted: false,
     };
 
     if (attributes) {
-      const attributeFilters: FilterQuery<Product>[] = [];
+      const attributeFilters: FilterQuery<ProductDocument>[] = [];
 
       for (const [code, valuesStr] of Object.entries(attributes)) {
         if (!valuesStr) continue;
@@ -1041,12 +1061,11 @@ export class ProductsService {
           .filter((v) => v);
 
         if (values.length > 0) {
-          // Dùng $elemMatch để đảm bảo đúng cặp code-value trong mảng attributes
           attributeFilters.push({
             attributes: {
               $elemMatch: {
                 code: code,
-                value: { $in: values }, // Logic OR trong cùng nhóm (Red HOẶC Blue)
+                value: { $in: values },
               },
             },
           });
@@ -1060,7 +1079,7 @@ export class ProductsService {
     }
 
     // 4. Sort (AC8)
-    let sortOptions: any = {};
+    let sortOptions: { [key: string]: SortOrder } = {};
     switch (sort) {
       case SortOption.PRICE_ASC:
         sortOptions = { sale_price: 1, price: 1 };
@@ -1092,7 +1111,7 @@ export class ProductsService {
         )
         .sort(sortOptions)
         .skip(skip)
-        .limit(limit), 
+        .limit(limit),
       this.productModel.countDocuments(query),
     ]);
 
@@ -1100,7 +1119,7 @@ export class ProductsService {
     const breadcrumbs = await this.buildBreadcrumbs(category);
 
     return {
-      data: products, 
+      data: products,
       meta: {
         total,
         page,
@@ -1117,21 +1136,27 @@ export class ProductsService {
   }
 
   //Helper tạo Breadcrumb (AC4)
-  private async buildBreadcrumbs(category: any) {
+  private async buildBreadcrumbs(category: CategorySimple | null) {
     const crumbs: { name: string; slug: string }[] = [];
     let current = category;
-    let depth = 0;
-
-    // Vòng lặp truy ngược lên cha
-    while (current && depth < 10) {
+    let currentDepth = 0;
+    while (current && currentDepth < 10) {
       crumbs.unshift({ name: current.name, slug: current.slug });
+
       if (current.parent_id) {
-        current = await this.categoryModel.findById(current.parent_id).lean();
+        // Tìm cha, ép kiểu kết quả về CategorySimple
+        const parent = await this.categoryModel
+          .findById(current.parent_id)
+          .select('name slug parent_id') // Chỉ lấy field cần thiết
+          .lean();
+
+        current = parent as CategorySimple | null;
       } else {
         current = null;
       }
+      currentDepth++;
     }
-    // Thêm trang chủ vào đầu
+
     crumbs.unshift({ name: 'Trang chủ', slug: '' });
     return crumbs;
   }

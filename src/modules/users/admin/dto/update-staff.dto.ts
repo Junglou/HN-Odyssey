@@ -1,12 +1,6 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { CreateStaffDto } from './create-staff.dto';
-import {
-  IsOptional,
-  IsString,
-  MinLength,
-  IsEnum,
-  IsArray,
-} from 'class-validator';
+import { IsOptional, IsString, MinLength, IsArray } from 'class-validator';
 import { Role } from '../../../../common/enums/role.enum';
 
 export class UpdateStaffDto extends PartialType(CreateStaffDto) {

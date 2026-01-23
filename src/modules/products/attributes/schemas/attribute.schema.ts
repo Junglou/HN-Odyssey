@@ -7,7 +7,7 @@ export type AttributeDocument = Attribute & Document;
 @Schema({ _id: false })
 export class AttributeValue {
   @Prop({ required: true })
-  label: string; // Tên hiển thị (VD: Đỏ, XL) 
+  label: string; // Tên hiển thị (VD: Đỏ, XL)
 
   @Prop({ required: true })
   value: string; // Giá trị lưu DB (VD: red, xl) - Dùng để query

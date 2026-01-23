@@ -22,6 +22,11 @@ import { OptionalJwtAuthGuard } from 'src/common/guards/optional-auth.guard';
 import { BuyNowDto } from './dto/buy-now.dto';
 import { FilterOrderDto } from './dto/filter-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import {
+  InitGuestCheckoutDto,
+  VerifyGuestOtpDto,
+} from './dto/guest-checkout.dto';
+import type { VnpayReturnParams } from 'src/common/interfaces/oder.interface';
 
 @Controller('orders')
 export class OrdersController {
@@ -34,8 +39,8 @@ export class OrdersController {
     @CurrentUser() user: IUser | null,
     @Ip() ip: string,
     @UserAgent() userAgent: string,
-  ) {
-    const userId = user ? user._id : null;
+  ): Promise<any> {
+    const userId = user ? user._id.toString() : null;
     return this.ordersService.createOrder(userId, dto, ip, userAgent);
   }
 
@@ -69,11 +74,12 @@ export class OrdersController {
     @Ip() ip: string,
     @UserAgent() userAgent: string,
   ) {
-    const actorName = user['name'] || user['email'] || 'Staff';
+    const actorName = user.fullName || user.email || 'Staff';
+
     return this.ordersService.updateStatusAdvanced(
       id,
       dto,
-      user._id,
+      user._id.toString(),
       actorName,
       ip,
       userAgent,
@@ -108,5 +114,39 @@ export class OrdersController {
       throw new BadRequestException('Danh sách ID không hợp lệ');
     }
     return this.ordersService.generateBulkPrintData(ids, type);
+  }
+
+  @Public()
+  @Post('guest/init')
+  async initGuestCheckout(@Body() dto: InitGuestCheckoutDto) {
+    return this.ordersService.initGuestCheckout(dto);
+  }
+
+  @Public()
+  @Post('guest/verify-otp')
+  async verifyGuestOtp(@Body() dto: VerifyGuestOtpDto) {
+    return this.ordersService.verifyGuestOtp(dto);
+  }
+
+  @Public()
+  @Post('preview')
+  async previewOrder(@Body() dto: CreateOrderDto) {
+    return this.ordersService.previewOrder(dto);
+  }
+
+  @Public()
+  @Get('vnpay-ipn')
+  // [FIX]: Thay 'any' bằng 'VnpayReturnParams'
+  async vnpayIpn(@Query() query: VnpayReturnParams) {
+    return this.ordersService.handleVnpayIpn(query);
+  }
+
+  // orders.controller.ts
+  @Public()
+  @Post('guest/convert-to-member')
+  async convertGuestToMember(
+    @Body() body: { orderId: string; password: string },
+  ) {
+    return this.ordersService.convertGuestToMember(body.orderId, body.password);
   }
 }

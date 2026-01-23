@@ -19,6 +19,34 @@ import { FilterProductDto } from './catalog/dto/filter-product.dto';
 import { ProductStatus } from 'src/common/enums/product-status.enum';
 import { AttributeType } from 'src/common/enums/attribute-type.enum';
 
+// 1. ĐỊNH NGHĨA INTERFACE CHO KẾT QUẢ AGGREGATION
+export interface CountResult {
+  _id: { code: string; value: string };
+  count: number;
+}
+
+export interface RangeResult {
+  _id: string;
+  min: number;
+  max: number;
+}
+
+export interface AggregationFacetResult {
+  counts: CountResult[];
+  ranges: RangeResult[];
+}
+
+// 2. ĐỊNH NGHĨA INTERFACE CHO KẾT QUẢ CUỐI CÙNG
+export interface FilterOutput {
+  id: any;
+  name: string;
+  code: string;
+  type: string;
+  min?: number;
+  max?: number;
+  options?: any[];
+}
+
 @Injectable()
 export class ProductFilterService {
   constructor(
@@ -83,7 +111,7 @@ export class ProductFilterService {
       stock: { $gt: 0 },
     };
 
-    //Apply filters đang chọn
+    // Apply filters đang chọn
     if (attributes) {
       const attributeFilters: FilterQuery<Product>[] = [];
       for (const [code, valuesStr] of Object.entries(attributes)) {
@@ -143,32 +171,38 @@ export class ProductFilterService {
       },
     ];
 
-    const results = await this.productModel.aggregate(aggregationPipeline);
+    // Truyền generic type vào aggregate để kết quả trả về có kiểu cụ thể
+    const results =
+      await this.productModel.aggregate<AggregationFacetResult>(
+        aggregationPipeline,
+      );
 
-    //Lấy kết quả an toàn
+    // Lấy kết quả an toàn (đã có type từ interface AggregationFacetResult)
     const counts = results[0]?.counts || [];
     const ranges = results[0]?.ranges || [];
 
     // 5. CHUYỂN ĐỔI KẾT QUẢ SANG MAP
     const countMap = new Map<string, number>();
-    //Dùng đúng biến counts thay vì countResults
+
+    // item giờ đã có kiểu CountResult, không còn là any
     counts.forEach((item) => {
       const key = `${item._id.code}_${item._id.value}`;
       countMap.set(key, item.count);
     });
 
     // 6. MAP DỮ LIỆU
-    const finalFilters = attributesConfig
+    const finalFilters: FilterOutput[] = attributesConfig
       .map((attr) => {
-        //Xử lý riêng cho Range Slider
+        // Xử lý riêng cho Range Slider
         if (attr.display_type === AttributeType.RANGE_SLIDER) {
-          const rangeData = ranges.find((r: any) => r._id === attr.code);
+          // r có kiểu RangeResult
+          const rangeData = ranges.find((r) => r._id === attr.code);
           return {
             id: attr._id,
             name: attr.name,
             code: attr.code,
             type: attr.display_type,
-            // Trả về Min/Max để Frontend vẽ thanh trượt (AC2, AC12)
+            // rangeData có kiểu, truy cập min/max an toàn
             min: rangeData ? rangeData.min : 0,
             max: rangeData ? rangeData.max : 0,
             options: [],
@@ -208,12 +242,13 @@ export class ProductFilterService {
           options: processedOptions,
         };
       })
-      //Filter thông minh: Giữ lại Slider nếu có Data, Giữ lại List nếu có Option
+      // Filter thông minh: Giữ lại Slider nếu có Data, Giữ lại List nếu có Option
+      // attr giờ có kiểu FilterOutput, không cần ép kiểu as any
       .filter((attr) => {
         if (attr.type === AttributeType.RANGE_SLIDER) {
-          return (attr as any).max > (attr as any).min;
+          return (attr.max || 0) > (attr.min || 0);
         }
-        return attr.options.some((o) => !o.disabled);
+        return attr.options?.some((o) => !o.disabled) ?? false;
       });
 
     return finalFilters;

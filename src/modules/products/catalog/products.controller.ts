@@ -15,7 +15,9 @@ import {
   BadRequestException,
   Res,
   HttpStatus,
+  HttpException,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import {
@@ -38,7 +40,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import sharp from 'sharp';
 import { FilterProductDto } from './dto/filter-product.dto';
-import { ProductFilterService } from '../products-filter.service';
+import { FilterOutput, ProductFilterService } from '../products-filter.service';
+import type { ProductQueryParam } from 'src/common/interfaces/product.interface';
 
 @Controller('products')
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
@@ -51,8 +54,8 @@ export class ProductsController {
   // PUBLIC API (STOREFRONT)
 
   @Get('filters')
-  @Public()
-  async getFilters(@Query() query: FilterProductDto) {
+  // Khai báo kiểu trả về rõ ràng: Promise<FilterOutput[]>
+  async getFilters(@Query() query: FilterProductDto): Promise<FilterOutput[]> {
     return this.productFilterService.getSmartFiltersForCategory(query);
   }
 
@@ -68,23 +71,27 @@ export class ProductsController {
 
   @Public()
   @Get('store/details/:slug')
-  async findOneBySlug(@Param('slug') slug: string, @Res() res) {
+  async findOneBySlug(@Param('slug') slug: string, @Res() res: Response) {
     try {
       const product = await this.productsService.findBySlug(slug);
       return res.status(HttpStatus.OK).json(product);
     } catch (error) {
       // Bắt lỗi 301 để Redirect
-      if (error.getStatus() === HttpStatus.MOVED_PERMANENTLY) {
-        const response = error.getResponse();
-        const newSlug = response['new_slug'];
+      if (error instanceof HttpException) {
+        if (
+          (error.getStatus() as HttpStatus) === HttpStatus.MOVED_PERMANENTLY
+        ) {
+          const response = error.getResponse() as { new_slug: string };
+          const newSlug = response.new_slug;
 
-        // Trả về Header Location (Quan trọng cho Google SEO)
-        return res.redirect(
-          HttpStatus.MOVED_PERMANENTLY,
-          `/api/products/store/details/${newSlug}`,
-        );
+          // Trả về Header Location (Quan trọng cho Google SEO)
+          return res.redirect(
+            HttpStatus.MOVED_PERMANENTLY,
+            `/api/products/store/details/${newSlug}`,
+          );
+        }
+        throw error;
       }
-      throw error;
     }
   }
 
@@ -115,14 +122,14 @@ export class ProductsController {
 
   @Get()
   @RequirePermissions(Resource.PRODUCTS, Action.READ)
-  findAllAdmin(@Query() query: any) {
+  findAllAdmin(@Query() query: ProductQueryParam) {
     return this.productsService.findAll(query);
   }
 
   @Get('price-requests/pending')
   @RequirePermissions(Resource.PRODUCTS, Action.READ)
   @Roles(Role.SUPER_ADMIN)
-  findPendingPriceRequests(@Query() query: any) {
+  findPendingPriceRequests(@Query() query: ProductQueryParam) {
     return this.productsService.findPendingPriceRequests(query);
   }
 
@@ -296,27 +303,32 @@ export class ProductsController {
   }
 
   @Get(':slug')
-  async getDetail(@Param('slug') slug: string, @Res() res) {
+  async getDetail(@Param('slug') slug: string, @Res() res: Response) {
     try {
       const product = await this.productsService.findBySlug(slug);
       return res.status(HttpStatus.OK).json(product);
     } catch (error) {
-      if (error.getStatus() === HttpStatus.MOVED_PERMANENTLY) {
-        const response = error.getResponse();
-        const newSlug = response['new_slug'];
-        // Set Header Location để Google Bot biết đường link mới
-        return res.redirect(
-          HttpStatus.MOVED_PERMANENTLY,
-          `/products/${newSlug}`,
-        );
+      if (error instanceof HttpException) {
+        if (
+          (error.getStatus() as HttpStatus) === HttpStatus.MOVED_PERMANENTLY
+        ) {
+          const response = error.getResponse() as { new_slug: string };
+          const newSlug = response.new_slug;
 
-        // Nếu làm SPA (React/Next), trả về JSON để FE tự push router:
-        // return res.status(HttpStatus.MOVED_PERMANENTLY).json({
-        //    redirect: true,
-        //    new_url: `/products/${newSlug}`
-        // });
+          // Set Header Location để Google Bot biết đường link mới
+          return res.redirect(
+            HttpStatus.MOVED_PERMANENTLY,
+            `/products/${newSlug}`,
+          );
+
+          // Nếu làm SPA (React/Next), trả về JSON để FE tự push router:
+          // return res.status(HttpStatus.MOVED_PERMANENTLY).json({
+          //    redirect: true,
+          //    new_url: `/products/${newSlug}`
+          // });
+        }
+        throw error;
       }
-      throw error;
     }
   }
 }

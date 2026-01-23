@@ -14,7 +14,7 @@ export class AuditLog {
   actor_id?: Types.ObjectId;
 
   @Prop({ required: false, index: true })
-  actor_employee_code?: string; 
+  actor_employee_code?: string;
 
   @Prop({ required: false })
   actor_email?: string;

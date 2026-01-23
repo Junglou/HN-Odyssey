@@ -18,6 +18,55 @@ import {
 import { ReportReviewDto } from './dto/report-review.dto';
 import { Department } from 'src/common/enums/department.enum';
 
+// 1. Interface cho Query Params
+export interface ReviewQueryParam {
+  page?: string | number;
+  limit?: string | number;
+  star?: string | number;
+  has_media?: string; // 'true' | 'false'
+  sort_by?: string;
+  variant_sku?: string;
+  [key: string]: any;
+}
+
+// 2. Interface cho kết quả Aggregation tính điểm trung bình
+interface RatingAggregationResult {
+  _id: Types.ObjectId;
+  avgRating: number;
+  totalReviews: number;
+}
+
+// 3. Interface cho kết quả Aggregation findAll
+interface ReviewListAggregationResult {
+  data: (ReviewDocument & { user?: any; variant_name?: string })[];
+  totalCount: { count: number }[];
+}
+
+// 4. Interface cho kết quả Aggregation thống kê
+interface RatingStatResult {
+  _id: number; // 1, 2, 3, 4, 5
+  count: number;
+}
+
+// 5. Interface phụ trợ cho Variant
+interface VariantAttribute {
+  code: string;
+  value: string;
+}
+interface ProductVariantLean {
+  sku: string;
+  attributes: VariantAttribute[];
+}
+
+interface ReviewFilter {
+  product_id: Types.ObjectId;
+  status: string;
+  rating?: number;
+  variant_sku?: string;
+  media?: { $not: { $size: number } };
+  [key: string]: any;
+}
+
 @Injectable()
 export class ReviewsService {
   constructor(
@@ -80,7 +129,8 @@ export class ReviewsService {
       status: 'APPROVED',
     });
 
-    this.updateProductRating(dto.productId);
+    // Thêm await để tránh floating promises
+    await this.updateProductRating(dto.productId);
 
     await this.auditLogsService.log({
       action: 'CREATE_REVIEW',
@@ -101,7 +151,8 @@ export class ReviewsService {
   }
 
   async updateProductRating(productId: string) {
-    const stats = await this.reviewModel.aggregate([
+    // Ép kiểu kết quả aggregation về RatingAggregationResult[]
+    const stats = await this.reviewModel.aggregate<RatingAggregationResult>([
       {
         $match: {
           product_id: new Types.ObjectId(productId),
@@ -122,24 +173,30 @@ export class ReviewsService {
     ]);
 
     if (stats.length > 0) {
-      const { avgRating, totalReviews, stars } = stats[0];
+      // Xóa biến 'stars' thừa, truy cập an toàn nhờ Interface
+      const { avgRating, totalReviews } = stats[0];
+
+      // avgRating có thể là null nếu chưa có review approved nào
+      const safeAvg = avgRating || 0;
+
       await this.productModel.updateOne(
         { _id: productId },
         {
-          rating_average: parseFloat(avgRating.toFixed(1)),
+          rating_average: parseFloat(safeAvg.toFixed(1)),
           review_count: totalReviews,
         },
       );
     }
   }
 
-  async findAll(productId: string, query: any) {
+  // Sử dụng Interface ReviewQueryParam thay vì any
+  async findAll(productId: string, query: ReviewQueryParam) {
     const {
       page = 1,
       limit = 10,
       star,
       has_media,
-      sort_by = 'newest', 
+      sort_by = 'newest',
       variant_sku,
     } = query;
 
@@ -147,8 +204,8 @@ export class ReviewsService {
     const limitNumber = Number(limit);
     const skip = (pageNumber - 1) * limitNumber;
 
-    // 1. Xây dựng điều kiện lọc ($match)
-    const matchFilter: any = {
+    // Sử dụng Interface ReviewFilter thay vì any
+    const matchFilter: ReviewFilter = {
       product_id: new Types.ObjectId(productId),
       status: 'APPROVED',
     };
@@ -161,97 +218,97 @@ export class ReviewsService {
       matchFilter.variant_sku = variant_sku;
     }
 
-    // Nếu user chỉ định lọc "Có hình ảnh"
     if (has_media === 'true') {
       matchFilter.media = { $not: { $size: 0 } };
     }
 
-    // 2. Xây dựng logic sắp xếp ($sort)
-    // AC15: Mặc định ưu tiên Media lên đầu, sau đó mới đến ngày tháng
-    let sortStage: any = {};
+    let sortStage: Record<string, 1 | -1> = {};
 
     if (sort_by === 'helpful') {
       sortStage = { helpful_count: -1, createdAt: -1 };
     } else if (sort_by === 'oldest') {
       sortStage = { createdAt: 1 };
     } else {
-      // Trường hợp 'newest' hoặc mặc định
-      // Ưu tiên: Có Media (1) > Không Media (0) -> Sau đó mới đến ngày tạo mới nhất
       sortStage = { has_media_priority: -1, createdAt: -1 };
     }
 
-    // 3. Thực thi Aggregation Pipeline
-    const [result] = await this.reviewModel.aggregate([
-      // B1: Lọc dữ liệu
-      { $match: matchFilter },
-
-      // B2: Tính toán trường ảo để phục vụ sắp xếp (AC15)
-      // Nếu mảng media > 0 phần tử thì gán has_media_priority = 1, ngược lại = 0
-      {
-        $addFields: {
-          has_media_priority: {
-            $cond: { if: { $gt: [{ $size: '$media' }, 0] }, then: 1, else: 0 },
-          },
-        },
-      },
-
-      // B3: Sắp xếp
-      { $sort: sortStage },
-
-      // B4: Phân trang & Lấy tổng số (Dùng $facet để chạy song song)
-      {
-        $facet: {
-          data: [
-            { $skip: skip },
-            { $limit: limitNumber },
-            // Lookup để populate user info (Thay cho .populate)
-            {
-              $lookup: {
-                from: 'users', 
-                localField: 'user_id',
-                foreignField: '_id',
-                as: 'user',
-                pipeline: [{ $project: { full_name: 1, avatar: 1 } }], 
+    const [result] =
+      await this.reviewModel.aggregate<ReviewListAggregationResult>([
+        { $match: matchFilter },
+        {
+          $addFields: {
+            has_media_priority: {
+              $cond: {
+                if: { $gt: [{ $size: '$media' }, 0] },
+                then: 1,
+                else: 0,
               },
             },
-            // Unwind mảng user (vì lookup trả về mảng)
-            { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-            // Map lại field user_id cho khớp format cũ nếu cần (Optional)
-            { $addFields: { user_id: '$user' } },
-          ],
-          totalCount: [{ $count: 'count' }],
+          },
         },
-      },
-    ]);
+        { $sort: sortStage },
+        {
+          $facet: {
+            data: [
+              { $skip: skip },
+              { $limit: limitNumber },
+              {
+                $lookup: {
+                  from: 'users',
+                  localField: 'user_id',
+                  foreignField: '_id',
+                  as: 'user',
+                  pipeline: [{ $project: { full_name: 1, avatar: 1 } }],
+                },
+              },
+              { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+              { $addFields: { user_id: '$user' } },
+            ],
+            totalCount: [{ $count: 'count' }],
+          },
+        },
+      ]);
 
     const reviewsDocs = result.data;
     const total = result.totalCount[0]?.count || 0;
 
-    // 4. Mapping tên biến thể 
     const product = await this.productModel
       .findById(productId)
       .select('variants')
       .lean();
 
     const variantMap = new Map<string, string>();
+
     if (product && product.variants) {
-      product.variants.forEach((v) => {
-        const variantName = v.attributes.map((attr) => attr.value).join(' / ');
-        variantMap.set(v.sku, variantName);
+      const variants = product.variants as unknown as ProductVariantLean[];
+      variants.forEach((v) => {
+        if (v.attributes) {
+          const variantName = v.attributes
+            .map((attr) => attr.value)
+            .join(' / ');
+          variantMap.set(v.sku, variantName);
+        }
       });
     }
 
-    // 5. Format dữ liệu trả về
+    // Định nghĩa kiểu cho docObj để tránh lỗi unsafe member access/return
     const finalReviews = reviewsDocs.map((doc) => {
-      // Vì dùng aggregate nên doc đã là Plain Object, không cần .toObject()
-      // Xóa field tạm has_media_priority cho gọn response
-      delete doc.has_media_priority;
-      delete doc.user; // Đã map vào user_id ở step lookup
+      // Ép kiểu về object có các thuộc tính mở rộng
+      const docObj = doc as ReviewDocument & {
+        variant_name?: string;
+        has_media_priority?: number;
+        user?: any;
+      };
+
+      // Xóa thuộc tính an toàn
+      delete docObj.has_media_priority;
+      delete docObj.user;
 
       if (doc.variant_sku) {
-        doc.variant_name = variantMap.get(doc.variant_sku) || doc.variant_sku;
+        docObj.variant_name =
+          variantMap.get(doc.variant_sku) || doc.variant_sku;
       }
-      return doc;
+      return docObj;
     });
 
     return {
@@ -279,9 +336,9 @@ export class ReviewsService {
     );
     if (!review) throw new NotFoundException('Review not found');
 
-    this.updateProductRating(review.product_id.toString());
+    // Thêm await
+    await this.updateProductRating(review.product_id.toString());
 
-    //Ghi nhận hành động duyệt
     if (adminId) {
       await this.auditLogsService.log({
         action: 'APPROVE_REVIEW',
@@ -309,11 +366,9 @@ export class ReviewsService {
     ip?: string,
     userAgent?: string,
   ) {
-    // 1. Kiểm tra Review có tồn tại không
     const review = await this.reviewModel.findById(reviewId);
     if (!review) throw new NotFoundException('Đánh giá không tồn tại');
 
-    // 2. Kiểm tra xem user này đã report review này chưa (Tránh spam report)
     const existingReport = await this.reviewReportModel.findOne({
       review_id: new Types.ObjectId(reviewId),
       reporter_id: new Types.ObjectId(userId),
@@ -323,7 +378,6 @@ export class ReviewsService {
       throw new BadRequestException('Bạn đã báo cáo đánh giá này rồi.');
     }
 
-    // 3. Tạo báo cáo mới
     const report = await this.reviewReportModel.create({
       review_id: new Types.ObjectId(reviewId),
       reporter_id: new Types.ObjectId(userId),
@@ -351,11 +405,9 @@ export class ReviewsService {
     const review = await this.reviewModel.findById(reviewId);
     if (!review) throw new NotFoundException('Review not found');
 
-    // Kiểm tra xem user đã like chưa
     const hasLiked = review.liked_by_users.includes(userId.toString());
 
     if (hasLiked) {
-      // Unlike
       await this.reviewModel.updateOne(
         { _id: reviewId },
         {
@@ -365,7 +417,6 @@ export class ReviewsService {
       );
       return { message: 'Unvoted', current_count: review.helpful_count - 1 };
     } else {
-      // Like
       await this.reviewModel.updateOne(
         { _id: reviewId },
         {
@@ -380,7 +431,8 @@ export class ReviewsService {
   async getStats(productId: string) {
     const objectId = new Types.ObjectId(productId);
 
-    const stats = await this.reviewModel.aggregate([
+    // Ép kiểu aggregation stats về RatingStatResult[]
+    const stats = await this.reviewModel.aggregate<RatingStatResult>([
       {
         $match: {
           product_id: objectId,
@@ -389,12 +441,14 @@ export class ReviewsService {
       },
       {
         $group: {
-          _id: '$rating', 
+          _id: '$rating',
           count: { $sum: 1 },
         },
       },
     ]);
-    const result = {
+
+    // Định nghĩa kiểu rõ ràng cho result object
+    const result: { [key: number]: number; total: number; average: number } = {
       5: 0,
       4: 0,
       3: 0,
@@ -407,6 +461,7 @@ export class ReviewsService {
     let totalRatingSum = 0;
 
     stats.forEach((item) => {
+      // item._id giờ đã có kiểu number
       result[item._id] = item.count;
       result.total += item.count;
       totalRatingSum += item._id * item.count;

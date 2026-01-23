@@ -32,7 +32,7 @@ class SeoConfigDto {
 export class VariantAttributeDto {
   @IsNotEmpty()
   @IsString()
-  code: string; // VD: "color" 
+  code: string; // VD: "color"
 
   @IsNotEmpty()
   @IsString()
@@ -40,7 +40,7 @@ export class VariantAttributeDto {
 
   @IsOptional()
   @IsString()
-  unit?: string; 
+  unit?: string;
 }
 
 // 4. DTO tạo Biến thể

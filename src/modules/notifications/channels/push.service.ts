@@ -32,7 +32,7 @@ export class PushService {
 
     if (!isProduction) {
       this.logger.debug(
-        `[MOCK PUSH] To: ${deviceToken.substring(0, 10)}... | Title: ${title} | Body: ${body}`,
+        `[MOCK PUSH] To: ${deviceToken.substring(0, 10)}... | Title: ${title} | Body: ${body} | Data: ${JSON.stringify(data || {})}`,
       );
       return;
     }
@@ -47,13 +47,14 @@ export class PushService {
       */
       this.logger.log(`Push notification sent to device`);
     } catch (error) {
-      this.logger.error(`Push notification failed`, error.stack);
+      const err = error as Error;
+      this.logger.error(`Push notification failed`, err.stack);
     }
   }
 
   //Gửi thông báo cho hàng loạt user (VD: Marketing Campaign)
   async sendToTopic(topic: string, title: string, body: string) {
-    this.logger.log(`Sending to topic ${topic}: ${title}`);
+    this.logger.log(`Sending to topic ${topic}: ${title} | Content: ${body}`);
     // Code tương tự sendToDevice nhưng dùng method sendToTopic của Firebase
   }
 }

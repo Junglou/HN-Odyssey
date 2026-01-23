@@ -1,7 +1,6 @@
 import {
   IsOptional,
   IsString,
-  IsEnum,
   IsDateString,
   IsInt,
   Min,
@@ -30,13 +29,13 @@ export class FilterOrderDto {
   sort?: string;
 
   @IsOptional()
-  @Transform(({ value }) => parseInt(value))
+  @Transform(({ value }) => parseInt(value as string))
   @IsInt()
   @Min(1)
   page?: number = 1;
 
   @IsOptional()
-  @Transform(({ value }) => parseInt(value))
+  @Transform(({ value }) => parseInt(value as string))
   @IsInt()
   @Min(1)
   limit?: number = 10;

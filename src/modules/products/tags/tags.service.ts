@@ -103,7 +103,6 @@ export class TagsService {
     if (!tag) throw new NotFoundException('Thẻ không tồn tại');
 
     const oldName = tag.name;
-    const oldData = tag.toObject();
     let nameChanged = false;
 
     if (updateDto.name && updateDto.name !== oldName) {
@@ -220,7 +219,6 @@ export class TagsService {
     }
 
     // 1. Cộng dồn usage
-    const oldTargetUsage = target.usage_count;
     target.usage_count += source.usage_count;
     await target.save();
 

@@ -89,7 +89,7 @@ export class StockService {
     const { product_id, sku, quantity } = dto;
 
     // Lúc này hàng đã nằm trong stock_on_hold, ta chỉ cần xóa nó đi
-    let filter = { _id: new Types.ObjectId(product_id) };
+    const filter = { _id: new Types.ObjectId(product_id) };
     let update = {};
 
     // Check xem là biến thể hay sản phẩm thường để build query
@@ -113,7 +113,7 @@ export class StockService {
     const { product_id, sku, quantity } = dto;
 
     // Trả lại hàng từ on_hold về stock khả dụng
-    let filter = { _id: new Types.ObjectId(product_id) };
+    const filter = { _id: new Types.ObjectId(product_id) };
     let update = {};
 
     const product = await this.productModel

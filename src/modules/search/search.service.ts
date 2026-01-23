@@ -48,7 +48,7 @@ export class SearchService {
     }
 
     // AC15: Log (Fire & Forget)
-    this.logSearchTerm(cleanKeyword, userId, deviceId);
+    void this.logSearchTerm(cleanKeyword, userId, deviceId);
 
     //TÌM SẢN PHẨM BẰNG ATLAS SEARCH (FUZZY AI)
 
@@ -159,7 +159,7 @@ export class SearchService {
     deviceId?: string,
   ) {
     try {
-      const filter: any = { keyword: keyword.toLowerCase() };
+      const filter: Record<string, any> = { keyword: keyword.toLowerCase() };
       // Nếu user đã login, log theo user, ngược lại log theo device
       if (userId) filter.user_id = userId;
       else if (deviceId) filter.device_id = deviceId;

@@ -5,9 +5,6 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
-import { APP_GUARD } from '@nestjs/core';
-import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
-import { RolesGuard } from './common/guards/roles.guard';
 import { AdminModule } from './modules/users/admin/admin.module';
 import { CategoriesModule } from './modules/products/categories/categories.module';
 import { AuditLogsModule } from './modules/system/audit-logs/audit-logs.module';
@@ -27,7 +24,7 @@ import { MarketingModule } from './modules/marketing/marketing.module';
   imports: [
     RedisModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
+      useFactory: (configService: ConfigService) => ({
         type: 'single',
         url: configService.get<string>('REDIS_URL') || 'redis://localhost:6379',
       }),
@@ -36,7 +33,7 @@ import { MarketingModule } from './modules/marketing/marketing.module';
 
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
+      useFactory: (configService: ConfigService) => ({
         uri: configService.get<string>('MONGO_URL'),
       }),
       inject: [ConfigService],
@@ -64,7 +61,7 @@ import { MarketingModule } from './modules/marketing/marketing.module';
     RolesModule,
     SalesModule,
     SearchModule,
-    MarketingModule
+    MarketingModule,
   ],
   controllers: [AppController],
   providers: [

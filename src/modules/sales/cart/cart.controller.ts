@@ -21,26 +21,25 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import type { IUser } from '../../../common/interfaces/user.interface';
 import { OptionalJwtAuthGuard } from 'src/common/guards/optional-auth.guard';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { CartResponse } from 'src/common/interfaces/cart-response.interface';
 
 @Controller('cart')
 export class CartController {
   constructor(private readonly cartService: CartService) {}
 
   // 1. LẤY GIỎ HÀNG
-  @UseGuards(OptionalJwtAuthGuard)
   @Get()
   async getCart(
     @CurrentUser() user: IUser | null,
     @Query('guestSessionId') guestSessionId: string,
-  ) {
+  ): Promise<CartResponse> {
+    // Trả về toàn bộ Object giỏ hàng
     const userId = user ? user._id : null;
-    if (!userId && !guestSessionId) {
-      return { items: [], summary: { subtotal: 0 } };
-    }
+    // ... xử lý trả về
     return this.cartService.getCart(userId, guestSessionId);
   }
 
-  // 2. THÊM VÀO GIỎ 
+  // 2. THÊM VÀO GIỎ
   @UseGuards(OptionalJwtAuthGuard)
   @Post('add')
   async addToCart(

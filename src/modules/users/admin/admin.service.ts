@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import * as bcrypt from 'bcryptjs';
-import { Model, Types } from 'mongoose';
+import { Model, Types, FilterQuery } from 'mongoose';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import { QueryStaffDto } from './dto/query-staff.dto';
@@ -25,6 +25,12 @@ import {
 } from 'src/common/enums/department.enum';
 import { Role, RoleDocument } from '../roles/schemas/role.schema';
 import { RoleLevel } from 'src/common/enums/role-level.enum';
+
+interface MongoError extends Error {
+  code?: number;
+  keyPattern?: Record<string, number>;
+  keyValue?: Record<string, any>;
+}
 
 @Injectable()
 export class AdminService {
@@ -63,7 +69,6 @@ export class AdminService {
     const initials = this.getInitials(lastName, firstName);
     const deptCode = this.getDepartmentCode(department);
 
-    // Lấy level cao nhất từ danh sách roles
     const validRoles = await this.roleModel
       .find({
         slug: { $in: roles },
@@ -98,24 +103,25 @@ export class AdminService {
 
   getDepartmentOptions = () => {
     return Object.values(Department).map((dept) => ({
-      value: dept, // Gửi xuống DB: 'MANAGEMENT'
-      label: DEPARTMENT_LABELS[dept], // Hiển thị: 'Ban quản trị'
-      code: DEPARTMENT_CODES[dept], // Metadata nếu cần: '1'
+      value: dept,
+      label: DEPARTMENT_LABELS[dept],
+      code: DEPARTMENT_CODES[dept],
     }));
   };
 
-  // HELPER: So sánh sự thay đổi dữ liệu để ghi log
-  private getDiff(oldData: any, newData: any) {
-    const diff: any = {};
-    // Chỉ so sánh các key có trong DTO gửi lên
+  // HELPER: Type-safe diff
+  // [FIX UNSAFE]: Dùng 'unknown' thay vì 'any' để Eslint không báo lỗi gán unsafe
+  private getDiff(
+    oldData: Record<string, unknown>,
+    newData: Record<string, unknown>,
+  ): Record<string, any> {
+    const diff: Record<string, any> = {};
     Object.keys(newData).forEach((key) => {
-      // Bỏ qua các trường không cần thiết hoặc nhạy cảm
       if (['password', 'confirm_password'].includes(key)) return;
 
       const oldVal = oldData[key];
       const newVal = newData[key];
 
-      // So sánh giá trị (dùng JSON.stringify để so sánh cả mảng/object)
       if (
         newVal !== undefined &&
         JSON.stringify(oldVal) !== JSON.stringify(newVal)
@@ -134,7 +140,6 @@ export class AdminService {
     userAgent: string,
     currentUserRoles: string[],
   ) {
-    // 1. Check quyền Super Admin
     if (!currentUserRoles.includes(RoleEnum.SUPER_ADMIN)) {
       if (dto.roles.includes(RoleEnum.SUPER_ADMIN)) {
         throw new ForbiddenException(
@@ -143,8 +148,6 @@ export class AdminService {
       }
     }
 
-    // 2. Validate Roles & Lấy Level
-    // Thay vì count, ta find để lấy luôn field 'level' phục vụ sinh mã
     const validRoles = await this.roleModel
       .find({
         slug: { $in: dto.roles },
@@ -156,21 +159,14 @@ export class AdminService {
       throw new BadRequestException('Một hoặc nhiều vai trò không hợp lệ.');
     }
 
-    // 3. Check trùng Email
     const existUser = await this.userModel.findOne({ email: dto.email });
     if (existUser) throw new ConflictException('Email đã tồn tại.');
 
-    // 4. GENERATE MÃ NHÂN VIÊN
     const initials = this.getInitials(dto.lastName, dto.firstName);
     const deptCode = this.getDepartmentCode(dto.department);
-
-    // Lấy level cao nhất (số bé nhất). Mặc định Staff (3) nếu role chưa config level
     const roleLevels = validRoles.map((r) => r.level || RoleLevel.STAFF);
     const minLevel = Math.min(...roleLevels);
-
     const codePrefix = `${initials}-${deptCode}-${minLevel}`;
-
-    // b. Tìm số thứ tự tiếp theo cho Prefix này
     const regex = new RegExp(`^${codePrefix}-\\d{4}$`);
 
     const lastStaff = await this.staffModel
@@ -187,11 +183,9 @@ export class AdminService {
 
     const finalEmployeeCode = `${codePrefix}-${nextSequence.toString().padStart(4, '0')}`;
 
-    // 5. Hash Password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(dto.password, salt);
 
-    // 6. Init Object
     const newStaff = new this.staffModel({
       employee_code: finalEmployeeCode,
       email: dto.email,
@@ -206,38 +200,39 @@ export class AdminService {
       metadata: { createdBy: createdById },
     });
 
-    // 7. Save & Handle Race Condition
     let savedUser;
     try {
       savedUser = await newStaff.save();
-    } catch (error) {
-      if (error.code === 11000) {
-        if (error.keyPattern.employee_code) {
+    } catch (error: unknown) {
+      const mongoError = error as MongoError;
+      if (mongoError.code === 11000 && mongoError.keyPattern) {
+        if (mongoError.keyPattern.employee_code) {
           throw new ConflictException(
             `Hệ thống bận (Trùng mã ${finalEmployeeCode}). Vui lòng thử lại.`,
           );
         }
-        if (error.keyPattern.email)
+        if (mongoError.keyPattern.email)
           throw new ConflictException(`Email '${dto.email}' đã tồn tại.`);
-        if (error.keyPattern.phone)
+        if (mongoError.keyPattern.phone)
           throw new ConflictException(`SĐT '${dto.phone}' đã tồn tại.`);
       }
       throw new InternalServerErrorException(error);
     }
 
-    // 8. Audit Log
+    const staffData = savedUser as unknown as Staff & { _id: Types.ObjectId };
+
     await this.auditLogsService.log({
       action: 'CREATE_STAFF',
       collection_name: 'users',
       actor_id: createdById,
-      target_id: savedUser._id,
-      actor_employee_code: savedUser.employee_code,
+      target_id: staffData._id,
+      actor_employee_code: staffData.employee_code,
       department: Department.MANAGEMENT,
       detail: {
-        email: savedUser.email,
-        roles: savedUser.roles,
-        employee_code: savedUser.employee_code,
-        department: savedUser.department,
+        email: staffData.email,
+        roles: staffData.roles,
+        employee_code: staffData.employee_code,
+        department: staffData.department,
       },
       ip,
       user_agent: userAgent,
@@ -246,9 +241,9 @@ export class AdminService {
     return {
       message: 'Tạo tài khoản Staff thành công.',
       data: {
-        _id: savedUser._id,
-        email: savedUser.email,
-        employeeCode: savedUser.employee_code,
+        _id: staffData._id,
+        email: staffData.email,
+        employeeCode: staffData.employee_code,
       },
     };
   }
@@ -265,7 +260,6 @@ export class AdminService {
     const user = await this.staffModel.findById(id);
     if (!user) throw new NotFoundException('Nhân sự không tồn tại.');
 
-    // 1. Kiểm tra quyền Super Admin
     if (dto.roles && !currentUserRoles.includes(RoleEnum.SUPER_ADMIN)) {
       if (dto.roles.includes(RoleEnum.SUPER_ADMIN)) {
         throw new ForbiddenException(
@@ -278,14 +272,11 @@ export class AdminService {
       throw new ForbiddenException('Không thể tự khóa chính mình.');
     }
 
-    const oldData = user.toObject();
+    // [FIX UNSAFE]: Cast to Record<string, unknown> để tương thích với getDiff mới
+    const oldData = user.toObject() as unknown as Record<string, unknown>;
 
-    //LOGIC KIỂM TRA ĐỔI MÃ: CHỈ KHI ROLE LEVEL THAY ĐỔI
     if (dto.roles) {
-      // 1. Lấy Level hiện tại đang có trong mã nhân viên cũ
       const currentLevelStr = user.employee_code.split('-')[2];
-
-      // 2. Tính Level mới dựa trên roles gửi lên
       const validRoles = await this.roleModel
         .find({ slug: { $in: dto.roles }, is_active: true })
         .select('level');
@@ -293,7 +284,6 @@ export class AdminService {
       const roleLevels = validRoles.map((r) => r.level || RoleLevel.STAFF);
       const newMinLevel = Math.min(...roleLevels);
 
-      // 3. So sánh: Chỉ sinh mã mới nếu Level thực sự thay đổi
       if (currentLevelStr && newMinLevel.toString() !== currentLevelStr) {
         user.employee_code = await this.generateEmployeeCode(
           user.last_Name,
@@ -304,7 +294,6 @@ export class AdminService {
       }
     }
 
-    // 3. Cập nhật các trường thông tin khác (Sau khi đã xử lý mã xong xuôi)
     if (dto.password) {
       const salt = await bcrypt.genSalt(10);
       user.password = await bcrypt.hash(dto.password, salt);
@@ -320,26 +309,30 @@ export class AdminService {
       user.email = dto.email;
     }
 
-    // Các thông tin cá nhân thay đổi thoải mái, không ảnh hưởng mã nữa
     if (dto.phone) user.phone = dto.phone;
     if (dto.firstName) user.first_Name = dto.firstName;
     if (dto.lastName) user.last_Name = dto.lastName;
     if (dto.department) user.department = dto.department;
     if (dto.roles) user.roles = dto.roles;
 
-    // 4. Lưu và Ghi Log
     try {
       await user.save();
-    } catch (error) {
-      if (error.code === 11000)
+    } catch (error: unknown) {
+      const mongoError = error as MongoError;
+      if (mongoError.code === 11000)
         throw new ConflictException('Dữ liệu (SĐT hoặc Mã) đã tồn tại.');
       throw new InternalServerErrorException(error);
     }
 
-    const diff = this.getDiff(oldData, dto);
+    // [FIX UNSAFE]: Cast dto to Record<string, unknown>
+    // Hàm getDiff đã trả về Record<string, any> nên biến diff không bị unsafe assignment
+    const diff = this.getDiff(
+      oldData,
+      dto as unknown as Record<string, unknown>,
+    );
 
-    // Ghi log nếu mã thay đổi
-    if (oldData.employee_code !== user.employee_code) {
+    // oldData giờ là unknown, nên khi so sánh cần ép kiểu hoặc check
+    if ((oldData.employee_code as string) !== user.employee_code) {
       diff['employee_code'] = {
         old: oldData.employee_code,
         new: user.employee_code,
@@ -382,6 +375,8 @@ export class AdminService {
 
     await user.save();
 
+    const employeeCode = (user as unknown as Staff).employee_code || 'UNKNOWN';
+
     await this.auditLogsService.log({
       action: 'DELETE_STAFF',
       collection_name: 'users',
@@ -389,7 +384,7 @@ export class AdminService {
       target_id: id,
       department: Department.MANAGEMENT,
       detail: {
-        employee_code: (user as any).employee_code,
+        employee_code: employeeCode,
         old_status: oldStatus,
         reason: 'Soft delete request by Admin',
       },
@@ -402,6 +397,16 @@ export class AdminService {
 
   // 4. DANH SÁCH NHÂN SỰ
   async findAllStaff(query: QueryStaffDto) {
+    type ExtendedQuery = QueryStaffDto & {
+      status?: string;
+      employee_code?: string;
+      is_active?: string | boolean;
+      role?: string[];
+      search?: string;
+      sort_by?: string;
+      sort_direction?: string;
+    };
+
     const {
       page = 1,
       limit = 20,
@@ -412,22 +417,22 @@ export class AdminService {
       employee_code,
       sort_by = 'createdAt',
       sort_direction = 'desc',
-    } = query as any;
+    } = query as ExtendedQuery;
 
-    const skip = (page - 1) * Number(limit);
-    const filter: any = { type: 'Staff' };
+    const skip = (Number(page) - 1) * Number(limit);
 
-    // 1. Tìm kiếm chung (Full-text Search)
+    const filter: FilterQuery<UserDocument> & { employee_code?: any } = {
+      type: 'Staff',
+    };
+
     if (search) {
       filter.$text = { $search: search };
     }
 
-    // 2. Lọc riêng theo Mã Nhân Viên (Tìm chính xác 1 phần)
     if (employee_code) {
       filter.employee_code = { $regex: employee_code, $options: 'i' };
     }
 
-    // 3. Các bộ lọc khác
     if (role) {
       filter.roles = role;
     }
@@ -439,7 +444,9 @@ export class AdminService {
       if (isActiveBool) {
         filter.status = UserStatus.ACTIVE;
       } else {
-        filter.status = { $in: [UserStatus.SUSPENDED, UserStatus.TERMINATED] };
+        filter.status = {
+          $in: [UserStatus.SUSPENDED, UserStatus.TERMINATED] as any[],
+        };
       }
     }
 
@@ -478,7 +485,7 @@ export class AdminService {
     return user;
   }
 
-  // 5. ĐỔI TRẠNG THÁI (Change Status)
+  // 5. ĐỔI TRẠNG THÁI
   async changeStatus(
     id: string,
     dto: ChangeStatusDto,
@@ -497,12 +504,13 @@ export class AdminService {
     const oldStatus = user.status;
     user.status = dto.status;
 
-    // Nếu block/inactive thì kích token cũ ra
     if (dto.status !== UserStatus.ACTIVE) {
       user.token_version = (user.token_version || 0) + 1;
     }
 
     await user.save();
+
+    const employeeCode = (user as unknown as Staff).employee_code || 'UNKNOWN';
 
     await this.auditLogsService.log({
       action: 'CHANGE_STAFF_STATUS',
@@ -511,7 +519,7 @@ export class AdminService {
       target_id: user._id,
       department: Department.MANAGEMENT,
       detail: {
-        employee_code: (user as any).employee_code,
+        employee_code: employeeCode,
         reason: dto.reason,
         old_status: oldStatus,
         new_status: dto.status,

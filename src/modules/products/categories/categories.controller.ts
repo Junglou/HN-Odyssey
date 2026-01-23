@@ -8,7 +8,6 @@ import {
   Delete,
   Query,
   UseGuards,
-  Req,
   Ip,
   Headers,
 } from '@nestjs/common';
@@ -26,6 +25,7 @@ import { Action, Resource } from 'src/common/enums/resource.enum';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import type { IUser } from 'src/common/interfaces/user.interface';
+import type { CategoryTree } from 'src/common/interfaces/CategoryTree';
 
 @Controller('categories')
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
@@ -43,7 +43,7 @@ export class CategoriesController {
 
   @Public()
   @Get('tree-view')
-  async findAll() {
+  async findAll(): Promise<CategoryTree[]> {
     return this.categoriesService.getTree(false);
   }
 
@@ -73,7 +73,7 @@ export class CategoriesController {
 
   @Get('admin/tree-view')
   @RequirePermissions(Resource.CATEGORIES, Action.READ)
-  getAdminTree() {
+  async getAdminTree(): Promise<CategoryTree[]> {
     return this.categoriesService.getTree(true);
   }
 

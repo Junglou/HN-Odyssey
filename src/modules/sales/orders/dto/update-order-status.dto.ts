@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, IsEnum, IsBoolean } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsBoolean } from 'class-validator';
 
 export class UpdateOrderStatusDto {
   @IsNotEmpty()
@@ -11,7 +11,7 @@ export class UpdateOrderStatusDto {
 
   @IsOptional()
   @IsBoolean()
-  is_override?: boolean; 
+  is_override?: boolean;
 
   @IsOptional()
   @IsString()

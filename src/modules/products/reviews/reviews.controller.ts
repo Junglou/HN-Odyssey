@@ -11,8 +11,9 @@ import {
   UseInterceptors,
   UploadedFiles,
   BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
-import { ReviewsService } from './reviews.service';
+import { type ReviewQueryParam, ReviewsService } from './reviews.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
@@ -27,33 +28,46 @@ import * as fs from 'fs';
 import * as path from 'path';
 import sharp from 'sharp';
 
+// 1. Định nghĩa Interface cho User trong Request
+interface ICurrentUser {
+  userId?: string;
+  _id?: string;
+  sub?: string;
+  [key: string]: any;
+}
+
 @Controller('reviews')
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
+
+  // Helper để lấy ID an toàn
+  private getUserId(user: ICurrentUser): string {
+    const id = user.userId || user._id || user.sub;
+    if (!id) {
+      throw new UnauthorizedException('User ID not found in token');
+    }
+    return String(id);
+  }
 
   // AC: Gửi đánh giá (User phải đăng nhập)
   @Post()
   @UseGuards(JwtAuthGuard)
   async create(
-    @CurrentUser() user: any,
+    @CurrentUser() user: ICurrentUser,
     @Body() dto: CreateReviewDto,
     @Ip() ip: string,
     @UserAgent() userAgent: string,
   ) {
-    //Log xem cấu trúc user thực tế là gì
-    //console.log('DEBUG User from Guard:', user);
-
-    const userId = user.userId || user._id || user.sub;
-
-    if (!userId) {
-      throw new Error('User ID not found in Request');
-    }
-    return this.reviewsService.create(userId.toString(), dto, ip, userAgent);
+    const userId = this.getUserId(user);
+    return this.reviewsService.create(userId, dto, ip, userAgent);
   }
 
   @Public()
   @Get('product/:productId')
-  async findAll(@Param('productId') productId: string, @Query() query) {
+  async findAll(
+    @Param('productId') productId: string,
+    @Query() query: ReviewQueryParam,
+  ) {
     return this.reviewsService.findAll(productId, query);
   }
 
@@ -63,7 +77,6 @@ export class ReviewsController {
   async approve(
     @Param('id') id: string,
     @Body('status') status: 'APPROVED' | 'HIDDEN',
-    @CurrentUser() user: any,
   ) {
     return this.reviewsService.approveReview(id, status);
   }
@@ -80,10 +93,10 @@ export class ReviewsController {
   async report(
     @Param('id') id: string,
     @Body() dto: ReportReviewDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: ICurrentUser,
   ) {
-    const userId = user.userId || user._id || user.sub;
-    return this.reviewsService.reportReview(userId.toString(), id, dto);
+    const userId = this.getUserId(user);
+    return this.reviewsService.reportReview(userId, id, dto);
   }
 
   @Post('upload-media')
@@ -140,8 +153,12 @@ export class ReviewsController {
 
   @Post(':id/vote')
   @UseGuards(JwtAuthGuard)
-  async voteHelpful(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.reviewsService.voteHelpful(id, user._id);
+  async voteHelpful(
+    @Param('id') id: string,
+    @CurrentUser() user: ICurrentUser,
+  ) {
+    const userId = this.getUserId(user);
+    return this.reviewsService.voteHelpful(id, userId);
   }
 
   @Public()

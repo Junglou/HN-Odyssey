@@ -35,7 +35,7 @@ export class CreateRoleDto {
 
   @IsOptional()
   @IsEnum(RoleLevel)
-  level?: RoleLevel; 
+  level?: RoleLevel;
 
   @IsArray()
   @ValidateNested({ each: true })

@@ -28,7 +28,7 @@ export class AuditLogsViewSetup implements OnModuleInit {
     const mainCollection = 'audit_logs';
     const viewsToCreate = [
       {
-        name: 'view_audit_management', 
+        name: 'view_audit_management',
         department: Department.MANAGEMENT,
       },
       {
@@ -44,7 +44,7 @@ export class AuditLogsViewSetup implements OnModuleInit {
         department: Department.MARKETING,
       },
       {
-        name: 'view_audit_accounting', 
+        name: 'view_audit_accounting',
         department: Department.ACCOUNTING,
       },
       {
@@ -92,13 +92,15 @@ export class AuditLogsViewSetup implements OnModuleInit {
               ],
             });
             this.logger.log(`[DB VIEW] Đã tạo View: ${view.name}`);
-          } catch (error) {
-            this.logger.error(`Lỗi tạo view ${view.name}: ${error.message}`);
+          } catch (error: any) {
+            this.logger.error(
+              `Lỗi tạo view ${view.name}: ${(error as Error).message}`,
+            );
           }
         }
       }
     } catch (error) {
-      this.logger.error(`Lỗi khi setup Views: ${error.message}`);
+      this.logger.error(`Lỗi khi setup Views: ${(error as Error).message}`);
     }
   }
 }

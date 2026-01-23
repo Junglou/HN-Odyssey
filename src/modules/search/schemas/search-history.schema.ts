@@ -3,7 +3,7 @@ import { Document } from 'mongoose';
 
 export type SearchHistoryDocument = SearchHistory & Document;
 
-@Schema({ timestamps: true }) 
+@Schema({ timestamps: true })
 export class SearchHistory {
   @Prop({ required: true, index: true })
   keyword: string;

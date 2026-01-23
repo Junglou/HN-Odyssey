@@ -3,7 +3,7 @@ import { IsNotEmpty, IsString, MinLength, IsEmail } from 'class-validator';
 export class RecoverAccountDto {
   @IsString()
   @IsNotEmpty()
-  account: string; 
+  account: string;
 
   @IsString()
   @IsNotEmpty()

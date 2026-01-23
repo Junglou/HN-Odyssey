@@ -1,4 +1,4 @@
-import { Module, Global } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { ConfigService, ConfigModule } from '@nestjs/config';
 import { getMailConfig } from '../../config/mail.config';

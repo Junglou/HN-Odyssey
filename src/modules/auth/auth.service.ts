@@ -8,10 +8,10 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
-import { Model, Connection } from 'mongoose';
+import { Model, Connection, Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
-import { JwtService } from '@nestjs/jwt';
-import { User } from '../users/schemas/user.schema';
+import { JwtService, JwtSignOptions } from '@nestjs/jwt';
+import { User, UserDocument } from '../users/schemas/user.schema';
 import { Customer } from '../users/customers/schemas/customer.schema';
 import { Verification } from '../auth/schema/verification.schema';
 import { RegisterDto } from './dto/register.dto';
@@ -30,6 +30,11 @@ import { UserStatus } from 'src/common/enums/user-status.enum';
 import { ResendOtpDto } from './dto/resend-otp.dto.ts';
 import { randomBytes } from 'crypto';
 import { Department } from 'src/common/enums/department.enum';
+import { Staff } from '../users/admin/schemas/staff.schema';
+import type {
+  IVerificationRecord,
+  OAuthProfile,
+} from 'src/common/interfaces/OAuthProfile';
 
 @Injectable()
 export class AuthService {
@@ -155,7 +160,7 @@ export class AuthService {
       await session.abortTransaction();
       throw error;
     } finally {
-      session.endSession();
+      await session.endSession();
     }
   }
 
@@ -184,6 +189,7 @@ export class AuthService {
     if (!dto.account.includes('@')) {
       dto.account = this.normalizePhoneNumber(dto.account);
     }
+
     // Tìm bản ghi OTP
     const record = await this.verificationModel.findOne({
       account: dto.account,
@@ -199,7 +205,10 @@ export class AuthService {
 
     if (record.failed_attempts >= 5) {
       // Nếu đang trong thời gian khóa
-      if (record.lock_until && record.lock_until > new Date()) {
+      if (
+        record.lock_until &&
+        new Date(record.lock_until).getTime() > Date.now()
+      ) {
         throw new BadRequestException(
           'Bạn nhập sai quá nhiều lần. Vui lòng thử lại sau 15 phút.',
         );
@@ -208,12 +217,12 @@ export class AuthService {
       else {
         record.failed_attempts = 0;
         record.lock_until = null;
-        await record.save();
+        await record.save(); // Đã có await (Tốt)
       }
     }
 
-    // AC10: Check hết hạn OTP (Dù DB có TTL nhưng code vẫn nên check kỹ)
-    if (new Date() > record.expired_at) {
+    // AC10: Check hết hạn OTP
+    if (new Date() > new Date(record.expired_at)) {
       throw new BadRequestException('Mã xác thực đã hết hạn.');
     }
 
@@ -226,7 +235,7 @@ export class AuthService {
         record.lock_until = new Date(Date.now() + 15 * 60 * 1000); // Khóa 15p
       }
 
-      await record.save();
+      await record.save(); // Đã có await
 
       throw new BadRequestException(
         `Mã không đúng. Bạn còn ${5 - record.failed_attempts} lần thử.`,
@@ -235,7 +244,7 @@ export class AuthService {
 
     // NẾU CODE ĐÚNG -> XỬ LÝ TIẾP
     if (dto.type === 'REGISTER') {
-      const user = await this.userModel.findOneAndUpdate(
+      const user = (await this.userModel.findOneAndUpdate(
         {
           $or: [{ email: dto.account }, { phone: dto.account }],
         },
@@ -244,27 +253,27 @@ export class AuthService {
           status: UserStatus.ACTIVE,
         },
         { new: true },
-      );
+      )) as UserDocument;
 
       if (!user)
         throw new NotFoundException('Không tìm thấy tài khoản tương ứng.');
 
-      // Xóa OTP sau khi dùng xong (Quan trọng để không dùng lại được - AC4)
-      await record.deleteOne();
+      // Xóa OTP sau khi dùng xong
+      await record.deleteOne(); // Đã có await
 
       // AC14: Tự động đăng nhập
       const accessToken = await this.generateAccessToken(user);
       const refreshToken = await this.generateRefreshToken(user, false);
 
-      // Lưu Refresh Token vào User (Logic Login) - QUAN TRỌNG
+      // Lưu Refresh Token vào User
       const hashedRt = await bcrypt.hash(refreshToken, 10);
       await this.userModel.updateOne(
         { _id: user._id },
         { refresh_token: hashedRt },
       );
 
-      // Ghi Audit Log Verify Thành công
-      this.auditLogsService.log({
+      // Ghi Audit Log
+      await this.auditLogsService.log({
         action: 'VERIFY_OTP_SUCCESS',
         collection_name: 'users',
         actor_id: user._id,
@@ -283,6 +292,7 @@ export class AuthService {
         user: {
           _id: user._id,
           email: user.email,
+          // Kiểm tra lại tên field trong Schema của bạn (last_Name hay lastName)
           full_name: user.last_Name + ' ' + user.first_Name,
           roles: user.roles,
         },
@@ -408,47 +418,53 @@ export class AuthService {
       );
     }
 
-    await this.usersService.resetFailedAttempt(user.id);
+    await this.usersService.resetFailedAttempt(String(user.id));
     return user;
   }
 
   //5. LOGIN
-  private async generateAccessToken(user: any) {
+  private async generateAccessToken(user: UserDocument) {
     const payload = {
-      sub: user._id,
+      sub: user._id.toString(),
       email: user.email,
       roles: user.roles,
-      token_version: user.token_version || 0,
+      token_version: user.token_version ?? 0,
     };
-    return this.jwtService.signAsync(payload, {
+
+    const options: JwtSignOptions = {
       secret: this.configService.get<string>('JWT_SECRET'),
-      expiresIn: (this.configService.get<string>('JWT_EXPIRES_IN') ||
-        '1h') as any,
-    });
+      expiresIn: (this.configService.get<string>('JWT_EXPIRES_IN') ??
+        '1h') as JwtSignOptions['expiresIn'],
+    };
+
+    return this.jwtService.signAsync(payload, options);
   }
 
   private async generateRefreshToken(
-    user: any,
+    user: UserDocument,
     isRemember: boolean,
   ): Promise<string> {
     const payload = {
-      sub: user._id,
+      sub: user._id.toString(),
       email: user.email,
       roles: user.roles,
-      token_version: user.token_version || 0,
+      token_version: user.token_version ?? 0,
     };
+
     if (user.status !== UserStatus.ACTIVE) {
       throw new ForbiddenException('Tài khoản của bạn đã bị khóa.');
     }
+
     const expiresIn = isRemember ? '30d' : '1d';
+
     return this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-      expiresIn: expiresIn as any,
+      expiresIn: expiresIn as JwtSignOptions['expiresIn'],
     });
   }
 
   async login(
-    user: any,
+    user: UserDocument,
     isRemember: boolean = false,
     ip: string,
     userAgent: string,
@@ -463,13 +479,21 @@ export class AuthService {
       { $set: { refresh_token: hashed } },
     );
 
-    this.auditLogsService.log({
+    let employeeCode: string | undefined = undefined;
+
+    if ('employee_code' in user) {
+      // Ép kiểu user sang Staff để lấy employee_code mà không bị Eslint báo lỗi
+      const staffUser = user as unknown as Staff;
+      employeeCode = staffUser.employee_code;
+    }
+
+    await this.auditLogsService.log({
       action: 'LOGIN',
       collection_name: 'users',
-      actor_id: user._id,
+      actor_id: user._id.toString(),
       actor_email: user.email,
-      actor_employee_code: user.employee_code || undefined,
-      target_id: user._id,
+      actor_employee_code: employeeCode,
+      target_id: user._id.toString(),
       department: Department.SUPPORT,
       detail: {
         roles: user.roles,
@@ -486,7 +510,7 @@ export class AuthService {
       user: {
         _id: user._id,
         email: user.email,
-        full_name: user.full_name,
+        full_name: user.fullName,
         roles: user.roles,
         avatar: user.avatar,
       },
@@ -496,18 +520,24 @@ export class AuthService {
   async refreshTokens(refreshToken: string) {
     if (!refreshToken) throw new BadRequestException('Thiếu refresh token');
 
-    let decoded;
+    // 1. Định nghĩa kiểu cho decoded để tránh lỗi 'unsafe member access'
+    let decoded: { sub: string };
+
     try {
+      // Ép kiểu kết quả trả về
       decoded = await this.jwtService.verifyAsync(refreshToken, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       });
-    } catch (e) {
+    } catch {
+      // 2. Bỏ '(e)' nếu không dùng biến lỗi để tránh lỗi 'unused-vars'
       throw new UnauthorizedException(
         'Refresh token không hợp lệ hoặc hết hạn',
       );
     }
 
-    const user = await this.userModel.findById(decoded.sub);
+    // 3. Ép kiểu UserDocument để đảm bảo biến user có đầy đủ thuộc tính (_id, refresh_token...)
+    const user = (await this.userModel.findById(decoded.sub)) as UserDocument;
+
     if (!user) throw new NotFoundException('User không tồn tại');
 
     if (!user.refresh_token) {
@@ -517,8 +547,10 @@ export class AuthService {
     const isValid = await bcrypt.compare(refreshToken, user.refresh_token);
     if (!isValid) throw new UnauthorizedException('Refresh token không khớp');
 
+    // Lúc này 'user' đã chuẩn kiểu UserDocument, truyền vào không bị lỗi nữa
     const newAccessToken = await this.generateAccessToken(user);
     const newRefreshToken = await this.generateRefreshToken(user, false);
+
     const newHash = await bcrypt.hash(newRefreshToken, 10);
 
     await this.userModel.updateOne(
@@ -554,20 +586,31 @@ export class AuthService {
   }
 
   //PRIVATE HELPER: Xử lý Brute-force
-  private async handleLoginFail(user: any, ip: string, userAgent: string) {
+  private async handleLoginFail(
+    user: UserDocument,
+    ip: string,
+    userAgent: string,
+  ) {
     const MAX_ATTEMPTS = 5;
     const LOCK_TIME_MINUTES = 30;
 
+    // Tăng số lần thử (Đã có trong schema nên không lỗi)
     user.login_attempts += 1;
 
-    //Ghi log mỗi lần đăng nhập sai
+    // Xử lý lấy employee_code an toàn (Dùng Type Guard)
+    const employeeCode =
+      'employee_code' in user
+        ? (user as unknown as Staff).employee_code
+        : undefined;
+
+    // Ghi log mỗi lần đăng nhập sai
     await this.auditLogsService.log({
       action: 'LOGIN_FAILED',
       collection_name: 'users',
-      actor_id: user._id,
+      actor_id: user._id.toString(),
       actor_email: user.email,
-      actor_employee_code: user.employee_code,
-      target_id: user._id,
+      actor_employee_code: employeeCode,
+      target_id: user._id.toString(),
       department: Department.SUPPORT,
       detail: {
         reason: 'Wrong Password',
@@ -579,15 +622,18 @@ export class AuthService {
     });
 
     if (user.login_attempts >= MAX_ATTEMPTS) {
+      // Thiết lập thời gian khóa
       user.lock_until = new Date(Date.now() + LOCK_TIME_MINUTES * 60 * 1000);
+
+      // Lỗi 583: Promises must be awaited
       await user.save();
 
       // Log Account Locked
       await this.auditLogsService.log({
         action: 'ACCOUNT_LOCKED',
         collection_name: 'users',
-        actor_id: user._id,
-        target_id: user._id,
+        actor_id: user._id.toString(),
+        target_id: user._id.toString(),
         department: Department.SUPPORT,
         detail: {
           reason: 'Brute-force attempts',
@@ -600,13 +646,14 @@ export class AuthService {
       throw new BadRequestException(
         `Bạn đã nhập sai quá ${MAX_ATTEMPTS} lần. Tài khoản bị khóa ${LOCK_TIME_MINUTES} phút.`,
       );
-    } else {
-      await user.save();
     }
+
+    // Lỗi 604: Promises must be awaited
+    await user.save();
   }
   // 6. XỬ LÝ LOGIN OAUTH
   async validateOAuthLogin(
-    profile: any,
+    profile: OAuthProfile,
     provider: 'google' | 'facebook',
     ip: string,
     userAgent: string,
@@ -622,17 +669,18 @@ export class AuthService {
         'Không thể đăng nhập vì tài khoản mạng xã hội không cung cấp Email.',
       );
 
-    let finalName = displayName;
-    if (!finalName || finalName === 'undefined undefined') {
-      finalName = name;
-    }
+    // Logic xử lý Name
+    let finalName: string = displayName ?? '';
+    if (!finalName || finalName === 'undefined undefined')
+      finalName = name ?? '';
+
     if (
       !finalName ||
       finalName.trim() === '' ||
       finalName === 'undefined undefined'
     ) {
-      const f = firstName || '';
-      const l = lastName || '';
+      const f = firstName ?? '';
+      const l = lastName ?? '';
       if (f || l) finalName = `${f} ${l}`.trim();
     }
     if (
@@ -643,8 +691,8 @@ export class AuthService {
       finalName = email.split('@')[0];
     }
 
-    const querySocial = {};
-    querySocial[`social_auth.${provider}_id`] = id;
+    // Truy vấn Social User
+    const querySocial = { [`social_auth.${provider}_id`]: id };
     const existingSocialUser = await this.userModel.findOne(querySocial);
 
     if (existingSocialUser) {
@@ -652,23 +700,28 @@ export class AuthService {
       return this.login(existingSocialUser, false, ip, userAgent);
     }
 
-    const existingEmailUser = await this.userModel.findOne({ email });
+    // Truy vấn Email User
+    const existingEmailUser = await this.userModel.findOne({
+      email,
+    });
 
     if (existingEmailUser) {
       this.checkUserBanStatus(existingEmailUser);
-      const updateData = {};
-      updateData[`social_auth.${provider}_id`] = id;
+      const updateData = { [`social_auth.${provider}_id`]: id };
 
       await this.userModel.updateOne(
         { _id: existingEmailUser._id },
         { $set: updateData },
       );
 
-      const updatedUser = await this.userModel.findById(existingEmailUser._id);
+      const updatedUser = (await this.userModel.findById(
+        existingEmailUser._id,
+      )) as UserDocument;
       return this.login(updatedUser, false, ip, userAgent);
     }
 
-    const socialPhone = profile.phone || profile.phoneNumber;
+    // Kiểm tra số điện thoại xung đột
+    const socialPhone = profile.phone ?? profile.phoneNumber;
     if (socialPhone) {
       const existingPhoneUser = await this.userModel.findOne({
         phone: socialPhone,
@@ -684,11 +737,12 @@ export class AuthService {
       }
     }
 
+    // Transaction xử lý tạo mới User
     const session = await this.connection.startSession();
     session.startTransaction();
     try {
-      let saveFirstName = firstName;
-      let saveLastName = lastName;
+      let saveFirstName = firstName ?? '';
+      let saveLastName = lastName ?? '';
 
       if (!saveFirstName || !saveLastName) {
         const nameParts = finalName.trim().split(' ');
@@ -696,35 +750,31 @@ export class AuthService {
           saveFirstName = nameParts[0];
           saveLastName = nameParts[0];
         } else {
-          saveFirstName = nameParts.pop();
+          saveFirstName = nameParts.pop() as string;
           saveLastName = nameParts.join(' ');
         }
       }
 
       const newUser = new this.customerModel({
         email: email,
-        full_name: finalName,
         first_Name: saveFirstName,
         last_Name: saveLastName,
-        phone: null,
-        is_active: true,
-        status: UserStatus.ACTIVE, // [FIX] Set Active
+        phone: undefined,
+        status: UserStatus.ACTIVE,
         roles: ['CUSTOMER'],
         type: 'Customer',
-        social_auth: { [provider + '_id']: id },
+        social_auth: { [`${provider}_id`]: id },
         password: null,
       });
 
-      if (!newUser.phone) newUser.set('phone', undefined);
-
       await newUser.save({ session });
 
-      this.auditLogsService.log({
+      await this.auditLogsService.log({
         action: 'REGISTER_OAUTH',
         collection_name: 'users',
-        actor_id: newUser._id,
+        actor_id: newUser._id.toString(),
         actor_email: newUser.email,
-        target_id: newUser._id,
+        target_id: newUser._id.toString(),
         department: Department.SUPPORT,
         detail: { provider: provider, email: email },
         ip: ip,
@@ -732,18 +782,23 @@ export class AuthService {
       });
 
       await session.commitTransaction();
-      return this.login(newUser, false, ip, userAgent);
+      return this.login(
+        newUser as unknown as UserDocument,
+        false,
+        ip,
+        userAgent,
+      );
     } catch (error) {
       await session.abortTransaction();
       throw error;
     } finally {
-      session.endSession();
+      await session.endSession();
     }
   }
 
-  private checkUserBanStatus(user: any) {
+  private checkUserBanStatus(user: UserDocument) {
     if (user.lock_until && user.lock_until > new Date()) {
-      throw new BadRequestException('Tài khoản đang bị tạm khóa (AC4).');
+      throw new BadRequestException('Tài khoản đang bị tạm khóa.');
     }
     if (user.status !== UserStatus.ACTIVE) {
       throw new UnauthorizedException('Tài khoản đã bị vô hiệu hóa.');
@@ -776,16 +831,22 @@ export class AuthService {
     requestId: string,
     dto: ProcessRecoveryDto,
     actorId: string,
-    ip: string = 'Unknown',
-    userAgent: string = 'Unknown',
+    ip: string,
+    userAgent: string,
   ) {
+    // 1. Ép kiểu Document cho request
     const request = await this.recoveryModel.findById(requestId);
     if (!request) throw new NotFoundException('Yêu cầu không tồn tại');
     if (request.status !== 'PENDING')
       throw new BadRequestException('Yêu cầu này đã được xử lý trước đó.');
 
+    // 2. Lấy thông tin Admin an toàn (Không dùng any)
     const adminUser = await this.userModel.findById(actorId);
-    const adminCode = (adminUser as any)?.employee_code;
+    let adminCode: string | undefined = undefined;
+
+    if (adminUser && 'employee_code' in adminUser) {
+      adminCode = (adminUser as unknown as Staff).employee_code;
+    }
     const adminEmail = adminUser?.email;
 
     let responseMessage = '';
@@ -797,10 +858,12 @@ export class AuthService {
 
       request.status = 'REJECTED';
       request.rejection_reason = dto.rejection_reason;
-      request.processed_by = actorId as any;
+      // Tránh dùng 'as any', dùng cast sang unknown rồi sang Types.ObjectId nếu cần
+      request.set('processed_by', new Types.ObjectId(actorId));
       request.processed_at = new Date();
       await request.save();
 
+      // 3. PHẢI AWAIT hàm gửi mail
       await this.emailService.sendRaw(
         request.contact_email,
         '[H&N Odyssey] Phản hồi yêu cầu khôi phục',
@@ -825,20 +888,23 @@ export class AuthService {
       const resetToken = this.generateRandomString(32);
       const expiredAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
+      // 4. Await khi tạo Verification
       await this.verificationModel.create({
         account: request.contact_email,
         code: resetToken,
         type: 'ADMIN_RESET_PASSWORD',
         expired_at: expiredAt,
-        linked_user_id: { userId: user._id },
+        linked_user_id: { userId: user._id.toString() }, // Chuyển sang string
       });
 
       request.status = 'APPROVED';
-      request.processed_by = actorId as any;
+      request.set('processed_by', new Types.ObjectId(actorId));
       request.processed_at = new Date();
       await request.save();
 
       const link = `https://hn-odyssey.com/recovery-reset?token=${resetToken}&email=${request.contact_email}`;
+
+      // 5. PHẢI AWAIT gửi mail link reset
       await this.emailService.sendResetPasswordLink(
         request.contact_email,
         link,
@@ -849,8 +915,9 @@ export class AuthService {
       actionType = 'APPROVE_RECOVERY_REQUEST';
     }
 
+    // 6. PHẢI AWAIT ghi Audit Log
     if (actionType) {
-      this.auditLogsService.log({
+      await this.auditLogsService.log({
         action: actionType,
         collection_name: 'recovery_requests',
         actor_id: actorId,
@@ -860,7 +927,7 @@ export class AuthService {
         department: Department.SUPPORT,
         detail: {
           target_account: request.target_account,
-          reason: dto.rejection_reason || 'Approved',
+          reason: dto.rejection_reason ?? 'Approved',
         },
         ip: ip,
         user_agent: userAgent,
@@ -881,7 +948,7 @@ export class AuthService {
     if (!account.includes('@')) {
       account = this.normalizePhoneNumber(account);
     }
-    this.auditLogsService.log({
+    await this.auditLogsService.log({
       action: 'FORGOT_PASSWORD_REQUEST',
       collection_name: 'users',
       actor_id: null,
@@ -970,7 +1037,7 @@ export class AuthService {
     await user.save();
     await verifyRecord.deleteOne();
 
-    this.auditLogsService.log({
+    await this.auditLogsService.log({
       action: 'RESET_PASSWORD_SUCCESS',
       collection_name: 'users',
       actor_id: user._id,
@@ -994,18 +1061,24 @@ export class AuthService {
       throw new BadRequestException('Mật khẩu xác nhận không khớp.');
     }
 
-    const verifyRecord = await this.verificationModel.findOne({
+    // 2. Ép kiểu kết quả trả về từ query
+    const verifyRecord = (await this.verificationModel.findOne({
       account: dto.account,
       code: dto.code,
       type: 'ADMIN_RESET_PASSWORD',
-    });
+    })) as unknown as IVerificationRecord | null;
 
     if (!verifyRecord)
       throw new BadRequestException('Liên kết khôi phục không hợp lệ.');
+
     if (verifyRecord.expired_at < new Date())
       throw new BadRequestException('Liên kết đã hết hạn.');
 
-    const userId = verifyRecord.linked_user_id?.['userId'];
+    // 3. Truy cập an toàn thông qua dấu chấm
+    const userId = verifyRecord.linked_user_id?.userId;
+    if (!userId)
+      throw new BadRequestException('Dữ liệu xác thực không hợp lệ.');
+
     const user = await this.userModel.findById(userId);
 
     if (!user) throw new NotFoundException('Tài khoản gốc không tồn tại.');
@@ -1026,14 +1099,18 @@ export class AuthService {
     await user.save();
     await verifyRecord.deleteOne();
 
-    this.auditLogsService.log({
+    // 4. Await log
+    await this.auditLogsService.log({
       action: 'ACCOUNT_RECOVERY_SUCCESS',
       collection_name: 'users',
-      actor_id: user._id,
+      actor_id: user._id.toString(),
       actor_email: user.email,
-      target_id: user._id,
+      target_id: user._id.toString(),
       department: Department.SUPPORT,
-      detail: { old_email: verifyRecord.account, new_email: dto.newEmail },
+      detail: {
+        old_email: verifyRecord.account,
+        new_email: dto.newEmail,
+      },
       ip: ip,
       user_agent: userAgent,
     });

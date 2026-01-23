@@ -16,6 +16,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { VerifyOtpDto } from './dto/verify.dto';
@@ -38,7 +39,11 @@ import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
-import type { IUser } from 'src/common/interfaces/user.interface';
+import type {
+  IUser,
+  RequestWithUser,
+} from 'src/common/interfaces/user.interface';
+import { OAuthProfile } from 'src/common/interfaces/OAuthProfile';
 
 @ApiTags('Auth (Xác thực)')
 @Controller('auth')
@@ -63,7 +68,7 @@ export class AuthController {
   //2. XÁC THỰC OTP (AC13)
   @Post('verify-otp')
   @Public()
-  @HttpCode(HttpStatus.OK) // Trả về 200 thay vì 201 mặc định
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Xác thực OTP để kích hoạt tài khoản' })
   @ApiResponse({
     status: 200,
@@ -75,8 +80,7 @@ export class AuthController {
     @Ip() ip: string,
     @UserAgent() userAgent: string,
   ) {
-    // Truyền ip và userAgent xuống Service
-    return this.authService.verifyOtp(dto, ip as string, userAgent);
+    return this.authService.verifyOtp(dto, ip, userAgent);
   }
 
   //3. GỬI LẠI OTP (AC12)
@@ -90,8 +94,7 @@ export class AuthController {
 
   //4. ĐĂNG NHẬP (US.02)
   @Post('login')
-  @Public() // Login thì không cần Token
-  // Ở đây gọi service trực tiếp để dễ debug logic Brute-force.
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng nhập hệ thống (AC1 -> AC14)' })
   @ApiResponse({
@@ -107,15 +110,12 @@ export class AuthController {
     @Ip() ip: string,
     @UserAgent() userAgent: string,
   ) {
-    // 1. Validate User (Check pass, status, brute-force)
     const user = await this.authService.validateUser(
       dto.account,
       dto.password,
       ip,
       userAgent,
     );
-
-    // 2. Generate Token (AC6, AC14)
     return this.authService.login(user, dto.rememberMe || false, ip, userAgent);
   }
 
@@ -123,32 +123,26 @@ export class AuthController {
   @Get('google')
   @Public()
   @UseGuards(AuthGuard('google'))
-  async googleAuth(@Req() req: any) {}
+  async googleAuth() {} // Xóa req để fix lỗi unused var
 
   @Get('google/callback')
   @Public()
-  @UseGuards(AuthGuard('google')) // AC5: Nếu cancel, Guard sẽ tự xử lý hoặc throw Unauthorized
-  async googleAuthRedirect(@Req() req: any, @Res() res: any) {
+  @UseGuards(AuthGuard('google'))
+  async googleAuthRedirect(@Req() req: RequestWithUser, @Res() res: Response) {
     try {
-      const ip =
+      const ip = (
         req.headers['x-forwarded-for'] ||
-        req.socket?.remoteAddress ||
-        'Unknown';
-      const userAgent = req.headers['user-agent'] || 'Unknown';
-      // Gọi Service xử lý logic AC2 -> AC10
+        req.socket.remoteAddress ||
+        'Unknown'
+      ).toString();
+      const userAgent = (req.headers['user-agent'] || 'Unknown').toString();
+
       const result = await this.authService.validateOAuthLogin(
-        req.user,
+        req.user as unknown as OAuthProfile,
         'google',
-        ip as string,
+        ip,
         userAgent,
       );
-
-      // AC7: Redirect về Frontend kèm Token
-      // Lưu ý: Không nên trả json trực tiếp vì đây là redirect từ browser
-      // Cách an toàn: Redirect về trang xử lý login của FE kèm token trên URL (hoặc set cookie)
-      /*res.redirect(
-        `${process.env.FRONTEND_URL}/auth/callback?token=${result.access_token}`,
-      );*/
 
       return res.json({
         message: 'Login Google thành công!',
@@ -156,9 +150,9 @@ export class AuthController {
         accessToken: result.access_token,
       });
     } catch (error) {
-      // AC6: Xử lý lỗi kết nối hoặc logic (AC9, AC4)
-      const message = encodeURIComponent(error.message);
-      res.redirect(`${process.env.FRONTEND_URL}/login?error=${message}`);
+      const err = error as Error;
+      const message = encodeURIComponent(err.message);
+      return res.redirect(`${process.env.FRONTEND_URL}/login?error=${message}`);
     }
   }
 
@@ -166,22 +160,27 @@ export class AuthController {
   @Get('facebook')
   @Public()
   @UseGuards(AuthGuard('facebook'))
-  async facebookAuth(@Req() req: any) {}
+  async facebookAuth() {}
 
   @Get('facebook/callback')
   @Public()
   @UseGuards(AuthGuard('facebook'))
-  async facebookAuthRedirect(@Req() req: any, @Res() res: any) {
+  async facebookAuthRedirect(
+    @Req() req: RequestWithUser,
+    @Res() res: Response,
+  ) {
     try {
-      const ip =
+      const ip = (
         req.headers['x-forwarded-for'] ||
-        req.socket?.remoteAddress ||
-        'Unknown';
-      const userAgent = req.headers['user-agent'] || 'Unknown';
+        req.socket.remoteAddress ||
+        'Unknown'
+      ).toString();
+      const userAgent = (req.headers['user-agent'] || 'Unknown').toString();
+
       const result = await this.authService.validateOAuthLogin(
-        req.user,
+        req.user as unknown as OAuthProfile,
         'facebook',
-        ip as string,
+        ip,
         userAgent,
       );
 
@@ -190,18 +189,14 @@ export class AuthController {
         user: req.user,
         accessToken: result.access_token,
       });
-
-      /*res.redirect(
-        `${process.env.FRONTEND_URL}/auth/callback?token=${result.access_token}`,
-      );*/
     } catch (error) {
-      const message = encodeURIComponent(error.message);
-      res.redirect(`${process.env.FRONTEND_URL}/login?error=${message}`);
+      const err = error as Error;
+      const message = encodeURIComponent(err.message);
+      return res.redirect(`${process.env.FRONTEND_URL}/login?error=${message}`);
     }
   }
 
   //7. GỬI YÊU CẦU KHÔI PHỤC (Public)
-  //AC1, AC2: Upload ảnh
   @Post('recovery-request')
   @Public()
   @UseInterceptors(FilesInterceptor('images', 3))
@@ -209,13 +204,12 @@ export class AuthController {
   async requestRecovery(
     @Body() dto: CreateRecoveryDto,
     @UploadedFiles(
-      //Validate trực tiếp tại Controller
       new ParseFilePipeBuilder()
         .addFileTypeValidator({
-          fileType: /(jpg|jpeg|png)$/, // Chỉ cho phép ảnh
+          fileType: /(jpg|jpeg|png)$/,
         })
         .addMaxSizeValidator({
-          maxSize: 1024 * 1024 * 5, // Tối đa 5MB (AC2)
+          maxSize: 1024 * 1024 * 5,
         })
         .build({
           errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -223,7 +217,6 @@ export class AuthController {
     )
     files: Array<Express.Multer.File>,
   ) {
-    // Logic giả lập lưu file
     const filePaths = files.map((f) => `uploads/${f.originalname}`);
     return this.authService.requestRecovery(dto, filePaths);
   }
@@ -250,15 +243,11 @@ export class AuthController {
     return this.authService.processRecovery(id, dto, user._id, ip, userAgent);
   }
 
-  //10. REFRESH TOKEN — LẤY ACCESS TOKEN MỚI (PUBLIC  )
+  //10. REFRESH TOKEN
   @Post('refresh')
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Lấy Access Token mới bằng Refresh Token' })
-  @ApiResponse({
-    status: 200,
-    description: 'Trả về Access Token mới và Refresh Token mới (Rotation).',
-  })
   async refreshToken(@Body('refresh_token') refreshToken: string) {
     if (!refreshToken) {
       throw new BadRequestException('Thiếu refresh_token trong body.');
@@ -266,9 +255,9 @@ export class AuthController {
     return this.authService.refreshTokens(refreshToken);
   }
 
-  //12. QUÊN MẬT KHẨU (AC1 -> AC3)
+  //12. QUÊN MẬT KHẨU
   @Post('forgot-password')
-  @Public() // Khách chưa login mới dùng được
+  @Public()
   @ApiOperation({ summary: 'Yêu cầu OTP/Link để reset mật khẩu' })
   async forgotPassword(
     @Body() dto: ForgotPasswordDto,
@@ -278,7 +267,7 @@ export class AuthController {
     return this.authService.forgotPassword(dto.account, ip, userAgent);
   }
 
-  //12. ĐẶT LẠI MẬT KHẨU (AC5)
+  //12. ĐẶT LẠI MẬT KHẨU
   @Post('reset-password')
   @Public()
   @ApiOperation({ summary: 'Submit mật khẩu mới kèm OTP/Token' })
@@ -290,7 +279,7 @@ export class AuthController {
     return this.authService.resetPassword(dto, ip, userAgent);
   }
 
-  //13. KHÔI PHỤC TÀI KHOẢN (Cho link Admin cấp)
+  //13. KHÔI PHỤC TÀI KHOẢN
   @Post('recover-account')
   @Public()
   @ApiOperation({ summary: 'Submit mật khẩu và email mới (Link từ Admin)' })
@@ -299,19 +288,13 @@ export class AuthController {
     @Ip() ip: string,
     @UserAgent() userAgent: string,
   ) {
-    // DTO này bắt buộc có newEmail
     return this.authService.recoverAccount(dto, ip, userAgent);
   }
 
-  //14. ĐĂNG XUẤT (US.02 - AC14, US.06 - AC10)
+  //14. ĐĂNG XUẤT
   @Post('logout')
-  // Không dùng @Public() -> Mặc định dùng JwtAuthGuard để chặn guest
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng xuất (Xóa Refresh Token)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Đăng xuất thành công, Refresh Token đã bị hủy.',
-  })
   async logout(
     @CurrentUser() user: IUser,
     @Ip() ip: string,

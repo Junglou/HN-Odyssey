@@ -8,7 +8,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-class ShippingInfoDto {
+export class ShippingInfoDto {
   @IsNotEmpty() name: string;
   @IsNotEmpty() phone: string;
   @IsNotEmpty() address: string;

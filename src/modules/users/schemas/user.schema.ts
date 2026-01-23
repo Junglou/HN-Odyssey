@@ -9,6 +9,11 @@ import { UserStatus } from 'src/common/enums/user-status.enum';
   toJSON: { virtuals: true },
 })
 export class User {
+  @Prop({ default: null })
+  avatar: string;
+
+  readonly fullName: string;
+
   @Prop({ required: true, unique: true, index: true })
   email: string;
 
@@ -23,8 +28,6 @@ export class User {
 
   @Prop({ required: true })
   last_Name: string;
-
-  fullName: string;
 
   @Prop({ type: Object, default: {} })
   social_auth: {

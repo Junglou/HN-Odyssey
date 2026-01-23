@@ -13,7 +13,8 @@ import { NotificationsModule } from 'src/modules/notifications/notifications.mod
 import { PdfService } from './pdf.service';
 import { OrdersCronService } from './orders.cron';
 import { JwtModule } from '@nestjs/jwt';
-import { PromotionsModule } from 'src/modules/marketing/promotions/promotions.module';
+import { StockModule } from 'src/modules/inventory/stock/stock.module';
+import { MarketingModule } from 'src/modules/marketing/marketing.module';
 
 @Module({
   imports: [
@@ -24,7 +25,8 @@ import { PromotionsModule } from 'src/modules/marketing/promotions/promotions.mo
     ]),
     AuditLogsModule,
     NotificationsModule,
-    PromotionsModule,
+    MarketingModule,
+    StockModule,
     JwtModule.register({}),
   ],
   controllers: [OrdersController],

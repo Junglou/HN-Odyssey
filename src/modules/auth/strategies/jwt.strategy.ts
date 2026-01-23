@@ -5,8 +5,16 @@ import { ConfigService } from '@nestjs/config';
 import { User } from 'src/modules/users/schemas/user.schema';
 import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
-// Đảm bảo import đúng đường dẫn Enum UserStatus
 import { UserStatus } from 'src/common/enums/user-status.enum';
+
+// 1. Định nghĩa Interface cho Payload
+interface JwtPayload {
+  sub: string;
+  email: string;
+  token_version?: number;
+  iat?: number;
+  exp?: number;
+}
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -25,23 +33,21 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: any) {
-    // 1. SỬA LỖI: Thay 'is_active' bằng 'status' trong câu lệnh select
+  // 2. Thay 'payload: any' bằng 'payload: JwtPayload'
+  async validate(payload: JwtPayload) {
     const user = await this.userModel
       .findById(payload.sub)
-      .select('status roles email token_version'); // Lấy trường status
+      .select('status roles email token_version');
 
     if (!user) {
       throw new UnauthorizedException('Tài khoản không tồn tại.');
     }
 
-    // 2. SỬA LỖI: Kiểm tra theo Enum UserStatus thay vì boolean is_active
     if (user.status !== UserStatus.ACTIVE) {
       throw new UnauthorizedException(
         'Tài khoản của bạn không có quyền thực hiện. Vui lòng liên hệ Admin.',
       );
     }
-
     const payloadVersion = payload.token_version || 0;
     const dbVersion = user.token_version || 0;
 
@@ -51,11 +57,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       );
     }
 
-    // 3. Return Roles lấy từ DB để đảm bảo tính mới nhất
+    // payload.sub và payload.email truy cập an toàn
     return {
       _id: payload.sub,
       email: payload.email,
-      roles: user.roles, // Mảng string ['SUPER_ADMIN', 'CUSTOMER']
+      roles: user.roles,
     };
   }
 }

@@ -1,5 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, HydratedDocument, Types } from 'mongoose';
+
+export type OrderDocument = HydratedDocument<Order>;
 
 class OrderItem {
   @Prop({ type: Types.ObjectId, ref: 'Product' }) product_id: Types.ObjectId;

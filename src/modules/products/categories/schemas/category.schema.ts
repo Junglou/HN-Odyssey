@@ -33,7 +33,7 @@ export class Category {
   slug: string;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Category', default: null })
-  parent_id: Types.ObjectId; 
+  parent_id: Types.ObjectId;
 
   @Prop({ type: [Ancestor], default: [] })
   ancestors: Ancestor[];

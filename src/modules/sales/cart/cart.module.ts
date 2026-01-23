@@ -14,13 +14,13 @@ import { PromotionsModule } from 'src/modules/marketing/promotions/promotions.mo
   imports: [
     MongooseModule.forFeature([
       { name: Cart.name, schema: CartSchema },
-      { name: Product.name, schema: ProductSchema }, 
+      { name: Product.name, schema: ProductSchema },
     ]),
     AuditLogsModule,
     PromotionsModule,
   ],
   controllers: [CartController],
   providers: [CartService],
-  exports: [CartService, MongooseModule], 
+  exports: [CartService, MongooseModule],
 })
 export class CartModule {}

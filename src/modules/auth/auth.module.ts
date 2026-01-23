@@ -34,7 +34,7 @@ import { Role, RoleSchema } from '../users/roles/schemas/role.schema';
     ]), // 2. Cấu hình JWT (Token) sử dụng registerAsync
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
+      useFactory: (configService: ConfigService) => ({
         global: true,
         secret: configService.get<string>('JWT_SECRET'),
         signOptions: { expiresIn: '1h' },

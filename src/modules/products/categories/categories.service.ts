@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { FilterQuery, Model, Types } from 'mongoose';
 import { AnyBulkWriteOperation } from 'mongodb';
 import {
   Category,
@@ -20,6 +20,17 @@ import sanitizeHtml from 'sanitize-html';
 import { Product, ProductDocument } from '../catalog/schemas/product.schema';
 import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
 import { Department } from 'src/common/enums/department.enum';
+import { CategoryTree } from 'src/common/interfaces/CategoryTree';
+
+export interface RawCategory {
+  _id: Types.ObjectId;
+  parent_id: Types.ObjectId | string | null;
+  name: string;
+  slug: string;
+  display_order?: number;
+  is_active: boolean;
+  image?: string;
+}
 
 @Injectable()
 export class CategoriesService {
@@ -45,12 +56,26 @@ export class CategoriesService {
     });
   }
 
-  private buildTree(categories: any[], parentId: string | null = null): any[] {
+  private buildTree(
+    categories: RawCategory[],
+    parentId: string | null = null,
+    level = 0,
+  ): CategoryTree[] {
     return categories
-      .filter((cat) => String(cat.parent_id) === String(parentId))
+      .filter((cat) => {
+        const pid = cat.parent_id ? cat.parent_id.toString() : null;
+        return pid === parentId;
+      })
       .map((cat) => ({
-        ...cat,
-        children: this.buildTree(categories, String(cat._id)),
+        _id: cat._id.toString(),
+        name: cat.name,
+        slug: cat.slug,
+        parentId: cat.parent_id ? cat.parent_id.toString() : null,
+        level: level,
+        order: cat.display_order ?? 0,
+        is_active: cat.is_active,
+        image: cat.image,
+        children: this.buildTree(categories, cat._id.toString(), level + 1),
       }));
   }
 
@@ -158,7 +183,7 @@ export class CategoriesService {
 
     const oldData = category.toObject();
 
-    //XỬ LÝ ĐỔI TÊN & SLUG
+    // --- XỬ LÝ ĐỔI TÊN & SLUG ---
     let nameChanged = false;
     if (updateDto.name && updateDto.name !== category.name) {
       const exists = await this.categoryModel.findOne({
@@ -196,7 +221,7 @@ export class CategoriesService {
 
       if (updateDto.parent_id === null) {
         newAncestors = [];
-        category.parent_id = null as any;
+        category.parent_id = null as unknown as Types.ObjectId;
       } else {
         const newParent = await this.categoryModel.findById(
           updateDto.parent_id,
@@ -245,7 +270,7 @@ export class CategoriesService {
     Object.assign(category, updateDto);
     const savedCategory = await category.save();
 
-    // PROPAGATION UPDATES (Cập nhật dây chuyền)
+    //PROPAGATION UPDATES (Cập nhật dây chuyền)
     if (nameChanged || updateDto.slug) {
       await this.categoryModel.updateMany(
         { 'ancestors._id': id },
@@ -286,11 +311,13 @@ export class CategoriesService {
           };
         });
 
-        const validOps = bulkOps.filter((op) => op.updateOne);
+        //Ép kiểu rõ ràng cho validOps để tránh lỗi unsafe assignment
+        const validOps = bulkOps.filter(
+          (op) => op.updateOne,
+        ) as AnyBulkWriteOperation<CategoryDocument>[];
+
         if (validOps.length > 0) {
-          await this.categoryModel.bulkWrite(
-            validOps as AnyBulkWriteOperation<CategoryDocument>[],
-          );
+          await this.categoryModel.bulkWrite(validOps);
         }
       }
     }
@@ -361,8 +388,8 @@ export class CategoriesService {
     };
   }
 
-  async getTree(includeHidden = false): Promise<any[]> {
-    const filter: any = {};
+  async getTree(includeHidden = false): Promise<CategoryTree[]> {
+    const filter: FilterQuery<CategoryDocument> = {};
     if (!includeHidden) filter.is_active = true;
 
     const categories = await this.categoryModel
@@ -370,7 +397,8 @@ export class CategoriesService {
       .sort({ display_order: 1, created_at: 1 })
       .lean();
 
-    return this.buildTree(categories, null);
+    // Gọi hàm buildTree với level mặc định là 0
+    return this.buildTree(categories, null, 0);
   }
 
   // 4. CẬP NHẬT THỨ TỰ

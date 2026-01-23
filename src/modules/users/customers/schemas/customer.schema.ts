@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Schema as MongooseSchema } from 'mongoose';
-import { User } from '../../schemas/user.schema'; 
+import { User } from '../../schemas/user.schema';
 
 // Sub-document cho địa chỉ (US.10)
 @Schema({ _id: true })

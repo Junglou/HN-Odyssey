@@ -1,15 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
 import * as path from 'path';
-import * as fs from 'fs';
 import * as bwipjs from 'bwip-js';
+import { OrderData, OrderItem } from 'src/common/interfaces/oder.interface';
 
 @Injectable()
 export class PdfService {
-  async generateInvoice(order: any, isCopy: boolean = false): Promise<Buffer> {
-    let barcodeBuffer: Buffer | null = null;
+  async generateInvoice(
+    order: OrderData,
+    isCopy: boolean = false,
+  ): Promise<Buffer> {
     try {
-      barcodeBuffer = await bwipjs.toBuffer({
+      await bwipjs.toBuffer({
         bcid: 'code128',
         text: order.order_code,
         scale: 3,
@@ -17,19 +19,28 @@ export class PdfService {
         includetext: false,
         textxalign: 'center',
       });
-    } catch (err) {
-      console.warn('Không thể tạo barcode:', err.message);
+    } catch (err: unknown) {
+      // Fix lỗi unsafe access .message
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn('Không thể tạo barcode:', msg);
     }
 
-    //TẠO PDF (STREAM ĐỒNG BỘ)
+    // TẠO PDF (STREAM ĐỒNG BỘ)
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ margin: 50 });
       const buffers: Buffer[] = [];
 
       // Thu thập dữ liệu stream
-      doc.on('data', (buffer) => buffers.push(buffer));
+      doc.on('data', (buffer: Buffer) => buffers.push(buffer));
       doc.on('end', () => resolve(Buffer.concat(buffers)));
-      doc.on('error', (err) => reject(err));
+
+      doc.on('error', (err) => {
+        if (err instanceof Error) {
+          reject(err);
+        } else {
+          reject(new Error(String(err)));
+        }
+      });
 
       // Cấu hình Font
       const fontRegularPath = path.join(
@@ -48,11 +59,9 @@ export class PdfService {
 
         // 3. Set font mặc định
         doc.font('Roboto-Regular');
-      } catch (err) {
-        console.warn(
-          'Không load được font, fallback về Helvetica. Lỗi:',
-          err.message,
-        );
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn('Không load được font, fallback về Helvetica. Lỗi:', msg);
         doc.font('Helvetica');
       }
 
@@ -69,8 +78,8 @@ export class PdfService {
         doc.fillColor('black');
       }
 
-      //GENERATE CONTENT
-      this.generateHeader(doc, order);
+      // GENERATE CONTENT
+      this.generateHeader(doc);
       this.generateCustomerInformation(doc, order);
       this.generateInvoiceTable(doc, order);
       this.generateFooter(doc);
@@ -80,7 +89,7 @@ export class PdfService {
   }
 
   // Helper: Header
-  private generateHeader(doc: any, order: any) {
+  private generateHeader(doc: typeof PDFDocument) {
     doc
       .fontSize(20)
       .font('Roboto-Bold')
@@ -93,7 +102,10 @@ export class PdfService {
   }
 
   // Helper: Thông tin khách
-  private generateCustomerInformation(doc: any, order: any) {
+  private generateCustomerInformation(
+    doc: typeof PDFDocument,
+    order: OrderData,
+  ) {
     const shipping = order.shipping_info;
 
     doc.fillColor('#444444').fontSize(20).text('HÓA ĐƠN BÁN HÀNG', 50, 160);
@@ -137,9 +149,8 @@ export class PdfService {
     this.generateHr(doc, 252);
   }
 
-  // Helper: Bảng sản phẩm (ĐÃ SỬA LOGIC DYNAMIC HEIGHT)
-  private generateInvoiceTable(doc: any, order: any) {
-    let i;
+  // Helper: Bảng sản phẩm
+  private generateInvoiceTable(doc: typeof PDFDocument, order: OrderData) {
     const invoiceTableTop = 330;
 
     // Header bảng
@@ -158,8 +169,8 @@ export class PdfService {
 
     let position = invoiceTableTop + 30; // Vị trí bắt đầu in items
 
-    for (i = 0; i < order.items.length; i++) {
-      const item = order.items[i];
+    for (let i = 0; i < order.items.length; i++) {
+      const item: OrderItem = order.items[i];
       const nameColWidth = 170; // Độ rộng cột Tên sản phẩm
 
       // 1. Tính toán chiều cao thực tế của tên sản phẩm
@@ -175,7 +186,6 @@ export class PdfService {
       if (position + rowHeight > 700) {
         doc.addPage();
         position = 50; // Reset về đầu trang mới
-        // (Optional: In lại header bảng ở đây nếu muốn)
       }
 
       this.generateTableRow(
@@ -186,7 +196,7 @@ export class PdfService {
         this.formatCurrency(item.price),
         item.quantity.toString(),
         this.formatCurrency(item.price * item.quantity),
-        nameColWidth, // Truyền width vào để hàm con biết đường xuống dòng
+        nameColWidth,
       );
 
       this.generateHr(doc, position + rowHeight + 10);
@@ -195,7 +205,7 @@ export class PdfService {
       position += rowHeight + 20;
     }
 
-    // Tổng kết (In ngay dưới dòng cuối cùng)
+    // Tổng kết
     const subtotalPosition = position + 20;
 
     doc.font('Roboto-Bold');
@@ -233,7 +243,7 @@ export class PdfService {
   }
 
   // Helper: Footer
-  private generateFooter(doc: any) {
+  private generateFooter(doc: typeof PDFDocument) {
     doc
       .fontSize(10)
       .text('Cảm ơn quý khách đã mua hàng tại H&N Odyssey.', 50, 700, {
@@ -243,7 +253,7 @@ export class PdfService {
   }
 
   // Utils: Vẽ dòng kẻ
-  private generateHr(doc: any, y: number) {
+  private generateHr(doc: typeof PDFDocument, y: number) {
     doc
       .strokeColor('#aaaaaa')
       .lineWidth(1)
@@ -254,19 +264,18 @@ export class PdfService {
 
   // Utils: Vẽ một dòng trong bảng
   private generateTableRow(
-    doc: any,
+    doc: typeof PDFDocument,
     y: number,
     c1: string,
     c2: string,
     c3: string,
     c4: string,
     c5: string,
-    c2Width: number = 170, // Thêm tham số width cho cột 2
+    c2Width: number = 170,
   ) {
     doc
       .fontSize(10)
       .text(c1, 50, y)
-      // Cột tên sản phẩm: Có width và align để tự xuống dòng
       .text(c2, 100, y, { width: c2Width, align: 'left' })
       .text(c3, 280, y, { width: 90, align: 'right' })
       .text(c4, 370, y, { width: 90, align: 'right' })

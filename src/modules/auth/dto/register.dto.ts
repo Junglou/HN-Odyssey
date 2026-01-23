@@ -48,9 +48,13 @@ export class RegisterDto {
   @ApiProperty({ example: 'Pass@1234', description: 'Mật khẩu mạnh (AC2)' })
   @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
   @MinLength(8, { message: 'Mật khẩu phải có ít nhất 8 ký tự' })
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/, {
-    message: 'Mật khẩu phải bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt',
-  })
+  @Matches(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
+    {
+      message:
+        'Mật khẩu phải bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt',
+    },
+  )
   password: string;
 
   @ApiProperty({ example: 'Pass@1234', description: 'Nhập lại mật khẩu (AC2)' })

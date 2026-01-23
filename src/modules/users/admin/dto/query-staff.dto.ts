@@ -1,12 +1,5 @@
 import { Type } from 'class-transformer';
-import {
-  IsOptional,
-  IsString,
-  IsNumberString,
-  IsEnum,
-  IsInt,
-  Min,
-} from 'class-validator';
+import { IsOptional, IsString, IsEnum, IsInt, Min } from 'class-validator';
 
 export class QueryStaffDto {
   @IsOptional()

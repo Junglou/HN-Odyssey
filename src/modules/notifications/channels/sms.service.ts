@@ -8,8 +8,8 @@ export class SmsService {
   private logger = new Logger(SmsService.name);
 
   constructor(private configService: ConfigService) {
-    const accountSid = this.configService.get('TWILIO_ACCOUNT_SID');
-    const authToken = this.configService.get('TWILIO_AUTH_TOKEN');
+    const accountSid = this.configService.get<string>('TWILIO_ACCOUNT_SID');
+    const authToken = this.configService.get<string>('TWILIO_AUTH_TOKEN');
 
     if (accountSid && authToken) {
       this.twilioClient = Twilio(accountSid, authToken);

@@ -8,19 +8,21 @@ export const getMailConfig = async (
 ): Promise<MailerOptions> => {
   return {
     transport: {
-      host: configService.get('MAIL_HOST'),
-      port: configService.get('MAIL_PORT'),
-      secure: configService.get('MAIL_SECURE') === 'true', // false cho port 587
+      host: configService.get<string>('MAIL_HOST'),
+      port: configService.get<number>('MAIL_PORT'),
+      secure: configService.get<string>('MAIL_SECURE') === 'true', // false cho port 587
       auth: {
-        user: configService.get('MAIL_USER'),
-        pass: configService.get('MAIL_PASSWORD'),
+        user: configService.get<string>('MAIL_USER'),
+        pass: configService.get<string>('MAIL_PASSWORD'),
       },
     },
     defaults: {
-      from: `"${configService.get('MAIL_FROM_NAME')}" <${configService.get('MAIL_FROM_ADDRESS')}>`,
+      from: `"${configService.get<string>(
+        'MAIL_FROM_NAME',
+      )}" <${configService.get<string>('MAIL_FROM_ADDRESS')}>`,
     },
     template: {
-      dir: join(__dirname, '../../common/templates'), // Tạo folder templates ở src/common/templates
+      dir: join(__dirname, '../../common/templates'),
       adapter: new HandlebarsAdapter(),
       options: {
         strict: true,

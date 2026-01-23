@@ -1,6 +1,33 @@
 import { Injectable } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
 
+// 1. Định nghĩa Interface để thay thế 'any'
+interface InvoiceItem {
+  product_name: string;
+  sku: string;
+  quantity: number;
+  price: number;
+}
+
+interface InvoiceOrder {
+  order_code: string;
+  items: InvoiceItem[];
+  total_amount: number;
+  discount_amount?: number;
+  createdAt?: Date | string;
+  shipping_info?: {
+    name?: string;
+    phone?: string;
+    address?: string;
+  };
+}
+
+interface Attachment {
+  filename: string;
+  content: Buffer;
+  contentType: string;
+}
+
 @Injectable()
 export class EmailService {
   constructor(private readonly mailerService: MailerService) {}
@@ -35,8 +62,9 @@ export class EmailService {
     });
   }
 
-  //THÊM MỚI: Gửi hóa đơn bán hàng
-  async sendInvoice(email: string, order: any, pdfBuffer?: Buffer) {
+  // THÊM MỚI: Gửi hóa đơn bán hàng
+  // FIX: Thay 'order: any' bằng 'order: InvoiceOrder'
+  async sendInvoice(email: string, order: InvoiceOrder, pdfBuffer?: Buffer) {
     // 1. Tạo nội dung các dòng sản phẩm (HTML)
     const itemsHtml = order.items
       .map(
@@ -47,9 +75,15 @@ export class EmailService {
             <small style="color: #777;">SKU: ${item.sku}</small>
           </td>
           <td style="padding: 10px; text-align: center;">${item.quantity}</td>
-          <td style="padding: 10px; text-align: right;">${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(item.price)}</td>
+          <td style="padding: 10px; text-align: right;">${new Intl.NumberFormat(
+            'vi-VN',
+            { style: 'currency', currency: 'VND' },
+          ).format(item.price)}</td>
           <td style="padding: 10px; text-align: right; font-weight: bold;">
-            ${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(item.price * item.quantity)}
+            ${new Intl.NumberFormat('vi-VN', {
+              style: 'currency',
+              currency: 'VND',
+            }).format(item.price * item.quantity)}
           </td>
         </tr>
       `,
@@ -83,7 +117,11 @@ export class EmailService {
             <p><strong>Người nhận:</strong> ${order.shipping_info?.name}</p>
             <p><strong>Số điện thoại:</strong> ${order.shipping_info?.phone}</p>
             <p><strong>Địa chỉ:</strong> ${order.shipping_info?.address}</p>
-            <p><strong>Ngày đặt:</strong> ${new Date(order.createdAt).toLocaleString('vi-VN')}</p>
+            <p><strong>Ngày đặt:</strong> ${
+              order.createdAt
+                ? new Date(order.createdAt).toLocaleString('vi-VN')
+                : 'N/A'
+            }</p>
           </div>
 
           <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
@@ -113,7 +151,8 @@ export class EmailService {
       `;
 
     // 4. Cấu hình file đính kèm (nếu có)
-    const attachments: any[] = [];
+    // FIX: Thay 'any[]' bằng 'Attachment[]'
+    const attachments: Attachment[] = [];
     if (pdfBuffer) {
       attachments.push({
         filename: `Invoice-${order.order_code}.pdf`,

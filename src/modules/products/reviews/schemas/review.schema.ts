@@ -15,7 +15,7 @@ export class Review extends Document {
   order_id: Types.ObjectId;
 
   @Prop({ required: true })
-  variant_sku: string; 
+  variant_sku: string;
 
   @Prop({ required: true, min: 1, max: 5 })
   rating: number;
@@ -33,13 +33,13 @@ export class Review extends Document {
   reply?: { content: string; staff_id: Types.ObjectId; replied_at: Date };
 
   @Prop({ default: 'APPROVED', enum: ['PENDING', 'APPROVED', 'HIDDEN'] })
-  status: string; 
+  status: string;
 
   @Prop({ default: 0 })
-  helpful_count: number; 
+  helpful_count: number;
 
   @Prop({ type: [String], default: [] })
-  liked_by_users: string[]; 
+  liked_by_users: string[];
 }
 
 export const ReviewSchema = SchemaFactory.createForClass(Review);

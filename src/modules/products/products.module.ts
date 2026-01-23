@@ -4,7 +4,6 @@ import { AttributesModule } from './attributes/attributes.module';
 import { TagsModule } from './tags/tags.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { CategoriesModule } from './categories/categories.module';
-import { ProductFilterService } from './products-filter.service';
 
 @Module({
   imports: [

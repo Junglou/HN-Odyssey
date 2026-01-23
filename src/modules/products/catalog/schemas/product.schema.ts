@@ -220,10 +220,13 @@ ProductSchema.virtual('badges').get(function (this: Product) {
     badges.push({ type: 'OUT_OF_STOCK', label: 'Hết hàng' });
     return badges;
   }
+  const productWithMeta = this as Product & { created_at?: Date };
 
-  const isNew =
-    new Date().getTime() - (this['created_at']?.getTime() || 0) <
-    7 * 24 * 60 * 60 * 1000;
+  const createdAt = productWithMeta.created_at;
+  const createdTime = createdAt instanceof Date ? createdAt.getTime() : 0;
+
+  const isNew = new Date().getTime() - createdTime < 7 * 24 * 60 * 60 * 1000;
+
   if (isNew) badges.push({ type: 'NEW', label: 'Mới' });
 
   if (this.sale_price > 0 && this.sale_price < this.price) {
