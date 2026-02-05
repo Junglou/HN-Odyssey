@@ -1,0 +1,257 @@
+/* src/pages/auth/VerifyOtpPage.css */
+
+/* --- 1. Keyframes (Giữ nguyên) --- */
+@keyframes verifyOtpFadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- 2. Layout Chung --- */
+.verify-page-container {
+  position: relative;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 100vh;
+  z-index: 1000;
+  display: flex;
+  font-family: "Lexend Exa", sans-serif;
+  overflow: hidden;
+  background-color: #fff;
+  margin: 0;
+  padding: 0;
+  color: #000;
+}
+
+/* --- 3. Cột Trái (Form) --- */
+.verify-left-section {
+  flex: 0 0 50%;
+  max-width: 50%;
+  background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  padding: 2rem;
+  z-index: 20;
+  border-right: 1px solid #eee;
+
+  /* Đồng bộ transition với RegisterPage */
+  transition: all 1s cubic-bezier(0.25, 1, 0.5, 1);
+  overflow: hidden;
+}
+
+/* Khi Đóng */
+.verify-page-container.collapsed .verify-left-section {
+  flex: 0 0 80px;
+  max-width: 80px;
+  padding: 0;
+  border: none;
+  background: linear-gradient(to right, #ffffff 0%, #f9f9f9 85%, #d1d1d1 100%);
+  box-shadow: 10px 0 30px -5px rgba(0, 0, 0, 0.15);
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
+  z-index: 50;
+}
+
+/* --- 4. Cột Phải (Benefit) --- */
+.verify-right-section {
+  flex: 1;
+  background-color: #eaddcd;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  transition: all 1s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.verify-info-card {
+  background: #ffffff;
+  padding: 3.5rem;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  max-width: 500px;
+  width: 90%;
+  opacity: 0;
+  animation: verifyOtpFadeInUp 1s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation-delay: 0.5s;
+}
+
+/* Typography Phải */
+.verify-info-title {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+  color: #000;
+}
+.verify-info-quote {
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  font-style: italic;
+  color: #111;
+}
+.verify-benefit-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 2.5rem 0;
+}
+.verify-benefit-item {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  color: #000;
+  line-height: 1.4;
+}
+.verify-benefit-icon {
+  margin-right: 12px;
+  margin-top: 2px;
+}
+.verify-explore-btn {
+  width: 160px;
+  padding: 0.8rem 2rem;
+  background-color: #000;
+  color: #fff;
+  border: none;
+  border-radius: 50px;
+  font-weight: 600;
+  cursor: pointer;
+  display: block;
+  margin: 0 auto;
+  transition: transform 0.2s;
+}
+.verify-explore-btn:hover {
+  transform: translateY(-1px);
+}
+
+/* --- 5. Mũi tên --- */
+.verify-back-arrow-container {
+  position: absolute;
+  top: 50%;
+  z-index: 2000;
+  width: 48px;
+  height: 48px;
+  background: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  color: #000;
+  opacity: 0;
+  animation: verifyOtpFadeInUp 1s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation-delay: 0.6s;
+  transition: all 1s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.verify-page-container:not(.collapsed) .verify-back-arrow-container {
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.verify-page-container.collapsed .verify-back-arrow-container {
+  left: 40px;
+  transform: translate(-50%, -50%);
+  box-shadow: 4px 0 15px rgba(0, 0, 0, 0.2);
+}
+
+.arrow-icon {
+  transition: transform 1s ease;
+}
+.verify-page-container.collapsed .arrow-icon {
+  transform: rotate(180deg);
+}
+
+/* ========================================================== */
+/* LOGIC ẨN/HIỆN FORM - ĐỒNG BỘ 100% VỚI REGISTERPAGE.CSS     */
+/* ========================================================== */
+
+/* Trạng thái MỞ */
+.verify-form-wrapper,
+.verify-input-group,
+.verify-otp-row,
+.verify-form-input {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  /* Giống Register: 0.8s ease-out */
+  transition: opacity 0.8s ease-out;
+}
+
+.verify-form-input {
+  transition:
+    opacity 0.8s ease-out,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-image 0.2s ease;
+}
+
+/* Trạng thái ĐÓNG (Collapsed) */
+.verify-page-container.collapsed .verify-form-wrapper,
+.verify-page-container.collapsed .verify-input-group,
+.verify-page-container.collapsed .verify-otp-row {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  /* Giống Register: 0.5s ease */
+  transition: opacity 0.5s ease;
+}
+
+/* Ẩn input riêng để xử lý border */
+.verify-page-container.collapsed .verify-form-input {
+  opacity: 0;
+  border-color: transparent;
+  transition:
+    opacity 0.5s ease,
+    border-color 0.1s ease;
+}
+
+/* Ẩn các thành phần con khác (bao gồm cả dòng Help text mới thêm) */
+.verify-page-container.collapsed .verify-title,
+.verify-page-container.collapsed .verify-help-text,
+.verify-page-container.collapsed .verify-process-btn,
+.verify-page-container.collapsed .verify-footer-links,
+.verify-page-container.collapsed .verify-required-mark,
+.verify-page-container.collapsed .otp-timer,
+.verify-page-container.collapsed .verify-send-btn,
+.verify-page-container.collapsed .verify-form-input::placeholder {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transition: opacity 0.2s ease !important;
+}
+
+/* Responsive */
+@media (max-width: 968px) {
+  .verify-page-container {
+    flex-direction: column;
+    overflow-y: auto;
+    height: auto;
+  }
+  .verify-left-section,
+  .verify-right-section {
+    flex: none;
+    max-width: 100%;
+    padding: 3rem 1.5rem;
+  }
+  .verify-back-arrow-container {
+    display: none;
+  }
+  .verify-right-section {
+    padding-bottom: 4rem;
+  }
+}

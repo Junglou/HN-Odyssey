@@ -1,0 +1,97 @@
+.recommendation-container {
+  width: 100%;
+}
+
+.reco-title {
+  font-size: 1.8rem;
+  font-weight: 800;
+  margin-bottom: 2rem;
+  color: #000;
+}
+
+.reco-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.8rem;
+}
+
+/* CARD SẢN PHẨM */
+.reco-card {
+  display: flex;
+  gap: 1.5rem;
+  background: #f4f4f4; /* Màu nền xám nhạt giống hình */
+  padding: 21px;
+  border-radius: 18px;
+  cursor: pointer;
+  align-items: flex-start;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.reco-card:hover {
+  background: #eeeeee;
+  transform: translateY(-2px);
+}
+
+.reco-img {
+  width: 120px;
+  height: 120px;
+  border-radius: 12px;
+  object-fit: cover;
+  background-color: #ddd;
+  flex-shrink: 0;
+}
+
+.reco-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 120px;
+  /* Dàn đều khoảng cách nếu nội dung ngắn, hoặc để gap cụ thể */
+  gap: 6px;
+}
+
+/* 1. TÊN SẢN PHẨM (Đậm, Font chính) */
+.reco-name {
+  font-size: 1.4rem;
+  margin: 0 0 4px 0;
+  font-weight: 800;
+  color: #000;
+  font-family: "Lexend Exa", sans-serif;
+}
+
+/* 2. STYLE CHO CÁC NHÃN (Description:, Price:) */
+.reco-label {
+  font-weight: 700;
+  color: #000;
+  font-size: 1.1rem;
+  font-family: "Lexend Exa", sans-serif;
+}
+
+/* 3. STYLE CHO NỘI DUNG (Font máy đánh chữ/Monospace) */
+.reco-mono-text {
+  font-family:
+    "Courier New", Courier, monospace; /* QUAN TRỌNG: Tạo hiệu ứng như hình */
+  color: #222;
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+
+/* Block Mô tả */
+.reco-desc-block {
+  margin-bottom: 8px;
+}
+
+/* Block Giá: CHỈNH SỬA TẠI ĐÂY */
+.reco-price-block {
+  margin-top: auto;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.price-val {
+  font-size: 1.4rem;
+  color: #000;
+}

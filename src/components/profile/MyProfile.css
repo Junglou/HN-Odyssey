@@ -1,0 +1,220 @@
+/* src/components/profile/MyProfile.css */
+
+/* --- MAIN CARD --- */
+.my-profile-card {
+  background-color: #ffffff;
+  border-radius: 24px;
+
+  /* SHADOW GIỐNG SIDEBAR (Đã chốt) */
+  box-shadow:
+    0 0 0 1px rgb(202, 200, 200),
+    8px 8px 4px rgba(17, 24, 39, 0.2);
+
+  width: 100%;
+  font-family: "Lexend Exa", sans-serif;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.profile-header {
+  padding: 2.5rem 3rem 1rem 3rem;
+  background: #fff;
+}
+.profile-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0;
+  color: #000;
+}
+
+/* --- GRID SYSTEM --- */
+.profile-internal-grid {
+  display: grid;
+  /* Avatar | Forms | Social | Recommend */
+  grid-template-columns: 220px 1.5fr 0.5fr 520px;
+  align-items: stretch;
+  min-height: 550px;
+}
+
+/* --- CỘT 1: AVATAR --- */
+.section-avatar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3rem 1rem;
+
+  /* Thêm vị trí tương đối để làm điểm neo cho đường kẻ */
+  position: relative;
+}
+
+/* TẠO ĐƯỜNG KẺ "THREAD LINE" LƠ LỬNG */
+.section-avatar::after {
+  content: "";
+  position: absolute;
+  right: 0; /* Nằm sát mép phải cột Avatar */
+  top: 10%; /* Cách trên 10% */
+  height: 80%; /* Chiều cao 80% (chừa dưới 10%) -> Lơ lửng */
+  width: 2px; /* Độ mảnh */
+  background-color: #cacaca; /* Màu xám nhạt chia cắt */
+}
+
+.avatar-frame {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  border: 4px solid #cfcfcf;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+  background: #fff;
+}
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.user-fullname {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+  text-align: center;
+  color: #000;
+}
+.change-avatar-text {
+  font-size: 0.85rem;
+  color: #888;
+  cursor: pointer;
+}
+
+/* --- CỘT 2: FORMS --- */
+.section-forms {
+  padding: 3rem 2rem;
+  display: flex;
+  flex-direction: column;
+}
+.block-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 1.8rem;
+  color: #000;
+}
+.info-grid-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.info-item label {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #000;
+}
+.info-value {
+  font-size: 1rem;
+  color: #555;
+  font-weight: 400;
+}
+.mt-between-forms {
+  margin-top: 3.5rem;
+}
+.btn-edit-pill {
+  margin-top: 0.5rem;
+  padding: 0.6rem 1.5rem;
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 50px;
+  font-size: 0.85rem;
+  color: #444;
+  cursor: pointer;
+  width: fit-content;
+  transition: 0.2s;
+}
+.btn-edit-pill:hover {
+  border-color: #000;
+  color: #000;
+}
+
+/* --- CỘT 3: SOCIAL --- */
+.section-social {
+  padding: 3rem 1rem;
+}
+.mini-title {
+  font-size: 1rem;
+  font-weight: 800;
+  margin-bottom: 1.5rem;
+  color: #000;
+}
+.align-with-fields {
+  margin-top: 3.8rem;
+}
+.align-with-account-fields {
+  margin-top: 8rem;
+}
+.social-list li {
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+.text-link {
+  font-size: 0.85rem;
+  color: #999;
+  text-decoration: underline;
+  margin-bottom: 0.8rem;
+  display: block;
+  cursor: pointer;
+}
+
+/* --- CỘT 4: RECOMMENDATION --- */
+.section-recs {
+  padding: 3rem 2rem;
+  /* ĐÃ XÓA: border-left cũ ngăn cách recommend */
+  border-left: none;
+}
+
+/* RESPONSIVE */
+@media (max-width: 1500px) {
+  .profile-internal-grid {
+    grid-template-columns: 220px 2fr 1fr;
+  }
+  .section-recs {
+    grid-column: span 3;
+    border-top: 1px solid #f0f0f0; /* Giữ border top khi xuống dòng */
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 1024px) {
+  .profile-internal-grid {
+    grid-template-columns: 1fr;
+  }
+  .section-avatar {
+    flex-direction: row;
+    gap: 2rem;
+    border-bottom: 1px solid #eee;
+  }
+
+  /* Ẩn đường kẻ dọc lơ lửng khi chuyển sang mobile (xếp dọc) */
+  .section-avatar::after {
+    display: none;
+  }
+
+  .section-recs {
+    border-top: none;
+    flex-direction: column;
+  }
+  .align-with-fields,
+  .align-with-account-fields {
+    margin-top: 0;
+  }
+}

@@ -1,0 +1,325 @@
+/* Style Layout trang đăng nhập */
+.login-page-container {
+  /* Cấu hình full màn hình, style Lexend Exa */
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 100vh;
+  /* giảm từ 9999 -> 1000 */
+  z-index: 1000;
+
+  display: flex;
+  font-family: "Lexend Exa", sans-serif;
+  overflow: hidden;
+  background-color: #fff;
+  margin: 0;
+  padding: 0;
+}
+
+/* Xử lý form bên trái sau khi đóng form */
+.login-left-section {
+  /* cấu hình form bên trái */
+  flex: 0 0 50%;
+  max-width: 50%;
+
+  background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  padding: 2rem;
+  z-index: 20; /* Nổi hơn cột phải */
+  border-right: 1px solid #eee;
+
+  /* Hiệu ứng trượt*/
+  transition: all 1s cubic-bezier(0.25, 1, 0.5, 1);
+  overflow: hidden;
+}
+
+/* Hiệu ứng cuộn khi thu form */
+.login-page-container.collapsed .login-left-section {
+  /* Dải trắng */
+  flex: 0 0 80px;
+  max-width: 80px;
+  padding: 0;
+  border: none;
+
+  /* Tinh chỉnh gradient */
+  /* Linear để có cảm giá chuyển màu */
+  background: linear-gradient(to right, #ffffff 0%, #f9f9f9 85%, #d1d1d1 100%);
+
+  /* Tạo hiệu ứng 3D (Shadow Drop) */
+  /* Bóng đen trên nền */
+  box-shadow: 10px 0 30px -5px rgba(0, 0, 0, 0.15);
+
+  /* Làm nổi bật thêm nét của Border */
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
+
+  z-index: 50; /* Đặt tầng 50 */
+}
+
+/* Layout thông tin cho tính năng mua sắm không cần đăng nhập */
+.login-right-section {
+  flex: 1; /* Tự động tràn màn hình */
+  background-color: #eaddcd; /* Màu be */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  transition: all 1s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.info-card {
+  background: #ffffff;
+  padding: 3.5rem;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  max-width: 500px;
+  width: 90%;
+}
+
+.info-title {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+  color: #000;
+  font-family: "Lexend Exa", sans-serif;
+}
+
+.info-quote {
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  color: #111;
+  font-style: italic;
+}
+
+.benefit-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 2.5rem 0;
+}
+
+.benefit-item {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  color: #000;
+  line-height: 1.4;
+}
+
+.benefit-icon {
+  margin-right: 12px;
+  margin-top: 2px;
+}
+
+.explore-btn {
+  width: 160px;
+  padding: 0.8rem 2rem;
+  background-color: #000;
+  color: #fff;
+  border: none;
+  border-radius: 50px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: block;
+  margin: 0 auto;
+}
+
+.explore-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+/* Mũi tên điều hướng */
+.back-arrow-container {
+  /* Vị trí chung */
+  position: absolute;
+  top: 50%;
+  z-index: 2000; /* Luôn nằm trên cùng */
+
+  /* Style nút tròn */
+  width: 48px;
+  height: 48px;
+  background: #fff;
+  color: #000;
+  border-radius: 50%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+
+  /* Setup Animation */
+  opacity: 0;
+  animation: fadeInUp 1s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation-delay: 0.6s; /* Hiện cuối cùng */
+
+  /* Transition cho hiệu ứng di chuyển */
+  transition: all 1s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* Vị trí khỉ mở */
+/* Nằm chính giữa màn hình (50%) */
+.login-page-container:not(.collapsed) .back-arrow-container {
+  left: 50%;
+  transform: translate(-50%, -50%);
+
+  /* Bóng của nút cũng đậm hơn để hợp với style bản đồ */
+  box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* Vị trí khi đóng */
+/* Nằm giữa dải trắng 80px (tức là vị trí 40px) */
+.login-page-container.collapsed .back-arrow-container {
+  left: 40px;
+  transform: translate(-50%, -50%);
+
+  /* Đổi giao diện nút khi đóng */
+  box-shadow: 4px 0 15px rgba(0, 0, 0, 0.2); /* Đổ bóng nổi */
+}
+
+/* Xoay icon mũi tên */
+.arrow-icon {
+  transition: transform 1s ease;
+}
+
+/* Hiệu ứng xóa 180 độ */
+.login-page-container.collapsed .arrow-icon {
+  transform: rotate(180deg);
+}
+
+/* Responsive */
+@media (max-width: 968px) {
+  .login-page-container {
+    flex-direction: column;
+    overflow-y: auto;
+    position: relative;
+    height: auto;
+  }
+
+  .login-left-section,
+  .login-right-section {
+    flex: none;
+    max-width: 100%; /* Reset max-width trên mobile */
+    padding: 3rem 1.5rem;
+  }
+
+  /* Ẩn chức năng thu nhỏ trên mobile vì không cần thiết */
+  .back-arrow-container {
+    display: none;
+  }
+
+  .login-right-section {
+    padding-bottom: 4rem;
+  }
+}
+
+/* Hiệu ứng animation khi vừa mở trang */
+/* Áp dụng cho Khối Form (Bên trái) */
+.login-form-wrapper {
+  /* Các thuộc tính layout cơ bản */
+  width: 100%;
+  max-width: 480px;
+  min-width: 350px;
+
+  /* Để tránh hiển thị sẵn khi chưa có animation
+  */
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+
+  /* Animation lúc F5 (Load trang) */
+  animation: fadeInUp 1s cubic-bezier(0.25, 1, 0.5, 1) both;
+  animation-delay: 0.5s;
+
+  /* Transition lúc Mở/Đóng (Expand/Collapse) */
+  transition: opacity 1s ease-out 1s;
+}
+
+/* Chuyển động: Trượt từ dưới lên + Hiện dần */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px); /* Bắt đầu từ vị trí thấp hơn 30px */
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0); /* Về vị trí gốc */
+  }
+}
+
+/* Áp dụng cho thẻ thông tin (Bên phải) */
+.info-card {
+  /* Setup Animation */
+  opacity: 0;
+  animation: fadeInUp 1s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation-delay: 0.5s; /* Hiện sau Form bên trái (Cascade effect) */
+}
+
+/* Trạng thái mở Expand */
+/* Gộp chung Selector để đồng bộ */
+.login-form-wrapper,
+.input-group,
+.form-input {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* Cấu hình chung cho Wrapper và Group */
+.login-form-wrapper,
+.input-group {
+  /* Hiện trong 0.8s */
+  transition: opacity 0.8s ease-out;
+}
+
+/* Cấu hình riêng cho Input (Tách dòng để gõ phím không bị lag) */
+.form-input {
+  border-color: #888;
+  transition:
+    opacity 0.8s ease-out,
+    border-color 0.2s ease 0s,
+    box-shadow 0.2s ease 0s,
+    background-image 0.2s ease 0s;
+}
+
+/* Trạng thái đóng (Collapsed) */
+
+/* Ẩn Wrapper và Group */
+.login-page-container.collapsed .login-form-wrapper,
+.login-page-container.collapsed .input-group {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+
+  /* Biến mất trong 0.5s */
+  transition: opacity 0.5s ease;
+}
+
+/* Ẩn Input (Xử lý riêng để ẩn viền) */
+.login-page-container.collapsed .form-input {
+  opacity: 0;
+  border-color: transparent;
+
+  transition:
+    opacity 0.5s ease,
+    /* Đồng bộ 0.5s */ border-color 0.1s ease;
+}
+
+/* Ẩn dấu sao đỏ */
+.login-page-container.collapsed .required-mark {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
