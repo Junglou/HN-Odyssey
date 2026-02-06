@@ -6,26 +6,21 @@ import {
   Patch,
   Param,
   Delete,
-  UseGuards,
   Ip,
   Headers,
 } from '@nestjs/common';
 import { AttributesService } from './attributes.service';
 import { CreateAttributeDto } from './dto/create-attribute.dto';
 import { UpdateAttributeDto } from './dto/update-attribute.dto';
-import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { Role } from '../../../common/enums/role.enum';
-import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
-import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Public } from 'src/common/decorators/public.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import type { IUser } from 'src/common/interfaces/user.interface';
 
 @Controller('attributes')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class AttributesController {
   constructor(private readonly attributesService: AttributesService) {}
 

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
@@ -24,7 +25,6 @@ import {
   InitGuestCheckoutDto,
   VerifyGuestOtpDto,
 } from './dto/guest-checkout.dto';
-import * as bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import {
   AggregateResult,
@@ -34,25 +34,31 @@ import {
   OrderData,
   OrderItem,
   PrintTemplateData,
-  VnpayReturnParams,
   Voucher,
   VoucherType,
 } from 'src/common/interfaces/oder.interface';
-import * as crypto from 'crypto';
+import { VnpayService } from '../payment/providers/vnpay.service';
+import { ShippingConfig } from 'src/modules/shipping/schemas/shipping-config.schema';
+import { ShippingService } from 'src/modules/shipping/shipping.service';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
   constructor(
     @InjectModel(Order.name) private orderModel: Model<Order>,
     @InjectModel(Product.name) private productModel: Model<Product>,
     @InjectModel(Cart.name) private cartModel: Model<Cart>,
     @InjectConnection() private connection: Connection,
     @InjectRedis() private readonly redis: Redis,
+    @InjectModel(ShippingConfig.name)
+    private shippingConfigModel: Model<ShippingConfig>,
     private readonly auditLogsService: AuditLogsService,
     private readonly emailService: EmailService,
     private readonly pdfService: PdfService,
     private readonly promotionEngine: PromotionEngineService,
     private readonly stockService: StockService,
+    private readonly vnpayService: VnpayService,
+    private readonly shippingService: ShippingService,
   ) {}
 
   // US.121: DANH SÁCH ĐƠN HÀNG
@@ -180,11 +186,11 @@ export class OrdersService {
   }
 
   // 1. Thêm Helper giả lập tính Voucher (Hoặc Inject VoucherService thật vào đây)
-  // orders.service.ts
-
   private async applyVoucher(
     originalTotal: number,
     code?: string,
+    userId?: string | null,
+    items?: OrderItem[],
   ): Promise<{ finalTotal: number; discount: number }> {
     if (!code) return { finalTotal: originalTotal, discount: 0 };
 
@@ -202,14 +208,68 @@ export class OrdersService {
       throw new BadRequestException('Mã giảm giá không hợp lệ hoặc đã hết hạn');
     }
 
-    // 2. Check điều kiện
+    if (userId) {
+      const usedCountByUser = await this.orderModel.countDocuments({
+        user_id: new Types.ObjectId(userId),
+        voucher_code: code.toUpperCase(),
+        status: { $nin: ['CANCELLED', 'TEMPORARY'] },
+      });
+
+      const limitPerUser = 1;
+      if (usedCountByUser >= limitPerUser) {
+        throw new BadRequestException(
+          'Bạn đã hết lượt sử dụng mã giảm giá này.',
+        );
+      }
+    }
+
+    // Định nghĩa type mở rộng cục bộ để tránh dùng 'any'
+    // Báo cho TS biết Voucher này có thể có thêm trường applicable_category_ids
+    type VoucherWithScope = Voucher & { applicable_category_ids?: string[] };
+    const voucherWithScope = voucher as VoucherWithScope;
+
+    // 2. LOGIC CHECK DANH MỤC (SCOPE)
     if (
-      voucher.min_order_value !== undefined &&
-      originalTotal < voucher.min_order_value
+      items &&
+      voucherWithScope.applicable_category_ids &&
+      voucherWithScope.applicable_category_ids.length > 0
     ) {
-      throw new BadRequestException(
-        `Đơn hàng chưa đủ ${voucher.min_order_value}đ để dùng mã này`,
-      );
+      const productIds = items.map((i) => i.product_id);
+
+      // Tìm các sản phẩm trong giỏ hàng có thuộc danh mục được khuyến mãi không
+      const validProducts = await this.productModel
+        .find({
+          _id: { $in: productIds },
+          categories: { $in: voucherWithScope.applicable_category_ids },
+        })
+        .select('_id')
+        .lean();
+
+      const validProductIds = validProducts.map((p) => p._id.toString());
+
+      // Tính tổng tiền của CÁC SẢN PHẨM HỢP LỆ thôi
+      const eligibleAmount = items.reduce((sum, item) => {
+        if (validProductIds.includes(item.product_id.toString())) {
+          return sum + item.price * item.quantity;
+        }
+        return sum;
+      }, 0);
+
+      if (eligibleAmount < (voucher.min_order_value || 0)) {
+        throw new BadRequestException(
+          `Mã này chỉ áp dụng cho sản phẩm thuộc danh mục quy định (Tối thiểu ${voucher.min_order_value}đ).`,
+        );
+      }
+    } else {
+      // Logic check giá trị tối thiểu thông thường
+      if (
+        voucher.min_order_value !== undefined &&
+        originalTotal < voucher.min_order_value
+      ) {
+        throw new BadRequestException(
+          `Đơn hàng chưa đủ ${voucher.min_order_value}đ để dùng mã này`,
+        );
+      }
     }
 
     if (
@@ -343,12 +403,14 @@ export class OrdersService {
       const finalPrice = finalItem.discountedPrice || finalItem.unitPrice;
 
       //Trừ kho tạm thời (Hard Reserve)
-      await this.productModel
-        .updateOne(
-          { _id: product._id, 'variants.sku': data.variantSku },
-          { $inc: { 'variants.$.stock': -data.quantity } },
-        )
-        .session(session);
+      await this.stockService.holdStock(
+        {
+          product_id: product._id.toString(),
+          sku: variant.sku,
+          quantity: data.quantity,
+        },
+        session, // Truyền session vào để đảm bảo Transaction
+      );
 
       //Tạo đơn tạm
       const holdExpiresAt = new Date(Date.now() + 15 * 60000);
@@ -418,18 +480,15 @@ export class OrdersService {
 
   async initGuestCheckout(dto: InitGuestCheckoutDto) {
     // 1. VALIDATION CƠ BẢN
-
-    // Kiểm tra Email bắt buộc theo AC2 ngay đầu hàm
     if (!dto.shippingInfo.email) {
       throw new BadRequestException(
         'Vui lòng nhập Email để nhận mã xác thực (OTP).',
       );
     }
 
-    // [AC11] Rate Limit - Chống Spam OTP (60s cooldown)
+    // [AC11] Rate Limit - Chống Spam OTP
     const otpKey = `guest_otp:${dto.shippingInfo.email}`;
     const ttl = await this.redis.ttl(otpKey);
-    // Nếu key còn tồn tại và thời gian sống > (5 phút - 60 giây) -> Tức là vừa gửi chưa được 60s
     if (ttl > 240) {
       throw new BadRequestException(
         'Vui lòng đợi 60 giây trước khi gửi lại mã mới.',
@@ -445,19 +504,18 @@ export class OrdersService {
       throw new BadRequestException('Giỏ hàng trống hoặc hết hạn');
     }
 
-    // ---------------------------------------------------------
-    // 2. LOGIC GIỮ HÀNG & TẠO ĐƠN TẠM (CRITICAL FIX)
-    // ---------------------------------------------------------
+    const productIds = cart.items.map((i) => i.product_id);
+    const products = await this.productModel
+      .find({ _id: { $in: productIds } })
+      .select('name variants thumbnail price weight')
+      .lean();
+
+    // 2. LOGIC GIỮ HÀNG & TẠO ĐƠN TẠM (TRANSACTION)
     const session = await this.connection.startSession();
     session.startTransaction();
 
-    // [FIX 1] Định nghĩa kiểu rõ ràng cho heldItems thay vì any[]
-    // Giúp tránh lỗi 'Unsafe assignment' khi truy cập thuộc tính bên trong loop rollback
-    const heldItems: { product_id: any; sku: string; quantity: number }[] = [];
-
     try {
       // A. Dọn dẹp đơn tạm cũ (Nếu khách F5 hoặc bấm lại)
-      // Tránh việc 1 session giữ kho 2-3 lần
       const oldOrder = await this.orderModel
         .findOne({
           session_id: dto.cartSessionId,
@@ -467,102 +525,98 @@ export class OrdersService {
         .session(session);
 
       if (oldOrder) {
-        // Hoàn kho cho đơn cũ trước khi tạo đơn mới
+        // Hoàn kho cho đơn cũ
         for (const item of oldOrder.items) {
-          await this.stockService.restock({
-            product_id: item.product_id.toString(),
-            sku: item.sku,
-            quantity: item.quantity,
-          });
+          await this.stockService.restock(
+            {
+              product_id: item.product_id.toString(),
+              sku: item.sku,
+              quantity: item.quantity,
+            },
+            session, // [FIX 1] Truyền session vào đây để đồng bộ Transaction
+          );
         }
         await this.orderModel.deleteOne({ _id: oldOrder._id }).session(session);
       }
 
       // B. [AC8] Giữ hàng mới (Soft Allocation)
       for (const item of cart.items) {
-        await this.stockService.holdStock({
-          product_id: item.product_id.toString(),
-          sku: item.sku,
-          quantity: item.quantity,
-        });
-        heldItems.push({
-          product_id: item.product_id.toString(), // Convert ngay lúc này
-          sku: item.sku,
-          quantity: item.quantity,
-        });
+        await this.stockService.holdStock(
+          {
+            product_id: item.product_id.toString(),
+            sku: item.sku,
+            quantity: item.quantity,
+          },
+          session, // Đã có session -> An toàn
+        );
       }
 
-      // C. TẠO ĐƠN HÀNG TẠM (TEMPORARY)
-      // Đây là bước quan trọng nhất để CronJob có thể quét và hoàn kho sau 15p
+      // C. TẠO ĐƠN HÀNG TẠM
+      const orderItems = cart.items.map((cartItem) => {
+        const product = products.find(
+          (p) => p._id.toString() === cartItem.product_id.toString(),
+        );
+
+        // Fallback nếu không tìm thấy (dù khó xảy ra)
+        if (!product) {
+          throw new BadRequestException('Sản phẩm trong giỏ không hợp lệ');
+        }
+
+        // Tìm variant để lấy giá chính xác
+        const variant = product.variants.find((v) => v.sku === cartItem.sku);
+        const realPrice = variant ? variant.sale_price || variant.price : 0;
+        const realImage = variant?.image || product.thumbnail || '';
+
+        return {
+          product_id: cartItem.product_id,
+          sku: cartItem.sku,
+          quantity: cartItem.quantity,
+          product_name: product.name || 'Sản phẩm không xác định',
+          price: realPrice,
+          image: realImage,
+        };
+      });
+
       const tempOrder = new this.orderModel({
         order_code: `GUEST-${Date.now()}`,
         session_id: dto.cartSessionId,
         isGuest: true,
-        status: 'TEMPORARY', // Trạng thái này sẽ được CronJob theo dõi
-        hold_expires_at: new Date(Date.now() + 15 * 60000), // [AC8] 15 phút
-        items: cart.items.map((i) => ({
-          ...i,
-          product_name: 'Checking out...', // Tạm thời
-          price: 0, // Tạm thời, sẽ tính lại ở bước createOrder
-        })),
+        status: 'TEMPORARY',
+        hold_expires_at: new Date(Date.now() + 15 * 60000),
+        items: orderItems,
         guest_info: {
           name: dto.shippingInfo.name,
           phone: dto.shippingInfo.phone,
           email: dto.shippingInfo.email,
         },
         shipping_info: dto.shippingInfo,
-        total_amount: 0, // Tạm thời
+        total_amount: orderItems.reduce(
+          (sum, i) => sum + i.price * i.quantity,
+          0,
+        ),
       });
-
       await tempOrder.save({ session });
 
-      // Commit transaction nếu mọi thứ ổn
+      // Commit transaction
       await session.commitTransaction();
     } catch (error: unknown) {
+      // Rollback tự động
+      // Chỉ cần abort, MongoDB sẽ tự hoàn tác việc trừ kho ở bước B và bước A
       await session.abortTransaction();
-
-      const heldItems: {
-        product_id: string;
-        sku: string;
-        quantity: number;
-      }[] = [];
-
-      // Rollback thủ công: Nếu đã lỡ giữ hàng (holdItems) mà lỗi ở bước save order -> Phải nhả hàng ra
-      if (heldItems.length > 0) {
-        // 1. Lấy message lỗi an toàn
-        const errorMessage =
-          error instanceof Error ? error.message : 'Unknown error';
-
-        console.error('Lỗi transaction, đang hoàn kho...', errorMessage);
-
-        // 2. Duyệt qua mảng hàng đã giữ
-        for (const heldItem of heldItems) {
-          await this.stockService.restock({
-            product_id: heldItem.product_id,
-            sku: heldItem.sku,
-            quantity: heldItem.quantity,
-          });
-        }
-      }
-      throw error; // Ném lỗi ra cho Controller xử lý
+      throw error;
     } finally {
       await session.endSession();
     }
 
-    // ---------------------------------------------------------
     // 3. XỬ LÝ OTP & PHẢN HỒI
-    // ---------------------------------------------------------
-
-    // [AC6] Kiểm tra User tồn tại để gợi ý Login (Helper cho UI)
     const existingUser = await this.connection
       .collection('users')
       .findOne({ email: dto.shippingInfo.email });
 
-    // [AC4] Sinh OTP & Lưu Redis
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    await this.redis.set(otpKey, otpCode, 'EX', 300); // 5 phút
+    await this.redis.set(otpKey, otpCode, 'EX', 300);
 
-    // Vẫn lưu info tạm vào Redis để tiện cho bước Verify (tuỳ chọn, nhưng giữ lại cho logic cũ hoạt động)
+    // Lưu info tạm (Optional)
     await this.redis.set(
       `guest_temp_info:${dto.cartSessionId}`,
       JSON.stringify(dto.shippingInfo),
@@ -570,13 +624,10 @@ export class OrdersService {
       900,
     );
 
-    // [INTEGRATION] Gửi Email OTP
-    try {
-      await this.emailService.sendOtp(dto.shippingInfo.email, otpCode);
-    } catch (error) {
-      console.error('Lỗi gửi mail OTP:', error);
-      // Không throw lỗi để tránh block flow, khách có thể bấm "Gửi lại" sau
-    }
+    // Gửi Email (Không await để tránh block response)
+    this.emailService
+      .sendOtp(dto.shippingInfo.email, otpCode)
+      .catch((e) => console.error('Lỗi gửi mail OTP:', e));
 
     return {
       message: `Mã xác thực đã được gửi đến ${dto.shippingInfo.email}. Hàng được giữ trong 15 phút.`,
@@ -611,10 +662,8 @@ export class OrdersService {
     dto: CreateOrderDto,
     ip: string,
     userAgent: string,
-  ): Promise<MongooseOrderDoc> {
-    // ---------------------------------------------------------
+  ) {
     // A. LUỒNG MUA NGAY (BUY_NOW)
-    // ---------------------------------------------------------
     if (dto.source === 'BUY_NOW') {
       if (!dto.checkoutSessionToken) {
         throw new BadRequestException('Thiếu Token phiên mua hàng');
@@ -627,7 +676,6 @@ export class OrdersService {
         );
       }
 
-      // [FIX 1]: Sử dụng MongooseOrderDoc để có đầy đủ typing cho hàm .save() và các field
       const order = (await this.orderModel.findById(
         orderId,
       )) as unknown as MongooseOrderDoc;
@@ -639,15 +687,16 @@ export class OrdersService {
       }
 
       // 2. Tính phí vận chuyển
-      let shippingFee = 30000;
-      if (['HCM', '79'].includes(dto.shippingInfo.city_code || '')) {
-        shippingFee = 15000;
-      }
+      const shippingFee = await this.shippingService.calculateShippingFee(
+        dto.shippingInfo.city_code,
+        dto.shippingInfo.district_code,
+        order.items as unknown as (CartItem | OrderItem)[],
+        dto.isInstant,
+      );
 
       // 3. Kiểm tra trọng lượng
       const MAX_WEIGHT_KG = 50;
       let totalWeight = 0;
-      // [FIX 2]: Ép kiểu item an toàn
       for (const item of order.items) {
         const itemAny = item as unknown as { weight?: number };
         const w = itemAny.weight || 0.5;
@@ -662,7 +711,12 @@ export class OrdersService {
 
       // 4. Logic Voucher
       const { finalTotal: totalAfterVoucher, discount } =
-        await this.applyVoucher(order.total_amount, dto.voucherCode);
+        await this.applyVoucher(
+          order.total_amount,
+          dto.voucherCode,
+          userId,
+          order.items as unknown as OrderItem[], // Truyền items để check category
+        );
 
       // 5. Tổng thanh toán
       const finalOrderTotal = totalAfterVoucher + shippingFee;
@@ -702,7 +756,12 @@ export class OrdersService {
       order.discount_amount = discount;
       order.voucher_code = dto.voucherCode || '';
 
-      // [FIX 3]: Truy cập timeline trực tiếp vì MongooseOrderDoc đã định nghĩa nó
+      if (dto.voucherCode) {
+        await this.connection
+          .collection('promotions')
+          .updateOne({ code: dto.voucherCode }, { $inc: { used_count: 1 } });
+      }
+
       if (!order.timeline) {
         order.timeline = [];
       }
@@ -717,38 +776,56 @@ export class OrdersService {
       await order.save();
       await this.redis.del(dto.checkoutSessionToken);
 
-      // Gửi mail & Log
+      let paymentUrl: string | null = null;
+      if (order.payment.method === 'VNPAY') {
+        paymentUrl = this.vnpayService.createPaymentUrl(
+          order.order_code,
+          order.total_amount,
+          `Thanh toan don hang ${order.order_code}`,
+          ip,
+        );
+      }
+
       const emailToSend = order.guest_info?.email || order.shipping_info?.email;
       if (emailToSend) {
         this.emailService
-          // [FIX 4]: Ép kiểu sang InvoiceOrder
           .sendInvoice(emailToSend, order as unknown as InvoiceOrder)
-          .catch(console.error);
+          .catch((err: unknown) => {
+            const msg = err instanceof Error ? err.message : String(err);
+            this.logger.error(`Failed to send invoice email: ${msg}`);
+          });
       }
       await this.logCreateOrder(userId, order, dto.source, ip, userAgent);
 
-      return order;
+      return {
+        order: order,
+        paymentUrl: paymentUrl,
+        message: 'Tạo đơn hàng thành công',
+      };
     }
 
-    // ---------------------------------------------------------
     // B. LUỒNG MUA TỪ GIỎ HÀNG (CART)
-    // ---------------------------------------------------------
     const session = await this.connection.startSession();
     session.startTransaction();
 
     try {
-      // 1. Chuẩn bị dữ liệu
       const cartQuery: { user_id?: Types.ObjectId; session_id?: string } = {};
       let isGuestFlow = false;
-
-      // [FIX 5]: Định nghĩa kiểu cho orderToUpdate là MongooseOrderDoc hoặc null
       let orderToUpdate: MongooseOrderDoc | null = null;
 
       if (userId) {
-        // MEMBER
-        cartQuery.user_id = new Types.ObjectId(userId);
+        const userCartExists = await this.cartModel.exists({
+          user_id: new Types.ObjectId(userId),
+        });
+
+        if (userCartExists) {
+          cartQuery.user_id = new Types.ObjectId(userId);
+        } else if (dto.guestSessionId) {
+          cartQuery.session_id = dto.guestSessionId;
+        } else {
+          cartQuery.user_id = new Types.ObjectId(userId);
+        }
       } else if (dto.guestSessionId) {
-        // GUEST
         const isVerified = await this.redis.get(
           `guest_verified:${dto.guestSessionId}`,
         );
@@ -772,7 +849,6 @@ export class OrdersService {
           );
         }
 
-        // [FIX 6]: Ép kiểu kết quả tìm được về MongooseOrderDoc
         orderToUpdate = tempOrder as unknown as MongooseOrderDoc;
         cartQuery.session_id = dto.guestSessionId;
         isGuestFlow = true;
@@ -780,13 +856,11 @@ export class OrdersService {
         throw new BadRequestException('Không xác định được danh tính.');
       }
 
-      // 2. Lấy Cart
       const cart = await this.cartModel.findOne(cartQuery).session(session);
       if (!cart || !cart.items.length) {
         throw new BadRequestException('Giỏ hàng trống.');
       }
 
-      // 3. TÍNH TOÁN CORE
       const orderItems: OrderItem[] = [];
       let itemsTotalAmount = 0;
       let totalWeight = 0;
@@ -817,11 +891,12 @@ export class OrdersService {
           );
         }
 
-        const productWithWeight = product as unknown as { weight?: number };
+        const productWithWeight = product as unknown as {
+          weight?: number;
+        };
         const weight = productWithWeight.weight || 0.5;
         totalWeight += weight * item.quantity;
 
-        // Inventory Logic
         if (isGuestFlow) {
           await this.productModel
             .updateOne(
@@ -843,7 +918,6 @@ export class OrdersService {
 
         const currentPrice =
           variant.sale_price > 0 ? variant.sale_price : variant.price;
-
         const mainImage = product.images?.[0] || '';
 
         orderItems.push({
@@ -860,7 +934,6 @@ export class OrdersService {
         throw new BadRequestException(`Đơn hàng quá nặng (${totalWeight}kg).`);
       }
 
-      // 4. Promotion Engine
       const itemsForPromo = orderItems.map((i) => ({
         productId: i.product_id.toString(),
         sku: i.sku,
@@ -884,14 +957,20 @@ export class OrdersService {
         itemsTotalAmount += item.price * item.quantity;
       }
 
-      // 5. Shipping & Voucher
-      let shippingFee = 30000;
-      if (['HCM', '79'].includes(dto.shippingInfo.city_code || '')) {
-        shippingFee = 15000;
-      }
+      const shippingFee = await this.shippingService.calculateShippingFee(
+        dto.shippingInfo?.city_code,
+        dto.shippingInfo?.district_code,
+        orderItems,
+        dto.isInstant,
+      );
 
       const { finalTotal: totalAfterVoucher, discount: voucherDiscount } =
-        await this.applyVoucher(itemsTotalAmount, dto.voucherCode);
+        await this.applyVoucher(
+          itemsTotalAmount,
+          dto.voucherCode,
+          userId,
+          orderItems,
+        );
 
       const finalOrderTotal = totalAfterVoucher + shippingFee;
 
@@ -899,18 +978,45 @@ export class OrdersService {
         throw new BadRequestException('Đơn hàng > 5 triệu không hỗ trợ COD.');
       }
 
-      // 6. SAVE ORDER
-      // [FIX 7]: Khai báo tường minh kiểu trả về
+      // Khởi tạo biến để tránh lỗi used before assigned
       let savedOrder: MongooseOrderDoc;
 
+      // Block xử lý tạo đơn hàng (Bao gồm cả Guest và Member)
       if (isGuestFlow && orderToUpdate) {
-        // [GUEST]: Update OrderDoc
-        // Vì orderToUpdate đã được ép kiểu MongooseOrderDoc ở trên, ta dùng trực tiếp
+        // CASE 1: GUEST (Đã verify OTP)
         const orderDoc = orderToUpdate;
 
-        orderDoc.order_code = `ORD-${Date.now()}`;
-        orderDoc.items = orderItems;
+        const confirmedItems = orderDoc.items as unknown as OrderItem[];
 
+        let reCalcTotal = 0;
+        // Xóa reCalcWeight không dùng đến
+
+        for (const item of confirmedItems) {
+          reCalcTotal += item.price * item.quantity;
+        }
+
+        const shippingFeeGuest =
+          await this.shippingService.calculateShippingFee(
+            dto.shippingInfo?.city_code,
+            dto.shippingInfo?.district_code,
+            confirmedItems,
+            dto.isInstant,
+          );
+
+        const {
+          finalTotal: totalAfterVoucherGuest,
+          discount: voucherDiscountGuest,
+        } = await this.applyVoucher(
+          reCalcTotal,
+          dto.voucherCode,
+          userId,
+          confirmedItems,
+        );
+
+        const finalOrderTotalGuest = totalAfterVoucherGuest + shippingFeeGuest;
+
+        // Cập nhật Order Doc
+        orderDoc.order_code = `ORD-${Date.now()}`;
         orderDoc.shipping_info = {
           ...dto.shippingInfo,
           email: dto.shippingInfo.email || '',
@@ -918,44 +1024,53 @@ export class OrdersService {
           phone: dto.shippingInfo.phone || '',
           address: dto.shippingInfo.address || '',
         };
-
         orderDoc.guest_info = {
           name: dto.shippingInfo.name || '',
           phone: dto.shippingInfo.phone || '',
           email: dto.shippingInfo.email || '',
         };
-
         orderDoc.payment = {
           method: dto.paymentMethod,
           status: 'PENDING',
         };
-
-        orderDoc.total_amount = finalOrderTotal;
-        orderDoc.discount_amount = promoDiscount + (voucherDiscount || 0);
-        orderDoc.shipping_fee = shippingFee;
+        orderDoc.total_amount = finalOrderTotalGuest;
+        orderDoc.discount_amount =
+          (orderDoc.discount_amount || 0) + (voucherDiscountGuest || 0);
+        orderDoc.shipping_fee = shippingFeeGuest;
         orderDoc.voucher_code = dto.voucherCode || '';
         orderDoc.status = 'PENDING';
         orderDoc.hold_expires_at = new Date(Date.now() + 15 * 60000);
 
-        // [FIX 8]: Logic timeline sạch sẽ nhờ Interface
-        if (!orderDoc.timeline) {
-          orderDoc.timeline = [];
-        }
+        if (!orderDoc.timeline) orderDoc.timeline = [];
         orderDoc.timeline.push({
           status: 'PENDING',
           timestamp: new Date(),
           actor: 'Guest',
-          note: 'Guest confirmed order via Cart',
+          note: 'Guest confirmed order via Cart (OTP Verified)',
         });
+
+        // Xả kho giữ (Hold) -> Kho bán (Sold)
+        for (const item of confirmedItems) {
+          await this.productModel
+            .updateOne(
+              { _id: item.product_id, 'variants.sku': item.sku },
+              { $inc: { 'variants.$.stock_on_hold': -item.quantity } },
+            )
+            .session(session);
+        }
 
         await orderDoc.save({ session });
         savedOrder = orderDoc;
+
+        // Xóa Guest Cart
+        await this.cartModel
+          .deleteOne({ session_id: dto.guestSessionId })
+          .session(session);
       } else {
-        // [MEMBER]: Create New Order
-        // [FIX 9]: Ép kiểu ngay khi khởi tạo new Model
+        // CASE 2: MEMBER (Hoặc Guest thường không qua Flow OTP)
         const newOrder = new this.orderModel({
           order_code: `ORD-${Date.now()}`,
-          user_id: new Types.ObjectId(userId as string),
+          user_id: userId ? new Types.ObjectId(userId) : null,
           items: orderItems,
           shipping_info: {
             ...dto.shippingInfo,
@@ -964,7 +1079,10 @@ export class OrdersService {
             phone: dto.shippingInfo.phone || '',
             address: dto.shippingInfo.address || '',
           },
-          payment: { method: dto.paymentMethod, status: 'PENDING' },
+          payment: {
+            method: dto.paymentMethod,
+            status: 'PENDING',
+          },
           total_amount: finalOrderTotal,
           discount_amount: promoDiscount + (voucherDiscount || 0),
           shipping_fee: shippingFee,
@@ -986,7 +1104,42 @@ export class OrdersService {
         savedOrder = newOrder;
       }
 
-      // 7. Cleanup & Return
+      // Xử lý Voucher Usage Count
+      if (dto.voucherCode) {
+        const voucher = await this.connection
+          .collection<Voucher>('promotions')
+          .findOne({ code: dto.voucherCode }, { session });
+
+        if (voucher) {
+          if (voucher.usage_limit && voucher.usage_limit > 0) {
+            const updateResult = await this.connection
+              .collection('promotions')
+              .updateOne(
+                {
+                  code: dto.voucherCode,
+                  used_count: { $lt: voucher.usage_limit },
+                },
+                { $inc: { used_count: 1 } },
+                { session },
+              );
+
+            if (updateResult.modifiedCount === 0) {
+              throw new BadRequestException(
+                'Mã giảm giá đã hết lượt sử dụng ngay trong lúc bạn thanh toán.',
+              );
+            }
+          } else {
+            await this.connection
+              .collection('promotions')
+              .updateOne(
+                { code: dto.voucherCode },
+                { $inc: { used_count: 1 } },
+                { session },
+              );
+          }
+        }
+      }
+
       await this.cartModel.deleteOne({ _id: cart._id }).session(session);
       await session.commitTransaction();
 
@@ -995,18 +1148,33 @@ export class OrdersService {
         await this.redis.del(`guest_temp_info:${dto.guestSessionId}`);
       }
 
+      let paymentUrl: string | null = null;
+      if (savedOrder.payment.method === 'VNPAY') {
+        paymentUrl = this.vnpayService.createPaymentUrl(
+          savedOrder.order_code,
+          savedOrder.total_amount,
+          `Thanh toan don hang ${savedOrder.order_code}`,
+          ip,
+        );
+      }
+
       const recipientEmail = dto.shippingInfo.email;
       if (recipientEmail) {
         this.emailService
-          // [FIX 10]: Ép kiểu cho hàm sendInvoice
           .sendInvoice(recipientEmail, savedOrder as unknown as InvoiceOrder)
-          .catch(console.error);
+          .catch((err: unknown) => {
+            const msg = err instanceof Error ? err.message : String(err);
+            this.logger.error(`Failed to send invoice email: ${msg}`);
+          });
       }
 
       await this.logCreateOrder(userId, savedOrder, dto.source, ip, userAgent);
 
-      // [FIX 11]: Return an toàn vì savedOrder đã có kiểu MongooseOrderDoc
-      return savedOrder;
+      return {
+        order: savedOrder,
+        paymentUrl: paymentUrl,
+        message: 'Tạo đơn hàng thành công',
+      };
     } catch (error: unknown) {
       await session.abortTransaction();
       const errorMessage =
@@ -1346,8 +1514,8 @@ export class OrdersService {
         success: true,
         message: `Đã gửi hóa đơn (kèm PDF) đến ${recipientEmail}`,
       };
-    } catch (error) {
-      // [FIX 4]: Xử lý biến error an toàn (không gọi .message trực tiếp trên unknown)
+    } catch (error: unknown) {
+      // Xử lý biến error an toàn (không gọi .message trực tiếp trên unknown)
       console.error('Lỗi gửi mail/tạo PDF:', error);
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
@@ -1411,8 +1579,8 @@ export class OrdersService {
 
   // Helper
   private async logCreateOrder(
-    userId: string | null, // userId có thể null (Guest)
-    order: MongooseOrderDoc, // [FIX]: Dùng Interface chuẩn thay vì 'any'
+    userId: string | null | undefined,
+    order: MongooseOrderDoc,
     source: string,
     ip: string,
     userAgent: string,
@@ -1420,15 +1588,15 @@ export class OrdersService {
     await this.auditLogsService.log({
       action: 'CREATE_ORDER',
       collection_name: 'orders',
-      actor_id: userId, // Nếu userId null, AuditLogService cần xử lý được case này (hoặc ép về string rỗng nếu cần)
-      target_id: order._id as string, // [FIX]: Ép kiểu về string
+      actor_id: userId || undefined,
+      target_id: String(order._id),
       department: Department.SALES,
       detail: {
         order_code: order.order_code,
         total: order.total_amount,
         item_count: order.items.length,
         source: source,
-        payment_method: order.payment?.method, // [FIX]: Đã có thể log an toàn nhờ Interface
+        payment_method: order.payment?.method || 'UNKNOWN',
       },
       is_success: true,
       ip: ip,
@@ -1479,15 +1647,18 @@ export class OrdersService {
     );
 
     // 3. Tính phí Ship
-    const shippingFee = this.calculateShippingFee(
+    const shippingFee = await this.shippingService.calculateShippingFee(
       dto.shippingInfo?.city_code,
+      dto.shippingInfo?.district_code,
       items,
+      dto.isInstant,
     );
 
     // 4. Tính Voucher
     const { discount, finalTotal: totalAfterVoucher } = await this.applyVoucher(
       itemsTotal,
       dto.voucherCode,
+      null,
     );
 
     // 5. Kết quả cuối
@@ -1499,175 +1670,8 @@ export class OrdersService {
       discount_amount: discount,
       voucher_code: dto.voucherCode || null,
       total_amount: totalAmount,
-      shipping_method: 'Tiêu chuẩn',
+      shipping_method: dto.isInstant ? 'Hỏa tốc' : 'Tiêu chuẩn',
       can_cod: totalAmount <= 5000000,
     };
-  }
-
-  // Hàm tính phí ship tách riêng
-  private calculateShippingFee(
-    cityCode: string | undefined | null,
-    items: (CartItem | OrderItem)[],
-  ): number {
-    if (!cityCode) return 0;
-
-    // Logic: Tính tổng trọng lượng
-    const totalWeight = items.reduce((w, i) => {
-      const itemWithWeight = i as unknown as {
-        weight?: number;
-        quantity: number;
-      };
-
-      const itemWeight = itemWithWeight.weight || 0.5; // Mặc định 0.5kg nếu thiếu
-      return w + itemWeight * i.quantity;
-    }, 0);
-
-    // AC14: Check trọng lượng quá khổ
-    if (totalWeight > 50) {
-      throw new BadRequestException(
-        'Đơn hàng quá nặng (>50kg). Vui lòng liên hệ hotline.',
-      );
-    }
-
-    // AC: Phí cơ bản
-    let fee = 30000;
-    // Check code tỉnh thành (HCM, HN...)
-    if (['HCM', '79', 'HN', '01'].includes(cityCode)) {
-      fee = 15000;
-    }
-
-    // Logic hàng cồng kềnh (Ví dụ > 30kg)
-    if (totalWeight > 30) {
-      fee += 50000; // Phụ phí
-    }
-
-    return fee;
-  }
-
-  async handleVnpayIpn(vnpParams: VnpayReturnParams) {
-    // const secureHash = vnpParams.vnp_SecureHash; // (Biến này chưa dùng)
-    const orderId = vnpParams.vnp_TxnRef;
-    const rspCode = vnpParams.vnp_ResponseCode;
-    const isValidChecksum = this.verifyChecksum(vnpParams);
-    if (!isValidChecksum) {
-      return { RspCode: '97', Message: 'Invalid Checksum' };
-    }
-
-    // 2. Tìm đơn hàng
-    const order = (await this.orderModel.findOne({
-      order_code: orderId,
-    })) as unknown as MongooseOrderDoc;
-
-    if (!order) return { RspCode: '01', Message: 'Order not found' };
-
-    // 3. Check số tiền
-    const vnpAmount = vnpParams.vnp_Amount;
-    const amount = parseInt(vnpAmount) / 100;
-
-    if (order.total_amount !== amount) {
-      return { RspCode: '04', Message: 'Invalid Amount' };
-    }
-
-    // 4. Cập nhật trạng thái
-    if (order.payment.status === 'PAID') {
-      return { RspCode: '02', Message: 'Order already confirmed' };
-    }
-
-    if (rspCode === '00') {
-      // THANH TOÁN THÀNH CÔNG
-      order.payment.status = 'PAID';
-      order.status = 'CONFIRMED';
-      order.hold_expires_at = undefined;
-
-      // Timeline logic
-      if (!order.timeline) order.timeline = [];
-      order.timeline.push({
-        status: 'PAID',
-        timestamp: new Date(),
-        actor: 'VNPay IPN',
-        note: `Payment confirmed via VNPay (Txn: ${vnpParams.vnp_TransactionNo})`,
-      });
-
-      await order.save();
-
-      return { RspCode: '00', Message: 'Confirm Success' };
-    } else {
-      // THANH TOÁN THẤT BẠI
-      return { RspCode: '00', Message: 'Payment Failed confirmed' };
-    }
-  }
-
-  async convertGuestToMember(orderId: string, password: string) {
-    // 1. Tìm đơn hàng
-    const order = await this.orderModel.findById(orderId);
-    if (!order || !order.guest_info || !order.guest_info.email) {
-      throw new BadRequestException('Đơn hàng không hợp lệ để tạo tài khoản');
-    }
-
-    // 2. Check xem email đã tồn tại chưa
-    const existingUser = await this.connection
-      .collection('users')
-      .findOne({ email: order.guest_info.email });
-    if (existingUser) {
-      throw new BadRequestException(
-        'Email này đã có tài khoản. Vui lòng đăng nhập.',
-      );
-    }
-
-    // 3. Gọi UserService để tạo user mới
-    const hashedPassword = await this.hashPassword(password);
-
-    const newUser = await this.connection.collection('users').insertOne({
-      email: order.guest_info.email,
-      password: hashedPassword,
-      name: order.guest_info.name,
-      phone: order.guest_info.phone,
-      createdAt: new Date(),
-      role: 'CUSTOMER',
-    });
-
-    // 4. Cập nhật lại đơn hàng
-    order.user_id = newUser.insertedId;
-    (order as unknown as MongooseOrderDoc).isGuest = false;
-    await (order as unknown as MongooseOrderDoc).save();
-
-    return {
-      success: true,
-      message: 'Tạo tài khoản thành công',
-      userId: newUser.insertedId,
-    };
-  }
-
-  private async hashPassword(password: string): Promise<string> {
-    const salt = await bcrypt.genSalt(10);
-    return bcrypt.hash(password, salt);
-  }
-
-  // Thêm hàm check checksum giả lập
-  private verifyChecksum(vnpParams: VnpayReturnParams): boolean {
-    const secureHash = vnpParams.vnp_SecureHash;
-    const secretKey = process.env.VNP_HASH_SECRET || '';
-    const vnpParamsObj: Record<string, any> = { ...vnpParams };
-
-    delete vnpParamsObj['vnp_SecureHash'];
-    delete vnpParamsObj['vnp_SecureHashType'];
-
-    const sortedKeys = Object.keys(vnpParamsObj).sort();
-
-    let signData = '';
-    sortedKeys.forEach((key) => {
-      const value = vnpParamsObj[key] as string | number;
-      // Kiểm tra value tồn tại (loại trừ null/undefined nhưng giữ số 0)
-      if (value !== null && value !== undefined && value !== '') {
-        if (signData.length > 0) {
-          signData += '&';
-        }
-        signData += `${key}=${encodeURIComponent(String(value))}`;
-      }
-    });
-    const hmac = crypto.createHmac('sha512', secretKey);
-    const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
-
-    return secureHash === signed;
   }
 }

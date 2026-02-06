@@ -6,7 +6,6 @@ import {
   Post,
   Put,
   Query,
-  UseGuards,
   Ip,
   UseInterceptors,
   UploadedFiles,
@@ -15,8 +14,6 @@ import {
 } from '@nestjs/common';
 import { type ReviewQueryParam, ReviewsService } from './reviews.service';
 import { CreateReviewDto } from './dto/create-review.dto';
-import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { Role } from '../../../common/enums/role.enum';
 import { Public } from '../../../common/decorators/public.decorator';
@@ -51,7 +48,6 @@ export class ReviewsController {
 
   // AC: Gửi đánh giá (User phải đăng nhập)
   @Post()
-  @UseGuards(JwtAuthGuard)
   async create(
     @CurrentUser() user: ICurrentUser,
     @Body() dto: CreateReviewDto,
@@ -72,7 +68,6 @@ export class ReviewsController {
   }
 
   @Put(':id/approve')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   async approve(
     @Param('id') id: string,
@@ -82,14 +77,12 @@ export class ReviewsController {
   }
 
   @Get('admin/pending')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   async getPending() {
     return this.reviewsService.getPendingReviews();
   }
 
   @Post(':id/report')
-  @UseGuards(JwtAuthGuard)
   async report(
     @Param('id') id: string,
     @Body() dto: ReportReviewDto,
@@ -100,7 +93,6 @@ export class ReviewsController {
   }
 
   @Post('upload-media')
-  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FilesInterceptor('files'))
   async uploadReviewMedia(@UploadedFiles() files: Array<Express.Multer.File>) {
     if (!files || files.length === 0) {
@@ -152,7 +144,6 @@ export class ReviewsController {
   }
 
   @Post(':id/vote')
-  @UseGuards(JwtAuthGuard)
   async voteHelpful(
     @Param('id') id: string,
     @CurrentUser() user: ICurrentUser,

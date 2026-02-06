@@ -4,11 +4,18 @@ import { Document, HydratedDocument, Types } from 'mongoose';
 export type OrderDocument = HydratedDocument<Order>;
 
 class OrderItem {
-  @Prop({ type: Types.ObjectId, ref: 'Product' }) product_id: Types.ObjectId;
-  @Prop() sku: string;
-  @Prop() product_name: string;
-  @Prop() price: number;
-  @Prop() quantity: number;
+  @Prop({ type: Types.ObjectId, ref: 'Product' })
+  product_id: Types.ObjectId;
+  @Prop()
+  sku: string;
+  @Prop({ required: true })
+  product_name: string;
+  @Prop()
+  price: number;
+  @Prop()
+  quantity: number;
+  @Prop()
+  image: string;
 }
 
 @Schema()
@@ -29,6 +36,9 @@ export class Order extends Document {
 
   @Prop({ type: Object })
   guest_info?: { name: string; phone: string; email?: string };
+
+  @Prop({ default: false })
+  isGuest: boolean;
 
   @Prop({ type: [OrderItem] })
   items: OrderItem[];

@@ -120,6 +120,8 @@ export interface Voucher {
   usage_limit?: number;
   used_count: number;
   max_discount_amount?: number; // Mức giảm tối đa cho loại PERCENT
+  applicable_category_ids?: string[];
+  applicable_product_ids?: string[];
 }
 
 // Interface Input dành riêng cho Promotion Engine
@@ -174,27 +176,6 @@ export interface InvoiceOrder {
   };
 }
 
-// [FIX DONE]: Chỉ giữ lại 1 bản khai báo duy nhất và chuẩn nhất
-export interface OrderWithTimeline {
-  timeline: {
-    status: string;
-    timestamp: Date;
-    actor: string;
-    note: string;
-  }[];
-  // Hàm save có thể nhận options (như session)
-  save: (options?: any) => Promise<any>;
-}
-
-// [FIX DONE]: Chỉ giữ lại 1 bản khai báo duy nhất và chuẩn nhất
-export interface MongooseOrderDoc extends OrderData {
-  _id: any;
-  timeline: any[];
-  // Hàm save có thể nhận options (như session)
-  save: (options?: any) => Promise<MongooseOrderDoc>;
-  toObject: (options?: any) => OrderData;
-}
-
 export interface PrintTemplateData {
   type: 'INVOICE' | 'PACKING_SLIP';
   print_date: Date;
@@ -206,4 +187,30 @@ export interface PrintTemplateData {
   };
   items: any[];
   financials?: any;
+}
+
+// 6. MONGOOSE DOCUMENT INTERFACES (QUAN TRỌNG NHẤT)
+
+// Interface dùng để Type Casting trong Service khi dùng Mongoose
+export interface MongooseOrderDoc
+  extends OrderData, Omit<Document, 'timeline'> {
+  _id: any;
+
+  // Timeline đầy đủ
+  timeline: {
+    status: string;
+    timestamp: Date;
+    actor: string;
+    note: string;
+  }[];
+
+  // Các trường bổ sung để xử lý logic phức tạp
+  cancel_reason?: string;
+  internal_note?: string;
+
+  // Định nghĩa hàm save có hỗ trợ session (Transaction)
+  save: (options?: { session?: any }) => Promise<MongooseOrderDoc>;
+
+  // Hàm chuyển đổi sang Object thường
+  toObject: (options?: any) => OrderData;
 }

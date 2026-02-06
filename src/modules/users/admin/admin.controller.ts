@@ -6,29 +6,24 @@ import {
   Delete,
   Param,
   Query,
-  UseGuards,
   Ip,
   Headers as HttpHeaders,
   Patch,
 } from '@nestjs/common';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { Role } from 'src/common/enums/role.enum';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import { AdminService } from './admin.service';
 import { QueryStaffDto } from './dto/query-staff.dto';
 import { ChangeStatusDto } from './dto/change-status.dto';
 import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
-import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import type { IUser } from 'src/common/interfaces/user.interface';
 
 @Controller('admin/users/staff')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class AdminController {
   constructor(
     private readonly adminService: AdminService,

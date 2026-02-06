@@ -1,10 +1,16 @@
 import {
   BadRequestException,
   Injectable,
-  NotFoundException,
+  // Đã xóa NotFoundException vì không dùng tới để fix lỗi ESLint
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import {
+  Model,
+  Types,
+  ClientSession,
+  FilterQuery,
+  UpdateQuery,
+} from 'mongoose';
 
 import { AdjustStockDto } from './dto/adjust-stock.dto';
 import {
@@ -18,84 +24,82 @@ export class StockService {
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
   ) {}
 
-  // [AC2] BƯỚC 1: TẠM GIỮ HÀNG (HOLD) - Khi khách đặt đơn/vào giỏ
-  // [AC7] Đảm bảo tính nhất quán (Concurrency Safety)
-  async holdStock(dto: AdjustStockDto) {
+  // [AC2] BƯỚC 1: TẠM GIỮ HÀNG (HOLD)
+  async holdStock(dto: AdjustStockDto, session?: ClientSession) {
     const { product_id, sku, quantity } = dto;
 
-    // Tìm sản phẩm để check cấu hình [AC6] Backorder
-    const product = await this.productModel.findById(product_id);
-    if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
+    // 1. Lấy thông tin sản phẩm để check has_variants
+    const product = await this.productModel
+      .findById(product_id)
+      .select('has_variants')
+      .session(session || null);
+    if (!product) throw new BadRequestException('Sản phẩm không tồn tại');
 
-    let filter = {};
-    let update = {};
+    const filter: FilterQuery<ProductDocument> = {
+      _id: new Types.ObjectId(product_id),
+      status: 'ACTIVE',
+    };
 
-    // [AC5] Xử lý theo Biến thể (SKU Level) hoặc Sản phẩm đơn
+    let update: UpdateQuery<ProductDocument> = {};
+    const queryFilter: FilterQuery<ProductDocument> = { ...filter };
+
     if (product.has_variants) {
-      // Logic query: Tìm đúng ID + đúng SKU biến thể
-      // Điều kiện khóa (Lock condition):
-      // 1. Stock >= quantity (Còn đủ hàng)
-      // 2. HOẶC allow_backorder = true ([AC6] Cho phép bán âm)
-      filter = {
-        _id: new Types.ObjectId(product_id),
-        'variants.sku': sku,
-        $or: [
-          { 'variants.stock': { $gte: quantity } }, // [AC3] Logic chặn nếu hết hàng
-          { allow_backorder: true }, // [AC6] Ngoại lệ bán vượt mức
-        ],
-      };
-
-      // Hành động: Trừ kho khả dụng, cộng vào kho tạm giữ
+      // LOGIC CŨ (GIỮ NGUYÊN)
+      queryFilter['variants.sku'] = sku;
+      queryFilter['$or'] = [
+        { 'variants.stock': { $gte: quantity } },
+        { allow_backorder: true },
+      ];
       update = {
         $inc: {
           'variants.$.stock': -quantity,
           'variants.$.stock_on_hold': quantity,
+          stock: -quantity, // Đồng bộ kho tổng
         },
       };
     } else {
-      // Logic cho sản phẩm không có biến thể
-      filter = {
-        _id: new Types.ObjectId(product_id),
-        $or: [{ stock: { $gte: quantity } }, { allow_backorder: true }],
-      };
+      // LOGIC MỚI CHO SIMPLE PRODUCT
+      queryFilter['$or'] = [
+        { stock: { $gte: quantity } },
+        { allow_backorder: true },
+      ];
       update = {
-        $inc: { stock: -quantity, stock_on_hold: quantity },
+        $inc: {
+          stock: -quantity,
+          stock_on_hold: quantity,
+        },
       };
     }
 
-    // Thực thi Atomic Update (AC7)
-    const result = await this.productModel.findOneAndUpdate(filter, update, {
-      new: true,
-    });
+    const result = await this.productModel.findOneAndUpdate(
+      queryFilter,
+      update,
+      { new: true, session },
+    );
 
     if (!result) {
-      // [AC3] Nếu update thất bại -> Tức là hết hàng và không cho backorder
-      // Disable nút mua/báo lỗi cho Frontend
       throw new BadRequestException(
-        `Sản phẩm ${sku} đã hết hàng (Out of Stock).`,
+        `Sản phẩm ${sku || product_id} không đủ tồn kho.`,
       );
     }
 
-    return {
-      success: true,
-      message: 'Đã tạm giữ hàng thành công',
-      sku,
-      held_quantity: quantity,
-    };
+    return { success: true, sku, held_quantity: quantity };
   }
 
-  // [AC2] BƯỚC 2: TRỪ KHO CHÍNH THỨC (DEDUCT) - Khi thanh toán xong
-  async finalizeDeduction(dto: AdjustStockDto) {
+  // [AC2] BƯỚC 2: TRỪ KHO CHÍNH THỨC (DEDUCT)
+  async finalizeDeduction(dto: AdjustStockDto, session?: ClientSession) {
     const { product_id, sku, quantity } = dto;
 
-    // Lúc này hàng đã nằm trong stock_on_hold, ta chỉ cần xóa nó đi
-    const filter = { _id: new Types.ObjectId(product_id) };
-    let update = {};
+    const filter: FilterQuery<ProductDocument> = {
+      _id: new Types.ObjectId(product_id),
+    };
 
-    // Check xem là biến thể hay sản phẩm thường để build query
+    let update: UpdateQuery<ProductDocument> = {};
+
     const product = await this.productModel
       .findById(product_id)
-      .select('has_variants');
+      .select('has_variants')
+      .session(session || null);
 
     if (product?.has_variants) {
       filter['variants.sku'] = sku;
@@ -104,41 +108,51 @@ export class StockService {
       update = { $inc: { stock_on_hold: -quantity } };
     }
 
-    await this.productModel.updateOne(filter, update);
+    await this.productModel.updateOne(filter, update).session(session || null);
+
     return { success: true, message: 'Đã trừ kho chính thức' };
   }
 
-  // [AC2] BƯỚC 3: HOÀN KHO (RESTOCK) - Khi hủy đơn/quá hạn thanh toán
-  async restock(dto: AdjustStockDto) {
+  // [AC2] BƯỚC 3: HOÀN KHO (RESTOCK)
+  async restock(dto: AdjustStockDto, session?: ClientSession) {
     const { product_id, sku, quantity } = dto;
 
-    // Trả lại hàng từ on_hold về stock khả dụng
-    const filter = { _id: new Types.ObjectId(product_id) };
-    let update = {};
-
+    // 1. Check has_variants
     const product = await this.productModel
       .findById(product_id)
-      .select('has_variants');
+      .select('has_variants')
+      .session(session || null);
+    if (!product) return; // Silent return nếu sp đã bị xóa
 
-    if (product?.has_variants) {
+    const filter: FilterQuery<ProductDocument> = {
+      _id: new Types.ObjectId(product_id),
+    };
+
+    let update: UpdateQuery<ProductDocument> = {};
+
+    if (product.has_variants) {
       filter['variants.sku'] = sku;
       update = {
         $inc: {
-          'variants.$.stock': quantity, // Cộng lại kho bán
-          'variants.$.stock_on_hold': -quantity, // Trừ kho tạm giữ
+          'variants.$.stock': quantity,
+          'variants.$.stock_on_hold': -quantity,
+          stock: quantity,
         },
       };
     } else {
       update = {
-        $inc: { stock: quantity, stock_on_hold: -quantity },
+        $inc: {
+          stock: quantity,
+          stock_on_hold: -quantity,
+        },
       };
     }
 
-    await this.productModel.updateOne(filter, update);
-    return { success: true, message: 'Đã hoàn kho (Restock)' };
+    await this.productModel.updateOne(filter, update).session(session || null);
+    return { success: true, message: 'Đã hoàn kho' };
   }
 
-  // [AC4] KIỂM TRA TRẠNG THÁI CẢNH BÁO (Helper cho Frontend)
+  // [AC4] KIỂM TRA TRẠNG THÁI
   checkStockStatus(currentStock: number, min: number, max: number) {
     if (currentStock <= 0) return 'OUT_OF_STOCK';
     if (currentStock <= min) return 'LOW_STOCK_ALERT';

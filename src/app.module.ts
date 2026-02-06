@@ -19,6 +19,10 @@ import { SalesModule } from './modules/sales/sales.module';
 import { RedisModule } from '@nestjs-modules/ioredis';
 import { SearchModule } from './modules/search/search.module';
 import { MarketingModule } from './modules/marketing/marketing.module';
+import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { PermissionsGuard } from './common/guards/permissions.guard';
+import { RolesGuard } from './common/guards/roles.guard';
 
 @Module({
   imports: [
@@ -66,16 +70,21 @@ import { MarketingModule } from './modules/marketing/marketing.module';
   controllers: [AppController],
   providers: [
     AppService,
-    // // Đăng ký JwtAuthGuard cho toàn bộ ứng dụng (trừ các route @Public())
-    // {
-    //   provide: APP_GUARD,
-    //   useClass: JwtAuthGuard,
-    // },
-    // // Đăng ký RolesGuard để kiểm tra phân quyền sau khi JWT đã xác thực
-    // {
-    //   provide: APP_GUARD,
-    //   useClass: RolesGuard,
-    // },
+    //1. Xác thực danh tính trước (Ai đang đăng nhập?)
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+    // 2. Kiểm tra vai trò lớn (Có phải Admin không? Nếu không thì chặn luôn)
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+    // 3. Kiểm tra quyền chi tiết (Có được sửa user này không?)
+    {
+      provide: APP_GUARD,
+      useClass: PermissionsGuard,
+    },
   ],
 })
 export class AppModule {}

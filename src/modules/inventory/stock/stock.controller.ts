@@ -1,11 +1,9 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Post } from '@nestjs/common';
 import { StockService } from './stock.service';
 import { AdjustStockDto } from './dto/adjust-stock.dto';
-import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { Public } from 'src/common/decorators/public.decorator';
 
 @Controller('inventory/stock')
-@UseGuards(JwtAuthGuard)
 export class StockController {
   constructor(private readonly stockService: StockService) {}
 
@@ -19,6 +17,7 @@ export class StockController {
 
   // API gọi khi Thanh toán thành công (Webhook từ VNPAY/MOMO...)
   // Đáp ứng AC2 (Deduct)
+  @Public()
   @Post('deduct')
   async deductStock(@Body() dto: AdjustStockDto) {
     return this.stockService.finalizeDeduction(dto);

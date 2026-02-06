@@ -9,6 +9,8 @@ import {
   UseGuards,
   Ip,
 } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+
 import { CartService } from './cart.service';
 import { AddToCartDto } from './dto/add-to-cart.dto';
 import {
@@ -16,32 +18,38 @@ import {
   RemoveCartItemDto,
   UpdateCartItemDto,
 } from './dto/update-cart.dto';
+
+// Interfaces & Decorators
 import { UserAgent } from '../../../common/decorators/user-agent.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import type { IUser } from '../../../common/interfaces/user.interface';
-import { OptionalJwtAuthGuard } from 'src/common/guards/optional-auth.guard';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { CartResponse } from 'src/common/interfaces/cart-response.interface';
+import { Public } from 'src/common/decorators/public.decorator';
+import { OptionalJwtAuthGuard } from 'src/common/guards/optional-auth.guard';
 
+@ApiTags('Cart (Giỏ hàng)')
 @Controller('cart')
 export class CartController {
   constructor(private readonly cartService: CartService) {}
 
-  // 1. LẤY GIỎ HÀNG
+  // 1. LẤY GIỎ HÀNG (Hybrid: Guest hoặc User đều xem được)
   @Get()
+  @Public() // <--- QUAN TRỌNG: Mở cửa cho Guest
+  @UseGuards(OptionalJwtAuthGuard) // <--- QUAN TRỌNG: Kiểm tra xem có phải User không
+  @ApiOperation({ summary: 'Lấy thông tin giỏ hàng (Hỗ trợ cả Guest & User)' })
   async getCart(
     @CurrentUser() user: IUser | null,
     @Query('guestSessionId') guestSessionId: string,
   ): Promise<CartResponse> {
-    // Trả về toàn bộ Object giỏ hàng
     const userId = user ? user._id : null;
-    // ... xử lý trả về
     return this.cartService.getCart(userId, guestSessionId);
   }
 
   // 2. THÊM VÀO GIỎ
-  @UseGuards(OptionalJwtAuthGuard)
   @Post('add')
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Thêm sản phẩm vào giỏ' })
   async addToCart(
     @Body() dto: AddToCartDto,
     @CurrentUser() user: IUser | null,
@@ -53,8 +61,10 @@ export class CartController {
   }
 
   // 3. CẬP NHẬT SỐ LƯỢNG
-  @UseGuards(OptionalJwtAuthGuard)
   @Patch('update')
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Cập nhật số lượng item' })
   async updateItem(
     @Body() dto: UpdateCartItemDto,
     @CurrentUser() user: IUser | null,
@@ -70,8 +80,10 @@ export class CartController {
   }
 
   // 4. XÓA SẢN PHẨM
-  @UseGuards(OptionalJwtAuthGuard)
   @Delete('remove')
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Xóa item khỏi giỏ' })
   async removeItem(
     @Body() dto: RemoveCartItemDto,
     @CurrentUser() user: IUser | null,
@@ -87,8 +99,10 @@ export class CartController {
   }
 
   // 5. XÓA TẤT CẢ GIỎ HÀNG
-  @UseGuards(OptionalJwtAuthGuard)
   @Delete('clear')
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Làm trống giỏ hàng' })
   async clearCart(
     @CurrentUser() user: IUser | null,
     @Query('guestSessionId') guestSessionId: string,
@@ -97,9 +111,11 @@ export class CartController {
     return this.cartService.clearCart(userId, guestSessionId);
   }
 
-  // 6. ĐỔI BIẾN THỂ
-  @UseGuards(OptionalJwtAuthGuard)
+  // 6. ĐỔI BIẾN THỂ (SIZE/MÀU)
   @Patch('change-variant')
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Đổi biến thể sản phẩm trong giỏ' })
   async changeVariant(
     @Body() dto: ChangeVariantDto,
     @CurrentUser() user: IUser | null,
@@ -114,11 +130,12 @@ export class CartController {
     return this.cartService.changeVariant(userId, payload, ip, userAgent);
   }
 
-  // 7. GỘP GIỎ HÀNG
+  // 7. GỘP GIỎ HÀNG (Chỉ User mới làm được -> Giữ nguyên bảo mật)
   @Post('merge')
-  @UseGuards(JwtAuthGuard)
+  // Không có @Public -> Global JwtAuthGuard sẽ chặn nếu chưa login (Chuẩn)
+  @ApiOperation({ summary: 'Gộp giỏ hàng Guest vào User khi đăng nhập' })
   async mergeCart(
-    @CurrentUser() user: IUser,
+    @CurrentUser() user: IUser, // User chắc chắn tồn tại ở đây
     @Body('guestSessionId') guestSessionId: string,
     @Ip() ip: string,
     @UserAgent() userAgent: string,

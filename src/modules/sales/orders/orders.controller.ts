@@ -10,15 +10,10 @@ import {
   Query,
   BadRequestException,
 } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
-import { Public } from '../../../common/decorators/public.decorator';
-import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../../common/guards/roles.guard';
-import { UserAgent } from '../../../common/decorators/user-agent.decorator';
-import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import type { IUser } from '../../../common/interfaces/user.interface';
-import { OptionalJwtAuthGuard } from 'src/common/guards/optional-auth.guard';
 import { BuyNowDto } from './dto/buy-now.dto';
 import { FilterOrderDto } from './dto/filter-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -26,14 +21,25 @@ import {
   InitGuestCheckoutDto,
   VerifyGuestOtpDto,
 } from './dto/guest-checkout.dto';
-import type { VnpayReturnParams } from 'src/common/interfaces/oder.interface';
 
+// Decorators & Guards
+import { Public } from '../../../common/decorators/public.decorator';
+import { UserAgent } from '../../../common/decorators/user-agent.decorator';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import type { IUser } from '../../../common/interfaces/user.interface';
+import { OptionalJwtAuthGuard } from 'src/common/guards/optional-auth.guard';
+
+@ApiTags('Orders (Quản lý đơn hàng)')
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
-  @UseGuards(OptionalJwtAuthGuard)
+  // NHÓM 1: CÁC ROUTE TĨNH & PUBLIC
+  // 1. TẠO ĐƠN HÀNG (Hỗ trợ cả Guest và Member)
   @Post()
+  @Public() // Cho phép Guest
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Tạo đơn hàng mới (Cart hoặc BuyNow)' })
   async createOrder(
     @Body() dto: CreateOrderDto,
     @CurrentUser() user: IUser | null,
@@ -44,68 +50,40 @@ export class OrdersController {
     return this.ordersService.createOrder(userId, dto, ip, userAgent);
   }
 
-  // US.121: Lấy danh sách đơn hàng (Admin/Staff)
-  @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  async findAll(@Query() query: FilterOrderDto) {
-    return this.ordersService.findAll(query);
-  }
-
-  // US.122: Xem chi tiết đơn hàng
-  @Get(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  async findOne(@Param('id') id: string) {
-    return this.ordersService.findOne(id);
-  }
-
-  @Public()
+  // 3. INIT BUY NOW
   @Post('test/init-buy-now')
+  @Public()
+  @ApiOperation({ summary: 'Khởi tạo phiên mua ngay' })
   async initBuyNow(@Body() body: BuyNowDto) {
     return this.ordersService.createBuyNowSession(body);
   }
 
-  // US.123: Cập nhật trạng thái nâng cao
-  @Patch(':id/status-advanced')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  async updateStatusAdvanced(
-    @Param('id') id: string,
-    @Body() dto: UpdateOrderStatusDto,
-    @CurrentUser() user: IUser,
-    @Ip() ip: string,
-    @UserAgent() userAgent: string,
-  ) {
-    const actorName = user.fullName || user.email || 'Staff';
-
-    return this.ordersService.updateStatusAdvanced(
-      id,
-      dto,
-      user._id.toString(),
-      actorName,
-      ip,
-      userAgent,
-    );
+  // 4. GUEST CHECKOUT FLOW
+  @Post('guest/init')
+  @Public()
+  @ApiOperation({ summary: 'Guest: Khởi tạo thanh toán & Gửi OTP' })
+  async initGuestCheckout(@Body() dto: InitGuestCheckoutDto) {
+    return this.ordersService.initGuestCheckout(dto);
   }
 
-  // US.124: Lấy dữ liệu in (Hóa đơn / Phiếu xuất)
-  @Get(':id/print')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  async printOrder(
-    @Param('id') id: string,
-    @Query('type') type: 'INVOICE' | 'PACKING_SLIP',
-  ) {
-    return this.ordersService.generatePrintData(id, type);
+  @Post('guest/verify-otp')
+  @Public()
+  @ApiOperation({ summary: 'Guest: Xác thực OTP' })
+  async verifyGuestOtp(@Body() dto: VerifyGuestOtpDto) {
+    return this.ordersService.verifyGuestOtp(dto);
   }
 
-  // US.124 AC3: Gửi hóa đơn qua email
-  @Post(':id/send-invoice')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  async sendInvoice(@Param('id') id: string) {
-    return this.ordersService.sendInvoiceEmail(id);
+  // 5. TÍNH TOÁN XEM TRƯỚC
+  @Post('preview')
+  @Public()
+  @ApiOperation({ summary: 'Xem trước chi phí (Ship, Voucher...)' })
+  async previewOrder(@Body() dto: CreateOrderDto) {
+    return this.ordersService.previewOrder(dto);
   }
 
-  // US.124 AC4: In hàng loạt
+  // 6. IN HÀNG LOẠT
   @Post('print-bulk')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'In nhiều đơn hàng cùng lúc' })
   async printBulk(
     @Body('ids') ids: string[],
     @Query('type') type: 'INVOICE' | 'PACKING_SLIP',
@@ -116,37 +94,57 @@ export class OrdersController {
     return this.ordersService.generateBulkPrintData(ids, type);
   }
 
-  @Public()
-  @Post('guest/init')
-  async initGuestCheckout(@Body() dto: InitGuestCheckoutDto) {
-    return this.ordersService.initGuestCheckout(dto);
+  // 7. LẤY DANH SÁCH (Query Params)
+  @Get()
+  @ApiOperation({ summary: 'Lấy danh sách đơn hàng (Filter/Sort)' })
+  async findAll(@Query() query: FilterOrderDto) {
+    return this.ordersService.findAll(query);
   }
 
-  @Public()
-  @Post('guest/verify-otp')
-  async verifyGuestOtp(@Body() dto: VerifyGuestOtpDto) {
-    return this.ordersService.verifyGuestOtp(dto);
+  // NHÓM 2: CÁC ROUTE ĐỘNG (CÓ :id)
+
+  // 8. CHI TIẾT ĐƠN HÀNG
+  @Get(':id')
+  @ApiOperation({ summary: 'Xem chi tiết đơn hàng theo ID' })
+  async findOne(@Param('id') id: string) {
+    return this.ordersService.findOne(id);
   }
 
-  @Public()
-  @Post('preview')
-  async previewOrder(@Body() dto: CreateOrderDto) {
-    return this.ordersService.previewOrder(dto);
-  }
-
-  @Public()
-  @Get('vnpay-ipn')
-  // [FIX]: Thay 'any' bằng 'VnpayReturnParams'
-  async vnpayIpn(@Query() query: VnpayReturnParams) {
-    return this.ordersService.handleVnpayIpn(query);
-  }
-
-  // orders.controller.ts
-  @Public()
-  @Post('guest/convert-to-member')
-  async convertGuestToMember(
-    @Body() body: { orderId: string; password: string },
+  // 9. CẬP NHẬT TRẠNG THÁI
+  @Patch(':id/status-advanced')
+  @ApiOperation({ summary: 'Cập nhật trạng thái đơn hàng nâng cao' })
+  async updateStatusAdvanced(
+    @Param('id') id: string,
+    @Body() dto: UpdateOrderStatusDto,
+    @CurrentUser() user: IUser,
+    @Ip() ip: string,
+    @UserAgent() userAgent: string,
   ) {
-    return this.ordersService.convertGuestToMember(body.orderId, body.password);
+    const actorName = user.fullName || user.email || 'Staff';
+    return this.ordersService.updateStatusAdvanced(
+      id,
+      dto,
+      user._id.toString(),
+      actorName,
+      ip,
+      userAgent,
+    );
+  }
+
+  // 10. LẤY DATA IN
+  @Get(':id/print')
+  @ApiOperation({ summary: 'Lấy dữ liệu để in hóa đơn/phiếu giao' })
+  async printOrder(
+    @Param('id') id: string,
+    @Query('type') type: 'INVOICE' | 'PACKING_SLIP',
+  ) {
+    return this.ordersService.generatePrintData(id, type);
+  }
+
+  // 11. GỬI EMAIL HÓA ĐƠN
+  @Post(':id/send-invoice')
+  @ApiOperation({ summary: 'Gửi lại email hóa đơn cho khách' })
+  async sendInvoice(@Param('id') id: string) {
+    return this.ordersService.sendInvoiceEmail(id);
   }
 }

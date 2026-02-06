@@ -38,6 +38,10 @@ export class Customer extends User {
   // US.117: Ghi chú nội bộ của CSKH về khách này
   @Prop({ type: String })
   internal_note: string;
+
+  // Thêm vào trong class User
+  @Prop({ default: false })
+  is_subscribed: boolean;
 }
 
 export const CustomerSchema = SchemaFactory.createForClass(Customer);

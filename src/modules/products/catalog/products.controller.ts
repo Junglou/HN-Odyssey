@@ -7,7 +7,6 @@ import {
   Param,
   Delete,
   Query,
-  UseGuards,
   Ip,
   Headers as HttpHeaders,
   UploadedFiles,
@@ -25,15 +24,12 @@ import {
   UpdateProductPriceDto,
   UpdateProductStatusDto,
 } from './dto/update-product.dto';
-import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { Role } from '../../../common/enums/role.enum';
 import { Public } from '../../../common/decorators/public.decorator';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
-import { RolesGuard } from 'src/common/guards/roles.guard';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import type { IUser } from 'src/common/interfaces/user.interface';
 import * as fs from 'fs';
@@ -44,7 +40,6 @@ import { FilterOutput, ProductFilterService } from '../products-filter.service';
 import type { ProductQueryParam } from 'src/common/interfaces/product.interface';
 
 @Controller('products')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class ProductsController {
   constructor(
     private readonly productsService: ProductsService,

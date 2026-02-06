@@ -29,13 +29,10 @@ import { CreateRecoveryDto } from './dto/create-recovery.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
 import { ProcessRecoveryDto } from './dto/process-recovery.dto';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RecoverAccountDto } from './dto/recover-account.dto';
 import { UserAgent } from 'src/common/decorators/user-agent.decorator';
-import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
@@ -47,7 +44,6 @@ import { OAuthProfile } from 'src/common/interfaces/OAuthProfile';
 
 @ApiTags('Auth (Xác thực)')
 @Controller('auth')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 

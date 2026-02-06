@@ -1,8 +1,8 @@
 import {
-  Equals,
   IsBoolean,
   IsEmail,
   IsNotEmpty,
+  IsOptional,
   IsString,
   Matches,
   MinLength,
@@ -62,12 +62,12 @@ export class RegisterDto {
   @Match('password', { message: 'Mật khẩu nhập lại không khớp ' })
   confirmPassword: string;
 
-  @ApiProperty({ example: true, description: 'Đồng ý điều khoản (AC6)' })
-  @IsNotEmpty({ message: 'Bạn phải đồng ý với các điều khoản' })
-  @IsBoolean()
-  @Equals(true, {
-    message:
-      'Bạn phải đồng ý với Điều khoản sử dụng và Chính sách bảo mật (AC6)',
+  @ApiProperty({
+    example: true,
+    description: 'Đăng ký nhận bản tin quảng cáo (Tùy chọn)',
+    required: false,
   })
-  agreeToTerms: boolean;
+  @IsOptional()
+  @IsBoolean({ message: 'Giá trị phải là kiểu đúng/sai' })
+  isSubscribed?: boolean;
 }

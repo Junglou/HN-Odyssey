@@ -57,24 +57,34 @@ export class AuthService {
 
   //1. ĐĂNG KÝ TÀI KHOẢN (US.01)
   async register(dto: RegisterDto, ip: string, userAgent: string) {
-    if (dto.phoneNumber) {
-      dto.phoneNumber = this.normalizePhoneNumber(dto.phoneNumber);
+    // 1. Kiểm tra logic đơn giản trước (Tránh tốn CPU hash mật khẩu)
+    if (dto.password !== dto.confirmPassword) {
+      throw new BadRequestException('Mật khẩu xác nhận không khớp');
     }
-    // Kiểm tra xem số này có vừa yêu cầu đăng ký trong 60s qua không
+
+    // 2. Chuẩn hóa dữ liệu
+    const email = dto.email.toLowerCase().trim();
+    const phoneNumber = dto.phoneNumber
+      ? this.normalizePhoneNumber(dto.phoneNumber)
+      : null;
+    const accountKey = email || phoneNumber;
+
+    // 3. Kiểm tra Spam (Rate limit 60s)
     const existingOtp = await this.verificationModel.findOne({
-      account: dto.email || dto.phoneNumber,
+      account: accountKey,
       type: 'REGISTER',
-      createdAt: { $gt: new Date(Date.now() - 60 * 1000) }, // Trong 60s
+      createdAt: { $gt: new Date(Date.now() - 60 * 1000) },
     });
 
     if (existingOtp) {
       throw new BadRequestException(
-        'Bạn thao tác quá nhanh. Vui lòng đợi 60 giây trước khi đăng ký lại.',
+        'Bạn thao tác quá nhanh. Vui lòng đợi 60 giây.',
       );
     }
-    // AC3: Kiểm tra Email hoặc Phone đã tồn tại chưa
+
+    // 4. Kiểm tra tồn tại
     const existUser = await this.userModel.findOne({
-      $or: [{ email: dto.email }, { phone: dto.phoneNumber }],
+      $or: [{ email: email }, { phone: phoneNumber }],
     });
     if (existUser) {
       throw new ConflictException(
@@ -82,79 +92,66 @@ export class AuthService {
       );
     }
 
-    // AC8: Hash mật khẩu (Sử dụng bcryptjs)
+    // 5. Chỉ thực hiện Hash khi các bước kiểm tra trên đã PASS
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(dto.password, salt);
 
-    if (dto.password !== dto.confirmPassword) {
-      throw new BadRequestException('Mật khẩu xác nhận không khớp');
-    }
-
-    // BẮT ĐẦU TRANSACTION
     const session = await this.connection.startSession();
     session.startTransaction();
 
     try {
-      // AC7: Tạo Customer mới
+      // AC7: Tạo Customer
       const newCustomer = new this.customerModel({
         first_Name: dto.firstName,
         last_Name: dto.lastName,
-        email: dto.email,
-        phone: dto.phoneNumber,
+        email: email,
+        phone: phoneNumber,
         password: hashedPassword,
+        is_subscribed: dto.isSubscribed ?? false, // Xử lý trường hợp "thích thì tích"
         roles: ['CUSTOMER'],
         is_active: false,
         status: UserStatus.INACTIVE,
       });
       await newCustomer.save({ session });
 
-      // AC10: Tạo mã OTP
+      // AC10: Tạo và Lưu OTP
       const otpCode = this.generateOtpCode();
-      const expiredAt = new Date(Date.now() + 5 * 60 * 1000); // Hết hạn sau 5p
-
-      // Lưu OTP vào DB
       const verification = new this.verificationModel({
-        account: dto.email || dto.phoneNumber,
+        account: accountKey,
         code: otpCode,
         type: 'REGISTER',
-        expired_at: expiredAt,
+        expired_at: new Date(Date.now() + 5 * 60 * 1000),
       });
       await verification.save({ session });
 
-      // GỬI OTP THẬT (AC9)
-      if (dto.email) {
+      // Gửi OTP (Cân nhắc: Nếu gửi mail thất bại có nên hủy đăng ký không?)
+      if (email) {
         await this.emailService
-          .sendOtp(dto.email, otpCode)
+          .sendOtp(email, otpCode)
           .catch((e) => this.logger.error('Lỗi gửi mail:', e));
-      } else if (dto.phoneNumber) {
+      } else if (phoneNumber) {
         await this.smsService
-          .sendOtp(dto.phoneNumber, otpCode)
+          .sendOtp(phoneNumber, otpCode)
           .catch((e) => this.logger.error('Lỗi gửi SMS:', e));
       }
 
       await session.commitTransaction();
 
-      // Ghi Log Đăng ký
+      // Ghi Log Audit sau khi commit thành công
       await this.auditLogsService.log({
         action: 'REGISTER_LOCAL',
         collection_name: 'users',
         actor_id: newCustomer._id,
         target_id: newCustomer._id,
         department: Department.SUPPORT,
-        detail: {
-          email: dto.email,
-          phone: dto.phoneNumber,
-          status: 'PENDING_OTP',
-        },
-        ip: ip,
+        detail: { email, phone: phoneNumber, status: 'PENDING_OTP' },
+        ip,
         user_agent: userAgent,
       });
 
       return {
-        message: `Đăng ký thành công. Vui lòng kiểm tra ${
-          dto.email ? 'Email' : 'Tin nhắn'
-        } để nhập OTP.`,
-        account: dto.email || dto.phoneNumber,
+        message: `Đăng ký thành công. Vui lòng kiểm tra ${email ? 'Email' : 'Tin nhắn'} để nhận mã OTP.`,
+        account: accountKey,
       };
     } catch (error) {
       await session.abortTransaction();

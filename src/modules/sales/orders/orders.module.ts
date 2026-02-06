@@ -15,6 +15,12 @@ import { OrdersCronService } from './orders.cron';
 import { JwtModule } from '@nestjs/jwt';
 import { StockModule } from 'src/modules/inventory/stock/stock.module';
 import { MarketingModule } from 'src/modules/marketing/marketing.module';
+import { PaymentModule } from '../payment/payment.module';
+import {
+  ShippingConfig,
+  ShippingConfigSchema,
+} from 'src/modules/shipping/schemas/shipping-config.schema';
+import { ShippingModule } from 'src/modules/shipping/shipping.module';
 
 @Module({
   imports: [
@@ -22,11 +28,14 @@ import { MarketingModule } from 'src/modules/marketing/marketing.module';
       { name: Order.name, schema: OrderSchema },
       { name: Product.name, schema: ProductSchema },
       { name: Cart.name, schema: CartSchema },
+      { name: ShippingConfig.name, schema: ShippingConfigSchema },
     ]),
     AuditLogsModule,
     NotificationsModule,
     MarketingModule,
     StockModule,
+    PaymentModule,
+    ShippingModule,
     JwtModule.register({}),
   ],
   controllers: [OrdersController],

@@ -7,7 +7,6 @@ import {
   Param,
   Delete,
   Query,
-  UseGuards,
   Ip,
   Headers,
 } from '@nestjs/common';
@@ -17,18 +16,14 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 import { UpdateCategoryOrderDto } from './dto/update-category-order.dto';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { Role } from '../../../common/enums/role.enum';
-import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { Public } from '../../../common/decorators/public.decorator';
-import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
-import { RolesGuard } from 'src/common/guards/roles.guard';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import type { IUser } from 'src/common/interfaces/user.interface';
 import type { CategoryTree } from 'src/common/interfaces/CategoryTree';
 
 @Controller('categories')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 

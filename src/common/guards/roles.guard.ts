@@ -8,13 +8,12 @@ import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { Role } from '../enums/role.enum';
 import { ROLES_KEY } from '../decorators/roles.decorator';
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator'; // 👈 1. Import Key Public
 
-// 2. Định nghĩa Interface cho User
+// Interface User & Request (Giữ nguyên như bạn đã làm)
 interface RequestUser {
   roles: string[];
 }
-
-// 3. Định nghĩa Request chứa User
 interface RequestWithUser extends Request {
   user: RequestUser;
 }
@@ -24,13 +23,23 @@ export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    // 1. Lấy Required Roles
+    // 👇 2. THÊM ĐOẠN CHECK PUBLIC NÀY VÀO ĐẦU HÀM
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic) {
+      return true; // Nếu là Public -> Cho qua luôn, không cần check Role
+    }
+    // 👆 HẾT PHẦN THÊM
+
+    // --- Logic cũ giữ nguyên ---
     const requiredRoles = this.reflector.getAllAndOverride<string[]>(
       ROLES_KEY,
       [context.getHandler(), context.getClass()],
     );
 
-    // Nếu API không yêu cầu quyền -> Cho qua
     if (!requiredRoles) {
       return true;
     }
@@ -43,14 +52,11 @@ export class RolesGuard implements CanActivate {
     }
 
     const superAdminRole = Role.SUPER_ADMIN as unknown as string;
-
-    // Check Super Admin đi cửa sau
     if (user.roles.includes(superAdminRole)) {
       return true;
     }
 
     const hasRole = requiredRoles.some((role) => {
-      // Ép role yêu cầu về string (đề phòng nó là Enum)
       const roleStr = role as unknown as string;
       return user.roles.includes(roleStr);
     });
