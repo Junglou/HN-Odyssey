@@ -20,7 +20,6 @@ export class PdfService {
         textxalign: 'center',
       });
     } catch (err: unknown) {
-      // Fix lỗi unsafe access .message
       const msg = err instanceof Error ? err.message : String(err);
       console.warn('Không thể tạo barcode:', msg);
     }
@@ -123,7 +122,8 @@ export class PdfService {
 
       .text('Ngày đặt:', 50, customerTop + 15)
       .text(
-        new Date(order.createdAt).toLocaleDateString('vi-VN'),
+        // Thêm || Date.now() để đảm bảo luôn có giá trị ngày tháng
+        new Date(order.createdAt || Date.now()).toLocaleDateString('vi-VN'),
         150,
         customerTop + 15,
       )

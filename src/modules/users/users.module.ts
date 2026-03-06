@@ -22,6 +22,6 @@ const userModels = MongooseModule.forFeature([
   imports: [userModels, forwardRef(() => AdminModule), RolesModule],
 
   providers: [UsersService],
-  exports: [UsersService, userModels, MongooseModule],
+  exports: [UsersService, userModels, MongooseModule, RolesModule],
 })
 export class UsersModule {}

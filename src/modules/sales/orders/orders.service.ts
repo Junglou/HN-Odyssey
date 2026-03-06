@@ -40,6 +40,7 @@ import {
 import { VnpayService } from '../payment/providers/vnpay.service';
 import { ShippingConfig } from 'src/modules/shipping/schemas/shipping-config.schema';
 import { ShippingService } from 'src/modules/shipping/shipping.service';
+import { PaymentService } from '../payment/payment.service';
 
 @Injectable()
 export class OrdersService {
@@ -58,6 +59,7 @@ export class OrdersService {
     private readonly promotionEngine: PromotionEngineService,
     private readonly stockService: StockService,
     private readonly vnpayService: VnpayService,
+    private readonly paymentService: PaymentService,
     private readonly shippingService: ShippingService,
   ) {}
 
@@ -733,6 +735,9 @@ export class OrdersService {
         name: dto.shippingInfo.name || '',
         phone: dto.shippingInfo.phone || '',
         address: dto.shippingInfo.address || '',
+        city_code: Number(dto.shippingInfo.city_code),
+        district_code: Number(dto.shippingInfo.district_code),
+        ward_code: dto.shippingInfo.ward_code || '',
       };
 
       if (!order.guest_info) {
@@ -776,13 +781,17 @@ export class OrdersService {
       await order.save();
       await this.redis.del(dto.checkoutSessionToken);
 
+      // Tự động lấy cấu hình tạo Link theo phương thức
       let paymentUrl: string | null = null;
-      if (order.payment.method === 'VNPAY') {
-        paymentUrl = this.vnpayService.createPaymentUrl(
-          order.order_code,
-          order.total_amount,
-          `Thanh toan don hang ${order.order_code}`,
-          ip,
+      if (order.payment.method !== 'COD') {
+        paymentUrl = await this.paymentService.createPaymentUrl(
+          order.payment.method,
+          {
+            orderCode: order.order_code,
+            amount: order.total_amount,
+            description: `Thanh toan don hang ${order.order_code}`,
+            ipAddr: ip,
+          },
         );
       }
 
@@ -1023,6 +1032,9 @@ export class OrdersService {
           name: dto.shippingInfo.name || '',
           phone: dto.shippingInfo.phone || '',
           address: dto.shippingInfo.address || '',
+          city_code: Number(dto.shippingInfo.city_code),
+          district_code: Number(dto.shippingInfo.district_code),
+          ward_code: dto.shippingInfo.ward_code || '',
         };
         orderDoc.guest_info = {
           name: dto.shippingInfo.name || '',
@@ -1148,13 +1160,17 @@ export class OrdersService {
         await this.redis.del(`guest_temp_info:${dto.guestSessionId}`);
       }
 
+      // Tự động lấy cấu hình tạo Link theo phương thức
       let paymentUrl: string | null = null;
-      if (savedOrder.payment.method === 'VNPAY') {
-        paymentUrl = this.vnpayService.createPaymentUrl(
-          savedOrder.order_code,
-          savedOrder.total_amount,
-          `Thanh toan don hang ${savedOrder.order_code}`,
-          ip,
+      if (savedOrder.payment.method !== 'COD') {
+        paymentUrl = await this.paymentService.createPaymentUrl(
+          savedOrder.payment.method,
+          {
+            orderCode: savedOrder.order_code,
+            amount: savedOrder.total_amount,
+            description: `Thanh toan don hang ${savedOrder.order_code}`,
+            ipAddr: ip,
+          },
         );
       }
 

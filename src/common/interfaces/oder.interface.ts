@@ -1,12 +1,13 @@
-import { Types } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 // 1. ENUMS (Định nghĩa các trạng thái cố định)
 
 export enum OrderStatus {
-  TEMPORARY = 'TEMPORARY', // Đơn tạm (đang giữ hàng)
-  PENDING = 'PENDING', // Chờ xử lý
-  CONFIRMED = 'CONFIRMED', // Đã xác nhận
-  SHIPPING = 'SHIPPING', // Đang giao
+  TEMPORARY = 'TEMPORARY', // Đơn tạm (đang giữ hàng/chưa thanh toán xong)
+  PENDING = 'PENDING', // Chờ xử lý (Đã tạo xong, chờ admin/staff duyệt)
+  PRIORITY = 'PRIORITY', // Ưu tiên (Khách VIP hoặc đơn gấp)
+  CONFIRMED = 'CONFIRMED', // Đã xác nhận (Đã có tiền hoặc xác nhận COD)
+  SHIPPING = 'SHIPPING', // Đang giao hàng
   COMPLETED = 'COMPLETED', // Hoàn thành
   CANCELLED = 'CANCELLED', // Đã hủy
 }
@@ -15,6 +16,7 @@ export enum PaymentMethod {
   COD = 'COD',
   VNPAY = 'VNPAY',
   MOMO = 'MOMO',
+  ZALOPAY = 'ZALOPAY',
 }
 
 export enum PaymentStatus {
@@ -22,6 +24,7 @@ export enum PaymentStatus {
   PAID = 'PAID',
   FAILED = 'FAILED',
   REFUNDED = 'REFUNDED',
+  REFUND_NEEDED = 'REFUND_NEEDED', // Cần hoàn tiền (Lỗi hệ thống)
 }
 
 export enum VoucherType {
@@ -33,22 +36,24 @@ export enum VoucherType {
 
 export interface CartItem {
   product_id: string | Types.ObjectId;
-  product_name?: string; // Có thể có hoặc không tuỳ lúc query
+  product_name?: string;
   sku: string;
   quantity: number;
   price: number;
   image?: string;
+  weight?: number; // Cần cho tính phí ship
 }
 
-// Interface dùng cho Item trong Order
+// Interface dùng cho Item trong Order (Snapshot giá tại thời điểm mua)
 export interface OrderItem {
   product_id: string | Types.ObjectId;
   sku: string;
   product_name: string;
   quantity: number;
-  price: number;
-  final_price?: number;
+  price: number; // Giá gốc
+  final_price?: number; // Giá sau khi trừ khuyến mãi (nếu có logic tính từng item)
   image?: string;
+  weight?: number;
 }
 
 export interface ShippingInfo {
@@ -56,20 +61,25 @@ export interface ShippingInfo {
   phone: string;
   email: string;
   address: string;
+  city_code?: number; // Mã tỉnh (GHN/GHTK)
+  district_code?: number; // Mã quận
+  ward_code?: string; // Mã phường
   city?: string;
   district?: string;
   ward?: string;
   note?: string;
+  provider?: string; // GHN, GHTK
+  tracking_code?: string; // Mã vận đơn
 }
 
 export interface PaymentInfo {
   method: PaymentMethod | string;
   status: PaymentStatus | string;
-  transaction_id?: string;
+  transaction_id?: string; // Mã giao dịch phía cổng thanh toán
   payment_url?: string;
 }
 
-// Interface đầy đủ của một Order Document
+// Interface định nghĩa dữ liệu Order thuần túy (Plain Object)
 export interface OrderData {
   _id?: string | Types.ObjectId;
   order_code: string;
@@ -82,14 +92,14 @@ export interface OrderData {
 
   // Định danh khách hàng
   user_id?: string | Types.ObjectId;
-  session_id?: string;
+  session_id?: string; // Dùng cho Guest Checkout
   isGuest: boolean;
 
   // Thông tin tài chính
-  total_amount: number;
+  total_amount: number; // Tổng tiền phải trả
   shipping_fee: number;
   discount_amount: number;
-  final_amount: number;
+  final_amount?: number; // Có thể dùng alias cho total_amount
 
   // Thông tin chi tiết
   status: OrderStatus | string;
@@ -101,9 +111,9 @@ export interface OrderData {
   voucher_code?: string;
 
   // Timestamps
-  hold_expires_at?: Date;
-  createdAt: string | Date;
-  updatedAt: string | Date;
+  hold_expires_at?: Date; // Thời gian hết hạn giữ hàng
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
 }
 
 // 3. VOUCHER & PROMOTIONS
@@ -120,11 +130,11 @@ export interface Voucher {
   usage_limit?: number;
   used_count: number;
   max_discount_amount?: number; // Mức giảm tối đa cho loại PERCENT
-  applicable_category_ids?: string[];
-  applicable_product_ids?: string[];
+  applicable_category_ids?: string[]; // Áp dụng cho danh mục cụ thể
+  applicable_product_ids?: string[]; // Áp dụng cho sản phẩm cụ thể
 }
 
-// Interface Input dành riêng cho Promotion Engine
+// Interface Input dành riêng cho Promotion Engine xử lý
 export interface CartItemInput {
   productId: string;
   sku: string;
@@ -132,11 +142,12 @@ export interface CartItemInput {
   unitPrice: number;
 }
 
-// 4. EXTERNAL INTEGRATION (VNPay, v.v.)
+// 4. EXTERNAL INTEGRATION (VNPay, Momo, etc.)
 
 // Interface trả về từ VNPay (IPN hoặc Return URL)
+// Các trường này khớp với document của VNPay
 export interface VnpayReturnParams {
-  vnp_Amount: string;
+  vnp_Amount: string | number; // VNPay trả về string, nhưng đôi khi ta ép kiểu number
   vnp_BankCode?: string;
   vnp_BankTranNo?: string;
   vnp_CardType?: string;
@@ -148,16 +159,18 @@ export interface VnpayReturnParams {
   vnp_TransactionStatus?: string;
   vnp_TxnRef: string;
   vnp_SecureHash: string;
-  [key: string]: any;
+  vnp_SecureHashType?: string;
+  [key: string]: any; // Cho phép các trường mở rộng khác
 }
 
-// 5. HELPER INTERFACES
+// 5. HELPER INTERFACES (DTOs, Reports, Print)
 
 export interface AggregateResult<T> {
   data: T[];
   totalCount: { count: number }[];
 }
 
+// Dùng cho Email Service để gửi hóa đơn
 export interface InvoiceOrder {
   _id?: any;
   order_code: string;
@@ -176,6 +189,7 @@ export interface InvoiceOrder {
   };
 }
 
+// Dùng cho tính năng In Hóa Đơn (PDF)
 export interface PrintTemplateData {
   type: 'INVOICE' | 'PACKING_SLIP';
   print_date: Date;
@@ -191,12 +205,15 @@ export interface PrintTemplateData {
 
 // 6. MONGOOSE DOCUMENT INTERFACES (QUAN TRỌNG NHẤT)
 
-// Interface dùng để Type Casting trong Service khi dùng Mongoose
-export interface MongooseOrderDoc
-  extends OrderData, Omit<Document, 'timeline'> {
-  _id: any;
+/**
+ * Interface này kết hợp giữa dữ liệu nghiệp vụ (OrderData)
+ * và các phương thức của Mongoose Document (save, _id, ...).
+ * Dùng cái này trong Service để tránh lỗi 'Property does not exist'.
+ */
+export interface MongooseOrderDoc extends OrderData, Document {
+  _id: any; // Override _id của Mongoose để dễ xử lý
 
-  // Timeline đầy đủ
+  // Timeline (Thường là mảng sub-document trong schema)
   timeline: {
     status: string;
     timestamp: Date;
@@ -204,12 +221,13 @@ export interface MongooseOrderDoc
     note: string;
   }[];
 
-  // Các trường bổ sung để xử lý logic phức tạp
+  // Các trường bổ sung quản trị
   cancel_reason?: string;
   internal_note?: string;
+  print_count?: number; // Số lần đã in hóa đơn
 
   // Định nghĩa hàm save có hỗ trợ session (Transaction)
-  save: (options?: { session?: any }) => Promise<MongooseOrderDoc>;
+  save: (options?: { session?: any }) => Promise<this>;
 
   // Hàm chuyển đổi sang Object thường
   toObject: (options?: any) => OrderData;

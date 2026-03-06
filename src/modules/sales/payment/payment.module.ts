@@ -10,18 +10,31 @@ import {
   ProductSchema,
 } from 'src/modules/products/catalog/schemas/product.schema';
 import { NotificationsModule } from 'src/modules/notifications/notifications.module';
+import {
+  PaymentConfig,
+  PaymentConfigSchema,
+} from './schemas/payment-config.schema';
+import {
+  PaymentTransaction,
+  PaymentTransactionSchema,
+} from './schemas/payment-transaction.schema';
+import { UsersModule } from 'src/modules/users/users.module';
+import { MomoService } from './providers/momo.service';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Order.name, schema: OrderSchema },
       { name: Product.name, schema: ProductSchema },
+      { name: PaymentConfig.name, schema: PaymentConfigSchema },
+      { name: PaymentTransaction.name, schema: PaymentTransactionSchema },
     ]),
     StockModule,
     NotificationsModule,
+    UsersModule,
   ],
   controllers: [PaymentController],
-  providers: [PaymentService, VnpayService],
-  exports: [VnpayService],
+  providers: [PaymentService, VnpayService, MomoService],
+  exports: [VnpayService, MomoService, PaymentService],
 })
 export class PaymentModule {}
