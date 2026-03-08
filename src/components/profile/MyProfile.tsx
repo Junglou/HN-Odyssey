@@ -40,8 +40,17 @@ const MyProfile = ({
             <img src={user.avatar} alt="Avatar" className="avatar-img" />
           </div>
           <h2 className="user-fullname">{user.firstName}</h2>
-          <div className="change-avatar-text" onClick={onChangeAvatar}>
-            Change avatar
+
+          <div className="avatar-actions">
+            <button className="btn-avatar-action" onClick={onChangeAvatar}>
+              Change avatar
+            </button>
+            <button
+              className="btn-avatar-action"
+              onClick={() => navigate("/portal")}
+            >
+              Admin Portal
+            </button>
           </div>
         </div>
 

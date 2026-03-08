@@ -1,0 +1,201 @@
+/* Bao bọc ngoài cùng */
+.hn-header-wrapper {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: "Lexend Exa", sans-serif;
+  position: sticky;
+  top: 0;
+  z-index: 998;
+  transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.hn-header-wrapper.visible {
+  transform: translateY(0);
+}
+
+.hn-header-wrapper.hidden {
+  transform: translateY(-100%);
+}
+
+.header-main-bar {
+  background-color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 4%; /* Đồng bộ lề với thanh Top bar đen */
+  width: 100%;
+  box-sizing: border-box;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+/* ================== THỦ THUẬT FLEX 3 KHỐI ================== */
+
+/* Khối 1: Bên trái (Ép dùng flex: 1 để đẩy khối giữa vào tâm) */
+.header-left {
+  display: flex;
+  flex: 1;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+/* Khóa vùng bấm của logo lại, tránh bị vệt màu tím dài ngoằng */
+.header-logo {
+  display: block;
+  width: fit-content;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.header-logo img {
+  height: 65px;
+  object-fit: contain;
+  display: block;
+}
+
+/* Khối 2: Ở giữa (Menu chữ) */
+.header-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 35px;
+  white-space: nowrap;
+}
+
+.nav-link {
+  color: #000;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 0.95rem;
+  transition: opacity 0.2s;
+}
+
+.nav-link:hover {
+  opacity: 0.6;
+}
+
+/* Khối 3: Bên phải (Ép dùng flex: 1 giống khối trái để cân bằng) */
+.header-actions {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 24px;
+}
+
+/* ================== ICONS VÀ SEARCH ================== */
+.action-icon {
+  cursor: pointer;
+  color: #000;
+  transition: transform 0.2s;
+}
+
+.action-icon:hover {
+  transform: scale(1.1);
+}
+
+.header-search {
+  display: flex;
+  align-items: center;
+  background-color: #f1f1f1;
+  border-radius: 50px;
+  padding: 10px 18px;
+  gap: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  cursor: text;
+}
+
+.header-search input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #333;
+  width: 140px;
+}
+
+.header-search input::placeholder {
+  color: #999;
+  font-weight: 500;
+}
+
+/* =========================================
+   RESPONSIVE - HEADER
+========================================= */
+@media screen and (max-width: 1350px) {
+  .header-nav {
+    gap: 15px;
+  }
+  .nav-link {
+    font-size: 0.85rem;
+  }
+  .header-actions {
+    gap: 15px;
+  }
+  .header-search input {
+    width: 90px;
+  }
+  .header-logo img {
+    height: 50px;
+  }
+}
+
+@media screen and (max-width: 1024px) {
+  .header-nav {
+    display: none;
+  } /* Ẩn menu trên tablet/mobile */
+
+  /* Thu gọn search thành icon tròn */
+  .header-search {
+    padding: 10px;
+    border-radius: 50px;
+    width: 40px;
+    height: 40px;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    overflow: hidden;
+  }
+
+  .header-search input {
+    display: none;
+    width: 0;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  /* Mở rộng search khi click */
+  .header-search.active {
+    width: 220px;
+    justify-content: flex-start;
+    padding: 10px 18px;
+  }
+
+  .header-search.active input {
+    display: block;
+    width: 100%;
+    opacity: 1;
+  }
+
+  .header-logo img {
+    height: 45px;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .header-actions {
+    gap: 16px;
+  }
+
+  /* Thanh search bung full màn hình trên đt */
+  .header-search.active {
+    position: absolute;
+    right: 4%;
+    width: 92%;
+    z-index: 10;
+    background-color: #ffffff;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    border: 1px solid #ddd;
+  }
+}

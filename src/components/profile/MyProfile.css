@@ -82,10 +82,33 @@
   text-align: center;
   color: #000;
 }
-.change-avatar-text {
+
+.avatar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+  width: 100%;
+  align-items: center;
+}
+
+.btn-avatar-action {
+  padding: 0.6rem 1rem;
+  border: 1px solid #cfcfcf;
+  background: #fff;
+  border-radius: 50px;
   font-size: 0.85rem;
-  color: #888;
+  color: #333;
   cursor: pointer;
+  width: 80%;
+  max-width: 160px;
+  transition: all 0.2s ease;
+}
+
+.btn-avatar-action:hover {
+  border-color: #000;
+  color: #000;
+  background-color: #f9f9f9;
 }
 
 /* --- CỘT 2: FORMS --- */

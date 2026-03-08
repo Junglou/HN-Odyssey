@@ -1,0 +1,302 @@
+.hn-footer-wrapper {
+  background-color: #000000;
+  color: #fff;
+  font-family: "Lexend Exa", sans-serif;
+  padding: 4rem 6% 3rem 6%;
+  margin-top: auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* --- TOP SECTION --- */
+.footer-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  margin-bottom: 3.5rem;
+  width: 100%;
+}
+
+/* 1. KHỐI LOGO */
+.footer-logo-col {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  /* ĐÃ THÊM: Đẩy Logo lùi sang phải 3rem để cách xa đường kẻ ngang */
+  padding-right: 2rem;
+}
+
+.footer-logo-col img {
+  width: 100%;
+  max-width: 340px;
+  height: auto;
+  object-fit: contain;
+  transform: scale(1.15);
+  transform-origin: left center;
+}
+
+/* 2. KHỐI CONTACT */
+.footer-contact-col {
+  flex: 1.1;
+  border-left: 1px solid #fff;
+  border-right: 1px solid #fff;
+  padding: 0 4%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+}
+
+.contact-text {
+  font-size: 0.85rem;
+  font-weight: 400;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.social-icons-row {
+  display: flex;
+  gap: 14px;
+  margin-top: 6px;
+}
+
+.social-icon-wrapper {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.social-icon-wrapper:hover {
+  background-color: #fff;
+  color: #000000;
+}
+
+/* 3. KHỐI NEWSLETTER */
+.footer-newsletter-col {
+  flex: 1.7;
+  padding-left: 4%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.newsletter-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0 0 6px 0;
+}
+
+.newsletter-desc {
+  font-size: 0.85rem;
+  font-weight: 400;
+  margin: 0 0 20px 0;
+}
+
+.newsletter-form {
+  display: flex;
+  gap: 16px;
+}
+
+.newsletter-input-wrapper {
+  position: relative;
+  flex: 1;
+}
+
+.newsletter-input {
+  width: 100%;
+  padding: 12px 20px;
+  border-radius: 50px;
+  border: none;
+  font-family: inherit;
+  font-size: 0.9rem;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.newsletter-input::placeholder {
+  color: #aaa;
+}
+
+.input-asterisk {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #999;
+  pointer-events: none;
+}
+
+.newsletter-send-btn {
+  padding: 12px 45px;
+  border-radius: 50px;
+  background-color: transparent;
+  color: #fff;
+  border: 1.5px solid #fff;
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.newsletter-send-btn:hover {
+  background-color: #fff;
+  color: #000;
+}
+
+/* --- HORIZONTAL DIVIDER --- */
+.footer-divider {
+  width: 100%;
+  height: 1px;
+  background-color: #fff;
+  margin-bottom: 3.5rem;
+}
+
+/* --- BOTTOM SECTION --- */
+.footer-bottom {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  width: 100%;
+}
+
+.footer-nav-col {
+  display: flex;
+  flex-direction: column;
+  padding-left: 3rem;
+  padding-right: 1rem;
+
+  /* BƯỚC 1: Bỏ border-right cứng nhắc đi và thêm position: relative */
+  position: relative;
+}
+
+/* BƯỚC 2: Vẽ một vạch kẻ tùy chỉnh bằng ::after */
+.footer-nav-col::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 2.8rem; /* THỦ THUẬT Ở ĐÂY: Đẩy đỉnh của vạch kẻ tụt xuống 2.8rem để Title nhô lên */
+  bottom: 0; /* Đáy vạch kẻ vẫn chạm tột cùng */
+  width: 1px;
+  background-color: #fff;
+}
+
+/* BƯỚC 3: Giấu vạch kẻ của cột cuối cùng đi */
+.footer-nav-col:last-child::after {
+  display: none;
+}
+
+.footer-nav-col:last-child {
+  padding-right: 0;
+}
+
+/* Tiêu đề cột */
+.nav-col-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0 0 1.5rem 0;
+}
+
+/* Các link bên dưới */
+.footer-nav-link {
+  color: #fff;
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 300;
+  margin-bottom: 14px;
+  transition: opacity 0.2s ease;
+  width: fit-content;
+}
+
+.footer-nav-link:hover {
+  opacity: 0.6;
+}
+
+/* =========================================
+   RESPONSIVE - FOOTER
+========================================= */
+/* Dành cho Tablet (Màn hình vừa) */
+@media screen and (max-width: 1024px) {
+  .hn-footer-wrapper {
+    padding: 3rem 6%;
+  }
+
+  .footer-top {
+    flex-direction: column;
+    gap: 3rem;
+  }
+
+  /* Cụm Top: Thêm đường kẻ ngang mờ để phân chia Logo, Contact và Form */
+  .footer-logo-col,
+  .footer-contact-col,
+  .footer-newsletter-col {
+    padding: 0;
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2); /* Đường phân chia ngang */
+    padding-bottom: 2rem;
+    align-items: center;
+    text-align: center;
+  }
+
+  /* Xóa đường kẻ ngang ở phần tử cuối cùng của cụm Top */
+  .footer-newsletter-col {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .footer-logo-col img {
+    max-width: 250px;
+  }
+
+  /* Cụm Bottom: Chuyển về 1 cột trên Tablet để các đường kẻ ngang đẹp hơn */
+  .footer-bottom {
+    grid-template-columns: 1fr;
+    gap: 0; /* Bỏ gap để dùng padding và border */
+  }
+
+  /* Chuyển vạch kẻ dọc thành vạch kẻ ngang */
+  .footer-nav-col {
+    padding: 1.5rem 0; /* Khoảng cách trên dưới cho dễ bấm trên điện thoại */
+    border: none; /* Bỏ vạch dọc cứng */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2); /* Thêm vạch ngang mờ */
+    align-items: center;
+    text-align: center;
+  }
+
+  /* Ẩn vạch kẻ ảo ::after của giao diện PC */
+  .footer-nav-col::after {
+    display: none;
+  }
+
+  /* Bỏ vạch kẻ ngang ở cột cuối cùng */
+  .footer-nav-col:last-child {
+    border-bottom: none;
+  }
+
+  /* Căn giữa lại các tiêu đề và link */
+  .nav-col-title {
+    margin-bottom: 1rem;
+  }
+  .footer-nav-link {
+    margin-bottom: 10px;
+  }
+}
+
+/* Dành cho Mobile (Màn hình nhỏ) */
+@media screen and (max-width: 600px) {
+  .newsletter-form {
+    flex-direction: column;
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+
+  .newsletter-send-btn {
+    width: 100%;
+  }
+}

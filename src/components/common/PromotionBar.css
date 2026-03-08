@@ -1,0 +1,81 @@
+.promotion-bar-wrapper {
+  background-color: #000000;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: "Lexend Exa", sans-serif;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.promotion-bar-wrapper.visible {
+  max-height: 60px;
+  padding: 12px 4%; /* Đệm lề 4% cho 2 bên */
+  opacity: 1;
+}
+
+.promotion-bar-wrapper.hidden {
+  max-height: 0;
+  padding: 0 4%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ÉP KHỐI TRÁI VÀ PHẢI CHIẾM PHẦN KHÔNG GIAN BẰNG NHAU (flex: 1) */
+.promo-left {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex: 1;
+  gap: 32px;
+}
+
+.promo-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1;
+  gap: 32px;
+}
+
+.promo-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 0.85rem;
+  white-space: nowrap; /* Tránh rớt dòng */
+}
+
+.promo-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.promo-item:hover {
+  opacity: 0.7;
+}
+
+/* =========================================
+   RESPONSIVE - PROMOTION BAR
+========================================= */
+@media screen and (max-width: 1024px) {
+  .promo-left,
+  .promo-right {
+    display: none; /* Ẩn 2 khối phụ trên màn hình nhỏ */
+  }
+  .promo-center {
+    flex: 1;
+    justify-content: center;
+    font-size: 0.75rem; /* Thu nhỏ chữ một chút */
+  }
+}

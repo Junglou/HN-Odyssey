@@ -1,17 +1,27 @@
+// src/layouts/MainLayout.tsx
 import { Outlet } from "react-router-dom";
+import Header from "../components/common/Header";
+import PromotionBar from "../components/common/PromotionBar";
+import Footer from "../components/common/Footer";
 
 const MainLayout = () => {
   return (
-    <div className="main-layout">
-      {/* Header / Sidebar đặt ở đây */}
-      <header>My Header</header>
+    <div
+      style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}
+    >
+      {/* 1. Promotion Bar phải nằm ở đây */}
+      <PromotionBar />
 
-      <main>
-        {/* Outlet là nơi nội dung của DashboardPage/ProductListPage sẽ hiển thị */}
+      {/* 2. Header nằm ngay dưới */}
+      <Header />
+
+      {/* 3. Nội dung các trang */}
+      <main style={{ flex: 1 }}>
         <Outlet />
       </main>
 
-      {/* Footer đặt ở đây */}
+      {/* 4. Footer ở cuối cùng */}
+      <Footer />
     </div>
   );
 };
