@@ -14,7 +14,7 @@ import type { Request, Response } from 'express';
 import { PaymentService } from './payment.service';
 import { Public } from 'src/common/decorators/public.decorator';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { VnpayReturnParams } from 'src/common/interfaces/oder.interface';
+import type { VnpayReturnParams } from 'src/common/interfaces/order.interface';
 import { PaymentConfig } from './schemas/payment-config.schema';
 
 // Import Guards & Decorators của hệ thống (Nhớ trỏ đúng đường dẫn thực tế của bạn)

@@ -1,19 +1,30 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import {
   INNER_DISTRICTS,
   SHIPPING_FEES,
 } from 'src/common/constants/shipping.constant';
-import { CartItem, OrderItem } from 'src/common/interfaces/oder.interface';
+import { CartItem, OrderItem } from 'src/common/interfaces/order.interface';
 import { ShippingConfig } from './schemas/shipping-config.schema';
+import {
+  AdministrativeUnit,
+  AdministrativeUnitDocument,
+} from './schemas/administrative-unit.schema';
 
 @Injectable()
 export class ShippingService {
+  private readonly logger = new Logger(ShippingService.name);
   constructor(
     @InjectModel(ShippingConfig.name)
     private readonly shippingConfigModel: Model<ShippingConfig>,
+    @InjectModel(AdministrativeUnit.name)
+    private unitModel: Model<AdministrativeUnitDocument>,
   ) {}
+
+  async getMappingCode(gsoCode: string) {
+    return this.unitModel.findOne({ code: gsoCode }).lean();
+  }
 
   async calculateShippingFee(
     cityCode: string | undefined | null,
@@ -54,8 +65,19 @@ export class ShippingService {
 
     // 3. Tính trọng lượng tổng
     const totalWeight = items.reduce((w, i) => {
-      const itemWithWeight = i as unknown as { weight?: number };
-      const weightPerItem = itemWithWeight.weight || 0.5; // Mặc định 0.5kg nếu không có weight
+      const itemWithWeight = i as unknown as {
+        weight?: number;
+        product_name?: string;
+      };
+      const weightPerItem = itemWithWeight.weight || 0;
+
+      if (weightPerItem <= 0) {
+        this.logger.warn(
+          `CẢNH BÁO: Sản phẩm [${itemWithWeight.product_name}] chưa nhập cân nặng. Đang dùng fallback 0.5kg.`,
+        );
+        return w + 0.5 * i.quantity;
+      }
+
       return w + weightPerItem * i.quantity;
     }, 0);
 

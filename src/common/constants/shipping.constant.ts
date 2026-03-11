@@ -1,5 +1,5 @@
 // src/common/constants/shipping.constant.ts
-
+import { OrderStatus } from '../interfaces/order.interface';
 export const PROVINCES = {
   SUPPORTED_INSTANT: ['79', '01'], // 79: HCM, 01: HN (Chỉ 2 TP này có Hỏa tốc)
 };
@@ -54,4 +54,22 @@ export const SHIPPING_FEES = {
   MAX_WEIGHT_STANDARD: 50, // Max kg thường
 
   UNSUPPORTED_PROVINCES: ['97', '98', '99'],
+};
+
+export const GHN_INTERNAL_MAP: Record<string, OrderStatus> = {
+  ready_to_pick: OrderStatus.READY_TO_SHIP,
+  picking: OrderStatus.SHIPPING,
+  storing: OrderStatus.SHIPPING,
+  delivered: OrderStatus.COMPLETED,
+  return: OrderStatus.RETURNED,
+  cancel: OrderStatus.DELIVERY_FAILED,
+};
+
+export const GHTK_INTERNAL_MAP: Record<string, OrderStatus> = {
+  '2': OrderStatus.READY_TO_SHIP, // Đang chờ lấy hàng
+  '3': OrderStatus.SHIPPING, // Đã lấy hàng/Đang giao
+  '4': OrderStatus.SHIPPING, // Đang giao hàng
+  '45': OrderStatus.COMPLETED, // Đã giao hàng thành công
+  '21': OrderStatus.RETURNED, // Đã trả hàng
+  '-1': OrderStatus.CANCELLED, // Đã hủy
 };

@@ -20,6 +20,7 @@ import {
 } from './schemas/payment-transaction.schema';
 import { UsersModule } from 'src/modules/users/users.module';
 import { MomoService } from './providers/momo.service';
+import { CodService } from './providers/cod.service';
 
 @Module({
   imports: [
@@ -34,7 +35,7 @@ import { MomoService } from './providers/momo.service';
     UsersModule,
   ],
   controllers: [PaymentController],
-  providers: [PaymentService, VnpayService, MomoService],
-  exports: [VnpayService, MomoService, PaymentService],
+  providers: [PaymentService, VnpayService, MomoService, CodService],
+  exports: [VnpayService, MomoService, CodService, PaymentService],
 })
 export class PaymentModule {}

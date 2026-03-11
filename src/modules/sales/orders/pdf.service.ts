@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
 import * as path from 'path';
 import * as bwipjs from 'bwip-js';
-import { OrderData, OrderItem } from 'src/common/interfaces/oder.interface';
+import { OrderData, OrderItem } from 'src/common/interfaces/order.interface';
 
 @Injectable()
 export class PdfService {

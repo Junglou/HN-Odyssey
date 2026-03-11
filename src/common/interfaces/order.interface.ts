@@ -1,7 +1,6 @@
 import { Document, Types } from 'mongoose';
 
 // 1. ENUMS (Định nghĩa các trạng thái cố định)
-
 export enum OrderStatus {
   TEMPORARY = 'TEMPORARY', // Đơn tạm (đang giữ hàng/chưa thanh toán xong)
   PENDING = 'PENDING', // Chờ xử lý (Đã tạo xong, chờ admin/staff duyệt)
@@ -10,6 +9,9 @@ export enum OrderStatus {
   SHIPPING = 'SHIPPING', // Đang giao hàng
   COMPLETED = 'COMPLETED', // Hoàn thành
   CANCELLED = 'CANCELLED', // Đã hủy
+  READY_TO_SHIP = 'READY_TO_SHIP',
+  RETURNED = 'RETURNED',
+  DELIVERY_FAILED = 'DELIVERY_FAILED',
 }
 
 export enum PaymentMethod {
@@ -163,7 +165,7 @@ export interface VnpayReturnParams {
   [key: string]: any; // Cho phép các trường mở rộng khác
 }
 
-// 5. HELPER INTERFACES (DTOs, Reports, Print)
+// 5. HELPER INTERFACES
 
 export interface AggregateResult<T> {
   data: T[];
@@ -203,17 +205,11 @@ export interface PrintTemplateData {
   financials?: any;
 }
 
-// 6. MONGOOSE DOCUMENT INTERFACES (QUAN TRỌNG NHẤT)
-
-/**
- * Interface này kết hợp giữa dữ liệu nghiệp vụ (OrderData)
- * và các phương thức của Mongoose Document (save, _id, ...).
- * Dùng cái này trong Service để tránh lỗi 'Property does not exist'.
- */
+// 6. MONGOOSE DOCUMENT INTERFACES
 export interface MongooseOrderDoc extends OrderData, Document {
-  _id: any; // Override _id của Mongoose để dễ xử lý
+  _id: any;
 
-  // Timeline (Thường là mảng sub-document trong schema)
+  // Timeline
   timeline: {
     status: string;
     timestamp: Date;

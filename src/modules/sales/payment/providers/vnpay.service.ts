@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as crypto from 'crypto';
 import * as qs from 'qs';
-import { VnpayReturnParams } from 'src/common/interfaces/oder.interface';
+import { VnpayReturnParams } from 'src/common/interfaces/order.interface';
 import {
   CreatePaymentUrlDto,
   ParsedWebhookData,

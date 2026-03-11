@@ -33,14 +33,23 @@ import {
   MongooseOrderDoc,
   OrderData,
   OrderItem,
+  OrderStatus,
   PrintTemplateData,
   Voucher,
   VoucherType,
-} from 'src/common/interfaces/oder.interface';
+} from 'src/common/interfaces/order.interface';
 import { VnpayService } from '../payment/providers/vnpay.service';
 import { ShippingConfig } from 'src/modules/shipping/schemas/shipping-config.schema';
 import { ShippingService } from 'src/modules/shipping/shipping.service';
 import { PaymentService } from '../payment/payment.service';
+import { GhnService } from 'src/modules/shipping/providers/ghn.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { GhtkService } from 'src/modules/shipping/providers/ghtk.service';
+
+// type OrderDocWithShipping = MongooseOrderDoc & {
+//   waybillCode?: string;
+//   actualShippingFee?: number;
+// };
 
 @Injectable()
 export class OrdersService {
@@ -61,6 +70,9 @@ export class OrdersService {
     private readonly vnpayService: VnpayService,
     private readonly paymentService: PaymentService,
     private readonly shippingService: ShippingService,
+    private readonly ghnService: GhnService,
+    private readonly ghtkService: GhtkService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   // US.121: DANH SÁCH ĐƠN HÀNG
@@ -1226,6 +1238,9 @@ export class OrdersService {
       'SHIPPING',
       'COMPLETED',
       'CANCELLED',
+      'READY_TO_SHIP',
+      'DELIVERY_FAILED',
+      'RETURNED',
     ];
     if (!validStatuses.includes(status)) {
       throw new BadRequestException('Trạng thái không hợp lệ');
@@ -1282,6 +1297,7 @@ export class OrdersService {
   }
 
   //US.123: CẬP NHẬT TRẠNG THÁI (STATE MACHINE)
+
   async updateStatusAdvanced(
     id: string,
     dto: UpdateOrderStatusDto,
@@ -1291,81 +1307,194 @@ export class OrdersService {
     userAgent: string,
   ) {
     const session = await this.connection.startSession();
-    session.startTransaction(); // 1. Bắt đầu giao dịch
+    session.startTransaction();
 
     try {
-      // 2. Truyền session vào query tìm kiếm
+      // 1. Lấy thông tin đơn hàng trong Session
       const order = await this.orderModel.findById(id).session(session);
       if (!order) throw new NotFoundException('Đơn hàng không tìm thấy');
 
       const oldStatus = order.status;
       const newStatus = dto.status;
 
-      // AC6: Chặn sửa khi đã đóng
+      // 2. Logic kiểm tra quy trình (Workflow validation)
       if (['COMPLETED', 'CANCELLED'].includes(oldStatus) && !dto.is_override) {
         throw new BadRequestException(
           'Đơn hàng đã đóng. Cần quyền Ghi đè (Override) để mở lại.',
         );
       }
 
-      // AC1 & AC4: Validate State Transition với Logic Ghi đè an toàn
       if (dto.is_override) {
-        // Nếu chọn Ghi đè, BẮT BUỘC phải có lý do
         if (!dto.reason || dto.reason.trim() === '') {
           throw new BadRequestException(
             'Bắt buộc nhập lý do khi thực hiện Ghi đè quy trình (Override Workflow).',
           );
         }
-        // Bỏ qua validateStateTransition -> Cho phép nhảy cóc
       } else {
-        // Nếu đi luồng thường, bắt buộc phải đúng quy trình
         this.validateStateTransition(oldStatus, newStatus);
       }
 
-      // AC2: Xử lý Ưu tiên
       if (newStatus === 'PRIORITY' && oldStatus !== 'PENDING') {
         throw new BadRequestException(
           'Chỉ đơn chờ xử lý mới được chuyển sang Ưu tiên',
         );
       }
 
-      // AC5: Ràng buộc dữ liệu khi vận chuyển
-      if (newStatus === 'SHIPPING') {
+      // 3. Khai báo Interface an toàn để truy cập các trường city/district/ward
+      interface ISafeShippingInfo {
+        name: string;
+        phone: string;
+        address: string;
+        city_code: string;
+        district_code: string;
+        ward_code: string;
+        city?: string;
+        district?: string;
+        ward?: string;
+        provider?: string;
+        tracking_code?: string;
+      }
+
+      const sInfo = order.shipping_info as unknown as ISafeShippingInfo;
+      const provider = (sInfo.provider || 'GHN').toUpperCase();
+
+      // --- FIX LỖI ESLINT 1370-1374: Định nghĩa kiểu cho Item trong Map ---
+      const shippingItems = order.items.map((item) => {
+        // Ép kiểu item sang object cụ thể thay vì dùng 'any'
+        const i = item as unknown as {
+          product_name: string;
+          sku: string;
+          quantity: number;
+          price: number;
+          weight?: number;
+        };
+
+        return {
+          name: i.product_name,
+          code: i.sku,
+          quantity: i.quantity,
+          price: i.price,
+          weight: i.weight ?? 0.5,
+        };
+      });
+
+      // 4. Tích hợp đa vận chuyển (READY_TO_SHIP) - AC1, AC6
+      if (newStatus === 'READY_TO_SHIP' && !order.waybill_code) {
+        // Lookup Mapping địa lý từ Database
+        const unitMapping = await this.shippingService.getMappingCode(
+          sInfo.district_code,
+        );
+
+        const totalWeightKg = shippingItems.reduce(
+          (sum, i) => sum + i.weight * i.quantity,
+          0,
+        );
+
+        try {
+          let shippingResult: { waybillCode: string; actualFee: number };
+
+          if (provider === 'GHTK') {
+            // Nhánh GHTK
+            shippingResult = await this.ghtkService.createShippingOrder({
+              orderCode: order.order_code,
+              customerName: sInfo.name,
+              phone: sInfo.phone,
+              address: sInfo.address,
+              city: sInfo.city || unitMapping?.name || '',
+              district: sInfo.district || unitMapping?.name_with_type || '',
+              ward: sInfo.ward || '',
+              codAmount:
+                order.payment.method === 'COD' ? order.total_amount : 0,
+              totalValue: order.total_amount,
+              items: shippingItems,
+            });
+          } else {
+            // Nhánh GHN
+            const ghnDistrictId =
+              unitMapping?.mapping?.ghn_id || Number(sInfo.district_code);
+
+            shippingResult = await this.ghnService.createShippingOrder({
+              customerName: sInfo.name,
+              phone: sInfo.phone,
+              address: sInfo.address,
+              codAmount:
+                order.payment.method === 'COD' ? order.total_amount : 0,
+              weight: totalWeightKg,
+              wardCode: sInfo.ward_code || '',
+              districtId: ghnDistrictId,
+              note: order.internal_note || 'Hàng công nghệ H&N Odyssey',
+              items: shippingItems.map((i) => ({
+                ...i,
+                weight: Math.ceil(i.weight * 1000), // GHN dùng Gram
+              })),
+            });
+          }
+
+          // Lưu kết quả vận chuyển (Đã có Type nên không lỗi Unsafe assignment)
+          order.waybill_code = shippingResult.waybillCode;
+          order.actual_shipping_fee = shippingResult.actualFee;
+        } catch (error: unknown) {
+          const msg =
+            error instanceof Error ? error.message : 'Lỗi không xác định';
+          order.internal_note =
+            (order.internal_note || '') +
+            ` [Lỗi ĐVVC ${new Date().toLocaleString()}]: ${msg}`;
+          await order.save({ session });
+          this.logger.error(`[AC8] Đẩy đơn ${provider} thất bại: ${msg}`);
+          throw new BadRequestException(`ĐVVC ${provider} báo lỗi: ${msg}`);
+        }
+      }
+
+      // 5. Hủy đơn đồng bộ phía ĐVVC (AC7)
+      if (newStatus === 'CANCELLED' && order.waybill_code) {
+        const cancelCall =
+          provider === 'GHTK'
+            ? this.ghtkService.cancelOrder(order.waybill_code)
+            : this.ghnService.cancelOrder(order.waybill_code);
+
+        await cancelCall.catch((err: unknown) => {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `[AC7] Không thể hủy trên ${provider}: ${errorMessage}`,
+          );
+        });
+      }
+
+      // 6. Cập nhật thông tin vận chuyển thủ công (AC5)
+      if (newStatus === 'SHIPPING' && !order.waybill_code) {
         if (!dto.shipping_provider || !dto.tracking_code) {
           throw new BadRequestException(
             'Vui lòng nhập Đơn vị vận chuyển và Mã vận đơn',
           );
         }
+
         order.shipping_info.provider = dto.shipping_provider;
         order.shipping_info.tracking_code = dto.tracking_code;
       }
 
-      // AC3: Xử lý Hủy
+      // 7. Logic xử lý kho hàng
       if (newStatus === 'CANCELLED' && oldStatus !== 'CANCELLED') {
         await this.restoreStock(order as unknown as MongooseOrderDoc, session);
         order.cancel_reason = dto.reason || 'Hủy bởi nhân viên';
       }
 
-      // 2. Trường hợp KHÔI PHỤC ĐƠN ĐÃ HỦY
+      // Khôi phục đơn từ trạng thái Hủy -> Trừ lại kho
       if (oldStatus === 'CANCELLED' && newStatus !== 'CANCELLED') {
-        // Kiểm tra xem còn hàng để trừ không
         for (const item of order.items) {
           const product = await this.productModel
             .findById(item.product_id)
             .session(session);
-          if (!product) {
+          if (!product)
             throw new BadRequestException(
-              `Không thể khôi phục đơn: Sản phẩm ${item.product_name} đã bị xóa vĩnh viễn khỏi hệ thống.`,
+              `Sản phẩm ${item.product_name} đã bị xóa.`,
             );
-          }
-          const variant = product.variants.find((v) => v.sku === item.sku);
 
+          const variant = product.variants.find((v) => v.sku === item.sku);
           if (!variant || variant.stock < item.quantity) {
             throw new BadRequestException(
-              `Không thể khôi phục đơn. Sản phẩm ${item.product_name} (${item.sku}) không đủ tồn kho (Hiện có: ${variant ? variant.stock : 0}).`,
+              `Sản phẩm ${item.product_name} không đủ tồn kho.`,
             );
           }
-          // Thực hiện trừ kho
           await this.productModel
             .updateOne(
               { _id: item.product_id, 'variants.sku': item.sku },
@@ -1374,15 +1503,24 @@ export class OrdersService {
             .session(session);
         }
       }
-      // Cập nhật
-      order.status = newStatus;
-      if (newStatus === 'COMPLETED') order.payment.status = 'PAID';
 
-      // Nếu khôi phục đơn hủy, reset lý do hủy
+      // 8. Kết thúc cập nhật trạng thái & Timeline
+      order.status = newStatus;
+      if (newStatus === 'COMPLETED') {
+        order.payment.status = 'PAID';
+        if (order.user_id && !order.isGuest) {
+          this.eventEmitter.emit('order.completed', {
+            orderId: order._id,
+            userId: order.user_id,
+            totalAmount: order.total_amount,
+          });
+        }
+      }
+
       if (oldStatus === 'CANCELLED' && newStatus !== 'CANCELLED') {
         order.cancel_reason = undefined;
       }
-      // AC4 & AC7: Ghi Timeline & Internal Note
+
       if (dto.note) order.internal_note = dto.note;
 
       order.timeline.push({
@@ -1393,42 +1531,38 @@ export class OrdersService {
           dto.reason || dto.note || `Chuyển từ ${oldStatus} sang ${newStatus}`,
       });
 
-      // 3. Lưu với session
+      // 9. Lưu và Commit Transaction
       await order.save({ session });
-
-      // 4. Xác nhận giao dịch thành công
       await session.commitTransaction();
 
-      // Ghi log sau khi commit thành công để đảm bảo dữ liệu đã an toàn
+      // 10. Ghi log Audit chi tiết
       await this.auditLogsService.log({
         action: dto.is_override
           ? 'OVERRIDE_ORDER_STATUS'
           : 'UPDATE_ORDER_STATUS',
         collection_name: 'orders',
         actor_id: actorId,
-        target_id: order._id,
+        target_id: String(order._id),
         department: Department.SALES,
         detail: {
           order_code: order.order_code,
           old_status: oldStatus,
           new_status: newStatus,
+          waybill_code: order.waybill_code || null,
+          provider: provider,
+          actual_fee: order.actual_shipping_fee || 0,
           reason: dto.reason || null,
-          is_override: dto.is_override || false,
-          note: dto.note || null,
-          tracking_code: dto.tracking_code || null,
         },
-        ip: ip,
+        ip,
         user_agent: userAgent,
         is_success: true,
       });
 
       return order;
     } catch (error) {
-      // 5. Nếu có lỗi, hoàn tác mọi thay đổi (kể cả hoàn kho)
       await session.abortTransaction();
       throw error;
     } finally {
-      // 6. Kết thúc phiên làm việc
       await session.endSession();
     }
   }
@@ -1567,10 +1701,13 @@ export class OrdersService {
     const flows: Record<string, string[]> = {
       PENDING: ['PRIORITY', 'CONFIRMED', 'CANCELLED'],
       PRIORITY: ['CONFIRMED', 'CANCELLED'],
-      CONFIRMED: ['SHIPPING', 'CANCELLED'],
-      SHIPPING: ['COMPLETED', 'CANCELLED'],
+      CONFIRMED: ['READY_TO_SHIP', 'SHIPPING', 'CANCELLED'], // Thêm READY_TO_SHIP
+      READY_TO_SHIP: ['SHIPPING', 'CANCELLED'], // Khai báo thêm READY_TO_SHIP
+      SHIPPING: ['COMPLETED', 'CANCELLED', 'DELIVERY_FAILED', 'RETURNED'], // Thêm các trạng thái GHN trả về
       COMPLETED: [],
       CANCELLED: [],
+      DELIVERY_FAILED: [],
+      RETURNED: [],
     };
 
     const allowedNextStates = flows[oldS];
@@ -1689,5 +1826,79 @@ export class OrdersService {
       shipping_method: dto.isInstant ? 'Hỏa tốc' : 'Tiêu chuẩn',
       can_cod: totalAmount <= 5000000,
     };
+  }
+
+  // US.123: Cập nhật qua Webhook (Fix lỗi Enum & Property access)
+  async updateStatusByWaybill(waybillCode: string, status: OrderStatus) {
+    const order = await this.orderModel.findOne({ waybill_code: waybillCode });
+    if (!order) return;
+
+    if (String(order.status) === String(status)) return;
+
+    order.status = status;
+
+    // LOGIC TỐI ƯU: Cập nhật trạng thái thanh toán & Trigger sự kiện
+    if (status === OrderStatus.COMPLETED) {
+      // 1. Giao thành công -> Thu tiền xong
+      order.payment.status = 'PAID';
+
+      // 2. Kích hoạt luồng tích điểm (Thỏa mãn AC2 - US.35)
+      if (order.user_id && !order.isGuest) {
+        this.eventEmitter.emit('order.completed', {
+          orderId: order._id,
+          userId: order.user_id,
+          totalAmount: order.total_amount,
+        });
+      }
+    } else if (
+      status === OrderStatus.DELIVERY_FAILED ||
+      status === OrderStatus.RETURNED
+    ) {
+      // Giao thất bại hoặc Hoàn trả -> Đánh dấu thanh toán thất bại để kế toán đối soát
+      order.payment.status = 'FAILED';
+
+      // Thêm ghi chú để dễ truy vết sau này
+      const reason =
+        status === OrderStatus.RETURNED
+          ? 'Khách hoàn trả'
+          : 'Giao hàng thất bại';
+      order.internal_note =
+        (order.internal_note || '') +
+        ` [System: Thanh toán COD thất bại - Lý do: ${reason}]`;
+    }
+
+    const historyUpdate = {
+      status: String(status),
+      timestamp: new Date(),
+      actor: 'GHN_SYSTEM',
+      note: `Đồng bộ tự động: ${status}`,
+    };
+
+    order.timeline.push(historyUpdate);
+    return order.save();
+  }
+
+  async getShippingLabel(orderId: string) {
+    const order = await this.orderModel.findById(orderId);
+    if (!order || !order.waybill_code) {
+      throw new BadRequestException(
+        'Đơn hàng chưa được đẩy sang ĐVVC hoặc không tồn tại mã vận đơn',
+      );
+    }
+
+    const provider = (order.shipping_info?.provider || 'GHN').toUpperCase();
+    let url = '';
+
+    if (provider === 'GHTK') {
+      url = await this.ghtkService.getPrintLabel(order.waybill_code);
+    } else {
+      url = await this.ghnService.getPrintLabel(order.waybill_code);
+    }
+
+    this.logger.log(
+      `Admin lấy link in cho đơn hàng: ${order.order_code} qua ${provider}`,
+    );
+
+    return { url };
   }
 }

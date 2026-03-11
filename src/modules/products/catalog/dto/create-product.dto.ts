@@ -9,6 +9,7 @@ import {
   IsOptional,
   IsString,
   Matches,
+  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -131,7 +132,10 @@ export class CreateProductDto {
   variants?: CreateProductVariantDto[];
 
   // US.78: Tồn kho & Cấu hình
-  @IsOptional() @IsNumber() @Min(0) weight?: number;
+  @IsNumber({}, { message: 'Cân nặng phải là số (kg)' })
+  @Min(0.01, { message: 'Cân nặng tối thiểu là 0.01kg (10g)' })
+  @Max(50, { message: 'Cân nặng không được vượt quá 50kg' })
+  weight: number;
 
   @IsOptional() @IsNumber() @Min(0) stock?: number; // Tổng tồn kho (nếu là sp đơn giản)
   @IsOptional() @IsNumber() @Min(0) min_stock?: number;

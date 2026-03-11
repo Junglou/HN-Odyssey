@@ -59,6 +59,9 @@ export class Order extends Document {
       'COMPLETED', // Đã giao hàng
       'CANCELLED', // Đã hủy
       'TEMPORARY', // Đơn tạm (Buy Now)
+      'READY_TO_SHIP',
+      'RETURNED',
+      'DELIVERY_FAILED',
     ],
   })
   status: string;
@@ -83,11 +86,19 @@ export class Order extends Document {
     name: string;
     phone: string;
     address: string;
+    district_code: string; // Thêm dòng này
+    ward_code: string;
     city_code: string;
     email?: string;
     provider?: string;
     tracking_code?: string;
   };
+
+  @Prop()
+  waybill_code: string;
+
+  @Prop()
+  actual_shipping_fee: number;
 
   // Thêm Timeline (AC4 - Chi tiết đơn hàng)
   @Prop({ type: [SchemaFactory.createForClass(OrderTimeline)], default: [] })

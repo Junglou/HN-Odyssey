@@ -25,8 +25,9 @@ import { PaymentStrategy } from 'src/common/interfaces/payment-strategy.interfac
 import {
   InvoiceOrder,
   VnpayReturnParams,
-} from 'src/common/interfaces/oder.interface';
+} from 'src/common/interfaces/order.interface';
 import { MomoService } from './providers/momo.service';
+import { CodService } from './providers/cod.service';
 
 type LogOrderContext = {
   order_code: string;
@@ -52,9 +53,11 @@ export class PaymentService {
     private readonly transactionModel: Model<PaymentTransactionDocument>,
     @InjectRedis() private readonly redis: Redis,
     @InjectConnection() private readonly connection: Connection,
+    private readonly codService: CodService,
   ) {
     this.strategies['VNPAY'] = this.vnpayService;
     this.strategies['MOMO'] = this.momoService;
+    this.strategies['COD'] = this.codService;
   }
 
   private async getConfig(provider: string): Promise<PaymentConfig> {

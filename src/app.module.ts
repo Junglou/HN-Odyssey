@@ -23,6 +23,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { RolesGuard } from './common/guards/roles.guard';
     SalesModule,
     SearchModule,
     MarketingModule,
+    EventEmitterModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [
