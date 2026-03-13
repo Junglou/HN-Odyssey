@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
@@ -21,6 +21,8 @@ import {
   ShippingConfigSchema,
 } from 'src/modules/shipping/schemas/shipping-config.schema';
 import { ShippingModule } from 'src/modules/shipping/shipping.module';
+import { OrderStateMachine } from './flow/order-state-machine.service';
+import { OrderShippingListener } from './listeners/order-shipping.listener';
 
 @Module({
   imports: [
@@ -34,12 +36,18 @@ import { ShippingModule } from 'src/modules/shipping/shipping.module';
     NotificationsModule,
     MarketingModule,
     StockModule,
-    PaymentModule,
+    forwardRef(() => PaymentModule),
     ShippingModule,
     JwtModule.register({}),
   ],
   controllers: [OrdersController],
-  providers: [OrdersService, PdfService, OrdersCronService],
+  providers: [
+    OrdersService,
+    PdfService,
+    OrdersCronService,
+    OrderStateMachine,
+    OrderShippingListener,
+  ],
   exports: [OrdersService],
 })
 export class OrdersModule {}

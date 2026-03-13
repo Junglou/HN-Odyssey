@@ -50,18 +50,26 @@ export class Order extends Document {
   total_amount: number;
 
   @Prop({
-    default: 'PENDING',
+    type: String,
+    default: 'TEMPORARY',
     enum: [
-      'PENDING', // Chờ xử lý
-      'PRIORITY', // Ưu tiên (AC2)
-      'CONFIRMED', // Đang xử lý / Đã xác nhận
-      'SHIPPING', // Đang vận chuyển
-      'COMPLETED', // Đã giao hàng
-      'CANCELLED', // Đã hủy
-      'TEMPORARY', // Đơn tạm (Buy Now)
+      'TEMPORARY',
+      'PENDING',
+      'PRIORITY',
+      'CONFIRMED',
+      'PROCESSING',
+      'ON_HOLD',
       'READY_TO_SHIP',
-      'RETURNED',
+      'SHIPPING',
+      'DELIVERED',
       'DELIVERY_FAILED',
+      'COMPLETED',
+      'CANCELLED',
+      'RETURNED',
+      'REFUND_PENDING',
+      'REFUNDED',
+      'REFUND_NEEDED',
+      'TRADE_IN_REVIEW',
     ],
   })
   status: string;

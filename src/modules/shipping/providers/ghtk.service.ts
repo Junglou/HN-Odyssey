@@ -1,6 +1,7 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosError } from 'axios';
+import { ShippingService } from '../shipping.service';
 
 // 1. Định nghĩa Interface cho dữ liệu đầu vào
 interface IGhtkItem {
@@ -38,29 +39,42 @@ export class GhtkService {
   private readonly apiUrl: string;
   private readonly apiToken: string;
 
-  constructor(private configService: ConfigService) {
-    this.apiUrl = 'https://services.giaohangtietkiem.vn/services/shipment';
+  constructor(
+    private configService: ConfigService,
+    private shippingService: ShippingService,
+  ) {
+    this.apiUrl = 'https://services-staging.ghtklab.com/services/shipment';
     this.apiToken = this.configService.get<string>('GHTK_TOKEN') ?? '';
   }
 
-  // Thay 'any' bằng 'IGhtkOrderInput'
+  private async getActiveToken(): Promise<string> {
+    const config = await this.shippingService.getDefaultConfig();
+    return (
+      config?.ghtk_config?.token ||
+      this.configService.get<string>('GHTK_TOKEN') ||
+      ''
+    );
+  }
+
   async createShippingOrder(orderData: IGhtkOrderInput) {
     try {
+      const token = await this.getActiveToken(); // 2. Lấy token động
+
       const response = await axios.post<IGhtkResponse>(
         `${this.apiUrl}/order`,
         {
           products: orderData.items.map((item) => ({
             name: item.name,
-            weight: item.weight, // GHTK xử lý Kg/Gram tùy gói, ở đây ta dùng giá trị đã truyền
+            weight: item.weight,
             quantity: item.quantity,
           })),
           order: {
             id: orderData.orderCode,
-            pick_name: 'H&N Odyssey Shop',
-            pick_address: 'Địa chỉ kho của bạn',
-            pick_province: 'TP. Hồ Chí Minh',
-            pick_district: 'Quận 1',
-            pick_tel: '0901234567',
+            pick_name: 'H&N Odyssey Store',
+            pick_address: '217 Đ. Đặng Thuỳ Trâm',
+            pick_province: 'Thành phố Hồ Chí Minh', // Phải khớp với mapping GHTK
+            pick_district: 'Quận Bình Thạnh', // Phải khớp với mapping GHTK
+            pick_tel: '098919964',
             tel: orderData.phone,
             name: orderData.customerName,
             address: orderData.address,
@@ -74,12 +88,15 @@ export class GhtkService {
             value: orderData.totalValue,
           },
         },
-        { headers: { Token: this.apiToken } },
+        {
+          headers: {
+            Token: token,
+            'X-Client-Source': 'S308157', // Thêm cái này để GHTK Staging nhận diện partner
+          },
+        },
       );
 
-      // Truy cập an toàn qua Interface
       const result = response.data;
-
       if (!result.success) {
         throw new Error(result.message || 'Lỗi không xác định từ GHTK');
       }
@@ -129,7 +146,7 @@ export class GhtkService {
   // AC5: Lấy link in phiếu gửi GHTK
   async getPrintLabel(label: string): Promise<string> {
     // GHTK hỗ trợ in trực tiếp trên nền tảng web của họ thông qua alias code
-    return `https://khachhang.giaohangtietkiem.vn/khachhang?code=${label}`;
+    return `https://khachhang-staging.ghtklab.com/khachhang?code=${label}`;
   }
 
   async cancelOrder(label: string) {

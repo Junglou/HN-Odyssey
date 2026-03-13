@@ -12,6 +12,12 @@ import {
   AdministrativeUnitDocument,
 } from './schemas/administrative-unit.schema';
 
+export interface IShippingConfig {
+  default_provider: string;
+  ghn_config?: { token: string; shop_id: number; is_active: boolean };
+  ghtk_config?: { token: string; is_active: boolean };
+}
+
 @Injectable()
 export class ShippingService {
   private readonly logger = new Logger(ShippingService.name);
@@ -22,8 +28,16 @@ export class ShippingService {
     private unitModel: Model<AdministrativeUnitDocument>,
   ) {}
 
-  async getMappingCode(gsoCode: string) {
-    return this.unitModel.findOne({ code: gsoCode }).lean();
+  async getDefaultConfig(): Promise<IShippingConfig | null> {
+    return await this.shippingConfigModel
+      .findOne({ code: 'DEFAULT_CONFIG' })
+      .lean<IShippingConfig>() // Ép kiểu ngay tại đây để Mongoose trả về đúng Interface
+      .exec();
+  }
+
+  // Nên thêm kiểu trả về cho hàm này luôn để các biến unitMapping bên kia không bị lỗi 'any'
+  async getMappingCode(gsoCode: string): Promise<AdministrativeUnit | null> {
+    return this.unitModel.findOne({ code: gsoCode }).lean().exec();
   }
 
   async calculateShippingFee(

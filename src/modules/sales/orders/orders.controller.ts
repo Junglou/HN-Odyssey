@@ -47,7 +47,8 @@ export class OrdersController {
     @UserAgent() userAgent: string,
   ): Promise<any> {
     const userId = user ? user._id.toString() : null;
-    return this.ordersService.createOrder(userId, dto, ip, userAgent);
+    const cleanIp = ip === '::1' || !ip ? '127.0.0.1' : ip;
+    return this.ordersService.createOrder(userId, dto, cleanIp, userAgent);
   }
 
   // 3. INIT BUY NOW

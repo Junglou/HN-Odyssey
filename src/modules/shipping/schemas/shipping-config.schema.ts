@@ -24,6 +24,15 @@ export class ShippingConfig extends Document {
 
   @Prop({ type: ShippingFees })
   fees: ShippingFees;
+
+  @Prop({ default: 'GHN' })
+  default_provider: string;
+
+  @Prop({ type: Object })
+  ghn_config: { token: string; shop_id: number; is_active: boolean };
+
+  @Prop({ type: Object })
+  ghtk_config: { token: string; is_active: boolean };
 }
 
 export const ShippingConfigSchema =

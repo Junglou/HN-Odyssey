@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { PaymentController } from './payment.controller';
 import { PaymentService } from './payment.service';
 import { VnpayService } from './providers/vnpay.service';
@@ -21,6 +21,7 @@ import {
 import { UsersModule } from 'src/modules/users/users.module';
 import { MomoService } from './providers/momo.service';
 import { CodService } from './providers/cod.service';
+import { OrdersModule } from '../orders/orders.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { CodService } from './providers/cod.service';
       { name: PaymentConfig.name, schema: PaymentConfigSchema },
       { name: PaymentTransaction.name, schema: PaymentTransactionSchema },
     ]),
+    forwardRef(() => OrdersModule),
     StockModule,
     NotificationsModule,
     UsersModule,

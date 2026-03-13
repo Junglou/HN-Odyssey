@@ -11,7 +11,6 @@ import { PaymentConfig } from '../schemas/payment-config.schema';
 
 @Injectable()
 export class VnpayService {
-  // Khai báo logger ở đây để giải quyết lỗi "Property 'logger' does not exist"
   private readonly logger = new Logger(VnpayService.name);
 
   // Tạo URL thanh toán chuyển hướng sang VNPAY

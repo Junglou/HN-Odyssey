@@ -1,4 +1,3 @@
-// src/common/constants/shipping.constant.ts
 import { OrderStatus } from '../interfaces/order.interface';
 export const PROVINCES = {
   SUPPORTED_INSTANT: ['79', '01'], // 79: HCM, 01: HN (Chỉ 2 TP này có Hỏa tốc)

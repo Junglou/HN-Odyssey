@@ -145,6 +145,58 @@ export class EmailService {
     `;
   }
 
+  async sendRefundAlert(
+    adminEmail: string,
+    refundData: {
+      order_code: string;
+      amount: number;
+      method: string;
+      reason?: string;
+    },
+  ) {
+    await this.mailerService.sendMail({
+      to: adminEmail,
+      subject: `[KẾ TOÁN] Yêu cầu hoàn tiền đơn hàng #${refundData.order_code}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; border: 2px solid #dc3545; border-radius: 8px; max-width: 600px;">
+          <div style="background-color: #dc3545; color: white; padding: 10px; text-align: center; border-radius: 5px 5px 0 0;">
+            <h2 style="margin: 0;">YÊU CẦU HOÀN TIỀN</h2>
+          </div>
+          
+          <div style="padding: 20px;">
+            <p>Hệ thống ghi nhận đơn hàng sau cần được hoàn tiền do <b>Hủy đơn sau khi đã thanh toán Online</b>.</p>
+            
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #eee;"><b>Mã đơn hàng:</b></td>
+                <td style="padding: 8px; border-bottom: 1px solid #eee;">#${refundData.order_code}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #eee;"><b>Số tiền cần hoàn:</b></td>
+                <td style="padding: 8px; border-bottom: 1px solid #eee; color: #dc3545; font-weight: bold;">
+                  ${this.formatCurrency(refundData.amount)}
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #eee;"><b>Phương thức gốc:</b></td>
+                <td style="padding: 8px; border-bottom: 1px solid #eee;">${refundData.method}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #eee;"><b>Lý do hủy:</b></td>
+                <td style="padding: 8px; border-bottom: 1px solid #eee;">${refundData.reason || 'Không có lý do cụ thể'}</td>
+              </tr>
+            </table>
+
+            <p style="margin-top: 20px; font-size: 14px; color: #666;">
+              <i>Vui lòng truy cập cổng thanh toán (${refundData.method}) để thực hiện hoàn tiền cho khách. 
+              Sau khi hoàn tất, hãy cập nhật trạng thái đơn hàng thành <b>REFUNDED</b>.</i>
+            </p>
+          </div>
+        </div>
+      `,
+    });
+  }
+
   private formatCurrency(amount: number) {
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',

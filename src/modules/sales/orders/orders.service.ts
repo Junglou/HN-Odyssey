@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
-import { Model, Connection, Types, FilterQuery, ClientSession } from 'mongoose';
+import { Model, Connection, Types, FilterQuery } from 'mongoose';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { Order } from './schemas/order.schema';
@@ -45,6 +45,7 @@ import { PaymentService } from '../payment/payment.service';
 import { GhnService } from 'src/modules/shipping/providers/ghn.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { GhtkService } from 'src/modules/shipping/providers/ghtk.service';
+import { OrderStateMachine } from './flow/order-state-machine.service';
 
 // type OrderDocWithShipping = MongooseOrderDoc & {
 //   waybillCode?: string;
@@ -73,6 +74,7 @@ export class OrdersService {
     private readonly ghnService: GhnService,
     private readonly ghtkService: GhtkService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly stateMachine: OrderStateMachine,
   ) {}
 
   // US.121: DANH SÁCH ĐƠN HÀNG
@@ -793,6 +795,18 @@ export class OrdersService {
       await order.save();
       await this.redis.del(dto.checkoutSessionToken);
 
+      for (const item of order.items) {
+        await this.stockService.finalizeDeduction(
+          {
+            product_id: item.product_id.toString(),
+            sku: item.sku,
+            quantity: item.quantity,
+          },
+          // Lưu ý: BuyNow không dùng Mongoose Session ở bước createOrder này
+          // nên truyền undefined hoặc bỏ trống tham số session
+        );
+      }
+
       // Tự động lấy cấu hình tạo Link theo phương thức
       let paymentUrl: string | null = null;
       if (order.payment.method !== 'COD') {
@@ -895,6 +909,15 @@ export class OrdersService {
           throw new BadRequestException(`Sản phẩm ${item.sku} không khả dụng`);
         }
 
+        await this.stockService.holdStock(
+          {
+            product_id: item.product_id.toString(),
+            sku: item.sku,
+            quantity: item.quantity,
+          },
+          session,
+        );
+
         const variant = product.variants.find((v) => v.sku === item.sku);
         if (!variant) throw new BadRequestException(`Lỗi biến thể ${item.sku}`);
 
@@ -929,12 +952,6 @@ export class OrdersService {
           if (variant.stock < item.quantity) {
             throw new BadRequestException(`Sản phẩm ${product.name} hết hàng.`);
           }
-          await this.productModel
-            .updateOne(
-              { _id: product._id, 'variants.sku': item.sku },
-              { $inc: { 'variants.$.stock': -item.quantity } },
-            )
-            .session(session);
         }
 
         const currentPrice =
@@ -1075,12 +1092,15 @@ export class OrdersService {
 
         // Xả kho giữ (Hold) -> Kho bán (Sold)
         for (const item of confirmedItems) {
-          await this.productModel
-            .updateOne(
-              { _id: item.product_id, 'variants.sku': item.sku },
-              { $inc: { 'variants.$.stock_on_hold': -item.quantity } },
-            )
-            .session(session);
+          // Sử dụng finalizeDeduction để trừ stock_on_hold một cách chuyên nghiệp
+          await this.stockService.finalizeDeduction(
+            {
+              product_id: item.product_id.toString(),
+              sku: item.sku,
+              quantity: item.quantity,
+            },
+            session,
+          );
         }
 
         await orderDoc.save({ session });
@@ -1126,6 +1146,17 @@ export class OrdersService {
 
         await newOrder.save({ session });
         savedOrder = newOrder;
+
+        for (const item of orderItems) {
+          await this.stockService.finalizeDeduction(
+            {
+              product_id: item.product_id.toString(),
+              sku: item.sku,
+              quantity: item.quantity,
+            },
+            session,
+          );
+        }
       }
 
       // Xử lý Voucher Usage Count
@@ -1224,80 +1255,7 @@ export class OrdersService {
     }
   }
 
-  // 3. UPDATE STATUS (Admin/System)
-  async updateStatus(
-    orderId: string,
-    status: string,
-    adminId: string,
-    ip: string,
-    userAgent: string,
-  ) {
-    const validStatuses = [
-      'PENDING',
-      'CONFIRMED',
-      'SHIPPING',
-      'COMPLETED',
-      'CANCELLED',
-      'READY_TO_SHIP',
-      'DELIVERY_FAILED',
-      'RETURNED',
-    ];
-    if (!validStatuses.includes(status)) {
-      throw new BadRequestException('Trạng thái không hợp lệ');
-    }
-
-    //Nếu Hủy đơn thủ công -> Phải hoàn tồn kho
-    if (status === 'CANCELLED') {
-      const orderToCheck = await this.orderModel.findById(orderId);
-
-      // Chỉ hoàn kho nếu đơn hàng chưa từng bị hủy trước đó
-      if (orderToCheck && orderToCheck.status !== 'CANCELLED') {
-        for (const item of orderToCheck.items) {
-          await this.productModel.updateOne(
-            { _id: item.product_id, 'variants.sku': item.sku },
-            { $inc: { 'variants.$.stock': item.quantity } },
-          );
-        }
-      }
-    }
-
-    type OrderUpdatePayload = {
-      status: string;
-      'payment.status'?: string; // Cho phép key đặc biệt này
-    };
-
-    const updateData: OrderUpdatePayload = { status };
-
-    if (status === 'COMPLETED') updateData['payment.status'] = 'PAID';
-    if (status === 'CANCELLED') updateData['payment.status'] = 'CANCELLED';
-    const order = await this.orderModel.findByIdAndUpdate(
-      orderId,
-      { $set: updateData },
-      { new: true },
-    );
-
-    if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
-
-    // Audit Log
-    await this.auditLogsService.log({
-      action: 'UPDATE_ORDER_STATUS',
-      collection_name: 'orders',
-      actor_id: adminId,
-      target_id: order._id,
-      department: Department.SALES,
-      detail: {
-        new_status: status,
-        order_code: order.order_code,
-      },
-      ip: ip,
-      user_agent: userAgent,
-    });
-
-    return order;
-  }
-
-  //US.123: CẬP NHẬT TRẠNG THÁI (STATE MACHINE)
-
+  // US.123: CẬP NHẬT TRẠNG THÁI (STATE MACHINE) ĐÃ FIX BUG LINT
   async updateStatusAdvanced(
     id: string,
     dto: UpdateOrderStatusDto,
@@ -1305,265 +1263,218 @@ export class OrdersService {
     actorName: string,
     ip: string,
     userAgent: string,
-  ) {
+  ): Promise<OrderData> {
     const session = await this.connection.startSession();
     session.startTransaction();
 
+    let orderDoc: OrderData;
+    let oldStatus: OrderStatus;
+    const nextStatus = dto.status as OrderStatus;
+
     try {
-      // 1. Lấy thông tin đơn hàng trong Session
       const order = await this.orderModel.findById(id).session(session);
       if (!order) throw new NotFoundException('Đơn hàng không tìm thấy');
 
-      const oldStatus = order.status;
-      const newStatus = dto.status;
+      oldStatus = order.status as OrderStatus;
+      let finalStatusToSave = nextStatus;
 
-      // 2. Logic kiểm tra quy trình (Workflow validation)
-      if (['COMPLETED', 'CANCELLED'].includes(oldStatus) && !dto.is_override) {
-        throw new BadRequestException(
-          'Đơn hàng đã đóng. Cần quyền Ghi đè (Override) để mở lại.',
-        );
-      }
+      // 1. VALIDATE TRẠNG THÁI
+      await this.stateMachine.validateTransition(
+        order as unknown as MongooseOrderDoc,
+        nextStatus,
+        dto.is_override ?? false,
+        dto.reason,
+      );
 
-      if (dto.is_override) {
-        if (!dto.reason || dto.reason.trim() === '') {
-          throw new BadRequestException(
-            'Bắt buộc nhập lý do khi thực hiện Ghi đè quy trình (Override Workflow).',
+      if (
+        nextStatus === OrderStatus.PROCESSING &&
+        oldStatus !== OrderStatus.PROCESSING
+      ) {
+        for (const item of order.items) {
+          await this.stockService.finalizeDeduction(
+            {
+              product_id: item.product_id.toString(),
+              sku: item.sku,
+              quantity: item.quantity,
+            },
+            session,
           );
         }
-      } else {
-        this.validateStateTransition(oldStatus, newStatus);
       }
 
-      if (newStatus === 'PRIORITY' && oldStatus !== 'PENDING') {
-        throw new BadRequestException(
-          'Chỉ đơn chờ xử lý mới được chuyển sang Ưu tiên',
-        );
-      }
+      // 2. LOGIC HỦY ĐƠN & HOÀN TỒN KHO
+      if (
+        nextStatus === OrderStatus.CANCELLED &&
+        oldStatus !== OrderStatus.CANCELLED
+      ) {
+        // Danh sách trạng thái "Hàng chưa ra khỏi cửa kho"
+        const canAutoRestock = [
+          OrderStatus.TEMPORARY,
+          OrderStatus.PENDING,
+          OrderStatus.CONFIRMED,
+          OrderStatus.READY_TO_SHIP,
+          OrderStatus.PRIORITY,
+          OrderStatus.TRADE_IN_REVIEW,
+        ].includes(oldStatus);
 
-      // 3. Khai báo Interface an toàn để truy cập các trường city/district/ward
-      interface ISafeShippingInfo {
-        name: string;
-        phone: string;
-        address: string;
-        city_code: string;
-        district_code: string;
-        ward_code: string;
-        city?: string;
-        district?: string;
-        ward?: string;
-        provider?: string;
-        tracking_code?: string;
-      }
-
-      const sInfo = order.shipping_info as unknown as ISafeShippingInfo;
-      const provider = (sInfo.provider || 'GHN').toUpperCase();
-
-      // --- FIX LỖI ESLINT 1370-1374: Định nghĩa kiểu cho Item trong Map ---
-      const shippingItems = order.items.map((item) => {
-        // Ép kiểu item sang object cụ thể thay vì dùng 'any'
-        const i = item as unknown as {
-          product_name: string;
-          sku: string;
-          quantity: number;
-          price: number;
-          weight?: number;
-        };
-
-        return {
-          name: i.product_name,
-          code: i.sku,
-          quantity: i.quantity,
-          price: i.price,
-          weight: i.weight ?? 0.5,
-        };
-      });
-
-      // 4. Tích hợp đa vận chuyển (READY_TO_SHIP) - AC1, AC6
-      if (newStatus === 'READY_TO_SHIP' && !order.waybill_code) {
-        // Lookup Mapping địa lý từ Database
-        const unitMapping = await this.shippingService.getMappingCode(
-          sInfo.district_code,
-        );
-
-        const totalWeightKg = shippingItems.reduce(
-          (sum, i) => sum + i.weight * i.quantity,
-          0,
-        );
-
-        try {
-          let shippingResult: { waybillCode: string; actualFee: number };
-
-          if (provider === 'GHTK') {
-            // Nhánh GHTK
-            shippingResult = await this.ghtkService.createShippingOrder({
-              orderCode: order.order_code,
-              customerName: sInfo.name,
-              phone: sInfo.phone,
-              address: sInfo.address,
-              city: sInfo.city || unitMapping?.name || '',
-              district: sInfo.district || unitMapping?.name_with_type || '',
-              ward: sInfo.ward || '',
-              codAmount:
-                order.payment.method === 'COD' ? order.total_amount : 0,
-              totalValue: order.total_amount,
-              items: shippingItems,
-            });
-          } else {
-            // Nhánh GHN
-            const ghnDistrictId =
-              unitMapping?.mapping?.ghn_id || Number(sInfo.district_code);
-
-            shippingResult = await this.ghnService.createShippingOrder({
-              customerName: sInfo.name,
-              phone: sInfo.phone,
-              address: sInfo.address,
-              codAmount:
-                order.payment.method === 'COD' ? order.total_amount : 0,
-              weight: totalWeightKg,
-              wardCode: sInfo.ward_code || '',
-              districtId: ghnDistrictId,
-              note: order.internal_note || 'Hàng công nghệ H&N Odyssey',
-              items: shippingItems.map((i) => ({
-                ...i,
-                weight: Math.ceil(i.weight * 1000), // GHN dùng Gram
-              })),
-            });
+        if (canAutoRestock) {
+          // Dùng StockService để giải phóng cả stock_on_hold
+          for (const item of order.items) {
+            await this.stockService.restock(
+              {
+                product_id: item.product_id.toString(),
+                sku: item.sku,
+                quantity: item.quantity,
+              },
+              session,
+            );
           }
-
-          // Lưu kết quả vận chuyển (Đã có Type nên không lỗi Unsafe assignment)
-          order.waybill_code = shippingResult.waybillCode;
-          order.actual_shipping_fee = shippingResult.actualFee;
-        } catch (error: unknown) {
-          const msg =
-            error instanceof Error ? error.message : 'Lỗi không xác định';
-          order.internal_note =
-            (order.internal_note || '') +
-            ` [Lỗi ĐVVC ${new Date().toLocaleString()}]: ${msg}`;
-          await order.save({ session });
-          this.logger.error(`[AC8] Đẩy đơn ${provider} thất bại: ${msg}`);
-          throw new BadRequestException(`ĐVVC ${provider} báo lỗi: ${msg}`);
+        } else {
+          order.internal_note = `[CẢNH BÁO]: Đơn hủy khi đang giao. Cần kiểm tra hàng thực tế trước khi hoàn kho.`;
         }
+
+        // Bẻ lái sang REFUND_PENDING nếu đã thanh toán Online
+        if (order.payment.status === 'PAID' && order.payment.method !== 'COD') {
+          finalStatusToSave = OrderStatus.REFUND_PENDING;
+        }
+        order.cancel_reason = dto.reason || 'Hủy bởi Admin';
       }
 
-      // 5. Hủy đơn đồng bộ phía ĐVVC (AC7)
-      if (newStatus === 'CANCELLED' && order.waybill_code) {
-        const cancelCall =
-          provider === 'GHTK'
-            ? this.ghtkService.cancelOrder(order.waybill_code)
-            : this.ghnService.cancelOrder(order.waybill_code);
+      // 3. LOGIC ADMIN OVERRIDE (KHÔI PHỤC ĐƠN HỦY)
+      const isReversingCancel =
+        (oldStatus === OrderStatus.CANCELLED ||
+          oldStatus === OrderStatus.REFUND_PENDING) &&
+        nextStatus === OrderStatus.PENDING;
 
-        await cancelCall.catch((err: unknown) => {
-          const errorMessage = err instanceof Error ? err.message : String(err);
-          this.logger.warn(
-            `[AC7] Không thể hủy trên ${provider}: ${errorMessage}`,
+      if (isReversingCancel && dto.is_override) {
+        // Khi Admin khôi phục, phải trừ lại kho (Hold hàng lại)
+        for (const item of order.items) {
+          await this.stockService.holdStock(
+            {
+              product_id: item.product_id.toString(),
+              sku: item.sku,
+              quantity: item.quantity,
+            },
+            session,
           );
-        });
+        }
+        order.cancel_reason = undefined;
+        order.waybill_code = '';
+        order.actual_shipping_fee = 0;
+        order.internal_note = `[OVERRIDE]: Admin khôi phục đơn hàng.`;
       }
 
-      // 6. Cập nhật thông tin vận chuyển thủ công (AC5)
-      if (newStatus === 'SHIPPING' && !order.waybill_code) {
+      // 4. XỬ LÝ SHIPPING THỦ CÔNG
+      if (nextStatus === OrderStatus.SHIPPING && !order.waybill_code) {
         if (!dto.shipping_provider || !dto.tracking_code) {
           throw new BadRequestException(
-            'Vui lòng nhập Đơn vị vận chuyển và Mã vận đơn',
+            'Bắt buộc có ĐVVC và Mã vận đơn để chuyển sang SHIPPING',
           );
         }
-
         order.shipping_info.provider = dto.shipping_provider;
         order.shipping_info.tracking_code = dto.tracking_code;
+        order.waybill_code = dto.tracking_code;
       }
 
-      // 7. Logic xử lý kho hàng
-      if (newStatus === 'CANCELLED' && oldStatus !== 'CANCELLED') {
-        await this.restoreStock(order as unknown as MongooseOrderDoc, session);
-        order.cancel_reason = dto.reason || 'Hủy bởi nhân viên';
-      }
-
-      // Khôi phục đơn từ trạng thái Hủy -> Trừ lại kho
-      if (oldStatus === 'CANCELLED' && newStatus !== 'CANCELLED') {
-        for (const item of order.items) {
-          const product = await this.productModel
-            .findById(item.product_id)
-            .session(session);
-          if (!product)
-            throw new BadRequestException(
-              `Sản phẩm ${item.product_name} đã bị xóa.`,
-            );
-
-          const variant = product.variants.find((v) => v.sku === item.sku);
-          if (!variant || variant.stock < item.quantity) {
-            throw new BadRequestException(
-              `Sản phẩm ${item.product_name} không đủ tồn kho.`,
-            );
-          }
-          await this.productModel
-            .updateOne(
-              { _id: item.product_id, 'variants.sku': item.sku },
-              { $inc: { 'variants.$.stock': -item.quantity } },
-            )
-            .session(session);
-        }
-      }
-
-      // 8. Kết thúc cập nhật trạng thái & Timeline
-      order.status = newStatus;
-      if (newStatus === 'COMPLETED') {
-        order.payment.status = 'PAID';
-        if (order.user_id && !order.isGuest) {
-          this.eventEmitter.emit('order.completed', {
-            orderId: order._id,
-            userId: order.user_id,
-            totalAmount: order.total_amount,
-          });
-        }
-      }
-
-      if (oldStatus === 'CANCELLED' && newStatus !== 'CANCELLED') {
-        order.cancel_reason = undefined;
-      }
-
+      // 5. CẬP NHẬT TRẠNG THÁI & LƯU DB
+      order.status = finalStatusToSave;
       if (dto.note) order.internal_note = dto.note;
 
-      order.timeline.push({
-        status: newStatus,
-        timestamp: new Date(),
-        actor: actorName,
-        note:
-          dto.reason || dto.note || `Chuyển từ ${oldStatus} sang ${newStatus}`,
-      });
+      this.stateMachine.addTimeline(
+        order as unknown as MongooseOrderDoc,
+        finalStatusToSave,
+        actorName,
+        dto.reason || dto.note,
+      );
 
-      // 9. Lưu và Commit Transaction
       await order.save({ session });
       await session.commitTransaction();
 
-      // 10. Ghi log Audit chi tiết
+      orderDoc = order.toObject() as unknown as OrderData;
+      const validActorId = Types.ObjectId.isValid(actorId) ? actorId : null;
+
+      // 6. AUDIT LOG & EVENTS (Bắn sau khi commit thành công)
       await this.auditLogsService.log({
-        action: dto.is_override
-          ? 'OVERRIDE_ORDER_STATUS'
-          : 'UPDATE_ORDER_STATUS',
+        action: dto.is_override ? 'OVERRIDE_STATUS' : 'UPDATE_STATUS',
         collection_name: 'orders',
-        actor_id: actorId,
+        actor_id: validActorId,
         target_id: String(order._id),
         department: Department.SALES,
-        detail: {
-          order_code: order.order_code,
-          old_status: oldStatus,
-          new_status: newStatus,
-          waybill_code: order.waybill_code || null,
-          provider: provider,
-          actual_fee: order.actual_shipping_fee || 0,
-          reason: dto.reason || null,
-        },
+        detail: { old: oldStatus, new: finalStatusToSave },
         ip,
         user_agent: userAgent,
         is_success: true,
       });
 
-      return order;
-    } catch (error) {
+      this.handleOrderEvents(finalStatusToSave, orderDoc);
+
+      return orderDoc;
+    } catch (error: unknown) {
+      // 1. Luôn abort transaction trước
       await session.abortTransaction();
-      throw error;
+
+      // 2. Kiểm tra kiểu dữ liệu của error để lấy message an toàn
+      const finalErrorMsg =
+        error instanceof Error ? error.message : 'Lỗi hệ thống không xác định';
+
+      // 3. Throw exception với message đã được xử lý
+      throw new BadRequestException(finalErrorMsg);
     } finally {
       await session.endSession();
+    }
+  }
+
+  // HELPER: Tách riêng logic bắn event để code chính sạch hơn
+
+  private handleOrderEvents(status: OrderStatus, orderDoc: OrderData) {
+    // Tự động đẩy đơn sang GHN/GHTK
+    if (status === OrderStatus.READY_TO_SHIP && !orderDoc.waybill_code) {
+      this.eventEmitter.emit('order.ready_to_ship', orderDoc);
+    }
+
+    // Hủy vận đơn trên hệ thống ĐVVC
+    if (status === OrderStatus.CANCELLED && orderDoc.waybill_code) {
+      this.eventEmitter.emit('order.cancelled_shipping', orderDoc);
+    }
+
+    // Đổi điều kiện kích hoạt cộng điểm thành DELIVERED
+    if (
+      status === OrderStatus.DELIVERED &&
+      orderDoc.user_id &&
+      !orderDoc.isGuest
+    ) {
+      this.eventEmitter.emit('order.completed', {
+        // Bạn có thể cân nhắc đổi tên event này sau nếu muốn
+        orderId: String(orderDoc._id),
+        userId: String(orderDoc.user_id),
+        totalAmount: orderDoc.total_amount,
+      });
+    }
+
+    // 1. Luồng hoàn tiền
+    if (status === OrderStatus.REFUND_PENDING) {
+      // Bắn event để các module khác (Loyalty, Inventory) biết
+      this.eventEmitter.emit('order.refund_requested', orderDoc);
+
+      // Gửi mail trực tiếp cho Kế toán
+      const accountingEmail =
+        process.env.ACCOUNTING_EMAIL || 'ke-toan@hnodyssey.com';
+
+      this.emailService
+        .sendRefundAlert(accountingEmail, {
+          order_code: orderDoc.order_code,
+          amount: orderDoc.total_amount,
+          method: orderDoc.payment.method,
+          reason: orderDoc.cancel_reason ?? 'Không có lý do cụ thể',
+        })
+        .catch((err) =>
+          this.logger.error('Lỗi gửi mail hoàn tiền cho kế toán:', err),
+        );
+    }
+
+    // [BỔ SUNG]: Event Trade-In (Thông báo cho bộ phận kiểm định)
+    if (status === OrderStatus.TRADE_IN_REVIEW) {
+      this.eventEmitter.emit('order.trade_in_alert', orderDoc);
     }
   }
 
@@ -1696,41 +1607,19 @@ export class OrdersService {
     return results;
   }
 
-  //HELPER METHODS
-  private validateStateTransition(oldS: string, newS: string) {
-    const flows: Record<string, string[]> = {
-      PENDING: ['PRIORITY', 'CONFIRMED', 'CANCELLED'],
-      PRIORITY: ['CONFIRMED', 'CANCELLED'],
-      CONFIRMED: ['READY_TO_SHIP', 'SHIPPING', 'CANCELLED'], // Thêm READY_TO_SHIP
-      READY_TO_SHIP: ['SHIPPING', 'CANCELLED'], // Khai báo thêm READY_TO_SHIP
-      SHIPPING: ['COMPLETED', 'CANCELLED', 'DELIVERY_FAILED', 'RETURNED'], // Thêm các trạng thái GHN trả về
-      COMPLETED: [],
-      CANCELLED: [],
-      DELIVERY_FAILED: [],
-      RETURNED: [],
-    };
-
-    const allowedNextStates = flows[oldS];
-
-    if (!allowedNextStates || !allowedNextStates.includes(newS)) {
-      throw new BadRequestException(
-        `Không thể chuyển trạng thái từ ${oldS} sang ${newS} theo quy trình chuẩn.`,
-      );
-    }
-  }
-
-  private async restoreStock(order: MongooseOrderDoc, session: ClientSession) {
-    for (const item of order.items) {
-      await this.productModel
-        .updateOne(
-          { _id: item.product_id, 'variants.sku': item.sku },
-          { $inc: { 'variants.$.stock': item.quantity } },
-        )
-        .session(session);
-    }
-  }
+  // private async restoreStock(order: MongooseOrderDoc, session: ClientSession) {
+  //   for (const item of order.items) {
+  //     await this.productModel
+  //       .updateOne(
+  //         { _id: item.product_id, 'variants.sku': item.sku },
+  //         { $inc: { 'variants.$.stock': item.quantity } },
+  //       )
+  //       .session(session);
+  //   }
+  // }
 
   // Helper
+
   private async logCreateOrder(
     userId: string | null | undefined,
     order: MongooseOrderDoc,
@@ -1828,54 +1717,34 @@ export class OrdersService {
     };
   }
 
-  // US.123: Cập nhật qua Webhook (Fix lỗi Enum & Property access)
-  async updateStatusByWaybill(waybillCode: string, status: OrderStatus) {
+  // US.123: Cập nhật qua Webhook (Đã fix lỗi so sánh Enum)
+  async updateStatusByWaybill(
+    waybillCode: string,
+    status: OrderStatus,
+  ): Promise<OrderData | void> {
     const order = await this.orderModel.findOne({ waybill_code: waybillCode });
-    if (!order) return;
-
-    if (String(order.status) === String(status)) return;
-
-    order.status = status;
-
-    // LOGIC TỐI ƯU: Cập nhật trạng thái thanh toán & Trigger sự kiện
-    if (status === OrderStatus.COMPLETED) {
-      // 1. Giao thành công -> Thu tiền xong
-      order.payment.status = 'PAID';
-
-      // 2. Kích hoạt luồng tích điểm (Thỏa mãn AC2 - US.35)
-      if (order.user_id && !order.isGuest) {
-        this.eventEmitter.emit('order.completed', {
-          orderId: order._id,
-          userId: order.user_id,
-          totalAmount: order.total_amount,
-        });
-      }
-    } else if (
-      status === OrderStatus.DELIVERY_FAILED ||
-      status === OrderStatus.RETURNED
-    ) {
-      // Giao thất bại hoặc Hoàn trả -> Đánh dấu thanh toán thất bại để kế toán đối soát
-      order.payment.status = 'FAILED';
-
-      // Thêm ghi chú để dễ truy vết sau này
-      const reason =
-        status === OrderStatus.RETURNED
-          ? 'Khách hoàn trả'
-          : 'Giao hàng thất bại';
-      order.internal_note =
-        (order.internal_note || '') +
-        ` [System: Thanh toán COD thất bại - Lý do: ${reason}]`;
+    if (!order) {
+      this.logger.warn(
+        `Webhook: Không tìm thấy đơn hàng với mã vận đơn ${waybillCode}`,
+      );
+      return;
     }
 
-    const historyUpdate = {
-      status: String(status),
-      timestamp: new Date(),
-      actor: 'GHN_SYSTEM',
-      note: `Đồng bộ tự động: ${status}`,
-    };
+    // Fix lỗi no-unsafe-enum-comparison bằng cách ép về string khi so sánh
+    if (String(order.status) === String(status)) return;
 
-    order.timeline.push(historyUpdate);
-    return order.save();
+    // Gọi lại updateStatusAdvanced (Return Promise<OrderData>)
+    return this.updateStatusAdvanced(
+      String(order._id),
+      {
+        status: status,
+        note: `Cập nhật tự động từ Đơn vị vận chuyển (Mã vận đơn: ${waybillCode})`,
+      },
+      'SYSTEM_ID',
+      'SYSTEM_WEBHOOK',
+      '127.0.0.1',
+      'Webhook-Handler',
+    );
   }
 
   async getShippingLabel(orderId: string) {

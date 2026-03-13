@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { InjectModel, InjectConnection } from '@nestjs/mongoose';
-import { Model, Connection } from 'mongoose';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { Order } from './schemas/order.schema';
-import { StockService } from 'src/modules/inventory/stock/stock.service';
+import { OrdersService } from './orders.service';
+import { OrderStatus } from 'src/common/interfaces/order.interface';
 
 @Injectable()
 export class OrdersCronService {
@@ -11,69 +12,79 @@ export class OrdersCronService {
 
   constructor(
     @InjectModel(Order.name) private orderModel: Model<Order>,
-    @InjectConnection() private readonly connection: Connection,
-    private readonly stockService: StockService,
+    private readonly ordersService: OrdersService,
   ) {}
 
-  // Quét đơn hàng hết hạn giữ hàng (15 phút) mỗi phút
+  // Thêm lại quét đơn hết hạn (15 phút) mỗi phút một lần
   @Cron(CronExpression.EVERY_MINUTE)
   async handleExpiredOrders() {
     const now = new Date();
-
-    // Tìm các đơn hàng cần hủy (Guest chưa thanh toán hoặc BuyNow chưa chốt)
     const expiredOrders = await this.orderModel.find({
-      status: { $in: ['PENDING', 'TEMPORARY'] },
+      status: { $in: [OrderStatus.PENDING, OrderStatus.TEMPORARY] },
       hold_expires_at: { $lte: now },
     });
 
-    if (expiredOrders.length === 0) return;
+    for (const order of expiredOrders) {
+      try {
+        await this.ordersService.updateStatusAdvanced(
+          String(order._id),
+          {
+            status: OrderStatus.CANCELLED,
+            reason: 'Hệ thống tự động hủy do hết hạn thanh toán (15 phút).',
+          },
+          'SYSTEM',
+          'SYSTEM_CRON',
+          '127.0.0.1',
+          'Cronjob',
+        );
+      } catch (e: unknown) {
+        const errorMessage = e instanceof Error ? e.message : String(e);
+
+        this.logger.error(
+          `Lỗi hủy đơn hết hạn ${order.order_code}: ${errorMessage}`,
+        );
+      }
+    }
+  }
+
+  // Quét đơn hàng hết hạn giữ hàng 7 ngày sau khi giao hàng thành công
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  async handleAutoCompletedOrders() {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    // Tìm các đơn DELIVERED có updatedAt <= 7 ngày trước
+    const ordersToComplete = await this.orderModel.find({
+      status: OrderStatus.DELIVERED,
+      updatedAt: { $lte: sevenDaysAgo },
+    });
+
+    if (ordersToComplete.length === 0) return;
 
     this.logger.log(
-      `Found ${expiredOrders.length} expired orders. Processing cleanup...`,
+      `Tự động hoàn thành ${ordersToComplete.length} đơn hàng đã giao quá 7 ngày.`,
     );
 
-    // Xử lý từng đơn hàng trong một Transaction riêng biệt
-    // (Để nếu 1 đơn lỗi thì không ảnh hưởng các đơn khác)
-    for (const order of expiredOrders) {
-      const session = await this.connection.startSession();
-      session.startTransaction();
-
+    for (const order of ordersToComplete) {
       try {
-        // 1. Hoàn kho (Restock) thông qua StockService
-        for (const item of order.items) {
-          await this.stockService.restock(
-            {
-              product_id: item.product_id.toString(), // Đã ép kiểu string an toàn
-              sku: item.sku,
-              quantity: item.quantity,
-            },
-            session, // [FIX] Truyền session vào để đảm bảo an toàn
-          );
-        }
-
-        // 2. Cập nhật trạng thái đơn hàng sang CANCELLED
-        order.status = 'CANCELLED';
-        // [QUAN TRỌNG] Lý do phải chứa chữ 'timeout' để logic handleVnpayIpn bắt được
-        order.cancel_reason =
-          'System: Auto cancel due to payment timeout (15m)';
-        order.hold_expires_at = undefined; // Xóa field này để không bị quét lại
-
-        // Lưu với session
-        await order.save({ session });
-
-        await session.commitTransaction();
-
-        this.logger.log(
-          `Successfully cancelled expired order: ${order.order_code}`,
+        await this.ordersService.updateStatusAdvanced(
+          String(order._id),
+          {
+            status: OrderStatus.COMPLETED,
+            note: 'Hệ thống tự động hoàn thành sau 7 ngày giao hàng thành công.',
+          },
+          'SYSTEM_ID',
+          'SYSTEM_CRONJOB',
+          '127.0.0.1',
+          'Auto-Complete-Service',
         );
-      } catch (error: any) {
-        await session.abortTransaction();
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+
         this.logger.error(
-          `Failed to process expired order ${order.order_code}: ${error instanceof Error ? error.message : String(error)}`,
-          error instanceof Error ? error.stack : undefined,
+          `Lỗi auto-complete đơn ${order.order_code}: ${errorMessage}`,
         );
-      } finally {
-        await session.endSession();
       }
     }
   }

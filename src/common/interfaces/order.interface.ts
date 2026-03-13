@@ -11,7 +11,18 @@ export enum OrderStatus {
   CANCELLED = 'CANCELLED', // Đã hủy
   READY_TO_SHIP = 'READY_TO_SHIP',
   RETURNED = 'RETURNED',
+  DELIVERED = 'DELIVERED',
   DELIVERY_FAILED = 'DELIVERY_FAILED',
+  PROCESSING = 'PROCESSING',
+  ON_HOLD = 'ON_HOLD',
+
+  // Trạng thái hoàn tiền
+  REFUND_PENDING = 'REFUND_PENDING', // Chờ kế toán hoàn tiền (sau khi hủy đơn PAID)
+  REFUNDED = 'REFUNDED', // Đã hoàn tiền xong
+
+  // Neo cho Trade-in (Thu cũ đổi mới)
+  TRADE_IN_REVIEW = 'TRADE_IN_REVIEW', // Đang kiểm định thiết bị cũ
+  REFUND_NEEDED = 'REFUND_NEEDED',
 }
 
 export enum PaymentMethod {
@@ -108,6 +119,10 @@ export interface OrderData {
   items: OrderItem[];
   shipping_info: ShippingInfo;
   payment: PaymentInfo;
+
+  waybill_code?: string; // Mã vận đơn từ ĐVVC (GHN/GHTK)
+  actual_shipping_fee?: number; // Phí ship thực tế từ ĐVVC
+  cancel_reason?: string;
 
   // Voucher
   voucher_code?: string;
@@ -228,3 +243,23 @@ export interface MongooseOrderDoc extends OrderData, Document {
   // Hàm chuyển đổi sang Object thường
   toObject: (options?: any) => OrderData;
 }
+
+// bảng xếp hạng trạng thái để chống lùi (Regression)
+export const STATUS_RANK: Record<string, number> = {
+  [OrderStatus.TEMPORARY]: 0,
+  [OrderStatus.PENDING]: 1,
+  [OrderStatus.TRADE_IN_REVIEW]: 2,
+  [OrderStatus.PRIORITY]: 2,
+  [OrderStatus.CONFIRMED]: 3,
+  [OrderStatus.ON_HOLD]: 3,
+  [OrderStatus.PROCESSING]: 4,
+  [OrderStatus.READY_TO_SHIP]: 4,
+  [OrderStatus.SHIPPING]: 5,
+  [OrderStatus.DELIVERED]: 6,
+  [OrderStatus.COMPLETED]: 7,
+  // Các trạng thái kết thúc đặt là 99 để Regression Guard hiểu là trạng thái cuối
+  [OrderStatus.CANCELLED]: 99,
+  [OrderStatus.RETURNED]: 99,
+  [OrderStatus.REFUND_PENDING]: 98, // Chờ hoàn tiền
+  [OrderStatus.REFUNDED]: 99,
+};

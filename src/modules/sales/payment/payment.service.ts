@@ -3,6 +3,8 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  forwardRef,
+  Inject,
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
@@ -21,13 +23,18 @@ import {
   PaymentTransaction,
   PaymentTransactionDocument,
 } from './schemas/payment-transaction.schema';
-import { PaymentStrategy } from 'src/common/interfaces/payment-strategy.interface';
+import {
+  PaymentStrategy,
+  CreatePaymentUrlDto,
+} from 'src/common/interfaces/payment-strategy.interface';
 import {
   InvoiceOrder,
   VnpayReturnParams,
+  OrderStatus,
 } from 'src/common/interfaces/order.interface';
 import { MomoService } from './providers/momo.service';
 import { CodService } from './providers/cod.service';
+import { OrdersService } from '../orders/orders.service';
 
 type LogOrderContext = {
   order_code: string;
@@ -54,6 +61,9 @@ export class PaymentService {
     @InjectRedis() private readonly redis: Redis,
     @InjectConnection() private readonly connection: Connection,
     private readonly codService: CodService,
+
+    @Inject(forwardRef(() => OrdersService))
+    private readonly ordersService: OrdersService,
   ) {
     this.strategies['VNPAY'] = this.vnpayService;
     this.strategies['MOMO'] = this.momoService;
@@ -80,12 +90,7 @@ export class PaymentService {
 
   async createPaymentUrl(
     method: string,
-    dto: {
-      orderCode: string;
-      amount: number;
-      description: string;
-      ipAddr: string;
-    },
+    dto: CreatePaymentUrlDto,
   ): Promise<string | null> {
     if (method === 'COD') return null;
 
@@ -94,7 +99,6 @@ export class PaymentService {
 
     const config = await this.getConfig(method);
 
-    // Tạo Mock Object chuẩn Type LogOrderContext
     const mockOrder: LogOrderContext = {
       order_code: dto.orderCode,
       total_amount: dto.amount,
@@ -118,30 +122,24 @@ export class PaymentService {
 
     const config = await this.getConfig(provider);
 
-    // 1. Verify Checksum
     const isValid = strategy.verifyWebhookData(config, rawData);
     if (!isValid) {
       this.logger.error(`[Security] Checksum Failed for ${provider}`);
       return { RspCode: '97', Message: 'Invalid Checksum' };
     }
 
-    // 2. Parse Data
     const { responseCode, amount, orderCode, transactionCode } =
       strategy.parseWebhookData(rawData);
 
-    // 3. IDEMPOTENCY CHECK - Redis Lock
     const lockKey = `lock:ipn:${orderCode}`;
     const acquired = await this.redis.set(lockKey, 'LOCKED', 'EX', 10, 'NX');
-
-    if (!acquired) {
+    if (!acquired)
       return { RspCode: '00', Message: 'Order already processing' };
-    }
 
     try {
       const order = await this.orderModel.findOne({ order_code: orderCode });
       if (!order) return { RspCode: '01', Message: 'Order Not Found' };
 
-      // Validate Amount
       if (order.total_amount !== amount) {
         await this.logTransaction(
           order,
@@ -157,74 +155,43 @@ export class PaymentService {
         return { RspCode: '00', Message: 'Order already confirmed' };
       }
 
-      // XỬ LÝ KẾT QUẢ
       if (responseCode === '00') {
-        // A. LOGIC HỒI SINH ĐƠN HÀNG
         if (
           order.status === 'CANCELLED' &&
           String(order.cancel_reason).includes('timeout')
         ) {
-          // Xóa các tham số thừa khi gọi hàm
           return this.processRecovery(order);
         }
 
-        // B. LOGIC THANH TOÁN THƯỜNG
-        const session = await this.connection.startSession();
-        session.startTransaction();
-        try {
-          order.payment.status = 'PAID';
-          order.status = 'CONFIRMED';
-          order.hold_expires_at = undefined;
+        await this.ordersService.updateStatusAdvanced(
+          String(order._id),
+          {
+            status: OrderStatus.CONFIRMED,
+            note: `Thanh toán thành công qua ${provider}. Mã GD: ${transactionCode}`,
+          },
+          'SYSTEM_PAYMENT',
+          `${provider}_GATEWAY`,
+          '127.0.0.1',
+          'IPN_HANDLER',
+        );
 
-          if (!order.user_id) {
-            for (const item of order.items) {
-              await this.stockService.finalizeDeduction(
-                {
-                  product_id: String(item.product_id),
-                  sku: item.sku,
-                  quantity: item.quantity,
-                },
-                session,
-              );
-            }
-          }
+        order.payment.status = 'PAID';
+        order.payment.transaction_id = transactionCode;
+        order.hold_expires_at = undefined;
 
-          order.timeline = order.timeline || [];
-          order.timeline.push({
-            status: 'PAID',
-            timestamp: new Date(),
-            actor: `${provider} IPN`,
-            note: `Thanh toán thành công (Mã GD: ${transactionCode})`,
-          });
-
-          await order.save({ session });
-          await session.commitTransaction();
-
-          await this.logTransaction(
-            order,
-            provider,
-            rawData,
-            'SUCCESS',
-            'Payment Success',
-          );
-
-          return { RspCode: '00', Message: 'Confirm Success' };
-        } catch (e) {
-          await session.abortTransaction();
-          throw e;
-        } finally {
-          await session.endSession();
-        }
-      } else {
-        // THANH TOÁN THẤT BẠI
-        order.payment.status = 'FAILED';
-        order.timeline.push({
-          status: 'FAILED',
-          timestamp: new Date(),
-          actor: `${provider} IPN`,
-          note: `Payment Failed: ${responseCode}`,
-        });
         await order.save();
+        await this.logTransaction(
+          order,
+          provider,
+          rawData,
+          'SUCCESS',
+          'Payment Success',
+        );
+        return { RspCode: '00', Message: 'Confirm Success' };
+      } else {
+        order.payment.status = 'FAILED';
+        await order.save();
+
         await this.logTransaction(
           order,
           provider,
@@ -237,9 +204,7 @@ export class PaymentService {
         if (email) {
           const frontendUrl =
             process.env.FRONTEND_URL || 'http://localhost:5173';
-          const paymentLink = `${frontendUrl}/checkout/repay/${String(
-            order._id,
-          )}`;
+          const paymentLink = `${frontendUrl}/checkout/repay/${String(order._id)}`;
           void this.emailService.sendRepaymentLink(
             email,
             order.order_code,
@@ -249,23 +214,16 @@ export class PaymentService {
 
         return { RspCode: '00', Message: 'Payment Failed Confirmed' };
       }
-    } catch (e) {
-      this.logger.error(e);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Unknown error';
+      this.logger.error(`IPN Error: ${msg}`);
       return { RspCode: '99', Message: 'System Error' };
     } finally {
       await this.redis.del(lockKey);
     }
   }
 
-  // Xóa hẳn các tham số thừa provider, rawData, txnCode
   private async processRecovery(order: OrderDocument) {
-    if (order.status !== 'CANCELLED') {
-      this.logger.warn(
-        `Skip recovery for order ${order.order_code}: Status is ${order.status}`,
-      );
-      return { RspCode: '00', Message: 'Order not cancelled, skip recovery' };
-    }
-
     const session = await this.connection.startSession();
     session.startTransaction();
     try {
@@ -274,11 +232,7 @@ export class PaymentService {
         const product = await this.productModel
           .findById(item.product_id)
           .session(session);
-        if (!product) {
-          allItemsAvailable = false;
-          break;
-        }
-        const variant = product.variants.find((v) => v.sku === item.sku);
+        const variant = product?.variants.find((v) => v.sku === item.sku);
         if (!variant || variant.stock < item.quantity) {
           allItemsAvailable = false;
           break;
@@ -286,44 +240,51 @@ export class PaymentService {
       }
 
       if (allItemsAvailable) {
-        for (const item of order.items) {
-          await this.productModel
-            .updateOne(
-              { _id: item.product_id, 'variants.sku': item.sku },
-              { $inc: { 'variants.$.stock': -item.quantity } },
-            )
-            .session(session);
-        }
-        order.status = 'CONFIRMED';
+        await this.ordersService.updateStatusAdvanced(
+          String(order._id),
+          {
+            status: OrderStatus.CONFIRMED,
+            reason: 'Khôi phục đơn hàng thành công do tiền về muộn.',
+            is_override: true,
+          },
+          'SYSTEM_RECOVERY',
+          'PAYMENT_RECOVERY_SERVICE',
+          '127.0.0.1',
+          'RECOVERY_AGENT',
+        );
+
         order.payment.status = 'PAID';
         order.cancel_reason = undefined;
-        order.timeline.push({
-          status: 'CONFIRMED',
-          timestamp: new Date(),
-          actor: 'System (Recovery)',
-          note: 'Khôi phục đơn hàng do tiền về muộn',
-        });
-
         await order.save({ session });
         await session.commitTransaction();
 
         const email = order.guest_info?.email || order.shipping_info?.email;
         if (email) {
-          void this.emailService
-            .sendInvoice(email, order as unknown as InvoiceOrder)
-            .catch((e) => this.logger.error('Error sending invoice', e));
+          void this.emailService.sendInvoice(
+            email,
+            order as unknown as InvoiceOrder,
+          );
         }
         return { RspCode: '00', Message: 'Order Recovered' };
       } else {
-        order.payment.status = 'REFUND_NEEDED';
-        order.internal_note = `Khách thanh toán thành công lúc ${new Date().toISOString()} nhưng đơn bị hủy do Timeout và hết hàng.`;
-        await order.save({ session });
-        await session.commitTransaction();
+        // SỬA LẠI ĐOẠN NÀY:
+        await this.ordersService.updateStatusAdvanced(
+          String(order._id),
+          {
+            status: OrderStatus.REFUND_NEEDED,
+            reason:
+              'Khách thanh toán thành công nhưng hàng đã hết trong lúc chờ. Cần hoàn tiền ngay.',
+            is_override: true,
+          },
+          'SYSTEM_PAYMENT',
+          'PAYMENT_RECOVERY_SERVICE',
+          '127.0.0.1',
+          'RECOVERY_AGENT',
+        );
 
-        return {
-          RspCode: '00',
-          Message: 'Payment received but Out of Stock. Marked for Refund.',
-        };
+        order.payment.status = 'REFUND_NEEDED';
+        await order.save({ session });
+        return { RspCode: '00', Message: 'Out of stock. Marked for Refund.' };
       }
     } catch (e) {
       await session.abortTransaction();
@@ -340,10 +301,7 @@ export class PaymentService {
     status: string,
     msg: string,
   ) {
-    // Dùng Type Guard để lấy ID an toàn
     let orderId: string | Types.ObjectId = new Types.ObjectId();
-
-    // Kiểm tra nếu object có thuộc tính _id và nó không null/undefined
     if ('_id' in order && order._id) {
       orderId = order._id;
     }
@@ -364,21 +322,32 @@ export class PaymentService {
   async getRepaymentLink(id: string, ip: string) {
     const order = await this.orderModel.findById(id);
     if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
-    if (order.status !== 'PENDING' || order.payment.status === 'PAID') {
+
+    if (
+      String(order.status) !== String(OrderStatus.PENDING) ||
+      order.payment.status === 'PAID'
+    ) {
       throw new BadRequestException(
         'Đơn hàng không ở trạng thái chờ thanh toán.',
       );
     }
+
     const now = new Date();
     if (!order.hold_expires_at || new Date(order.hold_expires_at) < now) {
-      order.status = 'CANCELLED';
-      order.cancel_reason =
-        'System: Payment link requested but session expired';
-      await order.save();
+      await this.ordersService.updateStatusAdvanced(
+        id,
+        {
+          status: OrderStatus.CANCELLED,
+          reason: 'Phiên thanh toán hết hạn (15p)',
+        },
+        'SYSTEM',
+        'CLEANUP_SERVICE',
+        ip,
+        'REPAY_LINK_REQUEST',
+      );
       throw new BadRequestException('Phiên giao dịch đã hết hạn.');
     }
 
-    // Gọi hàm createPaymentUrl với tham số động là order.payment.method
     const paymentUrl = await this.createPaymentUrl(order.payment.method, {
       orderCode: order.order_code,
       amount: order.total_amount,
@@ -388,16 +357,13 @@ export class PaymentService {
 
     return {
       orderCode: order.order_code,
-      paymentUrl: paymentUrl,
+      paymentUrl,
       expiresAt: order.hold_expires_at,
     };
   }
 
   async verifyReturnUrl(query: VnpayReturnParams): Promise<boolean> {
-    // 1. Lấy Config của VNPAY từ Redis/DB
     const config = await this.getConfig('VNPAY');
-
-    // 2. Truyền config vào hàm verify của provider
     return this.vnpayService.verifyReturnUrl(config, query);
   }
 
@@ -408,68 +374,42 @@ export class PaymentService {
     const config = await this.configModel.findOneAndUpdate(
       { provider },
       { $set: updateData },
-      { new: true }, // Bỏ upsert: true theo chuẩn HTTP PATCH
+      { new: true },
     );
-
-    if (!config) {
-      throw new NotFoundException(
-        `Không tìm thấy cấu hình cho cổng ${provider}`,
-      );
-    }
-
-    // Xóa cache Redis để hệ thống lấy cấu hình mới nhất ngay lập tức
+    if (!config)
+      throw new NotFoundException(`Không tìm thấy cấu hình cổng ${provider}`);
     await this.redis.del(`payment_config:${provider}`);
-
-    return {
-      message: `Đã cập nhật cấu hình cổng ${provider}`,
-      data: config,
-    };
+    return { message: `Đã cập nhật cấu hình cổng ${provider}`, data: config };
   }
 
-  // Dùng chung cho cả Momo và Vnpay Return URL
   async verifyProviderReturnUrl(
     provider: string,
     query: Record<string, unknown>,
   ): Promise<boolean> {
     const config = await this.getConfig(provider);
     const strategy = this.strategies[provider];
+    if (!strategy) return false;
 
-    if (!strategy) {
-      return false;
-    }
-
-    // MoMo sử dụng chung cơ chế ký số cho cả Webhook và Return URL
-    if (provider === 'MOMO') {
-      return strategy.verifyWebhookData(config, query);
-    }
-
-    // VNPAY có logic tính checksum Return URL hơi khác so với IPN
+    if (provider === 'MOMO') return strategy.verifyWebhookData(config, query);
     if (provider === 'VNPAY') {
       return this.vnpayService.verifyReturnUrl(
         config,
         query as unknown as VnpayReturnParams,
       );
     }
-
     return false;
   }
 
-  // US2.AC4: Quy trình Hoàn tiền
   async processRefund(orderId: string, adminId: string) {
     const order = await this.orderModel.findById(orderId);
-
-    // AC4: Chỉ hoàn tiền đơn đã PAID
     if (!order || order.payment.status !== 'PAID') {
-      throw new BadRequestException(
-        'Chỉ hỗ trợ hoàn tiền đơn hàng đã thanh toán.',
-      );
+      throw new BadRequestException('Chỉ hoàn tiền đơn hàng đã thanh toán.');
     }
 
     const provider = order.payment.method;
     const strategy = this.strategies[provider];
 
     if (!strategy || !strategy.refundTransaction) {
-      // Logic fallback nếu cổng chưa hỗ trợ API tự động
       order.payment.status = 'REFUND_NEEDED';
       order.internal_note =
         'Cổng này chưa hỗ trợ hoàn tiền tự động. Cần xử lý thủ công.';
@@ -478,14 +418,11 @@ export class PaymentService {
     }
 
     const config = await this.getConfig(provider);
-
-    // AC6: Tra cứu từ bảng Payment Logs (TransactionModel)
     const paymentLog = await this.transactionModel.findOne({
       order_code: order.order_code,
       status: 'SUCCESS',
     });
 
-    // Sử dụng hàm getRefundDate đã chuẩn hóa ở Bước 2
     const transDate = strategy.getRefundDate(
       (paymentLog?.response_data as Record<string, unknown>) || {},
     );
@@ -500,33 +437,27 @@ export class PaymentService {
       );
 
       if (isRefundSuccess) {
-        order.payment.status = 'REFUNDED';
-        order.status = 'CANCELLED';
-        order.timeline.push({
-          status: 'REFUNDED',
-          timestamp: new Date(),
-          actor: adminId,
-          note: `Hoàn tiền tự động thành công qua ${provider}`,
-        });
-        await order.save();
-
-        // AC7: Ghi log an ninh (Audit Log)
-        await this.logTransaction(
-          order,
-          provider,
-          {},
-          'SUCCESS',
-          'Refund Completed',
+        await this.ordersService.updateStatusAdvanced(
+          String(order._id),
+          {
+            status: OrderStatus.CANCELLED,
+            reason: `Hoàn tiền thành công qua ${provider}.`,
+            is_override: true,
+          },
+          adminId,
+          'ADMIN_REFUND',
+          '127.0.0.1',
+          'REFUND_AGENT',
         );
+
+        order.payment.status = 'REFUNDED';
+        await order.save();
         return { message: 'Hoàn tiền tự động thành công.' };
       }
     } catch (error: unknown) {
-      this.logger.error(
-        `Refund Failed: ${error instanceof Error ? error.message : 'Unknown'}`,
-      );
-      throw new BadRequestException(
-        'Lỗi từ cổng thanh toán khi thực hiện hoàn tiền.',
-      );
+      const errMsg = error instanceof Error ? error.message : 'Unknown';
+      this.logger.error(`Refund Failed: ${errMsg}`);
+      throw new BadRequestException('Lỗi từ cổng thanh toán khi hoàn tiền.');
     }
   }
 }

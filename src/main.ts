@@ -9,7 +9,12 @@ async function bootstrap() {
     origin: true,
     credentials: true,
   });
-  app.useGlobalPipes(new ValidationPipe());
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true, // Tự động ép kiểu chuỗi sang số/boolean theo DTO
+      transformOptions: { enableImplicitConversion: true },
+    }),
+  );
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap().catch((err) => {

@@ -16,8 +16,6 @@ import { Public } from 'src/common/decorators/public.decorator';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { VnpayReturnParams } from 'src/common/interfaces/order.interface';
 import { PaymentConfig } from './schemas/payment-config.schema';
-
-// Import Guards & Decorators của hệ thống (Nhớ trỏ đúng đường dẫn thực tế của bạn)
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { Resource, Action } from 'src/common/enums/resource.enum';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
@@ -123,7 +121,6 @@ export class PaymentController {
         query,
       );
 
-      // Bỏ chữ "as any", truyền thẳng biến query vì nó đã là Record<string, unknown>
       if (isValid && String(resultCode) === '0') {
         return res.redirect(`${frontendUrl}/checkout/success?code=${orderId}`);
       } else {
@@ -157,7 +154,7 @@ export class PaymentController {
   //API DÀNH CHO ADMIN
 
   @Patch('admin/configs/:provider')
-  @UseGuards(JwtAuthGuard, PermissionsGuard) // [FIX 2] Mở khóa Guard
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions(Resource.SYSTEM, Action.UPDATE) // Quyền cấu hình hệ thống
   @ApiOperation({
     summary: 'Admin cập nhật cấu hình cổng thanh toán (US1.AC1)',
@@ -173,7 +170,7 @@ export class PaymentController {
   }
 
   @Post('admin/refund/:orderId')
-  @UseGuards(JwtAuthGuard, PermissionsGuard) // [FIX 2] Mở khóa Guard
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions(Resource.ORDERS, Action.UPDATE) // Quyền thao tác với đơn hàng
   @ApiOperation({ summary: 'Admin yêu cầu hoàn tiền cho đơn hàng (US2.AC4)' })
   async requestRefund(

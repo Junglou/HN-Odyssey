@@ -1,14 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Injectable } from '@nestjs/common';
-import { PaymentStrategy } from 'src/common/interfaces/payment-strategy.interface';
+import {
+  CreatePaymentUrlDto,
+  PaymentStrategy,
+} from 'src/common/interfaces/payment-strategy.interface';
 import { PaymentConfig } from '../schemas/payment-config.schema';
-
-/**
- * Hùng lưu ý: Hãy mở file 'src/modules/sales/payment/dto/create-payment-link.dto.ts'
- * Xem chính xác tên class được export là gì (Ví dụ: CreatePaymentDto hoặc CreatePaymentLinkDto)
- * Nếu chưa chắc chắn, bạn có thể dùng 'any' tạm thời để vượt qua lỗi compile:
- */
-type CreatePaymentDtoStub = any;
+type CreatePaymentDtoStub = CreatePaymentUrlDto;
 
 @Injectable()
 export class CodService implements PaymentStrategy {

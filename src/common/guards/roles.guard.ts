@@ -10,7 +10,7 @@ import { Role } from '../enums/role.enum';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
-// Interface User & Request (Giữ nguyên như bạn đã làm)
+// Interface User & Request
 interface RequestUser {
   roles: string[];
 }
@@ -23,7 +23,7 @@ export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    // 👇 2. THÊM ĐOẠN CHECK PUBLIC NÀY VÀO ĐẦU HÀM
+    // 2. THÊM ĐOẠN CHECK PUBLIC NÀY VÀO ĐẦU HÀM
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -32,9 +32,7 @@ export class RolesGuard implements CanActivate {
     if (isPublic) {
       return true; // Nếu là Public -> Cho qua luôn, không cần check Role
     }
-    // 👆 HẾT PHẦN THÊM
 
-    // --- Logic cũ giữ nguyên ---
     const requiredRoles = this.reflector.getAllAndOverride<string[]>(
       ROLES_KEY,
       [context.getHandler(), context.getClass()],

@@ -2,7 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Schema as MongooseSchema } from 'mongoose';
 import { User } from '../../schemas/user.schema';
 
-// Sub-document cho địa chỉ (US.10)
+// Sub-document cho địa chỉ (US.10, US.05)
 @Schema({ _id: true })
 export class Address {
   @Prop() name: string;
@@ -10,9 +10,10 @@ export class Address {
   @Prop() street: string;
   @Prop() city_code: string;
   @Prop() district_code: string;
+  @Prop() ward_code: string;
   @Prop({ default: false }) is_default: boolean;
 }
-const AddressSchema = SchemaFactory.createForClass(Address);
+export const AddressSchema = SchemaFactory.createForClass(Address);
 
 @Schema()
 export class Customer extends User {
@@ -27,19 +28,27 @@ export class Customer extends User {
     total_spent: number;
   };
 
-  // US.10: Sổ địa chỉ
+  // US.05: Sổ địa chỉ
   @Prop({ type: [AddressSchema], default: [] })
   addresses: Address[];
 
-  // Wishlist (Yêu thích)
-  @Prop([{ type: MongooseSchema.Types.ObjectId, ref: 'Product' }])
-  wishlist: MongooseSchema.Types.ObjectId[];
+  // US.02: Wishlist (Yêu thích)
+  @Prop([
+    {
+      product: { type: MongooseSchema.Types.ObjectId, ref: 'Product' },
+      variant_id: { type: MongooseSchema.Types.ObjectId, default: null },
+      _id: false, // Tắt tự động tạo _id cho các object con này để tối ưu DB
+    },
+  ])
+  wishlist: Array<{
+    product: MongooseSchema.Types.ObjectId;
+    variant_id: MongooseSchema.Types.ObjectId | null;
+  }>;
 
   // US.117: Ghi chú nội bộ của CSKH về khách này
-  @Prop({ type: String })
+  @Prop({ type: String, default: '' })
   internal_note: string;
 
-  // Thêm vào trong class User
   @Prop({ default: false })
   is_subscribed: boolean;
 }
