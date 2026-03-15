@@ -2,9 +2,9 @@ import "./OrderShippingNote.css";
 import { CircleCheck } from 'lucide-react';
 
 interface OrderNoteProp {
-  title: String;
-  date: String;
-  time: String;
+  title: string;
+  date: string;
+  time: string;
 }
 
 const OrderShippingNote = ({title, date, time}:OrderNoteProp) => {

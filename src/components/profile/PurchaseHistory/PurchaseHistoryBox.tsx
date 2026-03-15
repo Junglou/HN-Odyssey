@@ -3,7 +3,7 @@ import type { UserAddress, UserOrder } from "../../../types/user";
 import "./PurchaseHistoryBox.css";
 
 interface HistoryBoxProp {
-  id: String,
+  id: string,
   address: UserAddress;
   order: UserOrder;
 }

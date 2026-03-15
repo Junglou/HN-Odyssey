@@ -29,8 +29,8 @@ export interface UserAddress {
 export interface UserOrder {
   address: UserAddress;
   product: ProductRecommendation[];
-  orderDate: String;
-  shipDate: String;
-  shipFee: String;
+  orderDate: string;
+  shipDate: string;
+  shipFee: string;
   status: string;
 }

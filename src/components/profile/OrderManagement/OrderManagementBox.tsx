@@ -3,7 +3,7 @@ import type { UserAddress, UserOrder } from "../../../types/user";
 import "./OrderManagementBox.css";
 
 interface OrderBoxProp {
-  id: String,
+  id: string,
   address: UserAddress;
   order: UserOrder;
 }
