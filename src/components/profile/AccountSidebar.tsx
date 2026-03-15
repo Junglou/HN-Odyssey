@@ -13,13 +13,9 @@ import {
 
 const menuItems = [
   { label: "My Profile", path: "/profile", icon: <UserIcon /> },
-  { label: "Address Management", path: "/profile/address", icon: <MapIcon /> },
+  { label: "Address Management", path: "/profile/address-management", icon: <MapIcon /> },
   { label: "Order Management", path: "/profile/orders", icon: <CartIcon /> },
-  {
-    label: "Purchase History",
-    path: "/profile/history",
-    icon: <HistoryIcon />,
-  },
+  { label: "Purchase History",path: "/profile/history",icon: <HistoryIcon />,},
   { label: "My Wishlist", path: "/profile/wishlist", icon: <HeartIcon /> },
   { label: "Recently Viewed", path: "/profile/recent", icon: <HistoryIcon /> },
   { label: "My Coupon", path: "/profile/coupon", icon: <TicketIcon /> },

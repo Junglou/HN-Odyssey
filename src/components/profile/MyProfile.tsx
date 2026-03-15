@@ -69,6 +69,18 @@ const MyProfile = ({
                 <label>Last name</label>
                 <div className="info-value">name</div>
               </div>
+              <div className="info-item">
+                <label>Gender</label>
+                <div className="info-value">Male</div>
+              </div>
+              <div className="info-item">
+                <label>Birthday</label>
+                <div className="info-value">dd/mm/yyyy</div>
+              </div>
+              <div className="info-item">
+                <label>Display Name</label>
+                <div className="info-value">name</div>
+              </div>
             </div>
             {/* ... */}
             <button className="btn-edit-pill" onClick={onEditProfile}>
@@ -78,6 +90,24 @@ const MyProfile = ({
           <div className="info-block mt-between-forms">
             <h3 className="block-title">Account information</h3>
             {/* ... render info ... */}
+            <div className="info-grid-row">
+              <div className="info-item">
+                <label>Username</label>
+                <div className="info-value">username</div>
+              </div>
+              <div className="info-item">
+                <label>Password</label>
+                <div className="info-value">************</div>
+              </div>
+              <div className="info-item">
+                <label>Email</label>
+                <div className="info-value">useremail@gmail.com</div>
+              </div>
+              <div className="info-item">
+                <label>Phone</label>
+                <div className="info-value">1234567890</div>
+              </div>
+            </div>
             <button className="btn-edit-pill" onClick={onEditAccount}>
               Edit user account
             </button>

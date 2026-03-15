@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import AccountSidebar from "../../components/profile/AccountSidebar";
-import MyProfile from "../../components/profile/MyProfile"; // Import Component mới đổi tên
-import "./MyProfilePage.css"; // CSS Layout trang
-import type { UserProfile, ProductRecommendation } from "../../types/user";
+import AddressManagement from "../../components/profile/AddressManagement/AddressManagement"; // Import Component mới đổi tên
+import "./AddressManagementPage.css"; // CSS Layout trang
+import type { UserProfile, ProductRecommendation, UserAddress } from "../../types/user";
 
-const MyProfilePage = () => {
+const AddressMangementPage = () => {
   // 1. Quản lý State
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,10 +53,26 @@ const MyProfilePage = () => {
     },
   ];
 
-  // 3. Handlers
-  const handleEditProfile = () => console.log("Edit Profile");
-  const handleEditAccount = () => console.log("Edit Account");
-  const handleChangeAvatar = () => console.log("Change Avatar");
+  const addresses: UserAddress[]= [ 
+    {
+      receiverName: "John",
+      address: "28 whatever Str",
+      city: "Ho Chi Minh",
+      country: "Vietnam"
+    },
+    {
+      receiverName: "Alex",
+      address: "39 whatever Str",
+      city: "Los Angeles",
+      country: "US"
+    },
+    {
+      receiverName: "Jenny",
+      address: "90 whatever Str",
+      city: "Ha Noi",
+      country: "Vietnam"
+    },
+  ];
 
   if (loading || !user) return <div>Loading...</div>;
 
@@ -70,16 +86,14 @@ const MyProfilePage = () => {
 
       {/* Content (Nội dung phải) */}
       <div className="content-wrapper">
-        <MyProfile
+        <AddressManagement
           user={user}
+          address={addresses}
           recommendations={recommendations}
-          onEditProfile={handleEditProfile}
-          onEditAccount={handleEditAccount}
-          onChangeAvatar={handleChangeAvatar}
         />
       </div>
     </div>
   );
 };
 
-export default MyProfilePage;
+export default AddressMangementPage;

@@ -1,4 +1,4 @@
-.my-profile-page-container {
+.my-wishlist-page-container {
   display: flex;
   background-color: #ffffff;
   min-height: 100vh;
@@ -26,7 +26,7 @@
 
 /* 1. Laptop nhỏ & Tablet ngang (< 1200px) */
 @media (max-width: 1200px) {
-  .my-profile-page-container {
+  .my-wishlist-page-container {
     padding: 2rem 2rem; /* Giảm padding 2 bên */
     gap: 1.5rem; /* Giảm khoảng cách giữa 2 cột */
   }
@@ -34,7 +34,7 @@
 
 /* 2. Tablet dọc & Mobile (< 992px) */
 @media (max-width: 992px) {
-  .my-profile-page-container {
+  .my-wishlist-page-container {
     flex-direction: column; /* Chuyển thành 1 cột dọc */
     padding: 1rem;
   }

@@ -12,8 +12,13 @@ import ResetPasswordPage from "../pages/auth/ResetPasswordPage";
 import AccountRecoveryPage from "../pages/auth/AccountRecoveryPage";
 import AccountRecoVerifiedPage from "../pages/auth/AccountRecoVerifiedPage";
 import MyProfilePage from "../pages/profile/MyProfilePage";
+import AddressMangementPage from "../pages/profile/AddressManagementPage";
 
 import UserManagement from "../pages/portal/UserManagementPage";
+import OrderMangementPage from "../pages/profile/OrderManagementPage";
+import OrderDetailPage from "../pages/profile/OrderDetailPage";
+import PurchaseHistoryPage from "../pages/profile/PurchaseHistoryPage";
+import MyWishlistPage from "../pages/profile/MyWishlistPage";
 
 // Ghi nhớ để sau này: Trong dự án lớn có thể dùng React.lazy() để tối ưu performance
 
@@ -53,6 +58,26 @@ export const router = createBrowserRouter([
       {
         path: "/profile",
         element: <MyProfilePage />,
+      },
+      {
+        path: "/profile/address-management",
+        element: <AddressMangementPage />,
+      },
+      {
+        path: "/profile/orders",
+        element: <OrderMangementPage />
+      },
+      {
+        path: "/profile/orders/detail",
+        element: <OrderDetailPage />
+      },
+      {
+        path: "/profile/history",
+        element: <PurchaseHistoryPage />
+      },
+      {
+        path: "/profile/wishlist",
+        element: <MyWishlistPage />
       },
       {
         index: true, // Route mặc định của path: "/"
