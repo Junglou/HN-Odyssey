@@ -1,0 +1,157 @@
+/* Lớp phủ mờ */
+.tm-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.tm-modal-content {
+  background-color: #fff;
+  border-radius: 8px;
+  width: 400px;
+  max-width: 95%;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  font-family: inherit;
+  overflow: hidden;
+}
+
+.tm-modal-header {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.tm-modal-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.tm-close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #6b7280;
+  transition: color 0.2s;
+}
+
+.tm-close-btn:hover {
+  color: #111827;
+}
+
+.tm-modal-body {
+  padding: 20px;
+}
+
+.tm-search-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.tm-search-input:focus {
+  border-color: #3b82f6;
+}
+
+.tm-tag-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 250px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.tm-tag-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.95rem;
+  color: #374151;
+  transition: background-color 0.2s;
+  display: flex; /* new: Dàn ngang chữ và dấu tick */
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tm-tag-item:last-child {
+  border-bottom: none;
+}
+
+.tm-tag-item:hover {
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+/* new: Style khi tag được tích chọn (giống màu Variant) */
+.tm-tag-item.selected {
+  background-color: #e0f2fe;
+  color: #0369a1;
+  font-weight: 600;
+}
+
+.tm-tag-empty {
+  padding: 16px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.95rem;
+}
+
+/* new: Khu vực chứa nút Confirm & Cancel */
+.tm-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 0 20px 20px 20px;
+}
+
+.tm-btn-cancel {
+  padding: 8px 16px;
+  background-color: #e5e7eb;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #374151;
+  font-family: inherit;
+}
+
+.tm-btn-cancel:hover {
+  border-color: #9ca3af;
+  background-color: #d1d5db;
+}
+
+.tm-btn-confirm {
+  padding: 8px 16px;
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.tm-btn-confirm:hover {
+  background-color: #2563eb;
+}

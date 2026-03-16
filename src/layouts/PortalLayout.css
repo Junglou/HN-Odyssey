@@ -1,15 +1,27 @@
-/* Khung bọc toàn bộ Portal */
+/* chặn cuộn ngang trình duyệt */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* khung bọc toàn bộ portal */
 .portal-container {
   display: flex;
   min-height: 100vh;
   background-color: #f8f9fa;
   font-family: "Lexend Exa", sans-serif;
+  width: 100%;
+  overflow-x: hidden;
 }
 
-/* ==================== SIDEBAR (LEFT) ==================== */
+/* sidebar trái */
 .portal-sidebar {
   width: 280px;
-  background-color: #e6d3bd;
+  background: linear-gradient(to bottom, #f5ebd9 0%, #e6d3bd 100%);
   color: #1a1a1a;
   display: flex;
   flex-direction: column;
@@ -21,22 +33,26 @@
   overflow-y: auto;
   box-sizing: border-box;
   scrollbar-width: none;
-  /* HIỆU ỨNG TỪ HEADER: Trượt mượt mà khi Responsive */
   transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
   z-index: 1000;
+  border-top-right-radius: 24px;
+  border-bottom-right-radius: 24px;
+  box-shadow: 4px 0 12px rgba(0, 0, 0, 0.3);
+  user-select: none;
+  -webkit-user-select: none;
 }
 .portal-sidebar::-webkit-scrollbar {
   display: none;
 }
 
-/* --- HEADER ("H&N-Portal") --- */
+/* tiêu đề portal */
 .portal-brand {
   background-color: #e2c6a8;
   border-radius: 12px;
   padding: 16px;
   font-size: 1.2rem;
-  font-weight: 800; /* ÉP CHỮ ĐẦY ĐẶN */
-  letter-spacing: -0.5px; /* ÉP CHỮ ĐẦY ĐẶN */
+  font-weight: 800;
+  letter-spacing: -0.5px;
   text-align: center;
   margin-bottom: 32px;
   box-shadow:
@@ -44,11 +60,17 @@
     0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
-/* --- MENU ITEMS --- */
+/* danh sách menu */
 .sidebar-menu {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
+}
+
+/* new: Gom nhóm menu cha và con để loại bỏ lỗi nhân đôi khoảng cách (double-gap), ép các mục lớn cách đều nhau tuyệt đối */
+.menu-group {
+  display: flex;
+  flex-direction: column;
 }
 
 .menu-item {
@@ -58,10 +80,9 @@
   padding: 12px 16px;
   border-radius: 12px;
   font-size: 0.95rem;
-  font-weight: 600; /* ÉP CHỮ ĐẦY ĐẶN */
-  letter-spacing: -0.3px; /* ÉP CHỮ ĐẦY ĐẶN */
+  font-weight: 600;
+  letter-spacing: -0.3px;
   cursor: pointer;
-  /* HIỆU ỨNG TỪ HEADER */
   transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
@@ -71,7 +92,7 @@
   gap: 12px;
 }
 
-/* Icon style - To hơn một chút để cân xứng */
+/* icon menu */
 .menu-icon {
   width: 24px;
   height: 24px;
@@ -80,10 +101,9 @@
   transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-/* Hover effect cho Menu Item */
 .menu-item:hover {
-  background-color: #e9d8c5;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  background-color: #edd2b6;
+  box-shadow: 3px 5px 4px #a48668;
 }
 
 .menu-item:hover .menu-icon {
@@ -91,35 +111,42 @@
 }
 
 .menu-item.active-parent {
-  background-color: #ddbe9e;
-  box-shadow:
-    0 6px 12px rgba(0, 0, 0, 0.08),
-    0 2px 4px rgba(0, 0, 0, 0.05);
+  background-color: #edd2b6;
   font-weight: 700;
+  box-shadow: 3px 5px 4px #a48668;
 }
+
 .chevron-icon {
-  width: 32px; /* Gấp gần gấp đôi so với 18px cũ */
+  width: 32px;
   height: 32px;
-  display: flex; /* Đảm bảo nó luôn được bọc trong block flex */
+  display: flex;
   align-items: center;
   justify-content: center;
   transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 }
+
 .chevron-icon.open {
   transform: rotate(180deg);
 }
 
-/* --- CHILD ITEMS (SUBMENU) --- */
+/* menu con */
 .submenu {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding-top: 8px;
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
 .submenu-item {
-  padding: 10px 16px 10px 48px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px 16px 10px 36px;
+  display: flex;
+  align-items: center;
   font-size: 0.85rem;
-  font-weight: 500; /* ÉP CHỮ ĐẦY ĐẶN */
+  font-weight: 500;
   letter-spacing: -0.2px;
   border-radius: 12px;
   cursor: pointer;
@@ -128,17 +155,23 @@
 }
 
 .submenu-item:hover {
-  background-color: #e9d8c5;
-  transform: translateX(4px); /* Hiệu ứng trượt nhẹ sang phải */
+  background-color: #edd2b6;
+  box-shadow: 3px 5px 4px #a48668;
+  transform: translateX(4px);
 }
 
 .submenu-item.active {
-  background-color: #ddbe9e;
+  background-color: #edd2b6;
   font-weight: 700;
   color: #1a1a1a;
+  box-shadow: 3px 5px 4px #a48668;
 }
 
-/* --- LOGOUT BUTTON --- */
+.submenu-item:last-child {
+  margin-bottom: 4px;
+}
+
+/* nút đăng xuất */
 .sidebar-bottom {
   margin-top: auto;
   padding-top: 20px;
@@ -156,22 +189,28 @@
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 }
+
 .logout-btn:hover {
   background-color: #e9d8c5;
-  transform: translateX(-4px); /* Trượt nhẹ sang trái */
+  transform: translateX(-4px);
 }
 
-/* ==================== MAIN CONTENT ==================== */
+/* khung nội dung chính bên phải */
 .portal-main-content {
   flex: 1;
   margin-left: 280px;
-  padding: 30px 40px;
+  padding: clamp(20px, 3vw, 40px);
   display: flex;
   flex-direction: column;
-  transition: margin-left 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  width: calc(100% - 280px);
+  min-width: 0;
+  box-sizing: border-box;
+  transition:
+    margin-left 0.4s cubic-bezier(0.25, 1, 0.5, 1),
+    width 0.4s;
 }
 
-/* ==================== RESPONSIVE (MOBILE & TABLET) ==================== */
+/* responsive cho điện thoại và tablet */
 .mobile-menu-toggle {
   display: none;
 }
@@ -180,14 +219,13 @@
 }
 
 @media screen and (max-width: 1024px) {
-  /* Nút Hamburger hiện ra ở góc trái */
   .mobile-menu-toggle {
     display: flex;
     align-items: center;
     justify-content: center;
     position: fixed;
-    top: 20px;
-    left: 20px;
+    top: 16px;
+    left: 16px;
     z-index: 990;
     background: #e6d3bd;
     border: none;
@@ -201,24 +239,21 @@
     transform: scale(1.05);
   }
 
-  /* Ẩn Sidebar sang bên trái màn hình */
   .portal-sidebar {
     transform: translateX(-100%);
     box-shadow: 5px 0 15px rgba(0, 0, 0, 0.1);
   }
 
-  /* Khi được bấm mở, Sidebar trượt ra */
   .portal-sidebar.open {
     transform: translateX(0);
   }
 
-  /* Nội dung chính tràn toàn màn hình, đẩy padding top xuống để nhường nút Toggle */
   .portal-main-content {
     margin-left: 0;
-    padding: 80px 20px 30px 20px;
+    width: 100%;
+    padding: 80px 16px 20px 16px;
   }
 
-  /* Màn đen mờ che nội dung khi mở Menu trên điện thoại */
   .portal-backdrop {
     display: block;
     position: fixed;

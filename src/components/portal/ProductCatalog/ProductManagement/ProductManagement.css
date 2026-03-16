@@ -1,0 +1,621 @@
+/* base container cho toàn bộ component, cấu hình flexbox cơ bản */
+.pm-container {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2vw, 20px);
+  font-family: "Lexend Exa", sans-serif;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.pm-container * {
+  box-sizing: border-box;
+}
+
+/* header section chứa title, breadcrumb và nút add */
+.pm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: clamp(12px, 1.5vw, 16px);
+}
+.pm-title {
+  font-size: clamp(1.4rem, 2.5vw, 1.8rem);
+  font-weight: 800;
+  margin: 0 0 4px 0;
+}
+.pm-breadcrumb {
+  font-size: clamp(0.75rem, 1vw, 0.85rem);
+  color: #666;
+  margin: 0;
+}
+
+/* style cho nút add new product */
+.pm-btn-add {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  padding: clamp(8px, 1.5vw, 10px) clamp(16px, 2.5vw, 20px);
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: clamp(0.85rem, 1vw, 0.95rem);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+/* wrapper dạng card nền trắng bọc ngoài filter và table */
+.pm-filters-card {
+  background-color: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: clamp(16px, 2vw, 20px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2vw, 20px);
+  width: 100%;
+  min-width: 0;
+}
+
+/* row chứa các control filter (input search, selects) */
+.pm-filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(10px, 1.5vw, 16px);
+  align-items: stretch;
+  width: 100%;
+}
+
+.pm-filter-input {
+  flex: 3 1 200px;
+  padding: clamp(8px, 1.2vw, 10px) 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  outline: none;
+  font-family: inherit;
+  font-size: clamp(0.85rem, 1vw, 0.95rem);
+  background-color: #fff;
+  transition: border-color 0.2s;
+}
+
+/* Dropdown */
+.pm-custom-dropdown {
+  position: relative;
+  font-family: inherit;
+  font-size: clamp(0.85rem, 1vw, 0.95rem);
+  user-select: none;
+}
+.pm-filter-dropdown {
+  flex: 1 1 130px;
+}
+.pm-page-dropdown {
+  width: 130px;
+}
+.pm-dropdown-trigger {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: clamp(8px, 1.2vw, 10px) 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #fff;
+  color: #111827;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  height: 100%;
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+.pm-dropdown-trigger.active,
+.pm-dropdown-trigger:hover {
+  border-color: #000000;
+}
+.pm-dropdown-arrow {
+  transition: transform 0.3s ease;
+  margin-left: 8px;
+}
+.pm-dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+/* animation menu dropdown */
+.pm-dropdown-options {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  overflow: hidden;
+  animation: slideFadeIn 0.2s ease-out forwards;
+  transform-origin: top center;
+}
+.pm-dropdown-option {
+  padding: 10px 16px;
+  cursor: pointer;
+  color: #374151;
+  transition: background-color 0.2s;
+}
+.pm-dropdown-option:hover {
+  background-color: #f3f4f6;
+}
+.pm-dropdown-option.selected {
+  background-color: #e9e9e9;
+  color: #000000;
+  font-weight: 600;
+}
+
+/* style cho nút clear filter */
+.pm-btn-clear {
+  flex: 1 1 auto;
+  padding: clamp(8px, 1.2vw, 10px) 20px;
+  background-color: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: clamp(0.85rem, 1vw, 0.95rem);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.2s;
+}
+.pm-btn-clear:hover {
+  background-color: #f9fafb;
+  border-color: #000000;
+}
+
+/* container chứa các nút bulk action */
+.pm-bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: clamp(8px, 1vw, 12px);
+  width: 100%;
+}
+.pm-btn-bulk {
+  padding: clamp(6px, 1vw, 8px) clamp(12px, 1.5vw, 16px);
+  background-color: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: clamp(0.8rem, 1vw, 0.85rem);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  flex: 0 1 auto;
+}
+.pm-btn-bulk:focus {
+  outline: none;
+}
+.pm-btn-bulk:active {
+  transform: scale(0.97);
+}
+.pm-btn-bulk:hover {
+  background-color: #f9fafb;
+  border-color: #000000;
+}
+.pm-btn-bulk.delete {
+  background-color: #e1251b;
+  color: white;
+  border-color: #e1251b;
+}
+
+/* wrapper cuộn ngang cho table kèm style thanh cuộn đồng bộ */
+.pm-table-wrapper {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 #f1f1f1;
+}
+.pm-table-wrapper::-webkit-scrollbar {
+  height: 6px;
+}
+.pm-table-wrapper::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 8px;
+}
+.pm-table-wrapper::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 8px;
+}
+
+.pm-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  min-width: 650px;
+}
+.pm-table th,
+.pm-table td {
+  padding: clamp(10px, 1.5vw, 16px);
+  font-size: clamp(0.8rem, 1.2vw, 0.9rem);
+  border-bottom: 1px solid #e5e7eb;
+}
+.pm-table th:last-child,
+.pm-table td:last-child {
+  white-space: nowrap;
+}
+
+.pm-td-name {
+  white-space: normal;
+  word-break: break-word;
+  min-width: 160px;
+}
+
+.pm-table th {
+  background-color: #f3f4f6;
+  font-weight: 700;
+  color: #374151;
+}
+.pm-table td {
+  color: #111827;
+}
+
+/* flexbox và style cho nội dung thẻ th để sửa lỗi sort icon bị lệch */
+.pm-th-content {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  position: relative;
+}
+.pm-sort-th {
+  cursor: pointer;
+}
+.pm-sort-icon {
+  font-family: inherit;
+  font-size: 0.8rem;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+.pm-sort-th:hover .pm-sort-icon {
+  opacity: 0.8;
+}
+.pm-sort-active {
+  opacity: 1;
+}
+
+/* màu background khi row được check */
+.pm-selected-row {
+  background-color: #f5e1cd !important;
+}
+
+.pm-td-flex {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pm-td-empty {
+  text-align: center;
+  padding: 30px;
+  color: #666;
+}
+
+/* hình ảnh thu nhỏ */
+.pm-img-placeholder {
+  width: clamp(48px, 4vw, 56px);
+  height: clamp(48px, 4vw, 56px);
+  border-radius: 8px;
+  background-color: #f3f4f6;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+}
+.pm-img-mock {
+  width: clamp(24px, 3vw, 32px);
+  height: clamp(24px, 3vw, 32px);
+  background-color: #d1d5db;
+  border-radius: 4px;
+}
+
+/* style cho status badge và các chấm màu (dot) */
+.pm-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+.pm-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.status-Active .pm-dot {
+  background-color: #10b981;
+}
+.status-Active {
+  color: #10b981;
+}
+.status-Inactive .pm-dot {
+  background-color: #ef4444;
+}
+.status-Inactive {
+  color: #ef4444;
+}
+.status-Draft .pm-dot {
+  background-color: #6b7280;
+}
+.status-Draft {
+  color: #6b7280;
+}
+
+/* flex container cho cụm action buttons trong mỗi row */
+.pm-action-group {
+  display: flex;
+  gap: clamp(4px, 0.8vw, 8px);
+  align-items: center;
+  min-width: max-content;
+}
+.pm-icon-btn {
+  width: clamp(28px, 2.5vw, 32px);
+  height: clamp(28px, 2.5vw, 32px);
+  border-radius: 8px;
+  border: 1px solid #d1d5db !important;
+  background-color: #ffffff !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #4b5563 !important;
+  padding: 0;
+}
+.pm-icon-btn svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+/* custom toggle switch cho status dùng clamp để co giãn */
+.pm-toggle-switch {
+  width: clamp(36px, 3vw, 44px);
+  height: clamp(20px, 2vw, 24px);
+  border-radius: 20px;
+  position: relative;
+  cursor: pointer;
+  background-color: #e5e7eb;
+  border: 1px solid #d1d5db;
+  transition: 0.3s;
+}
+.pm-toggle-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: clamp(14px, 1.5vw, 18px);
+  height: clamp(14px, 1.5vw, 18px);
+  background: #fff;
+  border-radius: 50%;
+  transition: 0.3s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.pm-toggle-switch.on {
+  background-color: #eac6a8;
+}
+.pm-toggle-switch.on::after {
+  transform: translateX(
+    calc(clamp(36px, 3vw, 44px) - clamp(14px, 1.5vw, 18px) - 6px)
+  );
+}
+.pm-toggle-switch.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* animation keyframes chung cho popup/dropdown */
+@keyframes slideFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.pm-dropdown-wrapper {
+  position: relative;
+}
+.pm-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  width: 120px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 8px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: slideFadeIn 0.2s ease-out forwards;
+  transform-origin: top right;
+}
+.pm-dropdown-menu::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  right: 12px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid #fff;
+}
+.pm-dropdown-item {
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  background-color: transparent;
+}
+.pm-item-delete {
+  background-color: #e1251b;
+  color: white;
+}
+
+/* container chứa pagination và select limit */
+.pm-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 10px;
+  font-size: clamp(0.8rem, 1vw, 0.9rem);
+  font-weight: 500;
+  gap: 16px;
+}
+.pm-page-numbers {
+  display: flex;
+  gap: clamp(4px, 1vw, 8px);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.pm-page-num {
+  width: clamp(26px, 2.5vw, 30px);
+  height: clamp(26px, 2.5vw, 30px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  cursor: pointer;
+  background-color: transparent;
+  border: none;
+}
+.pm-page-num.active {
+  background-color: #f3f4f6;
+  font-weight: 700;
+}
+
+/* responsive mobile */
+@media (max-width: 767px) {
+  .pm-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .pm-btn-add {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .pm-filter-input,
+  .pm-btn-clear,
+  .pm-custom-dropdown {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .pm-btn-bulk {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .pm-table-wrapper {
+    border: none;
+    overflow: visible;
+  }
+
+  .pm-table {
+    min-width: 0 !important;
+    width: 100%;
+  }
+
+  .pm-table,
+  .pm-table tbody,
+  .pm-table tr,
+  .pm-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .pm-table thead tr {
+    display: flex;
+    padding-bottom: 8px;
+    border: none;
+  }
+  .pm-table thead th {
+    display: none;
+  }
+  .pm-table thead th:first-child {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 4px;
+    background: transparent;
+  }
+
+  .pm-table tr {
+    margin-bottom: 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    background-color: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+
+  .pm-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-align: right;
+    padding: 12px 0;
+    border-bottom: 1px dashed #e5e7eb;
+    white-space: normal;
+  }
+  .pm-table td:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .pm-table td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    color: #6b7280;
+    font-size: 0.85rem;
+    margin-right: 16px;
+    text-align: left;
+    flex-shrink: 0;
+  }
+
+  .pm-td-flex {
+    justify-content: flex-end;
+    width: 100%;
+  }
+  .pm-action-group {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    width: 100%;
+  }
+
+  .pm-pagination {
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+  }
+  .pm-page-numbers {
+    justify-content: center;
+    width: 100%;
+  }
+}

@@ -1,0 +1,308 @@
+/* container gốc cho heatmap */
+.ubh-container {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2vw, 24px);
+  font-family: "Lexend Exa", sans-serif;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.ubh-container * {
+  box-sizing: border-box;
+}
+
+/* Header tiêu đề */
+.ubh-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.ubh-title {
+  font-size: clamp(1.4rem, 2.5vw, 1.8rem);
+  font-weight: 800;
+  margin: 0 0 4px 0;
+}
+.ubh-breadcrumb {
+  font-size: clamp(0.75rem, 1vw, 0.85rem);
+  color: #666;
+  margin: 0;
+}
+
+/* container chia 2 cột */
+.ubh-layout {
+  display: flex;
+  gap: clamp(16px, 2vw, 24px);
+  align-items: flex-start;
+  width: 100%;
+  min-width: 0;
+}
+
+/* bản đồ nhiệt */
+.ubh-left-panel {
+  flex: 1;
+  background-color: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.ubh-visual-preview {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* khung nền web */
+.ubh-website-preview {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background-color: #1a1a1a;
+  border-radius: 8px;
+  position: relative;
+  overflow: hidden;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* đốm nhiệt (hotspot) */
+.ubh-hotspot {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(25px);
+  opacity: 0.8;
+}
+
+/* mock hotspot */
+.header-zone {
+  width: 150px;
+  height: 150px;
+  background: radial-gradient(circle, red, yellow, transparent);
+  top: 20%;
+  right: 25%;
+}
+.content-zone {
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, orange, green, transparent);
+  bottom: 10%;
+  left: 10%;
+}
+.footer-zone {
+  width: 100px;
+  height: 100px;
+  background: radial-gradient(circle, red, orange, transparent);
+  top: 40%;
+  left: 30%;
+}
+
+/* thanh chú thích màu nhiệt độ */
+.ubh-color-scale-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ubh-color-bar {
+  height: 12px;
+  width: 100%;
+  border-radius: 6px;
+  background: linear-gradient(to right, #3b82f6, #10b981, #eab308, #ef4444);
+}
+
+.ubh-color-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.ubh-scale-desc {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+/* panel giới hạn chiều rộng (form nhập và stat cards) */
+.ubh-right-panel {
+  flex: 0 0 clamp(300px, 25vw, 360px);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.ubh-control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ubh-label {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #111827;
+}
+
+/* Dropdown */
+.ubh-select {
+  width: 100%;
+  padding: 10px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  background-color: #fff;
+  outline: none;
+  cursor: pointer;
+}
+
+/* layout cho ô nhập ngày tháng */
+.ubh-date-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ubh-date-box {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #fff;
+  display: flex;
+  justify-content: flex-end;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+/* nút chuyển chế độ (desktop, mobile) */
+.ubh-device-toggles {
+  display: flex;
+  gap: 8px;
+}
+.ubh-device-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  background-color: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  color: #4b5563;
+  transition: all 0.2s;
+}
+.ubh-device-btn.active {
+  border-color: #111827;
+  border-width: 1.5px;
+  color: #111827;
+  font-weight: 700;
+}
+
+/* radio button */
+.ubh-radio-group {
+  display: flex;
+  gap: 16px;
+}
+.ubh-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #374151;
+}
+.ubh-radio-label input {
+  display: none;
+}
+.ubh-radio-custom {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.ubh-radio-custom.checked {
+  border-color: #111827;
+}
+.ubh-radio-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #111827;
+  border-radius: 50%;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: all 0.2s;
+}
+.ubh-radio-custom.checked .ubh-radio-dot {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* summary card */
+.ubh-stats-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Statistics card */
+.ubh-stat-card {
+  background-color: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.ubh-stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #111827;
+}
+.ubh-stat-info {
+  display: flex;
+  flex-direction: column;
+}
+.ubh-stat-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4b5563;
+}
+.ubh-stat-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+/* responsive */
+@media (max-width: 1024px) {
+  .ubh-layout {
+    flex-direction: column;
+  }
+  .ubh-right-panel {
+    width: 100%;
+    flex: none;
+  }
+}

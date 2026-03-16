@@ -1,0 +1,9 @@
+/* Page wrapper */
+.ubh-page-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}

@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import "./UserModal.css";
 
-// Interface chuẩn dùng chung
+// model user chung
 export interface User {
   id: number;
   name: string;
@@ -12,6 +12,7 @@ export interface User {
   selected: boolean;
 }
 
+// schema form để trả dữ liệu về component cha
 export interface UserFormData {
   name: string;
   email: string;
@@ -29,13 +30,15 @@ interface UserModalProps {
   onSubmit: (data: UserFormData) => void;
 }
 
-const UserModal: React.FC<UserModalProps> = ({
+// modal form popup
+export default function UserModal({
   isOpen,
   mode,
   initialData,
   onClose,
   onSubmit,
-}) => {
+}: UserModalProps) {
+  // khởi tạo state form (tự động refresh nhờ cơ chế key ở page ngoài)
   const [formData, setFormData] = useState<UserFormData>({
     name: initialData?.name || "",
     email: initialData?.email || "",
@@ -45,9 +48,10 @@ const UserModal: React.FC<UserModalProps> = ({
     status: initialData?.status || "Active",
   });
 
-  // Tự động vô hiệu hóa form nếu đang ở chế độ xem
+  // check flag để vô hiệu hóa input
   const isViewOnly = mode === "view";
 
+  // update state theo từng input
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
@@ -55,6 +59,7 @@ const UserModal: React.FC<UserModalProps> = ({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // validate trước khi trả data ra ngoài
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.role) {
@@ -64,6 +69,7 @@ const UserModal: React.FC<UserModalProps> = ({
     onSubmit(formData);
   };
 
+  // Switch khóa/kích hoạt tài khoản
   const handleToggleStatus = () => {
     if (!isViewOnly) {
       setFormData((prev) => ({
@@ -117,6 +123,7 @@ const UserModal: React.FC<UserModalProps> = ({
             />
           </div>
 
+          {/* chia hai cột username và password */}
           <div className="um-form-row">
             <div className="um-form-group">
               <label>
@@ -159,7 +166,6 @@ const UserModal: React.FC<UserModalProps> = ({
               disabled={isViewOnly}
               required
             >
-              {/* Thêm thuộc tính 'hidden' để ẩn dòng chữ xám này đi khi sổ menu xuống */}
               <option value="" disabled hidden>
                 Select Role
               </option>
@@ -169,13 +175,12 @@ const UserModal: React.FC<UserModalProps> = ({
             </select>
           </div>
 
+          {/* cụm thông tin trạng thái với toggle ui */}
           <div className="um-form-group">
             <label>{mode === "view" ? "Status" : "Account Status"}</label>
             <div className="um-modal-status-flex">
               <div
-                className={`um-modal-switch ${
-                  formData.status === "Active" ? "on" : ""
-                } ${isViewOnly ? "disabled" : ""}`}
+                className={`um-modal-switch ${formData.status === "Active" ? "on" : ""} ${isViewOnly ? "disabled" : ""}`}
                 onClick={handleToggleStatus}
               >
                 <div className="um-modal-switch-handle"></div>
@@ -184,6 +189,7 @@ const UserModal: React.FC<UserModalProps> = ({
             </div>
           </div>
 
+          {/* cụm nút */}
           <div className="um-modal-actions">
             {!isViewOnly ? (
               <>
@@ -212,6 +218,4 @@ const UserModal: React.FC<UserModalProps> = ({
       </div>
     </div>
   );
-};
-
-export default UserModal;
+}

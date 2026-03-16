@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import "./PortalLayout.css";
 
-// IMPORT TOÀN BỘ ICON TỪ FILE RIÊNG
+// Icon
 import {
   DashboardIcon,
   CatalogIcon,
@@ -22,7 +22,9 @@ const PortalLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [isUsersRolesOpen, setIsUsersRolesOpen] = useState(true);
+  // state quản lý đóng mở các menu cha
+  const [isUsersRolesOpen, setIsUsersRolesOpen] = useState(false);
+  const [isProductCatalogOpen, setIsProductCatalogOpen] = useState(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
@@ -62,11 +64,60 @@ const PortalLayout = () => {
             <ChevronIcon open={false} />
           </div>
 
-          <div className="menu-item">
-            <div className="menu-item-left">
-              <CatalogIcon /> Product Catalog
+          {/* new: Bọc menu Product Catalog vào menu-group để căn khoảng cách đều */}
+          <div className="menu-group">
+            <div
+              className={`menu-item ${isParentActive("/portal/products") || isParentActive("/portal/categories") || isParentActive("/portal/variants") || isParentActive("/portal/prices") || isParentActive("/portal/tags") ? "active-parent" : ""}`}
+              onClick={() => setIsProductCatalogOpen(!isProductCatalogOpen)}
+            >
+              <div className="menu-item-left">
+                <CatalogIcon /> Product Catalog
+              </div>
+              <ChevronIcon open={isProductCatalogOpen} />
             </div>
-            <ChevronIcon open={false} />
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateRows: isProductCatalogOpen ? "1fr" : "0fr",
+                transition:
+                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+                overflow: "hidden",
+              }}
+            >
+              <div className="submenu" style={{ minHeight: 0 }}>
+                <div
+                  className={`submenu-item ${isActive("/portal/products") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/products")}
+                >
+                  Product Management
+                </div>
+                <div
+                  className={`submenu-item ${isActive("/portal/categories") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/categories")}
+                >
+                  Category Management
+                </div>
+                <div
+                  className={`submenu-item ${isActive("/portal/variants") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/variants")}
+                >
+                  Variant Management
+                </div>
+                <div
+                  className={`submenu-item ${isActive("/portal/prices") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/prices")}
+                >
+                  Price Management
+                </div>
+                <div
+                  className={`submenu-item ${isActive("/portal/tags") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/tags")}
+                >
+                  Tag Management
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="menu-item">
@@ -97,34 +148,49 @@ const PortalLayout = () => {
             <ChevronIcon open={false} />
           </div>
 
-          <div
-            className={`menu-item ${isParentActive("/portal/user") ? "active-parent" : ""}`}
-            onClick={() => setIsUsersRolesOpen(!isUsersRolesOpen)}
-          >
-            <div className="menu-item-left">
-              <UsersRolesIcon /> Users & Roles
-            </div>
-            <ChevronIcon open={isUsersRolesOpen} />
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateRows: isUsersRolesOpen ? "1fr" : "0fr",
-              transition:
-                "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
-              overflow: "hidden",
-            }}
-          >
-            <div className="submenu" style={{ minHeight: 0 }}>
-              <div
-                className={`submenu-item ${isActive("/portal/users") ? "active" : ""}`}
-                onClick={() => handleNavigate("/portal/users")}
-              >
-                User Management
+          {/* new: Bọc menu Users & Roles vào menu-group để căn khoảng cách đều */}
+          <div className="menu-group">
+            <div
+              className={`menu-item ${isParentActive("/portal/user") || isParentActive("/portal/role") || isParentActive("/portal/heatmap") ? "active-parent" : ""}`}
+              onClick={() => setIsUsersRolesOpen(!isUsersRolesOpen)}
+            >
+              <div className="menu-item-left">
+                <UsersRolesIcon /> Users & Roles
               </div>
-              <div className="submenu-item">Role Management</div>
-              <div className="submenu-item">User Behavior Heatmap</div>
+              <ChevronIcon open={isUsersRolesOpen} />
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateRows: isUsersRolesOpen ? "1fr" : "0fr",
+                transition:
+                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+                overflow: "hidden",
+              }}
+            >
+              <div className="submenu" style={{ minHeight: 0 }}>
+                <div
+                  className={`submenu-item ${isActive("/portal/users") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/users")}
+                >
+                  User Management
+                </div>
+
+                <div
+                  className={`submenu-item ${isActive("/portal/roles") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/roles")}
+                >
+                  Role Management
+                </div>
+
+                <div
+                  className={`submenu-item ${isActive("/portal/heatmap") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/heatmap")}
+                >
+                  User Behavior Heatmap
+                </div>
+              </div>
             </div>
           </div>
 

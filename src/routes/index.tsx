@@ -13,12 +13,19 @@ import AccountRecoveryPage from "../pages/auth/AccountRecoveryPage";
 import AccountRecoVerifiedPage from "../pages/auth/AccountRecoVerifiedPage";
 import MyProfilePage from "../pages/profile/MyProfilePage";
 
-import UserManagement from "../pages/portal/UserManagementPage";
+import UserManagementPage from "../pages/portal/UsersAndRoles/UserManagement/UserManagementPage";
+import RoleManagementPage from "../pages/portal/UsersAndRoles/RoleManagement/RoleManagementPage";
+import UserBehaviorHeatmapPage from "../pages/portal/UsersAndRoles/UserBehaviorHeatmap/UserBehaviorHeatmapPage";
 
-// Ghi nhớ để sau này: Trong dự án lớn có thể dùng React.lazy() để tối ưu performance
+// import trang quản lý sản phẩm
+import ProductManagementPage from "../pages/portal/ProductCatalog/ProductManagement/ProductManagementPage";
+// import trang form thêm/sửa sản phẩm
+import ProductFormPage from "../pages/portal/ProductCatalog/ProductManagement/ProductFormPage";
+
+// ghi nhớ để sau này: trong dự án lớn có thể dùng react.lazy() để tối ưu performance
 
 export const router = createBrowserRouter([
-  // Route Auth
+  // route auth
   {
     path: "/login",
     element: <LoginPage />,
@@ -44,19 +51,18 @@ export const router = createBrowserRouter([
     element: <AccountRecoVerifiedPage />,
   },
 
-  // PROTECTED ROUTES (Dùng MainLayout)
+  // route bảo vệ dùng main layout
   {
     path: "/",
-    element: <MainLayout />, // MainLayout có <Outlet /> bên trong để render children
+    element: <MainLayout />,
     children: [
-      // Route Profile
       {
         path: "/profile",
         element: <MyProfilePage />,
       },
       {
-        index: true, // Route mặc định của path: "/"
-        element: <Navigate to="/login" replace />, // Redirect về login
+        index: true,
+        element: <Navigate to="/login" replace />,
       },
       {
         path: "dashboard",
@@ -69,22 +75,45 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // Lỗi 404 - Redirect về trang login
+  // lỗi 404
   {
     path: "*",
     element: <Navigate to="/login" replace />,
   },
 
-  // PROTECTED ROUTES (Dùng PortalLayout) - Dành cho admin/manager
+  // route bảo vệ dùng portal layout cho admin
   {
     path: "/portal",
     element: <PortalLayout />,
     children: [
       {
-        path: "users", // Đường dẫn sẽ là: /portal/users
-        element: <UserManagement />,
+        path: "users",
+        element: <UserManagementPage />,
       },
-      // Các trang portal khác sau này sẽ thêm tiếp vào đây
+      {
+        path: "roles",
+        element: <RoleManagementPage />,
+      },
+      {
+        path: "heatmap",
+        element: <UserBehaviorHeatmapPage />,
+      },
+      {
+        path: "products",
+        element: <ProductManagementPage />,
+      },
+      {
+        path: "products/new",
+        element: <ProductFormPage />,
+      },
+      {
+        path: "products/:id",
+        element: <ProductFormPage />,
+      },
+      {
+        path: "products/:id/edit",
+        element: <ProductFormPage />,
+      },
     ],
   },
 ]);

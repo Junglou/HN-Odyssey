@@ -1,4 +1,4 @@
-/* Lớp phủ đen làm mờ phía sau Modal */
+/* overlay làm mờ background */
 .um-modal-overlay {
   position: fixed;
   top: 0;
@@ -13,7 +13,7 @@
   font-family: "Lexend Exa", sans-serif;
 }
 
-/* Khung trắng chính của Modal */
+/* main box modal chứa content form */
 .um-modal-box {
   background-color: #ffffff;
   width: 100%;
@@ -26,7 +26,7 @@
   gap: 24px;
 }
 
-/* Tiêu đề bự, in đậm */
+/* title modal */
 .um-modal-title {
   font-size: 1.75rem;
   font-weight: 800;
@@ -34,34 +34,33 @@
   margin: 0;
 }
 
-/* Container cho Form */
+/* container chứa form */
 .um-modal-form {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-/* Từng khối Input */
+/* wrapper cho từng field input (label + control) */
 .um-form-group {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-/* Nhãn (Label) */
 .um-form-group label {
   font-size: 0.95rem;
   font-weight: 800;
   color: #000000;
 }
 
-/* Dấu sao đỏ */
+/* Dấu sao required (*) */
 .req {
   color: #e1251b;
   margin-left: 2px;
 }
 
-/* Style cho Input và Select */
+/* Thiết kế cho input và select */
 .um-form-group input,
 .um-form-group select {
   width: 100%;
@@ -81,20 +80,19 @@
   border-color: #000000;
 }
 
-/* Tùy chỉnh riêng cho thẻ select (Sửa lỗi mũi tên bị lệch) */
+/* Mũi tên */
 .um-form-group select {
-  appearance: none; /* Xóa mũi tên mặc định của trình duyệt */
+  appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  /* Vẽ lại mũi tên bằng SVG, canh lề chuẩn */
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%23333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>');
   background-repeat: no-repeat;
   background-position: right 16px center;
-  padding-right: 40px; /* Nhường chỗ cho mũi tên */
+  padding-right: 40px;
   cursor: pointer;
 }
 
-/* Hiển thị vô hiệu hóa (Chế độ View) - Viền nhạt, nền trắng */
+/* input/select ở mode view (disabled) */
 .um-form-group input:disabled,
 .um-form-group select:disabled {
   background-color: #ffffff;
@@ -102,7 +100,7 @@
   cursor: not-allowed;
 }
 
-/* Khối xếp 2 input trên 1 hàng (Username & Password) */
+/* layout row chia 2 cột cho các input nằm ngang (ví dụ username/password) */
 .um-form-row {
   display: flex;
   gap: 16px;
@@ -112,9 +110,7 @@
   flex: 1;
 }
 
-/* =====================================
-   Khối trạng thái (Status) + Toggle Switch
-====================================== */
+/* container bọc switch + status text */
 .um-modal-status-flex {
   display: flex;
   align-items: center;
@@ -128,14 +124,14 @@
   color: #000000;
 }
 
-/* Vẽ nút gạt (Switch) */
+/* Nút Switch */
 .um-modal-switch {
   width: 48px;
   height: 26px;
   border-radius: 20px;
   position: relative;
   cursor: pointer;
-  background-color: #d1d5db; /* Màu xám khi tắt */
+  background-color: #d1d5db;
   transition: background-color 0.3s ease;
   border: 1px solid transparent;
 }
@@ -152,9 +148,8 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
-/* Khi bật -> Đổi sang màu tím đậm như thiết kế */
 .um-modal-switch.on {
-  background-color: #6b46c1; /* Mã màu tím chuẩn */
+  background-color: #6b46c1;
 }
 
 .um-modal-switch.on .um-modal-switch-handle {
@@ -166,9 +161,7 @@
   opacity: 0.7;
 }
 
-/* =====================================
-   Cụm Nút Bấm Cuối Modal
-====================================== */
+/* nút submit và cancel */
 .um-modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -176,7 +169,6 @@
   margin-top: 16px;
 }
 
-/* Nút Submit (Create/Save) - Màu xám nhạt chữ trắng theo thiết kế Add User */
 .um-btn-modal-submit {
   background-color: #cccccc;
   color: #ffffff;
@@ -194,7 +186,6 @@
   background-color: #000000;
 }
 
-/* Nút Cancel / Close - Nền trắng, viền đen */
 .um-btn-modal-cancel {
   background-color: #ffffff;
   color: #000000;
@@ -208,7 +199,6 @@
   transition: all 0.2s ease;
 }
 
-/* Sửa lại Hover màu Đen đồng nhất toàn trang */
 .um-btn-modal-cancel:hover {
   background-color: #000000;
   color: #ffffff;
