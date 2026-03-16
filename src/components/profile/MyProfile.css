@@ -10,7 +10,7 @@
     0 0 0 1px rgb(202, 200, 200),
     8px 8px 4px rgba(17, 24, 39, 0.2);
 
-  width: 100%;
+  width: fit-content;
   font-family: "Lexend Exa", sans-serif;
   box-sizing: border-box;
   overflow: hidden;
@@ -55,8 +55,8 @@
   content: "";
   position: absolute;
   right: 0; /* Nằm sát mép phải cột Avatar */
-  top: 10%; /* Cách trên 10% */
-  height: 80%; /* Chiều cao 80% (chừa dưới 10%) -> Lơ lửng */
+  top: 5%; /* Cách trên 10% */
+  height: 90%; /* Chiều cao 80% (chừa dưới 10%) -> Lơ lửng */
   width: 2px; /* Độ mảnh */
   background-color: #cacaca; /* Màu xám nhạt chia cắt */
 }
@@ -113,7 +113,7 @@
 
 /* --- CỘT 2: FORMS --- */
 .section-forms {
-  padding: 3rem 2rem;
+  padding: 3rem 0rem 3rem 1.5rem;
   display: flex;
   flex-direction: column;
 }
@@ -126,7 +126,7 @@
 .info-grid-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2rem;
+  gap: 1rem;
   margin-bottom: 2rem;
 }
 .info-item {
@@ -145,7 +145,7 @@
   font-weight: 400;
 }
 .mt-between-forms {
-  margin-top: 3.5rem;
+  margin-top: 1rem;
 }
 .btn-edit-pill {
   margin-top: 0.5rem;
@@ -166,25 +166,36 @@
 
 /* --- CỘT 3: SOCIAL --- */
 .section-social {
-  padding: 3rem 1rem;
+  width: fit-content;
+  padding: 3rem 1.5rem;
 }
 .mini-title {
+  text-align: start;
+  white-space: nowrap;
   font-size: 1rem;
   font-weight: 800;
   margin-bottom: 1.5rem;
   color: #000;
 }
 .align-with-fields {
-  margin-top: 3.8rem;
+  margin-top: 1.9rem;
 }
 .align-with-account-fields {
   margin-top: 8rem;
 }
+.social-list
+{
+  padding: 0;
+}
 .social-list li {
+  margin-left: 0;
   margin-bottom: 1rem;
+  white-space: nowrap;
   font-size: 0.9rem;
   display: flex;
   align-items: center;
+  align-content: center;
+  justify-items: center;
   gap: 10px;
   font-weight: 600;
 }
@@ -199,7 +210,7 @@
 
 /* --- CỘT 4: RECOMMENDATION --- */
 .section-recs {
-  padding: 3rem 2rem;
+  padding: 1rem 1rem;
   /* ĐÃ XÓA: border-left cũ ngăn cách recommend */
   border-left: none;
 }

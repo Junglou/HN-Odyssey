@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import AccountSidebar from "../../components/profile/AccountSidebar";
-import MyProfile from "../../components/profile/MyProfile"; // Import Component mới đổi tên
-import "./MyProfilePage.css"; // CSS Layout trang
-import type { UserProfile, ProductRecommendation } from "../../types/user";
+import "./OrderDetailPage.css"; // CSS Layout trang
+import type { UserProfile, ProductRecommendation, UserAddress, UserOrder } from "../../types/user";
+import OrderDetail from "../../components/profile/OrderDetail/OrderDetail";
 
-const MyProfilePage = () => {
+const OrderDetailPage = () => {
   // 1. Quản lý State
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,10 +53,67 @@ const MyProfilePage = () => {
     },
   ];
 
-  // 3. Handlers
-  const handleEditProfile = () => console.log("Edit Profile");
-  const handleEditAccount = () => console.log("Edit Account");
-  const handleChangeAvatar = () => console.log("Change Avatar");
+  const addresses: UserAddress[]= [ 
+    {
+      receiverName: "John",
+      address: "28 whatever Str",
+      city: "Ho Chi Minh",
+      country: "Vietnam"
+    },
+    {
+      receiverName: "Alex",
+      address: "39 whatever Str",
+      city: "Los Angeles",
+      country: "US"
+    },
+    {
+      receiverName: "Jenny",
+      address: "90 whatever Str",
+      city: "Ha Noi",
+      country: "Vietnam"
+    },
+    {
+      receiverName: "Jake",
+      address: "10 whatever Str",
+      city: "California",
+      country: "US"
+    },
+  ];
+
+  const order: UserOrder[] = [
+    {
+      address: addresses[0],
+      product: recommendations,
+      orderDate: "26/12/2025",
+      shipDate: "28/12/2025",
+      shipFee: "10.00$",
+      status: "Confirming"
+    },
+    {
+      address: addresses[1],
+      product: recommendations,
+      orderDate: "26/12/2025",
+      shipDate: "28/12/2025",
+      shipFee: "10.00$",
+      status: "Confirming"
+    },
+    {
+      address: addresses[2],
+      product: recommendations,
+      orderDate: "28/12/2025",
+      shipDate: "30/12/2025",
+      shipFee: "15.00$",
+      status: "Shipping"
+    },
+    {
+      address: addresses[3],
+      product: recommendations,
+      orderDate: "01/01/2026",
+      shipDate: "03/01/2026",
+      shipFee: "20.00$",
+      status: "Completed"
+    }
+  ];
 
   if (loading || !user) return <div>Loading...</div>;
 
@@ -70,16 +127,13 @@ const MyProfilePage = () => {
 
       {/* Content (Nội dung phải) */}
       <div className="content-wrapper">
-        <MyProfile
+        <OrderDetail
           user={user}
-          recommendations={recommendations}
-          onEditProfile={handleEditProfile}
-          onEditAccount={handleEditAccount}
-          onChangeAvatar={handleChangeAvatar}
+          order={order[0]}
         />
       </div>
     </div>
   );
 };
 
-export default MyProfilePage;
+export default OrderDetailPage;

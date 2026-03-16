@@ -12,10 +12,16 @@ import ResetPasswordPage from "../pages/auth/ResetPasswordPage";
 import AccountRecoveryPage from "../pages/auth/AccountRecoveryPage";
 import AccountRecoVerifiedPage from "../pages/auth/AccountRecoVerifiedPage";
 import MyProfilePage from "../pages/profile/MyProfilePage";
+import AddressMangementPage from "../pages/profile/AddressManagementPage";
 
 import UserManagementPage from "../pages/portal/UsersAndRoles/UserManagement/UserManagementPage";
 import RoleManagementPage from "../pages/portal/UsersAndRoles/RoleManagement/RoleManagementPage";
 import UserBehaviorHeatmapPage from "../pages/portal/UsersAndRoles/UserBehaviorHeatmap/UserBehaviorHeatmapPage";
+
+import OrderMangementPage from "../pages/profile/OrderManagementPage";
+import OrderDetailPage from "../pages/profile/OrderDetailPage";
+import PurchaseHistoryPage from "../pages/profile/PurchaseHistoryPage";
+import MyWishlistPage from "../pages/profile/MyWishlistPage";
 
 // import trang quản lý sản phẩm
 import ProductManagementPage from "../pages/portal/ProductCatalog/ProductManagement/ProductManagementPage";
@@ -61,8 +67,28 @@ export const router = createBrowserRouter([
         element: <MyProfilePage />,
       },
       {
-        index: true,
-        element: <Navigate to="/login" replace />,
+        path: "/profile/address-management",
+        element: <AddressMangementPage />,
+      },
+      {
+        path: "/profile/orders",
+        element: <OrderMangementPage />,
+      },
+      {
+        path: "/profile/orders/detail",
+        element: <OrderDetailPage />,
+      },
+      {
+        path: "/profile/history",
+        element: <PurchaseHistoryPage />,
+      },
+      {
+        path: "/profile/wishlist",
+        element: <MyWishlistPage />,
+      },
+      {
+        index: true, // Route mặc định của path: "/"
+        element: <Navigate to="/login" replace />, // Redirect về login
       },
       {
         path: "dashboard",

@@ -18,3 +18,19 @@ export interface ProductRecommendation {
   price: number;
   image: string;
 }
+
+export interface UserAddress {
+  receiverName: string;
+  address: string;
+  city: string;
+  country: string;
+}
+
+export interface UserOrder {
+  address: UserAddress;
+  product: ProductRecommendation[];
+  orderDate: string;
+  shipDate: string;
+  shipFee: string;
+  status: string;
+}

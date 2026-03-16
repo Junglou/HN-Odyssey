@@ -1,0 +1,99 @@
+/* --- MAIN CARD --- */
+.my-profile-card {
+  background-color: #ffffff;
+  border-radius: 24px;
+
+  /* SHADOW GIỐNG SIDEBAR (Đã chốt) */
+  box-shadow:
+    0 0 0 1px rgb(202, 200, 200),
+    8px 8px 4px rgba(17, 24, 39, 0.2);
+
+  width: 100%;
+  font-family: "Lexend Exa", sans-serif;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.profile-header {
+  padding: 2.5rem 3rem 1rem 3rem;
+  background: #fff;
+}
+.profile-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0;
+  color: #000;
+}
+
+/* --- GRID SYSTEM --- */
+.address-box-internal-grid {
+  display: grid;
+  /* Content | Recommend */
+  grid-template-columns: 65% 35%;
+}
+
+/* --- CỘT 1: Address Box --- */
+.section-address
+{
+  padding-left: 1rem;
+  height: fit-content;
+  display: grid;
+  grid-template-columns: auto auto auto;
+  column-gap: 1rem;
+  row-gap: 1rem;
+}
+
+/* --- CỘT 2: RECOMMENDATION --- */
+.section-recs {
+  /* ĐÃ XÓA: border-left cũ ngăn cách recommend */
+  border-left: none;
+}
+
+.reco-title
+{
+  margin: 0;
+}
+
+.bottom-link-container
+{
+  margin-left: 1rem;
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: auto auto;
+}
+
+/* RESPONSIVE */
+@media (max-width: 1500px) {
+  .address-box-internal-grid {
+    grid-template-columns: 100%;
+  }
+  .section-address {
+  padding: 0 1rem;
+  height: fit-content;
+  display: grid;
+  grid-template-columns: auto auto auto;
+  column-gap: 1rem;
+  row-gap: 1rem;
+  }
+}
+@media (max-width: 1024px) {
+  .address-box-internal-grid {
+    grid-template-columns: 1fr;
+  }
+  .section-address {
+  padding-left: 1rem;
+  height: fit-content;
+  display: grid;
+  grid-template-columns: auto;
+  column-gap: 1rem;
+  row-gap: 1rem;
+  }
+
+  .section-recs {
+    border-top: none;
+    flex-direction: column;
+  }
+}
