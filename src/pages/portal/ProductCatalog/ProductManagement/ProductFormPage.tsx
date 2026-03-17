@@ -66,7 +66,8 @@ export default function ProductFormPage() {
   const location = useLocation();
 
   // check mode hiện tại truyền xuống component
-  const mode = location.pathname.includes("/edit")
+  // new: Định nghĩa rõ kiểu dữ liệu để TypeScript không báo lỗi string
+  const mode: "add" | "edit" | "view" = location.pathname.includes("/edit")
     ? "edit"
     : location.pathname.endsWith("/add") || id === "add"
       ? "add"
@@ -97,11 +98,10 @@ export default function ProductFormPage() {
   // hook fetch data chi tiết khi truy cập bằng id
   useEffect(() => {
     if (mode === "edit" || mode === "view") {
-      const loadProductData = async () => {
+      const loadProductData = () => {
         const foundProduct = MOCK_DB.find((p) => p.id === id);
 
         if (foundProduct) {
-          // nhồi data tương ứng vào form, bổ sung categoryId
           setProductData({
             sku: foundProduct.sku,
             name: foundProduct.name,
@@ -119,14 +119,22 @@ export default function ProductFormPage() {
           ]);
           setTags(["New Arrival"]);
         } else {
-          // fallback nếu người dùng gõ bừa 1 id không có thật
           setProductData({
             sku: `UNKNOWN-${id}`,
-            name: "Sản phẩm không tồn tại",
+            name: "N/a",
             status: "Draft",
-            description: "Không tìm thấy dữ liệu",
+            description: "No data available",
             categoryId: "",
           });
+          setPricingList([
+            {
+              id: "p1",
+              variantName: "Default / Base Product",
+              price: 0,
+              status: "draft",
+            },
+          ]);
+          setTags([]);
         }
       };
       loadProductData();
@@ -155,18 +163,6 @@ export default function ProductFormPage() {
     navigate("/portal/products");
   };
 
-  // handler chuyển toàn bộ giá đang pending sang approved
-  const handleApprovePrices = () => {
-    setPricingList((prev) =>
-      prev.map((item) =>
-        item.status === "pending_approval"
-          ? { ...item, status: "approved" as const }
-          : item,
-      ),
-    );
-    toast.success("Đã phê duyệt giá!");
-  };
-
   return (
     <div className="pf-page-container">
       <ProductForm
@@ -176,7 +172,6 @@ export default function ProductFormPage() {
         initialTags={tags}
         onCancel={handleCancel}
         onSave={handleSaveProduct}
-        onApprovePrices={handleApprovePrices}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import authService from "../services/auth.service"; // Import service vừa sửa
-import type { RegisterPayload } from "../types/auth";
+import authService from "../../services/auth.service";
+import type { RegisterPayload } from "../../types/auth";
 
 export interface ApiError {
   status?: number;

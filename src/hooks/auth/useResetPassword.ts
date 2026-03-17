@@ -1,6 +1,6 @@
 import { useState } from "react";
-import authService from "../services/auth.service";
-import type { ResetPasswordPayload } from "../types/auth";
+import authService from "../../services/auth.service";
+import type { ResetPasswordPayload } from "../../types/auth";
 
 export interface ApiError {
   response?: {

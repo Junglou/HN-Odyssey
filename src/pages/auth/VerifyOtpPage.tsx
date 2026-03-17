@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import VerifyOtpForm from "../../components/auth/VerifyOtpForm";
-import { useVerifyOtp } from "../../hooks/useVerifyOtp";
-import { useForgot } from "../../hooks/useForgot";
+import { useVerifyOtp } from "../../hooks/auth/useVerifyOtp";
+import { useForgot } from "../../hooks/auth/useForgot";
 import { toast } from "react-toastify";
 import "./VerifyOtpPage.css";
 

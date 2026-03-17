@@ -114,13 +114,18 @@ export default function ProductManagementPage() {
     } else if (filters.price === "low_to_high") {
       result.sort((a, b) => a.price - b.price);
     }
-
     return result;
   }, [products, filters]);
 
-  const totalPages = Math.ceil(filteredProducts.length / pagination.limit);
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredProducts.length / pagination.limit),
+  );
   const startIndex = (pagination.page - 1) * pagination.limit;
-  const endIndex = startIndex + pagination.limit;
+  const endIndex = Math.min(
+    startIndex + pagination.limit,
+    filteredProducts.length,
+  );
   const currentProducts: ProductRowData[] = filteredProducts
     .slice(startIndex, endIndex)
     .map((p) => ({

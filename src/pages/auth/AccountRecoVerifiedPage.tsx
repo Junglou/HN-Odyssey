@@ -3,8 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import AccountRecoVerifiedForm, {
   type RecoVerifiedPayload,
 } from "../../components/auth/AccountRecoVerifiedForm";
-import { useAccountRecoVerified } from "../../hooks/useAccountRecoVerified";
-import { useVerifyOtp } from "../../hooks/useVerifyOtp";
+import { useAccountRecoVerified } from "../../hooks/auth/useAccountRecoVerified";
+import { useVerifyOtp } from "../../hooks/auth/useVerifyOtp";
 import { toast } from "react-toastify";
 import "./AccountRecoVerifiedPage.css";
 

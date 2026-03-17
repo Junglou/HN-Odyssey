@@ -1,6 +1,5 @@
-// src/hooks/useForgot.ts
 import { useState } from "react";
-import axiosClient from "../api/axiosClient"; // Đảm bảo đường dẫn này đúng với dự án của bạn
+import axiosClient from "../../api/axiosClient"; // Đảm bảo đường dẫn này đúng với dự án của bạn
 
 export const useForgot = () => {
   const [loading, setLoading] = useState(false);

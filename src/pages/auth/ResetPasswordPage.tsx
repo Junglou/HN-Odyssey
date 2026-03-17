@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import ResetPasswordForm from "../../components/auth/ResetPasswordForm";
-import { useResetPassword } from "../../hooks/useResetPassword"; // Import Hook thật
+import { useResetPassword } from "../../hooks/auth/useResetPassword"; // Import Hook thật
 import { toast } from "react-toastify";
 import "./ResetPasswordPage.css";
 

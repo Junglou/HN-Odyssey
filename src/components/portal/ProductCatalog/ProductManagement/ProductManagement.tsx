@@ -164,7 +164,6 @@ export default function ProductManagement({
   actions,
 }: ProductManagementProps) {
   const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
-  const tableRef = useRef<HTMLDivElement>(null);
 
   // tắt dropdown menu khi click ra ngoài bảng
   useEffect(() => {
@@ -266,7 +265,7 @@ export default function ProductManagement({
           </button>
         </div>
 
-        <div className="pm-table-wrapper" ref={tableRef}>
+        <div className="pm-table-wrapper">
           <table className="pm-table">
             <thead>
               <tr>

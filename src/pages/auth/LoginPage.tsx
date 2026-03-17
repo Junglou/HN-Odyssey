@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useLogin } from "../../hooks/useLogin";
-import type { ApiError } from "../../hooks/useLogin";
+import { useLogin } from "../../hooks/auth/useLogin";
+import type { ApiError } from "../../hooks/auth/useLogin";
 import type { LoginPayload } from "../../types/auth";
 import LoginForm from "../../components/auth/LoginForm";
 import { toast } from "react-toastify";

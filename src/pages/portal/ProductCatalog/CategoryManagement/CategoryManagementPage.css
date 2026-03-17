@@ -1,0 +1,13 @@
+/* Định dạng lớp vỏ bọc bên ngoài khung hiển thị trang quản lý */
+.cm-page-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: clamp(12px, 3vw, 32px);
+  background-color: #f9fafb;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}

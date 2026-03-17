@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import authService from "../services/auth.service";
-import type { VerifyOtpPayload, ResendOtpPayload } from "../types/auth";
+import authService from "../../services/auth.service";
+import type { VerifyOtpPayload, ResendOtpPayload } from "../../types/auth";
 import { toast } from "react-toastify";
 
 export interface ApiError {

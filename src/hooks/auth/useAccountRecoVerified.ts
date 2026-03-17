@@ -1,6 +1,6 @@
 import { useState } from "react";
-import authService from "../services/auth.service";
-import type { ConfirmRecoveryPayload } from "../types/auth";
+import authService from "../../services/auth.service";
+import type { ConfirmRecoveryPayload } from "../../types/auth";
 
 export const useAccountRecoVerified = () => {
   const [loading, setLoading] = useState(false);

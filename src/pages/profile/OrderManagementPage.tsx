@@ -2,7 +2,12 @@ import { useState, useEffect } from "react";
 import AccountSidebar from "../../components/profile/AccountSidebar";
 import OrderManagement from "../../components/profile/OrderManagement/OrderManagement"; // Import Component mới đổi tên
 import "./OrderManagementPage.css"; // CSS Layout trang
-import type { UserProfile, ProductRecommendation, UserAddress, UserOrder } from "../../types/user";
+import type {
+  UserProfile,
+  ProductRecommendation,
+  UserAddress,
+  UserOrder,
+} from "../../types/user";
 
 const OrderMangementPage = () => {
   // 1. Quản lý State
@@ -53,30 +58,30 @@ const OrderMangementPage = () => {
     },
   ];
 
-  const addresses: UserAddress[]= [ 
+  const addresses: UserAddress[] = [
     {
       receiverName: "John",
       address: "28 whatever Str",
       city: "Ho Chi Minh",
-      country: "Vietnam"
+      country: "Vietnam",
     },
     {
       receiverName: "Alex",
       address: "39 whatever Str",
       city: "Los Angeles",
-      country: "US"
+      country: "US",
     },
     {
       receiverName: "Jenny",
       address: "90 whatever Str",
       city: "Ha Noi",
-      country: "Vietnam"
+      country: "Vietnam",
     },
     {
       receiverName: "Jake",
       address: "10 whatever Str",
       city: "California",
-      country: "US"
+      country: "US",
     },
   ];
 
@@ -87,7 +92,7 @@ const OrderMangementPage = () => {
       orderDate: "26/12/2025",
       shipDate: "28/12/2025",
       shipFee: "10.00$",
-      status: "Confirming"
+      status: "Confirming",
     },
     {
       address: addresses[1],
@@ -95,7 +100,7 @@ const OrderMangementPage = () => {
       orderDate: "26/12/2025",
       shipDate: "28/12/2025",
       shipFee: "10.00$",
-      status: "Confirming"
+      status: "Confirming",
     },
     {
       address: addresses[2],
@@ -103,7 +108,7 @@ const OrderMangementPage = () => {
       orderDate: "28/12/2025",
       shipDate: "30/12/2025",
       shipFee: "15.00$",
-      status: "Shipping"
+      status: "Shipping",
     },
     {
       address: addresses[3],
@@ -111,8 +116,8 @@ const OrderMangementPage = () => {
       orderDate: "01/01/2026",
       shipDate: "03/01/2026",
       shipFee: "20.00$",
-      status: "Completed"
-    }
+      status: "Completed",
+    },
   ];
 
   if (loading || !user) return <div>Loading...</div>;

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import AccountRecoveryForm from "../../components/auth/AccountRecoveryForm";
-import { useAccountRecovery } from "../../hooks/useAccountRecovery";
-import { useVerifyOtp } from "../../hooks/useVerifyOtp";
+import { useAccountRecovery } from "../../hooks/auth/useAccountRecovery";
+import { useVerifyOtp } from "../../hooks/auth/useVerifyOtp";
 import { toast } from "react-toastify";
 import "./AccountRecoveryPage.css";
 import type { AccountRecoveryPayload } from "../../types/auth";

@@ -1,7 +1,6 @@
 import { useState } from "react";
-import authService from "../services/auth.service";
-// Cập nhật: Import Type từ file types chung để đồng bộ
-import type { LoginPayload, LoginResponse } from "../types/auth";
+import authService from "../../services/auth.service";
+import type { LoginPayload, LoginResponse } from "../../types/auth";
 
 // Định nghĩa kiểu lỗi (Khớp với cấu trúc lỗi từ axiosClient)
 export interface ApiError {

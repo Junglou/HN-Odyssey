@@ -1,4 +1,4 @@
-/* Lớp phủ mờ */
+/* Overlay */
 .tm-modal-overlay {
   position: fixed;
   top: 0;
@@ -69,7 +69,7 @@
 }
 
 .tm-search-input:focus {
-  border-color: #3b82f6;
+  border-color: #8d8d8d;
 }
 
 .tm-tag-list {
@@ -89,7 +89,7 @@
   font-size: 0.95rem;
   color: #374151;
   transition: background-color 0.2s;
-  display: flex; /* new: Dàn ngang chữ và dấu tick */
+  display: flex; /* Dàn ngang chữ và dấu tick */
   justify-content: space-between;
   align-items: center;
 }
@@ -103,10 +103,10 @@
   color: #111827;
 }
 
-/* new: Style khi tag được tích chọn (giống màu Variant) */
+/* Selected tag */
 .tm-tag-item.selected {
   background-color: #e0f2fe;
-  color: #0369a1;
+  color: #000000;
   font-weight: 600;
 }
 
@@ -117,7 +117,7 @@
   font-size: 0.95rem;
 }
 
-/* new: Khu vực chứa nút Confirm & Cancel */
+/* Khu vực chứa nút Confirm & Cancel */
 .tm-modal-footer {
   display: flex;
   justify-content: flex-end;

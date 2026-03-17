@@ -1,0 +1,280 @@
+/* Lớp phủ màn hình tối màu khi mở ngăn kéo */
+.cd-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  opacity: 0;
+  animation: fadeIn 0.3s forwards;
+}
+
+/* Định dạng giao diện chính của ngăn kéo trượt */
+.cd-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: 450px;
+  background-color: #ffffff;
+  z-index: 1001;
+  box-shadow: -4px 0 15px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  font-family: "Lexend Exa", sans-serif;
+}
+
+/* Phần khu vực tiêu đề của ngăn kéo */
+.cd-header {
+  display: flex;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.cd-back-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  margin-left: -8px;
+  margin-right: 12px;
+  color: #111827;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.cd-back-btn:hover {
+  background-color: #f3f4f6;
+}
+
+.cd-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  margin: 0;
+  color: #111827;
+}
+
+/* Phần thân chứa các trường nhập liệu */
+.cd-body {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.cd-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cd-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.cd-required {
+  color: #ef4444;
+}
+
+.cd-input {
+  padding: 12px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.cd-input:focus {
+  border-color: #000000;
+}
+
+/* Khu vực cấu hình hiển thị cho danh sách thả xuống chọn thư mục cha */
+.cd-tree-select {
+  position: relative;
+  width: 100%;
+}
+
+.cd-tree-trigger {
+  padding: 12px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #fff;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.95rem;
+  min-height: 46px;
+}
+
+.cd-tree-trigger:hover {
+  border-color: #000000;
+}
+
+.cd-tree-placeholder {
+  color: #9ca3af;
+}
+
+.cd-tree-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  max-height: 250px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.cd-tree-node {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.cd-tree-node:hover {
+  background-color: #f3f4f6;
+}
+
+.cd-tree-node.selected {
+  background-color: #e0e7ff;
+  color: #3730a3;
+  font-weight: 600;
+}
+
+.cd-tree-toggle {
+  width: 20px;
+  display: flex;
+  align-items: center;
+  color: #6b7280;
+  margin-right: 4px;
+}
+
+/* Các lớp hiệu chỉnh giao diện nút công tắc thay đổi trạng thái */
+.cd-status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.cd-toggle-switch {
+  width: 44px;
+  height: 24px;
+  border-radius: 20px;
+  position: relative;
+  cursor: pointer;
+  background-color: #e5e7eb;
+  border: 1px solid #d1d5db;
+  transition: 0.3s;
+}
+
+.cd-toggle-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  transition: 0.3s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.cd-toggle-switch.on {
+  background-color: #6366f1;
+  border-color: #6366f1;
+}
+
+.cd-toggle-switch.on::after {
+  transform: translateX(20px);
+}
+
+.cd-status-text {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #111827;
+}
+
+/* Khu vực chân trang chứa các nút hành động */
+.cd-footer {
+  padding: 20px 24px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.cd-btn-cancel {
+  padding: 10px 20px;
+  background-color: white;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  font-family: inherit;
+  transition: background-color 0.2s;
+}
+
+.cd-btn-cancel:hover {
+  background-color: #f9fafb;
+}
+
+.cd-btn-submit {
+  padding: 10px 20px;
+  background-color: #d1d5db;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  font-family: inherit;
+  transition: background-color 0.2s;
+}
+
+.cd-btn-submit.active {
+  background-color: #3b82f6;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}

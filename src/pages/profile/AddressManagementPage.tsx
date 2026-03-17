@@ -2,7 +2,11 @@ import { useState, useEffect } from "react";
 import AccountSidebar from "../../components/profile/AccountSidebar";
 import AddressManagement from "../../components/profile/AddressManagement/AddressManagement"; // Import Component mới đổi tên
 import "./AddressManagementPage.css"; // CSS Layout trang
-import type { UserProfile, ProductRecommendation, UserAddress } from "../../types/user";
+import type {
+  UserProfile,
+  ProductRecommendation,
+  UserAddress,
+} from "../../types/user";
 
 const AddressMangementPage = () => {
   // 1. Quản lý State
@@ -53,24 +57,24 @@ const AddressMangementPage = () => {
     },
   ];
 
-  const addresses: UserAddress[]= [ 
+  const addresses: UserAddress[] = [
     {
       receiverName: "John",
       address: "28 whatever Str",
       city: "Ho Chi Minh",
-      country: "Vietnam"
+      country: "Vietnam",
     },
     {
       receiverName: "Alex",
       address: "39 whatever Str",
       city: "Los Angeles",
-      country: "US"
+      country: "US",
     },
     {
       receiverName: "Jenny",
       address: "90 whatever Str",
       city: "Ha Noi",
-      country: "Vietnam"
+      country: "Vietnam",
     },
   ];
 

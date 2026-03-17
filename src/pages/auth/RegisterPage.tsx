@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useRegister, type ApiError } from "../../hooks/useRegister";
+import { useRegister, type ApiError } from "../../hooks/auth/useRegister";
 import type { RegisterPayload } from "../../types/auth";
 import RegisterForm from "../../components/auth/RegisterForm";
 import { toast } from "react-toastify";

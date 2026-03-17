@@ -11,13 +11,9 @@ export interface VariantAttribute {
 interface VariantModalProps {
   isOpen: boolean;
   onClose: () => void;
-  // dữ liệu dòng đang sửa (nếu có). nếu null -> là đang thêm mới
   initialAttribute?: VariantAttribute | null;
-  // danh sách các thuộc tính khả dụng để hiển thị khi bấm add
   availableAttributes: VariantAttribute[];
-  // new: nhận mảng các biến thể đang có trên bảng để khôi phục trạng thái
   existingVariants: VariantAttribute[];
-  // new: Trả về một mảng thay vì 1 phần tử
   onConfirm: (attributes: VariantAttribute[]) => void;
 }
 
@@ -119,7 +115,7 @@ export default function VariantModal({
         <div className="vm-modal-header">
           <h3 className="vm-modal-title">
             {step === "select-attr"
-              ? "Add variant option"
+              ? "Manage Variants options"
               : "Edit variant attribute"}
           </h3>
         </div>
@@ -202,7 +198,6 @@ export default function VariantModal({
         </div>
 
         <div className="vm-modal-footer">
-          {/* Xử lý nút quay lại/hủy bỏ dựa trên step */}
           <button
             type="button"
             className="vm-btn-cancel"
@@ -222,7 +217,7 @@ export default function VariantModal({
               disabled={selectedAttrIds.length === 0}
               onClick={() => setStep("select-values")}
             >
-              Add
+              Next
             </button>
           )}
 

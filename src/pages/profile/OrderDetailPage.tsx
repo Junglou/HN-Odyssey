@@ -1,7 +1,12 @@
 import { useState, useEffect } from "react";
 import AccountSidebar from "../../components/profile/AccountSidebar";
 import "./OrderDetailPage.css"; // CSS Layout trang
-import type { UserProfile, ProductRecommendation, UserAddress, UserOrder } from "../../types/user";
+import type {
+  UserProfile,
+  ProductRecommendation,
+  UserAddress,
+  UserOrder,
+} from "../../types/user";
 import OrderDetail from "../../components/profile/OrderDetail/OrderDetail";
 
 const OrderDetailPage = () => {
@@ -53,30 +58,30 @@ const OrderDetailPage = () => {
     },
   ];
 
-  const addresses: UserAddress[]= [ 
+  const addresses: UserAddress[] = [
     {
       receiverName: "John",
       address: "28 whatever Str",
       city: "Ho Chi Minh",
-      country: "Vietnam"
+      country: "Vietnam",
     },
     {
       receiverName: "Alex",
       address: "39 whatever Str",
       city: "Los Angeles",
-      country: "US"
+      country: "US",
     },
     {
       receiverName: "Jenny",
       address: "90 whatever Str",
       city: "Ha Noi",
-      country: "Vietnam"
+      country: "Vietnam",
     },
     {
       receiverName: "Jake",
       address: "10 whatever Str",
       city: "California",
-      country: "US"
+      country: "US",
     },
   ];
 
@@ -87,7 +92,7 @@ const OrderDetailPage = () => {
       orderDate: "26/12/2025",
       shipDate: "28/12/2025",
       shipFee: "10.00$",
-      status: "Confirming"
+      status: "Confirming",
     },
     {
       address: addresses[1],
@@ -95,7 +100,7 @@ const OrderDetailPage = () => {
       orderDate: "26/12/2025",
       shipDate: "28/12/2025",
       shipFee: "10.00$",
-      status: "Confirming"
+      status: "Confirming",
     },
     {
       address: addresses[2],
@@ -103,7 +108,7 @@ const OrderDetailPage = () => {
       orderDate: "28/12/2025",
       shipDate: "30/12/2025",
       shipFee: "15.00$",
-      status: "Shipping"
+      status: "Shipping",
     },
     {
       address: addresses[3],
@@ -111,8 +116,8 @@ const OrderDetailPage = () => {
       orderDate: "01/01/2026",
       shipDate: "03/01/2026",
       shipFee: "20.00$",
-      status: "Completed"
-    }
+      status: "Completed",
+    },
   ];
 
   if (loading || !user) return <div>Loading...</div>;
@@ -127,10 +132,7 @@ const OrderDetailPage = () => {
 
       {/* Content (Nội dung phải) */}
       <div className="content-wrapper">
-        <OrderDetail
-          user={user}
-          order={order[0]}
-        />
+        <OrderDetail user={user} order={order[0]} />
       </div>
     </div>
   );

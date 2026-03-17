@@ -22,13 +22,9 @@ import OrderMangementPage from "../pages/profile/OrderManagementPage";
 import OrderDetailPage from "../pages/profile/OrderDetailPage";
 import PurchaseHistoryPage from "../pages/profile/PurchaseHistoryPage";
 import MyWishlistPage from "../pages/profile/MyWishlistPage";
-
-// import trang quản lý sản phẩm
 import ProductManagementPage from "../pages/portal/ProductCatalog/ProductManagement/ProductManagementPage";
-// import trang form thêm/sửa sản phẩm
 import ProductFormPage from "../pages/portal/ProductCatalog/ProductManagement/ProductFormPage";
-
-// ghi nhớ để sau này: trong dự án lớn có thể dùng react.lazy() để tối ưu performance
+import CategoryManagementPage from "../pages/portal/ProductCatalog/CategoryManagement/CategoryManagementPage";
 
 export const router = createBrowserRouter([
   // route auth
@@ -139,6 +135,10 @@ export const router = createBrowserRouter([
       {
         path: "products/:id/edit",
         element: <ProductFormPage />,
+      },
+      {
+        path: "categories",
+        element: <CategoryManagementPage />,
       },
     ],
   },

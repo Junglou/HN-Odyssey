@@ -1,7 +1,6 @@
-// src/hooks/useAccountRecovery.ts
 import { useState } from "react";
-import authService from "../services/auth.service";
-import type { AccountRecoveryPayload } from "../types/auth";
+import authService from "../../services/auth.service";
+import type { AccountRecoveryPayload } from "../../types/auth";
 
 export interface ApiError {
   response?: {
@@ -21,7 +20,7 @@ export const useAccountRecovery = () => {
     setError(null);
 
     try {
-      // 1. Chuyển đổi Object sang FormData để gửi File
+      // Chuyển đổi Object sang FormData để gửi File
       const formData = new FormData();
       formData.append("email", payload.email);
       formData.append("otpCode", payload.otpCode);
@@ -31,7 +30,7 @@ export const useAccountRecovery = () => {
         formData.append("evidence", payload.evidence);
       }
 
-      // 2. Gọi Service
+      // Gọi Service
       await authService.requestAccountRecovery(formData);
     } catch (err: unknown) {
       const apiError = err as ApiError;
