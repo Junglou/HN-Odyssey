@@ -46,6 +46,7 @@ import { GhnService } from 'src/modules/shipping/providers/ghn.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { GhtkService } from 'src/modules/shipping/providers/ghtk.service';
 import { OrderStateMachine } from './flow/order-state-machine.service';
+import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
 
 // type OrderDocWithShipping = MongooseOrderDoc & {
 //   waybillCode?: string;
@@ -832,6 +833,8 @@ export class OrdersService {
       }
       await this.logCreateOrder(userId, order, dto.source, ip, userAgent);
 
+      this.eventEmitter.emit(NOTIFY_EVENTS.ORDER_CREATED, order);
+
       return {
         order: order,
         paymentUrl: paymentUrl,
@@ -1228,6 +1231,8 @@ export class OrdersService {
       }
 
       await this.logCreateOrder(userId, savedOrder, dto.source, ip, userAgent);
+
+      this.eventEmitter.emit(NOTIFY_EVENTS.ORDER_CREATED, savedOrder);
 
       return {
         order: savedOrder,

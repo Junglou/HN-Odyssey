@@ -35,6 +35,8 @@ import {
 import { MomoService } from './providers/momo.service';
 import { CodService } from './providers/cod.service';
 import { OrdersService } from '../orders/orders.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
 
 type LogOrderContext = {
   order_code: string;
@@ -61,6 +63,7 @@ export class PaymentService {
     @InjectRedis() private readonly redis: Redis,
     @InjectConnection() private readonly connection: Connection,
     private readonly codService: CodService,
+    private readonly eventEmitter: EventEmitter2,
 
     @Inject(forwardRef(() => OrdersService))
     private readonly ordersService: OrdersService,
@@ -199,6 +202,12 @@ export class PaymentService {
           'FAILED',
           `Gateway Error: ${responseCode}`,
         );
+
+        this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
+          severity: 'HIGH', // Lỗi thanh toán là lỗi quan trọng
+          error_code: `PAYMENT_FAILED_${provider}`,
+          message: `Giao dịch thanh toán thất bại cho đơn hàng ${order.order_code}. Cổng: ${provider}, Mã lỗi trả về: ${responseCode}`,
+        });
 
         const email = order.guest_info?.email || order.shipping_info?.email;
         if (email) {
@@ -457,6 +466,14 @@ export class PaymentService {
     } catch (error: unknown) {
       const errMsg = error instanceof Error ? error.message : 'Unknown';
       this.logger.error(`Refund Failed: ${errMsg}`);
+
+      this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
+        severity: 'HIGH',
+        error_code: `REFUND_API_ERROR_${provider}`,
+        message: `Lỗi kết nối/xử lý từ cổng ${provider} khi yêu cầu hoàn tiền đơn ${order.order_code}. Chi tiết: ${errMsg}`,
+        stack_trace: error instanceof Error ? error.stack : undefined,
+      });
+
       throw new BadRequestException('Lỗi từ cổng thanh toán khi hoàn tiền.');
     }
   }

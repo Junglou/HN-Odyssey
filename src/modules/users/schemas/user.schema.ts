@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 import { UserStatus } from 'src/common/enums/user-status.enum';
 
 export enum Gender {
@@ -95,6 +95,9 @@ export class User {
 
   @Prop({ type: String, default: null })
   refresh_token: string | null;
+
+  @Prop({ type: Types.ObjectId, ref: 'Warehouse', default: null })
+  assigned_warehouse: Types.ObjectId; // Phục vụ AC10: Phân quyền theo kho
 }
 
 export type UserDocument = User & Document;

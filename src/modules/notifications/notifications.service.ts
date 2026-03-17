@@ -1,15 +1,459 @@
-import { Injectable } from '@nestjs/common';
-import { SendNotificationDto } from './dto/send-notification.dto';
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+import { Subject } from 'rxjs';
+import { bufferTime, filter } from 'rxjs/operators';
+import {
+  NotificationLog,
+  NotificationType,
+  NotificationPriority,
+} from './schemas/notification-log.schema';
+import { NotificationsGateway } from './notifications.gateway';
+import { EmailService } from './channels/email.service';
+import { Order } from 'src/modules/sales/orders/schemas/order.schema';
+
+import { InjectRedis } from '@nestjs-modules/ioredis';
+import Redis from 'ioredis';
+
+interface CreateNotificationData {
+  recipient_role: string;
+  recipient_id?: string | Types.ObjectId;
+  warehouse_id?: string | Types.ObjectId;
+  title: string;
+  message: string;
+  type: NotificationType;
+  priority?: NotificationPriority;
+  metadata?: Record<string, unknown>;
+}
+
+interface INotificationLogLean {
+  _id: Types.ObjectId;
+  title: string;
+  message: string;
+  type: NotificationType;
+  priority: NotificationPriority;
+  metadata?: Record<string, any>;
+  createdAt: string | number | Date;
+}
 
 @Injectable()
 export class NotificationsService {
-  // Placeholder function
-  create(createNotificationDto: SendNotificationDto) {
-    console.log(createNotificationDto);
-    return 'This action adds a new notification';
+  private orderStream = new Subject<Order>();
+  private readonly logger = new Logger(NotificationsService.name);
+
+  constructor(
+    @InjectModel(NotificationLog.name)
+    private readonly model: Model<NotificationLog>,
+    private readonly gateway: NotificationsGateway,
+    private readonly emailService: EmailService,
+    @InjectRedis() private readonly redis: Redis,
+  ) {
+    this.initOrderBatching();
   }
 
-  findAll() {
-    return `This action returns all notifications`;
+  private initOrderBatching() {
+    this.orderStream
+      .pipe(
+        bufferTime(500),
+        filter((orders) => orders.length > 0),
+      )
+      .subscribe({
+        // 1. Không dùng 'async' ở callback 'next' để tuân thủ kiểu 'void' của RxJS
+        next: (batch) => {
+          // 2. Dùng void (async () => { ... })() để chạy logic Promise một cách an toàn
+          void (async () => {
+            try {
+              if (batch.length === 1) {
+                await this.broadcastOrder(batch[0]);
+              } else {
+                await this.broadcastOrderBatch(batch);
+              }
+            } catch (error) {
+              this.logger.error('Lỗi khi xử lý batching đơn hàng:', error);
+            }
+          })();
+        },
+        error: (err) => this.logger.error('Order stream hỏng!', err),
+      });
+  }
+
+  async notifyNewOrder(order: Order) {
+    this.orderStream.next(order);
+  }
+
+  private async broadcastOrder(order: Order) {
+    const area = order.shipping_info?.city_code || 'DEFAULT';
+    const customerName = order.shipping_info?.name || 'Khách vãng lai';
+
+    const orderWithTimestamps = order as Order & { createdAt?: Date | string };
+    const createdAtDate = orderWithTimestamps.createdAt;
+
+    const orderTime =
+      createdAtDate instanceof Date
+        ? createdAtDate.toLocaleString('vi-VN')
+        : typeof createdAtDate === 'string'
+          ? new Date(createdAtDate).toLocaleString('vi-VN')
+          : new Date().toLocaleString('vi-VN');
+
+    await this.createAndSend({
+      recipient_role: 'SALES_STAFF',
+      warehouse_id: area,
+      title: 'Đơn hàng mới!',
+      message: `Đơn #${order.order_code} của ${customerName} - ${(order.total_amount || 0).toLocaleString()}đ lúc ${orderTime}`,
+      type: NotificationType.ORDER,
+      priority: NotificationPriority.HIGH,
+      metadata: {
+        order_id: String(order._id),
+        order_code: order.order_code,
+        target_url: `/admin/orders/${String(order._id)}`,
+      },
+    });
+  }
+
+  private async broadcastOrderBatch(batch: Order[]) {
+    const orderIds = batch.map((o) => String(o._id));
+    const totalValue = batch.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+
+    await this.createAndSend({
+      recipient_role: 'SALES_STAFF',
+      title: 'Nhiều đơn hàng mới',
+      message: `Bạn có ${batch.length} đơn hàng mới (Tổng: ${totalValue.toLocaleString()}đ) cần xử lý.`,
+      type: NotificationType.ORDER,
+      priority: NotificationPriority.HIGH,
+      metadata: {
+        is_batch: true,
+        order_ids: orderIds,
+        target_url: `/admin/orders`,
+      },
+    });
+  }
+
+  async createAndSend(data: CreateNotificationData) {
+    try {
+      const isSpam = await this.checkSpamSafe(data);
+      if (isSpam) return;
+
+      // 1. Lưu vào Database
+      const log = await new this.model({ ...data, is_read: false }).save();
+      const logData = log.toObject() as unknown as INotificationLogLean;
+
+      // 2. Xác định các Room cần gửi Socket (Tránh gửi lặp)
+      const warehouseId = data.warehouse_id ? String(data.warehouse_id) : '';
+      const payload = {
+        id: logData._id.toString(),
+        title: logData.title,
+        message: logData.message,
+        type: logData.type,
+        priority: logData.priority,
+        metadata: logData.metadata,
+        createdAt: logData.createdAt
+          ? new Date(logData.createdAt).toISOString()
+          : new Date().toISOString(),
+      };
+
+      // Gửi cho nhân viên theo từng kho cụ thể (Phân tuyến)
+      if (warehouseId) {
+        const areaRoom = `role_${data.recipient_role}_area_${warehouseId}`;
+        this.gateway.sendToRoom(areaRoom, 'new_notification', payload);
+      }
+
+      // Gửi cho Role tổng (Super Admin thường lắng nghe Room này)
+      const roleRoom = `role_${data.recipient_role}`;
+      this.gateway.sendToRoom(roleRoom, 'new_notification', payload);
+
+      // Gửi riêng cho cá nhân nếu có recipient_id
+      if (data.recipient_id) {
+        this.gateway.sendToRoom(
+          `user_${String(data.recipient_id)}`,
+          'new_notification',
+          payload,
+        );
+      }
+
+      return log;
+    } catch (error) {
+      this.logger.error(
+        'Critical failure in createAndSend',
+        error instanceof Error ? error.message : 'Unknown error',
+      );
+    }
+  }
+
+  async markAsRead(notificationId: string, userId: string) {
+    const updated = await this.model.findOneAndUpdate(
+      { _id: notificationId },
+      { is_read: true, read_at: new Date() },
+      { new: true },
+    );
+
+    if (updated) {
+      this.gateway.sendToRoom(`user_${userId}`, 'notification_read', {
+        id: notificationId,
+      });
+    }
+    return updated;
+  }
+
+  async markAllAsRead(userId: string, roles: string[]) {
+    const result = await this.model
+      .updateMany(
+        {
+          $or: [
+            { recipient_id: new Types.ObjectId(userId) },
+            { recipient_role: { $in: roles } },
+          ],
+          is_read: false,
+        },
+        { is_read: true, read_at: new Date() },
+      )
+      .exec();
+
+    if (result.modifiedCount > 0) {
+      this.gateway.sendToRoom(`user_${userId}`, 'all_notifications_read', {
+        success: true,
+      });
+    }
+    return result;
+  }
+
+  async getNotificationsForUser(
+    userId: string,
+    roles: string[],
+    page: number = 1,
+    limit: number = 10,
+  ) {
+    const skip = (page - 1) * limit;
+    const query = {
+      $or: [
+        { recipient_id: new Types.ObjectId(userId) },
+        { recipient_role: { $in: roles } },
+      ],
+    };
+
+    const [items, totalItems] = await Promise.all([
+      this.model
+        .find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.model.countDocuments(query).exec(),
+    ]);
+
+    return {
+      items,
+      meta: {
+        totalItems,
+        itemCount: items.length,
+        itemsPerPage: limit,
+        totalPages: Math.ceil(totalItems / limit),
+        currentPage: page,
+      },
+    };
+  }
+
+  async pushToOrderStream(order: Order) {
+    return this.notifyNewOrder(order);
+  }
+
+  async autoResolveStockAlert(sku: string) {
+    const result = await this.model
+      .updateMany(
+        { 'metadata.sku': sku, type: NotificationType.STOCK, is_read: false },
+        {
+          $set: {
+            is_read: true,
+            read_at: new Date(),
+            'metadata.resolved': true,
+          },
+        },
+      )
+      .exec();
+
+    if (result.modifiedCount > 0) {
+      // FIX: Gửi cho cả ADMIN và MANAGER để ai cũng thấy
+      const targetRoles = [
+        'SUPER_ADMIN',
+        'WAREHOUSE_MANAGER',
+        'WAREHOUSE_STAFF',
+      ];
+      const payload = {
+        title: '✅ Đã xử lý: Tồn kho ổn định',
+        message: `Sản phẩm ${sku} đã được nhập thêm hàng, cảnh báo đã tự động đóng.`,
+        type: NotificationType.STOCK,
+        priority: NotificationPriority.LOW,
+        metadata: { sku, resolved: true },
+      };
+
+      for (const role of targetRoles) {
+        this.gateway.sendToRoom(`role_${role}`, 'new_notification', payload);
+      }
+      this.logger.log(`[RESOLVE] Đã bắn Socket báo SKU ${sku} an toàn.`);
+    }
+
+    // Xóa khóa chống spam để lần sau hết hàng lại báo được ngay
+    await this.redis.del(`SPAM_STK_${sku}`);
+  }
+
+  async autoResolveAlert(
+    type: NotificationType,
+    metadataKey: string,
+    metadataValue: string,
+  ) {
+    const queryKey = `metadata.${metadataKey}`;
+    const result = await this.model
+      .updateMany(
+        { [queryKey]: metadataValue, type: type, is_read: false },
+        {
+          $set: {
+            is_read: true,
+            read_at: new Date(),
+            'metadata.resolved': true,
+          },
+        },
+      )
+      .exec();
+
+    if (result.modifiedCount > 0) {
+      // Bắn socket thông báo đã xử lý sự cố hệ thống/bảo mật
+      this.gateway.sendToRoom('role_SUPER_ADMIN', 'notification_resolved', {
+        type,
+        [metadataKey]: metadataValue,
+      });
+    }
+
+    if (type === NotificationType.SYSTEM) {
+      // FIX BUG REDIS: Phải có tiền tố SPAM_SYS_
+      await this.redis.del(`SPAM_SYS_${metadataValue}`);
+    }
+  }
+
+  async getUnreadCount(userId: string, roles: string[]): Promise<number> {
+    return this.model
+      .countDocuments({
+        $or: [
+          { recipient_id: new Types.ObjectId(userId) },
+          { recipient_role: { $in: roles } },
+        ],
+        is_read: false,
+      })
+      .exec();
+  }
+
+  async get7DayTrend() {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    return this.model.aggregate([
+      { $match: { createdAt: { $gte: sevenDaysAgo } } },
+      {
+        $group: {
+          _id: {
+            day: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            type: '$type',
+          },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { '_id.day': 1 } },
+    ]);
+  }
+
+  private async checkSpamSafe(data: CreateNotificationData): Promise<boolean> {
+    try {
+      if (
+        data.type === NotificationType.STOCK ||
+        data.type === NotificationType.SYSTEM
+      ) {
+        const sku =
+          typeof data.metadata?.sku === 'string' ? data.metadata.sku : '';
+        const err =
+          typeof data.metadata?.error_code === 'string'
+            ? data.metadata.error_code
+            : '';
+        const key =
+          data.type === NotificationType.STOCK
+            ? `SPAM_STK_${sku}`
+            : `SPAM_SYS_${err}`;
+
+        if (key.endsWith('_')) return false;
+
+        const exists = await this.redis.get(key);
+        if (exists) return true;
+
+        const cooldown = 5;
+        await this.redis.set(key, '1', 'EX', cooldown);
+      }
+    } catch {
+      return false;
+    }
+    return false;
+  }
+
+  private emitToRoomSafe(data: CreateNotificationData, payload: any) {
+    try {
+      const warehouseId = data.warehouse_id ? String(data.warehouse_id) : '';
+      const room = `role_${data.recipient_role}${warehouseId ? `_area_${warehouseId}` : ''}`;
+      this.gateway.sendToRoom(room, 'new_notification', payload);
+    } catch {
+      this.logger.error('Socket Emit thất bại');
+    }
+  }
+
+  async createAndSendToMultipleRoles(data: {
+    roles: string[];
+    warehouse_id: string | Types.ObjectId;
+    title: string;
+    message: string;
+    type: NotificationType;
+    priority: NotificationPriority;
+    metadata: Record<string, any>;
+  }) {
+    // 1. Check spam: Tạo object tạm khớp với interface CreateNotificationData để tránh ép kiểu any
+    const checkData: CreateNotificationData = {
+      recipient_role: data.roles[0], // Lấy role đầu tiên làm đại diện
+      type: data.type,
+      metadata: data.metadata,
+      title: data.title,
+      message: data.message,
+    };
+
+    const isSpam = await this.checkSpamSafe(checkData);
+    if (isSpam) {
+      console.log('--- [STOP] BỊ CHẶN BỞI CHỐNG SPAM ---');
+      return;
+    }
+
+    // 2. Lưu record vào DB (Dùng SUPER_ADMIN làm bản ghi gốc)
+    const log = await new this.model({
+      ...data,
+      recipient_role: 'SUPER_ADMIN',
+      is_read: false,
+    }).save();
+
+    // 3. Ép kiểu an toàn để lấy Object từ Mongoose mà không bị lỗi unsafe-assignment
+    const logData = log.toObject() as unknown as INotificationLogLean;
+
+    const payload = {
+      id: logData._id.toString(),
+      title: logData.title,
+      message: logData.message,
+      type: logData.type,
+      priority: logData.priority,
+      metadata: logData.metadata,
+      createdAt: logData.createdAt
+        ? new Date(logData.createdAt).toISOString()
+        : new Date().toISOString(),
+    };
+
+    // 4. Bắn Socket cho từng Role và Room tương ứng
+    for (const role of data.roles) {
+      const warehouseId =
+        role === 'SUPER_ADMIN' ? '' : String(data.warehouse_id);
+      const room = `role_${role}${warehouseId ? `_area_${warehouseId}` : ''}`;
+      console.log(`--- [EMIT] Đang gửi thông báo đến Room: ${room} ---`);
+      this.gateway.sendToRoom(room, 'new_notification', payload);
+    }
+    return log;
   }
 }

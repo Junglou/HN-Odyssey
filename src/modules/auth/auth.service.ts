@@ -35,6 +35,8 @@ import type {
   IVerificationRecord,
   OAuthProfile,
 } from 'src/common/interfaces/OAuthProfile';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
 
 @Injectable()
 export class AuthService {
@@ -53,6 +55,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly usersService: UsersService,
     private readonly auditLogsService: AuditLogsService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   //1. ĐĂNG KÝ TÀI KHOẢN (US.01)
@@ -501,6 +504,18 @@ export class AuthService {
       user_agent: userAgent,
     });
 
+    const currentHour = new Date().getHours();
+
+    // AC5: Cảnh báo ngoài giờ làm việc (Từ 23h đêm đến 5h sáng)
+    if (currentHour >= 23 || currentHour <= 5) {
+      this.eventEmitter.emit(NOTIFY_EVENTS.SECURITY_ALERT, {
+        severity: 'MEDIUM',
+        message: `Tài khoản ${user.email} vừa đăng nhập vào khung giờ lạ (${currentHour}h sáng). IP: ${ip}`,
+        user_id: user._id.toString(),
+        ip: ip,
+      });
+    }
+
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
@@ -638,6 +653,13 @@ export class AuthService {
         },
         ip: ip,
         user_agent: userAgent,
+      });
+
+      this.eventEmitter.emit(NOTIFY_EVENTS.SECURITY_ALERT, {
+        severity: 'CRITICAL',
+        message: `Phát hiện tấn công Brute-force: Tài khoản ${user.email} bị sai mật khẩu ${MAX_ATTEMPTS} lần liên tiếp. Đã khóa ${LOCK_TIME_MINUTES} phút.`,
+        user_id: user._id.toString(),
+        ip: ip,
       });
 
       throw new BadRequestException(
@@ -1034,6 +1056,10 @@ export class AuthService {
     await user.save();
     await verifyRecord.deleteOne();
 
+    this.eventEmitter.emit('notification.security.resolve', {
+      user_id: String(user._id),
+    });
+
     await this.auditLogsService.log({
       action: 'RESET_PASSWORD_SUCCESS',
       collection_name: 'users',
@@ -1095,6 +1121,10 @@ export class AuthService {
 
     await user.save();
     await verifyRecord.deleteOne();
+
+    this.eventEmitter.emit('notification.security.resolve', {
+      user_id: String(user._id),
+    });
 
     // 4. Await log
     await this.auditLogsService.log({

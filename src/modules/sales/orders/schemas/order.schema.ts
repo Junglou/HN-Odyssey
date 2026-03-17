@@ -118,6 +118,12 @@ export class Order extends Document {
 
   @Prop({ default: 0 })
   print_count: number; //AC8 (Bản chính/Bản sao)
+
+  @Prop()
+  createdAt?: Date;
+
+  @Prop()
+  updatedAt?: Date;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

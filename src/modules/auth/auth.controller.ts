@@ -41,6 +41,7 @@ import type {
   RequestWithUser,
 } from 'src/common/interfaces/user.interface';
 import { OAuthProfile } from 'src/common/interfaces/OAuthProfile';
+import { SecurityMonitorInterceptor } from 'src/common/interceptors/security-monitor.interceptor';
 
 @ApiTags('Auth (Xác thực)')
 @Controller('auth')
@@ -91,6 +92,7 @@ export class AuthController {
   //4. ĐĂNG NHẬP (US.02)
   @Post('login')
   @Public()
+  @UseInterceptors(SecurityMonitorInterceptor)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng nhập hệ thống (AC1 -> AC14)' })
   @ApiResponse({

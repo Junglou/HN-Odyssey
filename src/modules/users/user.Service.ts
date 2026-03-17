@@ -45,4 +45,14 @@ export class UsersService {
       login_attempts: 0,
     });
   }
+
+  async updateStatus(
+    userId: string,
+    updateData: { is_active: boolean; lock_reason?: string },
+  ) {
+    // Nếu dùng Mongoose
+    return this.userModel
+      .findByIdAndUpdate(userId, { $set: updateData }, { new: true })
+      .exec();
+  }
 }

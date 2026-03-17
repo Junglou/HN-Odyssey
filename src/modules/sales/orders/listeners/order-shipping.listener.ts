@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Order, OrderDocument } from '../schemas/order.schema';
@@ -11,6 +11,7 @@ import {
   type OrderData,
   type OrderItem,
 } from 'src/common/interfaces/order.interface';
+import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
 
 @Injectable()
 export class OrderShippingListener {
@@ -21,6 +22,7 @@ export class OrderShippingListener {
     private readonly ghnService: GhnService,
     private readonly ghtkService: GhtkService,
     private readonly shippingService: ShippingService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   @OnEvent('order.ready_to_ship', { async: true })
@@ -128,6 +130,13 @@ export class OrderShippingListener {
           internal_note: `[LỖI VẬN CHUYỂN ${new Date().toLocaleString()}]: ${errorMsg}. Vui lòng thử lại.`,
         },
       });
+
+      this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
+        severity: 'HIGH', // Hoặc CRITICAL nếu việc tạo đơn là cực kỳ trọng yếu
+        error_code: `SHIPPING_API_ERROR`,
+        message: `Mất kết nối hoặc lỗi API từ ĐVVC khi tạo vận đơn cho đơn ${orderPlain.order_code}. Chi tiết: ${errorMsg}`,
+        stack_trace: error instanceof Error ? error.stack : undefined,
+      });
     }
   }
 
@@ -153,6 +162,11 @@ export class OrderShippingListener {
       this.logger.warn(
         `Không thể hủy vận đơn ${orderPlain.waybill_code} trên ${provider}: ${errMsg}`,
       );
+      this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
+        severity: 'MEDIUM', // Lỗi hủy đơn thì độ ưu tiên thấp hơn tạo đơn
+        error_code: `SHIPPING_CANCEL_ERROR`,
+        message: `Lỗi API khi yêu cầu ĐVVC (${provider}) hủy vận đơn ${orderPlain.waybill_code}. Chi tiết: ${errMsg}`,
+      });
     }
   }
 }

@@ -9,6 +9,7 @@ import {
   Req,
   Res,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { PaymentService } from './payment.service';
@@ -20,9 +21,11 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { Resource, Action } from 'src/common/enums/resource.enum';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+import { PaymentMonitorInterceptor } from 'src/common/interceptors/payment-monitor.interceptor';
 
 @ApiTags('Payment')
 @Controller('payment')
+@UseInterceptors(PaymentMonitorInterceptor)
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 

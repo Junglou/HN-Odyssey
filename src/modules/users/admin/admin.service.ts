@@ -25,6 +25,8 @@ import {
 } from 'src/common/enums/department.enum';
 import { Role, RoleDocument } from '../roles/schemas/role.schema';
 import { RoleLevel } from 'src/common/enums/role-level.enum';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
 
 interface MongoError extends Error {
   code?: number;
@@ -39,6 +41,7 @@ export class AdminService {
     @InjectModel(Staff.name) private readonly staffModel: Model<Staff>,
     private readonly auditLogsService: AuditLogsService,
     @InjectModel(Role.name) private readonly roleModel: Model<RoleDocument>,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   private removeVietnameseTones(str: string): string {
@@ -349,6 +352,15 @@ export class AdminService {
       ip,
       user_agent: userAgent,
     });
+
+    if (diff['roles']) {
+      this.eventEmitter.emit(NOTIFY_EVENTS.SECURITY_ALERT, {
+        severity: 'HIGH',
+        message: `Hoạt động phân quyền: Tài khoản ${user.email} vừa được thay đổi quyền hạn thành [${user.roles.join(', ')}] bởi Admin ID: ${currentUserId}.`,
+        user_id: user._id.toString(),
+        ip: ip,
+      });
+    }
 
     return { message: 'Cập nhật thành công.', user };
   }

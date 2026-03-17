@@ -9,6 +9,7 @@ import { RolesModule } from './roles/roles.module';
 import { AddressesModule } from './addresses/addresses.module';
 import { WishlistModule } from './wishlist/wishlist.module';
 import { CustomersModule } from './customers/customers.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 const userModels = MongooseModule.forFeature([
   {
@@ -29,6 +30,7 @@ const userModels = MongooseModule.forFeature([
     WishlistModule,
     AddressesModule,
     CustomersModule,
+    forwardRef(() => NotificationsModule),
   ],
 
   providers: [UsersService],

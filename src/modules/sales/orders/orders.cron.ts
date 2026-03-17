@@ -5,6 +5,8 @@ import { Model } from 'mongoose';
 import { Order } from './schemas/order.schema';
 import { OrdersService } from './orders.service';
 import { OrderStatus } from 'src/common/interfaces/order.interface';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
 
 @Injectable()
 export class OrdersCronService {
@@ -13,6 +15,7 @@ export class OrdersCronService {
   constructor(
     @InjectModel(Order.name) private orderModel: Model<Order>,
     private readonly ordersService: OrdersService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   // Thêm lại quét đơn hết hạn (15 phút) mỗi phút một lần
@@ -43,6 +46,13 @@ export class OrdersCronService {
         this.logger.error(
           `Lỗi hủy đơn hết hạn ${order.order_code}: ${errorMessage}`,
         );
+
+        this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
+          severity: 'HIGH',
+          error_code: 'CRON_EXPIRED_ORDERS_FAILED',
+          message: `Lỗi khi chạy Job hủy đơn tự động (Đơn: ${order.order_code}): ${errorMessage}`,
+          stack_trace: e instanceof Error ? e.stack : undefined,
+        });
       }
     }
   }
@@ -85,6 +95,13 @@ export class OrdersCronService {
         this.logger.error(
           `Lỗi auto-complete đơn ${order.order_code}: ${errorMessage}`,
         );
+
+        this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
+          severity: 'HIGH',
+          error_code: 'CRON_AUTO_COMPLETE_FAILED',
+          message: `Lỗi khi chạy Job hoàn thành đơn tự động (Đơn: ${order.order_code}): ${errorMessage}`,
+          stack_trace: error instanceof Error ? error.stack : undefined,
+        });
       }
     }
   }

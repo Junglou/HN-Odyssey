@@ -19,11 +19,15 @@ import { SalesModule } from './modules/sales/sales.module';
 import { RedisModule } from '@nestjs-modules/ioredis';
 import { SearchModule } from './modules/search/search.module';
 import { MarketingModule } from './modules/marketing/marketing.module';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { PaymentMonitorInterceptor } from './common/interceptors/payment-monitor.interceptor';
+import { SecurityMonitorInterceptor } from './common/interceptors/security-monitor.interceptor';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { UebaMonitorInterceptor } from './common/interceptors/ueba-monitor.interceptor';
 
 @Module({
   imports: [
@@ -67,6 +71,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     SalesModule,
     SearchModule,
     MarketingModule,
+    NotificationsModule,
     EventEmitterModule.forRoot(),
   ],
   controllers: [AppController],
@@ -86,6 +91,18 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     {
       provide: APP_GUARD,
       useClass: PermissionsGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: SecurityMonitorInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: PaymentMonitorInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: UebaMonitorInterceptor,
     },
   ],
 })
