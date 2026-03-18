@@ -1,12 +1,10 @@
 import { useState } from "react";
 import "./RoleModal.css";
-import type { Role } from "../../../../pages/portal/UsersAndRoles/RoleManagement/RoleManagementPage";
+import type {
+  Role,
+  RoleFormData,
+} from "../../../../hooks/portal/UserAndRoles/RoleManagement/useRoleManagement";
 import { CloseIcon } from "../../../../assets/icons/RoleManagementIcons";
-
-export interface RoleFormData {
-  name: string;
-  status: "Active" | "Inactive";
-}
 
 interface RoleModalProps {
   isOpen: boolean;
@@ -23,7 +21,7 @@ export default function RoleModal({
   onClose,
   onSubmit,
 }: RoleModalProps) {
-  // auto init state, refresh khi initialData thay đổi
+  // tự động thiết lập lại state form khi initialData thay đổi
   const [formData, setFormData] = useState<RoleFormData>({
     name: initialData?.name || "",
     status: initialData?.status || "Active",

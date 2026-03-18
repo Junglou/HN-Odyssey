@@ -29,7 +29,6 @@ body {
   display: block;
 }
 
-/* THÊM ĐOẠN NÀY ĐỂ SỬA LỖI */
 #root {
   width: 100%;
   max-width: 100%; /* Cho phép tràn viền */

@@ -10,7 +10,7 @@ import {
   UnlockIcon,
 } from "../../../../assets/icons/UserManagementIcons";
 import type { User } from "./UserModal";
-import type { BulkAction } from "../../../../pages/portal/UsersAndRoles/UserManagement/UserManagementPage";
+import type { BulkAction } from "../../../../hooks/portal/UserAndRoles/UserManagement/useUserManagement";
 
 // props truyền từ container
 interface UserManagementProps {
@@ -77,7 +77,10 @@ function CustomDropdown({
     options.find((opt) => opt.value === value)?.label || options[0].label;
 
   return (
-    <div className={`um-custom-dropdown ${className}`} ref={dropdownRef}>
+    <div
+      className={`um-custom-dropdown ${className} ${isOpen ? "is-open" : ""}`}
+      ref={dropdownRef}
+    >
       <div
         className={`um-dropdown-trigger ${isOpen ? "active" : ""}`}
         onClick={() => setIsOpen(!isOpen)}
@@ -323,7 +326,9 @@ export default function UserManagement({
                           aria-checked={user.status === "Active"}
                         ></div>
 
-                        <div className="um-dropdown-wrapper">
+                        <div
+                          className={`um-dropdown-wrapper ${openDropdownId === user.id ? "is-open" : ""}`}
+                        >
                           <button
                             type="button"
                             className="um-icon-btn"

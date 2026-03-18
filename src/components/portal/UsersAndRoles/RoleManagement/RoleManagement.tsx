@@ -6,7 +6,7 @@ import type {
   Role,
   ModulePermission,
   Permission,
-} from "../../../../pages/portal/UsersAndRoles/RoleManagement/RoleManagementPage";
+} from "../../../../hooks/portal/UserAndRoles/RoleManagement/useRoleManagement";
 import {
   EditIcon,
   TrashIcon,
@@ -26,7 +26,7 @@ interface RoleManagementProps {
     permissions: ModulePermission[];
   };
   uiState: {
-    selectedRoleId: number;
+    selectedRoleId: number | null;
     hasUnsavedChanges: boolean;
     searchTerm: string;
   };
@@ -158,97 +158,111 @@ export default function RoleManagement({
         </div>
 
         {/* chi tiết quyền */}
-        <div className="rm-right-panel">
-          <div className="rm-right-header">
-            <div className="rm-right-title-group">
-              <h2 className="rm-role-title">Role: {selectedRole?.name}</h2>
-              {uiState.hasUnsavedChanges && (
-                <span className="rm-unsaved-tag">
-                  <WarningIcon />
-                  Unsaved Changes
-                </span>
-              )}
+        {uiState.selectedRoleId !== null && (
+          <div className="rm-right-panel">
+            <div className="rm-right-header">
+              <div className="rm-right-title-group">
+                <h2 className="rm-role-title">Role: {selectedRole?.name}</h2>
+                {uiState.hasUnsavedChanges && (
+                  <span className="rm-unsaved-tag">
+                    <WarningIcon />
+                    Unsaved Changes
+                  </span>
+                )}
+              </div>
+              <div className="rm-right-actions">
+                <button
+                  className="rm-btn-save"
+                  disabled={!uiState.hasUnsavedChanges}
+                  onClick={actions.saveChanges}
+                >
+                  Save Changes
+                </button>
+                <button
+                  className="rm-btn-cancel"
+                  onClick={actions.cancelChanges}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-            <div className="rm-right-actions">
-              <button
-                className="rm-btn-save"
-                disabled={!uiState.hasUnsavedChanges}
-                onClick={actions.saveChanges}
-              >
-                Save Changes
-              </button>
-              <button className="rm-btn-cancel" onClick={actions.cancelChanges}>
-                Cancel
-              </button>
-            </div>
-          </div>
 
-          {/* list check phân quyền */}
-          <div className="rm-permissions-container">
-            {data.permissions.map((module) => {
-              const isExpanded = expandedModules[module.moduleId] !== false;
+            {/* list check phân quyền */}
+            <div className="rm-permissions-container">
+              {data.permissions.map((module) => {
+                const isExpanded = expandedModules[module.moduleId] !== false;
 
-              return (
-                <div key={module.moduleId} className="rm-module-card">
-                  <div
-                    className="rm-module-header"
-                    onClick={() => toggleModule(module.moduleId)}
-                  >
-                    <div className="rm-module-name-col">
-                      <button className="rm-toggle-btn">
-                        {isExpanded ? <MinusSquareIcon /> : <PlusSquareIcon />}
-                      </button>
-                      <span className="rm-module-title">
-                        {module.moduleName}
-                      </span>
+                return (
+                  <div key={module.moduleId} className="rm-module-card">
+                    <div
+                      className="rm-module-header"
+                      onClick={() => toggleModule(module.moduleId)}
+                    >
+                      <div className="rm-module-name-col">
+                        <button className="rm-toggle-btn">
+                          {isExpanded ? (
+                            <MinusSquareIcon />
+                          ) : (
+                            <PlusSquareIcon />
+                          )}
+                        </button>
+                        <span className="rm-module-title">
+                          {module.moduleName}
+                        </span>
+                      </div>
+                      <div className="rm-perm-headers">
+                        <span>View</span>
+                        <span>Create</span>
+                        <span>Edit</span>
+                        <span>Delete</span>
+                      </div>
                     </div>
-                    <div className="rm-perm-headers">
-                      <span>View</span>
-                      <span>Create</span>
-                      <span>Edit</span>
-                      <span>Delete</span>
-                    </div>
-                  </div>
 
-                  {isExpanded && (
-                    <div className="rm-submodules-list">
-                      {module.subModules.map((sub) => (
-                        <div key={sub.subId} className="rm-submodule-row">
-                          <div className="rm-submodule-name">{sub.subName}</div>
-                          <div className="rm-perm-checkboxes">
-                            {PERMISSION_ACTIONS.map((action) => (
-                              <label key={action} className="rm-checkbox-label">
-                                <input
-                                  type="checkbox"
-                                  className="rm-checkbox"
-                                  checked={sub.permissions[action]}
-                                  onChange={() =>
-                                    actions.togglePermission(
-                                      module.moduleId,
-                                      sub.subId,
-                                      action,
-                                    )
-                                  }
-                                />
-                                <span className="rm-custom-check">
-                                  <CheckIcon />
-                                </span>
-                                <span className="rm-checkbox-text">
-                                  {action.charAt(0).toUpperCase() +
-                                    action.slice(1)}
-                                </span>
-                              </label>
-                            ))}
+                    {isExpanded && (
+                      <div className="rm-submodules-list">
+                        {module.subModules.map((sub) => (
+                          <div key={sub.subId} className="rm-submodule-row">
+                            <div className="rm-submodule-name">
+                              {sub.subName}
+                            </div>
+                            <div className="rm-perm-checkboxes">
+                              {PERMISSION_ACTIONS.map((action) => (
+                                <label
+                                  key={action}
+                                  className="rm-checkbox-label"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="rm-checkbox"
+                                    checked={sub.permissions[action]}
+                                    onChange={() =>
+                                      actions.togglePermission(
+                                        module.moduleId,
+                                        sub.subId,
+                                        action,
+                                      )
+                                    }
+                                  />
+                                  <span className="rm-custom-check">
+                                    <CheckIcon />
+                                  </span>
+                                  <span className="rm-checkbox-text">
+                                    {action.charAt(0).toUpperCase() +
+                                      action.slice(1)}
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

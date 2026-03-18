@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import "./UserModal.css";
 
 // model user chung
@@ -30,6 +30,100 @@ interface UserModalProps {
   onSubmit: (data: UserFormData) => void;
 }
 
+// --- Component Custom Select dành riêng cho Modal ---
+interface DropdownOption {
+  label: string;
+  value: string;
+}
+
+function CustomModalSelect({
+  name,
+  value,
+  options,
+  onChange,
+  disabled,
+  placeholder,
+}: {
+  name: string;
+  value: string;
+  options: DropdownOption[];
+  onChange: (name: string, value: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Xử lý click ra ngoài để đóng menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedLabel = options.find((opt) => opt.value === value)?.label;
+
+  return (
+    <div
+      className={`um-modal-custom-dropdown ${isOpen ? "is-open" : ""} ${disabled ? "disabled" : ""}`}
+      ref={dropdownRef}
+    >
+      <div
+        className={`um-modal-dropdown-trigger ${isOpen ? "active" : ""}`}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+      >
+        <span className={!selectedLabel ? "placeholder" : ""}>
+          {selectedLabel || placeholder}
+        </span>
+        <svg
+          className={`um-modal-dropdown-arrow ${isOpen ? "open" : ""}`}
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={disabled ? "#9ca3af" : "#333"}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </div>
+      {isOpen && !disabled && (
+        <div className="um-modal-dropdown-options">
+          {options.map((opt) => (
+            <div
+              key={opt.value}
+              className={`um-modal-dropdown-item ${value === opt.value ? "selected" : ""}`}
+              onClick={() => {
+                onChange(name, opt.value);
+                setIsOpen(false);
+              }}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Data mock cho Role
+const ROLE_OPTIONS: DropdownOption[] = [
+  { label: "Administrator", value: "Administrator" },
+  { label: "Content Manager", value: "Content Manager" },
+  { label: "Sale Staff", value: "Sale Staff" },
+];
+
 // modal form popup
 export default function UserModal({
   isOpen,
@@ -51,11 +145,14 @@ export default function UserModal({
   // check flag để vô hiệu hóa input
   const isViewOnly = mode === "view";
 
-  // update state theo từng input
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) => {
+  // update state theo input text thường
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // update state riêng cho custom dropdown
+  const handleCustomSelectChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -159,20 +256,15 @@ export default function UserModal({
             <label>
               Role <span className="req">*</span>
             </label>
-            <select
+            {/* Thay thế thẻ select gốc bằng CustomModalSelect */}
+            <CustomModalSelect
               name="role"
               value={formData.role}
-              onChange={handleInputChange}
+              options={ROLE_OPTIONS}
+              onChange={handleCustomSelectChange}
               disabled={isViewOnly}
-              required
-            >
-              <option value="" disabled hidden>
-                Select Role
-              </option>
-              <option value="Administrator">Administrator</option>
-              <option value="Content Manager">Content Manager</option>
-              <option value="Sale Staff">Sale Staff</option>
-            </select>
+              placeholder="Select Role"
+            />
           </div>
 
           {/* cụm thông tin trạng thái với toggle ui */}

@@ -61,11 +61,12 @@ export const useCategory = () => {
     useState<CategoryNode[]>(INITIAL_CATEGORIES);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Lưu trữ id của các danh mục đang được mở rộng để điều khiển hiển thị cây
+  // lưu trữ id của các danh mục đang mở
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
     new Set(["c2", "c2-1", "c3", "c3-1"]),
   );
 
+  // quản lý trạng thái đóng mở
   const [drawerConfig, setDrawerConfig] = useState<{
     isOpen: boolean;
     mode: "add" | "edit";
@@ -73,12 +74,13 @@ export const useCategory = () => {
     editingId?: string;
   }>({ isOpen: false, mode: "add" });
 
+  // xác nhận xóa
   const [deleteConfig, setDeleteConfig] = useState<{
     isOpen: boolean;
     categoryId: string | null;
   }>({ isOpen: false, categoryId: null });
 
-  // Tự động tính toán lại danh sách hiển thị có thay đổi
+  // tính toán và định dạng lại mảng danh mục thành mảng một chiều
   const visibleCategories = useMemo(() => {
     if (searchQuery.trim()) {
       return searchCategoriesFlat(categories, searchQuery);
@@ -95,27 +97,29 @@ export const useCategory = () => {
     });
   }, []);
 
+  // hàm tím kiếm danh mục
+  const findNodeAndParent = useCallback(function search(
+    nodes: CategoryNode[],
+    targetId: string,
+    parentId: string | null = null,
+  ): { node: CategoryNode; parentId: string | null } | null {
+    for (const node of nodes) {
+      if (node.id === targetId) return { node, parentId };
+      if (node.children) {
+        const found = search(node.children, targetId, node.id);
+        if (found) return found;
+      }
+    }
+    return null;
+  }, []);
+
   const openAddDrawer = useCallback(() => {
     setDrawerConfig({ isOpen: true, mode: "add" });
   }, []);
 
   const openEditDrawer = useCallback(
     (id: string) => {
-      const findNodeAndParent = (
-        nodes: CategoryNode[],
-        targetId: string,
-        parentId: string | null = null,
-      ): { node: CategoryNode; parentId: string | null } | null => {
-        for (const node of nodes) {
-          if (node.id === targetId) return { node, parentId };
-          if (node.children) {
-            const found = findNodeAndParent(node.children, targetId, node.id);
-            if (found) return found;
-          }
-        }
-        return null;
-      };
-
+      // new sử dụng hàm tìm kiếm dùng chung
       const found = findNodeAndParent(categories, id);
       if (found) {
         setDrawerConfig({
@@ -130,7 +134,7 @@ export const useCategory = () => {
         });
       }
     },
-    [categories],
+    [categories, findNodeAndParent],
   );
 
   const closeDrawer = useCallback(() => {
@@ -139,6 +143,7 @@ export const useCategory = () => {
 
   const saveCategory = useCallback(
     (formData: CategoryFormData) => {
+      // kiểm tra trùng tên cùng cấp trước khi thêm hoặc sửa
       if (
         isDuplicateSiblingName(
           categories,
@@ -181,28 +186,49 @@ export const useCategory = () => {
         }
         toast.success("Đã thêm danh mục mới!");
       } else if (drawerConfig.mode === "edit" && drawerConfig.editingId) {
-        const editRecursive = (nodes: CategoryNode[]): CategoryNode[] => {
-          return nodes.map((n) => {
-            if (n.id === drawerConfig.editingId) {
-              const updatedChildren =
-                formData.status === "Inactive" && n.children
-                  ? cascadeInactive(n.children)
-                  : n.children;
+        // cắt danh mục ra khỏi cây hiện tại để chuẩn bị dán vào vị trí mới nếu có thay đổi thư mục cha
+        const { newNodes, draggedNode } = removeNodeFromTree(
+          categories,
+          drawerConfig.editingId,
+        );
 
-              return {
-                ...n,
-                name: formData.name.trim(),
-                status: formData.status,
-                children: updatedChildren,
-              };
-            }
-            if (n.children)
-              return { ...n, children: editRecursive(n.children) };
-            return n;
-          });
+        if (!draggedNode) return;
+
+        // cập nhật tên và trạng thái mới cho danh mục vừa cắt
+        const updatedNode: CategoryNode = {
+          ...draggedNode,
+          name: formData.name.trim(),
+          status: formData.status,
+          children:
+            formData.status === "Inactive" && draggedNode.children
+              ? cascadeInactive(draggedNode.children)
+              : draggedNode.children,
         };
 
-        setCategories((prev) => editRecursive(prev));
+        // kiểm tra xem danh mục có được chọn vào một thư mục cha mới hay không
+        if (!formData.parentId) {
+          setCategories([...newNodes, updatedNode]);
+        } else {
+          // nếu có thư mục cha mới thì duyệt cây và nhét danh mục vào đúng vị trí của cha đó
+          const insertRecursive = (nodes: CategoryNode[]): CategoryNode[] => {
+            return nodes.map((n) => {
+              if (n.id === formData.parentId) {
+                return { ...n, children: [...(n.children ?? []), updatedNode] };
+              }
+              if (n.children)
+                return { ...n, children: insertRecursive(n.children) };
+              return n;
+            });
+          };
+          setCategories(insertRecursive(newNodes));
+
+          setExpandedIds((prev) => {
+            const next = new Set(prev);
+            next.add(formData.parentId!);
+            return next;
+          });
+        }
+
         toast.success("Đã cập nhật danh mục!");
       }
 
@@ -223,6 +249,7 @@ export const useCategory = () => {
     const idToDelete = deleteConfig.categoryId;
     if (!idToDelete) return;
 
+    // logic kiểm tra xem danh mục có con hay không
     const nodeToDelete = findNodeInTree(categories, idToDelete);
     if (
       nodeToDelete &&
@@ -251,11 +278,34 @@ export const useCategory = () => {
     toast.success("Đã xóa danh mục thành công!");
   }, [categories, deleteConfig.categoryId, cancelDelete]);
 
+  // logic kéo thả sắp xếp vị trí
   const moveCategory = useCallback(
     (draggedId: string, targetId: string) => {
+      // chặn kéo cha bỏ vào con
       if (checkIsDescendant(categories, draggedId, targetId)) {
         toast.error(
-          "Không thể kéo danh mục cha vào bên trong nhánh con của chính nó!",
+          "Cannot move a parent category into one of its own subcategories!",
+        );
+        return;
+      }
+
+      // kiểm tra trùng lặp
+      const draggedInfo = findNodeAndParent(categories, draggedId);
+      const targetInfo = findNodeAndParent(categories, targetId);
+
+      if (!draggedInfo || !targetInfo) return;
+
+      // chặn danh mục trùng tên di chuyển cùng cấp
+      if (
+        isDuplicateSiblingName(
+          categories,
+          draggedInfo.node.name,
+          targetInfo.parentId,
+          draggedId,
+        )
+      ) {
+        toast.error(
+          "Cannot move category because a category with the same name already exists at the target location!",
         );
         return;
       }
@@ -271,6 +321,7 @@ export const useCategory = () => {
       );
       if (!draggedNode) return;
 
+      // chèn danh mục vào đúng vị trí đích
       const finalNodes = isDraggingUp
         ? insertNodeBeforeTarget(newNodes, targetId, draggedNode)
         : insertNodeAfterTarget(newNodes, targetId, draggedNode);
@@ -278,7 +329,7 @@ export const useCategory = () => {
       setCategories(finalNodes);
       toast.success("Đã thay đổi vị trí hiển thị!");
     },
-    [categories, visibleCategories],
+    [categories, visibleCategories, findNodeAndParent],
   );
 
   return {

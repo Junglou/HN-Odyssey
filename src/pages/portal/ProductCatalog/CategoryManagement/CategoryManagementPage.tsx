@@ -53,7 +53,7 @@ export default function CategoryManagementPage() {
         onSave={saveCategory}
       />
 
-      {/* Modal xác nhận hiển thị khi người dùng bấm nút xóa */}
+      {/* Modal xác nhận xóa */}
       <ConfirmDeleteModal
         isOpen={deleteConfig.isOpen}
         message="Are you sure you want to delete this category?"

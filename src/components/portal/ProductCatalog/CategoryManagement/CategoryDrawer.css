@@ -1,4 +1,4 @@
-/* Lớp phủ màn hình tối màu khi mở ngăn kéo */
+/* Overlay */
 .cd-overlay {
   position: fixed;
   top: 0;
@@ -8,10 +8,10 @@
   background-color: rgba(0, 0, 0, 0.4);
   z-index: 1000;
   opacity: 0;
-  animation: fadeIn 0.3s forwards;
+  animation: cd-fadeIn 0.3s forwards;
 }
 
-/* Định dạng giao diện chính của ngăn kéo trượt */
+/* Drawer*/
 .cd-drawer {
   position: fixed;
   top: 0;
@@ -25,11 +25,11 @@
   display: flex;
   flex-direction: column;
   transform: translateX(100%);
-  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: cd-slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   font-family: "Lexend Exa", sans-serif;
 }
 
-/* Phần khu vực tiêu đề của ngăn kéo */
+/* Header */
 .cd-header {
   display: flex;
   align-items: center;
@@ -63,7 +63,7 @@
   color: #111827;
 }
 
-/* Phần thân chứa các trường nhập liệu */
+/* body */
 .cd-body {
   flex: 1;
   padding: 24px;
@@ -103,7 +103,7 @@
   border-color: #000000;
 }
 
-/* Khu vực cấu hình hiển thị cho danh sách thả xuống chọn thư mục cha */
+/* danh sách danh mục */
 .cd-tree-select {
   position: relative;
   width: 100%;
@@ -145,6 +145,16 @@
   padding: 8px;
 }
 
+/* hiển thị văn bản hướng dẫn phía trên */
+.cd-tree-header-text {
+  padding: 8px 12px;
+  color: #6b7280;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-bottom: 1px solid #f3f4f6;
+  margin-bottom: 4px;
+}
+
 .cd-tree-node {
   display: flex;
   align-items: center;
@@ -160,21 +170,71 @@
   background-color: #f3f4f6;
 }
 
+/* cập nhật màu nền xanh nhạt và chữ trắng cho mục đang được chọn */
 .cd-tree-node.selected {
-  background-color: #e0e7ff;
-  color: #3730a3;
+  background-color: #93c5fd;
+  color: #ffffff;
   font-weight: 600;
+}
+
+/* nhóm icon mũi tên và folder */
+.cd-tree-toggle-wrapper {
+  display: flex;
+  align-items: center;
+  margin-right: 8px;
 }
 
 .cd-tree-toggle {
   width: 20px;
   display: flex;
   align-items: center;
+  justify-content: center;
   color: #6b7280;
-  margin-right: 4px;
+  transition: transform 0.2s;
 }
 
-/* Các lớp hiệu chỉnh giao diện nút công tắc thay đổi trạng thái */
+.cd-tree-toggle.clickable {
+  cursor: pointer;
+}
+
+.cd-tree-toggle.collapsed {
+  transform: rotate(-90deg);
+}
+
+.cd-tree-toggle.expanded {
+  transform: rotate(0deg);
+}
+
+.cd-tree-node.selected .cd-tree-toggle {
+  color: #ffffff;
+}
+
+.cd-folder-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  width: 20px;
+  height: 20px;
+}
+
+.cd-folder-icon svg {
+  width: 100%;
+  height: 100%;
+  stroke-width: 1.5;
+}
+
+.cd-tree-path {
+  flex: 1;
+}
+
+/* biểu tượng dấu check căn lề sát bên phải */
+.cd-check-icon {
+  margin-left: auto;
+  font-weight: bold;
+}
+
+/* nút switch trạng thái */
 .cd-status-row {
   display: flex;
   align-items: center;
@@ -221,7 +281,7 @@
   color: #111827;
 }
 
-/* Khu vực chân trang chứa các nút hành động */
+/* button */
 .cd-footer {
   padding: 20px 24px;
   border-top: 1px solid #e5e7eb;
@@ -261,7 +321,7 @@
   background-color: #3b82f6;
 }
 
-@keyframes fadeIn {
+@keyframes cd-fadeIn {
   from {
     opacity: 0;
   }
@@ -270,7 +330,7 @@
   }
 }
 
-@keyframes slideInRight {
+@keyframes cd-slideInRight {
   from {
     transform: translateX(100%);
   }

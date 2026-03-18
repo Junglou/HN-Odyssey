@@ -492,7 +492,7 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 100;
   overflow: hidden;
-  animation: slideFadeIn 0.2s ease-out forwards;
+  animation: pf-slideFadeIn 0.2s ease-out forwards;
   transform-origin: top center;
 }
 .pf-dropdown-item {
@@ -541,5 +541,16 @@
 @media (max-width: 1024px) {
   .pf-grid-2-cols {
     grid-template-columns: 1fr;
+  }
+}
+
+@keyframes pf-slideFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

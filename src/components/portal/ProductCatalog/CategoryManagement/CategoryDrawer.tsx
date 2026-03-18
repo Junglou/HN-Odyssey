@@ -3,13 +3,16 @@ import "./CategoryDrawer.css";
 import {
   BackArrowIcon,
   FilterIcon,
+  FolderIcon,
 } from "../../../../assets/icons/CategoryIcons";
+import { ChevronDownIcon } from "../../../../assets/icons/HeaderIcons";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 import type {
   CategoryNode,
   CategoryStatus,
 } from "../../../../utils/portal/ProductCatalog/CategoryManagement/categoryTree.utils";
 
+// props
 export interface CategoryFormData {
   name: string;
   parentId: string | null;
@@ -35,9 +38,6 @@ export default function CategoryDrawer({
   onClose,
   onSave,
 }: CategoryDrawerProps) {
-  // Khởi tạo state một lần duy nhất khi component mount.
-  // Nhờ có thuộc tính "key" truyền từ component cha, component này sẽ
-  // tự động làm mới hoàn toàn mỗi khi ngăn kéo được mở lên.
   const [formData, setFormData] = useState<CategoryFormData>(
     initialData && mode === "edit"
       ? initialData
@@ -46,42 +46,92 @@ export default function CategoryDrawer({
 
   const [isTreeOpen, setIsTreeOpen] = useState(false);
   const treeRef = useRef<HTMLDivElement>(null);
+  const [expandedDropdownIds, setExpandedDropdownIds] = useState<Set<string>>(
+    new Set(categories.map((c) => c.id)),
+  );
 
-  // Tự động đóng danh sách chọn danh mục cha khi nhấp chuột ra ngoài
+  // hook đóng khi click ra ngoài
   useClickOutside(treeRef, () => setIsTreeOpen(false));
 
-  // Biến mảng dữ liệu thành một Map để tối ưu thời gian tìm kiếm phần tử từ O(n) xuống O(1)
-  const categoryMap = useMemo(() => {
-    const map = new Map<string, CategoryNode>();
-    const walk = (nodes: CategoryNode[]) => {
+  // tạo map dữ liệu giúp tối ưu tìm kiếm
+  const { categoryMap, parentMap } = useMemo(() => {
+    const cMap = new Map<string, CategoryNode>();
+    const pMap = new Map<string, string | null>();
+    const walk = (nodes: CategoryNode[], parentId: string | null = null) => {
       for (const node of nodes) {
-        map.set(node.id, node);
-        if (node.children) walk(node.children);
+        cMap.set(node.id, node);
+        pMap.set(node.id, parentId);
+        if (node.children) walk(node.children, node.id);
       }
     };
     walk(categories);
-    return map;
+    return { categoryMap: cMap, parentMap: pMap };
   }, [categories]);
 
-  // Đã xóa hoàn toàn useEffect gây lỗi Cascading Renders ở đây
+  // logic ẩn danh mục con của danh mục đang được edit
+  const hiddenNodeIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (mode === "edit" && editingId) {
+      ids.add(editingId);
+      const findDescendants = (parentId: string) => {
+        const node = categoryMap.get(parentId);
+        if (node && node.children) {
+          node.children.forEach((c) => {
+            ids.add(c.id);
+            findDescendants(c.id);
+          });
+        }
+      };
+      findDescendants(editingId);
+    }
+    return ids;
+  }, [mode, editingId, categoryMap]);
 
+  // hàm hỗ trợ lấy ra đường dẫn đầy đủ của danh mục cha
+  const getCategoryPath = (id: string | null): string => {
+    if (!id) return "None (Root Category)";
+
+    let path = "";
+    let currentId: string | null = id;
+
+    // duyệt ngược lên gốc để lấy chuỗi đường dẫn
+    while (currentId) {
+      const node = categoryMap.get(currentId);
+      if (!node) break;
+      path = path ? `${node.name} > ${path}` : node.name;
+      currentId = parentMap.get(currentId) || null;
+    }
+
+    return path;
+  };
   if (!isOpen) return null;
 
+  // lấy data danh mục cha
   const selectedParentNode = formData.parentId
     ? (categoryMap.get(formData.parentId) ?? null)
     : null;
 
-  // Xác định xem danh mục cha được chọn có đang bị ẩn hay không để khóa trạng thái
+  // kiểm tra trạng thái danh mục cha
   const isParentInactive = selectedParentNode?.status === "Inactive";
 
-  // Hàm đệ quy vẽ cấu trúc cây danh mục bên trong ô chọn thả xuống
-  const renderTreeNodes = (nodes: CategoryNode[], level: number = 0) => {
+  // hàm đệ quy cây danh mục
+  const renderTreeNodes = (
+    nodes: CategoryNode[],
+    level: number = 0,
+    parentPath: string = "",
+  ) => {
     return nodes.map((node) => {
-      // Ẩn danh mục đang được chỉnh sửa để người dùng không chọn nhầm nó làm cha của chính nó
-      if (mode === "edit" && editingId === node.id) return null;
+      // ẩn danh mục đang được chỉnh sửa
+      if (hiddenNodeIds.has(node.id)) return null;
 
       const hasChildren = !!node.children && node.children.length > 0;
       const isSelected = formData.parentId === node.id;
+      const currentPath = parentPath
+        ? `${parentPath} > ${node.name}`
+        : node.name;
+
+      // kiểm tra trạng thái danh mục
+      const isExpanded = expandedDropdownIds.has(node.id);
 
       return (
         <div key={node.id}>
@@ -92,7 +142,7 @@ export default function CategoryDrawer({
               e.stopPropagation();
               const clickedNode = categoryMap.get(node.id);
 
-              // Nếu người dùng chọn danh mục cha đang bị ẩn, ép trạng thái của danh mục hiện tại thành ẩn theo
+              // nếu danh mục cha inactive con inactive
               const forceInactive = clickedNode?.status === "Inactive";
               setFormData((prev) => ({
                 ...prev,
@@ -102,24 +152,57 @@ export default function CategoryDrawer({
               setIsTreeOpen(false);
             }}
           >
-            <div className="cd-tree-toggle">{hasChildren ? "▾" : ""}</div>
-            <span>{node.name}</span>
+            <div className="cd-tree-toggle-wrapper">
+              <div
+                className={`cd-tree-toggle ${hasChildren ? "clickable" : ""} ${isExpanded ? "expanded" : "collapsed"}`}
+                onClick={(e) => {
+                  if (!hasChildren) return;
+                  e.stopPropagation();
+                  setExpandedDropdownIds((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(node.id)) next.delete(node.id);
+                    else next.add(node.id);
+                    return next;
+                  });
+                }}
+              >
+                {hasChildren ? (
+                  <ChevronDownIcon />
+                ) : (
+                  <span style={{ width: 16 }}></span>
+                )}
+              </div>
+              {/* sử dụng component icon folder dạng outline thay cho emoji */}
+              <div className="cd-folder-icon">
+                <FolderIcon />
+              </div>
+            </div>
+
+            <span className="cd-tree-path">{currentPath}</span>
+
+            {/* hiển thị dấu tích nếu danh mục này đang được chọn */}
+            {isSelected && <span className="cd-check-icon">✓</span>}
           </div>
-          {hasChildren && renderTreeNodes(node.children ?? [], level + 1)}
+          {hasChildren &&
+            isExpanded &&
+            renderTreeNodes(node.children ?? [], level + 1, currentPath)}
         </div>
       );
     });
   };
 
+  // logic nút submit
   const handleSave = () => {
     if (!formData.name.trim()) return;
     onSave(formData);
   };
 
+  // kiểm tra điều kiện để tắt hoặc kích hoạt nút submit
   const isFormValid = formData.name.trim().length > 0;
 
   return (
     <>
+      {/* tạo overlay và phần nội dung chính của ngăn kéo */}
       <div className="cd-overlay" onClick={onClose}></div>
       <div className="cd-drawer">
         <div className="cd-header">
@@ -156,24 +239,39 @@ export default function CategoryDrawer({
                 <span
                   className={formData.parentId ? "" : "cd-tree-placeholder"}
                 >
-                  {selectedParentNode
-                    ? selectedParentNode.name
-                    : "None (Root Category)"}
+                  {/* gọi hàm để hiển thị chuỗi đường dẫn đầy đủ */}
+                  {getCategoryPath(formData.parentId)}
                 </span>
                 <FilterIcon />
               </div>
 
               {isTreeOpen && (
                 <div className="cd-tree-dropdown">
+                  <div className="cd-tree-header-text">
+                    Select parent category
+                  </div>
                   <div
                     className={`cd-tree-node ${formData.parentId === null ? "selected" : ""}`}
+                    /* bỏ thụt lề cho mục không chọn danh mục cha để thẳng hàng với các mục cấp gốc khác */
+                    style={{ paddingLeft: "8px" }}
                     onClick={() => {
                       setFormData({ ...formData, parentId: null });
                       setIsTreeOpen(false);
                     }}
                   >
-                    <div className="cd-tree-toggle"></div>
-                    <span>None (Root Category)</span>
+                    {/* loại bỏ thẻ bao bọc dư thừa và chỉ giữ lại icon folder để tránh bị đẩy lùi vào trong */}
+                    <div
+                      className="cd-folder-icon"
+                      style={{ marginRight: "8px" }}
+                    >
+                      <FolderIcon />
+                    </div>
+
+                    <span className="cd-tree-path">None (Root Category)</span>
+
+                    {formData.parentId === null && (
+                      <span className="cd-check-icon">✓</span>
+                    )}
                   </div>
                   {renderTreeNodes(categories)}
                 </div>

@@ -24,11 +24,11 @@ export default function CategoryManagement({
   onDeleteClick,
   onMoveCategory,
 }: CategoryManagementProps) {
-  // Quản lý ID của dòng đang được mở menu hành động (dấu 3 chấm)
+  // Quản lý ID của danh mục đang mở menu
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
-  // Sử dụng hook dùng chung để tự động đóng menu khi click ra ngoài bảng
+  // Gọi hook
   useClickOutside(tableRef, () => setOpenDropdownId(null));
 
   const handleToggleDropdown = (id: string) => {

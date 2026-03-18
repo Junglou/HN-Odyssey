@@ -35,8 +35,8 @@ export default function CategoryTableRow({
   onMoveCategory,
 }: CategoryTableRowProps) {
   const [isDragOver, setIsDragOver] = useState(false);
-  // hàm sự kiện kéo thả (Drag & Drop HTML5)
-  const handleDragStart = (e: React.DragEvent<HTMLTableRowElement>) => {
+  // hàm sự kiện kéo thả
+  const handleDragStart = (e: React.DragEvent<HTMLSpanElement>) => {
     e.dataTransfer.setData("text/plain", node.id);
   };
 
@@ -54,19 +54,19 @@ export default function CategoryTableRow({
     setIsDragOver(false);
 
     const draggedId = e.dataTransfer.getData("text/plain");
-    // Logic: Chỉ thực hiện kéo/thả nếu id kéo khác với id của dòng thả vào
+    // logic chỉ thực hiện kéo thả nếu id kéo khác với id của dòng thả vào
     if (draggedId && draggedId !== node.id) {
       onMoveCategory(draggedId, node.id);
     }
   };
 
-  // Hàm thu/mở danh mục
+  // hàm thu mở danh mục
   const handleExpandClick = () => {
     onToggleExpand(node.id);
   };
 
   const handleActionClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Ngăn click lan ra ngoài làm đóng menu
+    e.stopPropagation(); // ngăn click lan ra ngoài làm đóng menu
     onToggleDropdown(node.id);
   };
 
@@ -78,16 +78,14 @@ export default function CategoryTableRow({
     onDeleteClick(node.id);
   };
 
-  // class CSS
+  // class css
   const rowClassName = `cm-row ${isDragOver ? "drag-over" : ""}`;
   const toggleClassName = `cm-toggle-btn ${node.isExpanded ? "expanded" : "collapsed"}`;
   const actionBtnClassName = `cm-action-btn ${isDropdownOpen ? "active" : ""}`;
 
   return (
     <tr
-      draggable
       className={rowClassName}
-      onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -97,7 +95,11 @@ export default function CategoryTableRow({
           className="cm-td-name-wrapper"
           style={{ "--depth": node.depth } as React.CSSProperties}
         >
-          <span className="cm-drag-icon">
+          <span
+            className="cm-drag-icon"
+            draggable
+            onDragStart={handleDragStart}
+          >
             <DragHandleIcon />
           </span>
 
@@ -134,6 +136,8 @@ export default function CategoryTableRow({
             type="button"
             className={actionBtnClassName}
             onClick={handleActionClick}
+            aria-haspopup="menu"
+            aria-expanded={isDropdownOpen}
           >
             <DotsIcon />
           </button>
@@ -141,11 +145,13 @@ export default function CategoryTableRow({
           {isDropdownOpen && (
             <div
               className="cm-dropdown-menu"
+              role="menu"
               onClick={(e) => e.stopPropagation()}
             >
               <button
                 type="button"
                 className="cm-dropdown-item"
+                role="menuitem"
                 onClick={handleEdit}
               >
                 Edit Category
@@ -153,6 +159,7 @@ export default function CategoryTableRow({
               <button
                 type="button"
                 className="cm-dropdown-item cm-item-delete"
+                role="menuitem"
                 onClick={handleDelete}
               >
                 Delete
