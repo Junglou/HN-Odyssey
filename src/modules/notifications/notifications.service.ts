@@ -14,6 +14,9 @@ import { Order } from 'src/modules/sales/orders/schemas/order.schema';
 
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
+import { AuditLogsService } from '../system/audit-logs/audit-logs.service';
+import { Department } from 'src/common/enums/department.enum';
+import { Resource } from 'src/common/enums/resource.enum';
 
 interface CreateNotificationData {
   recipient_role: string;
@@ -46,6 +49,7 @@ export class NotificationsService {
     private readonly model: Model<NotificationLog>,
     private readonly gateway: NotificationsGateway,
     private readonly emailService: EmailService,
+    private readonly auditLogsService: AuditLogsService,
     @InjectRedis() private readonly redis: Redis,
   ) {
     this.initOrderBatching();
@@ -137,7 +141,35 @@ export class NotificationsService {
       const log = await new this.model({ ...data, is_read: false }).save();
       const logData = log.toObject() as unknown as INotificationLogLean;
 
-      // 2. Xác định các Room cần gửi Socket (Tránh gửi lặp)
+      // CẬP NHẬT: Gộp Audit Log (Xử lý lỗi ghi log 2 lần)
+      const auditedTypes = [
+        NotificationType.SYSTEM,
+        NotificationType.SECURITY,
+        NotificationType.ORDER,
+      ];
+
+      if (auditedTypes.includes(data.type)) {
+        await this.auditLogsService.log({
+          action: `${data.type}_NOTIFICATION_SENT`,
+          collection_name: Resource.NOTIFICATIONS,
+          target_id: log._id,
+          // Phân luồng Department chuẩn xác cho từng loại tin
+          department:
+            data.type === NotificationType.ORDER
+              ? Department.SALES
+              : Department.MANAGEMENT,
+          detail: {
+            title: data.title,
+            priority: data.priority,
+            recipient_role: data.recipient_role,
+            order_code: data.metadata?.order_code, // Luôn ưu tiên lưu mã đơn nếu có
+            metadata: data.metadata,
+          },
+          is_success: true,
+        });
+      }
+
+      // 2. Xác định các Room cần gửi Socket (Payload giữ nguyên như bạn đã viết)
       const warehouseId = data.warehouse_id ? String(data.warehouse_id) : '';
       const payload = {
         id: logData._id.toString(),
@@ -151,17 +183,19 @@ export class NotificationsService {
           : new Date().toISOString(),
       };
 
-      // Gửi cho nhân viên theo từng kho cụ thể (Phân tuyến)
+      // Gửi Socket (Logic Rooms giữ nguyên là rất tốt)
       if (warehouseId) {
-        const areaRoom = `role_${data.recipient_role}_area_${warehouseId}`;
-        this.gateway.sendToRoom(areaRoom, 'new_notification', payload);
+        this.gateway.sendToRoom(
+          `role_${data.recipient_role}_area_${warehouseId}`,
+          'new_notification',
+          payload,
+        );
       }
-
-      // Gửi cho Role tổng (Super Admin thường lắng nghe Room này)
-      const roleRoom = `role_${data.recipient_role}`;
-      this.gateway.sendToRoom(roleRoom, 'new_notification', payload);
-
-      // Gửi riêng cho cá nhân nếu có recipient_id
+      this.gateway.sendToRoom(
+        `role_${data.recipient_role}`,
+        'new_notification',
+        payload,
+      );
       if (data.recipient_id) {
         this.gateway.sendToRoom(
           `user_${String(data.recipient_id)}`,
@@ -172,10 +206,7 @@ export class NotificationsService {
 
       return log;
     } catch (error) {
-      this.logger.error(
-        'Critical failure in createAndSend',
-        error instanceof Error ? error.message : 'Unknown error',
-      );
+      this.logger.error('Critical failure in createAndSend', error);
     }
   }
 
@@ -194,7 +225,12 @@ export class NotificationsService {
     return updated;
   }
 
-  async markAllAsRead(userId: string, roles: string[]) {
+  async markAllAsRead(
+    userId: string,
+    roles: string[],
+    ip?: string,
+    userAgent?: string,
+  ) {
     const result = await this.model
       .updateMany(
         {
@@ -211,6 +247,16 @@ export class NotificationsService {
     if (result.modifiedCount > 0) {
       this.gateway.sendToRoom(`user_${userId}`, 'all_notifications_read', {
         success: true,
+      });
+
+      await this.auditLogsService.log({
+        action: 'MARK_ALL_NOTIFICATIONS_READ',
+        collection_name: Resource.NOTIFICATIONS,
+        actor_id: userId,
+        department: Department.MANAGEMENT,
+        detail: { count: result.modifiedCount },
+        ip,
+        user_agent: userAgent,
       });
     }
     return result;
@@ -271,6 +317,16 @@ export class NotificationsService {
       .exec();
 
     if (result.modifiedCount > 0) {
+      await this.auditLogsService.log({
+        action: 'STOCK_ALERT_RESOLVED',
+        collection_name: Resource.INVENTORY,
+        department: Department.WAREHOUSE,
+        detail: {
+          sku,
+          message:
+            'Tồn kho đã trở lại mức an toàn, hệ thống tự động đóng cảnh báo.',
+        },
+      });
       // FIX: Gửi cho cả ADMIN và MANAGER để ai cũng thấy
       const targetRoles = [
         'SUPER_ADMIN',
@@ -278,7 +334,7 @@ export class NotificationsService {
         'WAREHOUSE_STAFF',
       ];
       const payload = {
-        title: '✅ Đã xử lý: Tồn kho ổn định',
+        title: 'Đã xử lý: Tồn kho ổn định',
         message: `Sản phẩm ${sku} đã được nhập thêm hàng, cảnh báo đã tự động đóng.`,
         type: NotificationType.STOCK,
         priority: NotificationPriority.LOW,
@@ -315,7 +371,18 @@ export class NotificationsService {
       .exec();
 
     if (result.modifiedCount > 0) {
-      // Bắn socket thông báo đã xử lý sự cố hệ thống/bảo mật
+      // Ghi Audit Log hành động khắc phục tự động
+      await this.auditLogsService.log({
+        action: 'SYSTEM_INCIDENT_RESOLVED',
+        collection_name: Resource.SYSTEM,
+        department: Department.MANAGEMENT,
+        detail: {
+          type,
+          [metadataKey]: metadataValue,
+          message: 'Sự cố đã được xử lý và đóng cảnh báo tự động.',
+        },
+      });
+
       this.gateway.sendToRoom('role_SUPER_ADMIN', 'notification_resolved', {
         type,
         [metadataKey]: metadataValue,
@@ -323,7 +390,6 @@ export class NotificationsService {
     }
 
     if (type === NotificationType.SYSTEM) {
-      // FIX BUG REDIS: Phải có tiền tố SPAM_SYS_
       await this.redis.del(`SPAM_SYS_${metadataValue}`);
     }
   }
@@ -430,6 +496,19 @@ export class NotificationsService {
       recipient_role: 'SUPER_ADMIN',
       is_read: false,
     }).save();
+
+    if (data.type === NotificationType.STOCK) {
+      await this.auditLogsService.log({
+        action: 'STOCK_ALERT_SENT',
+        collection_name: Resource.INVENTORY,
+        target_id: log._id,
+        department: Department.WAREHOUSE,
+        detail: {
+          sku: typeof data.metadata?.sku === 'string' ? data.metadata.sku : '',
+          message: data.message,
+        },
+      });
+    }
 
     // 3. Ép kiểu an toàn để lấy Object từ Mongoose mà không bị lỗi unsafe-assignment
     const logData = log.toObject() as unknown as INotificationLogLean;

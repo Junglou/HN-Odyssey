@@ -14,6 +14,9 @@ import { Request } from 'express';
 import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
 import * as geoip from 'geoip-lite';
 import { ConfigService } from '@nestjs/config';
+import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
+import { Resource } from '../enums/resource.enum';
+import { Department } from '../enums/department.enum';
 
 interface RequestUser {
   userId: string;
@@ -48,6 +51,7 @@ export class SecurityMonitorInterceptor implements NestInterceptor {
     @InjectRedis() private readonly redis: Redis,
     private readonly eventEmitter: EventEmitter2,
     private readonly configService: ConfigService,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -131,6 +135,23 @@ export class SecurityMonitorInterceptor implements NestInterceptor {
               user_id: user.userId,
               ip: ip,
             });
+
+            await this.auditLogsService.log({
+              action: 'IMPOSSIBLE_TRAVEL_DETECTED',
+              collection_name: Resource.SYSTEM, // Thuộc về an ninh hệ thống
+              actor_id: user.userId,
+              department: Department.MANAGEMENT,
+              detail: {
+                old_ip: lastData.lastIp,
+                new_ip: ip,
+                distance_km: distance.toFixed(1),
+                time_diff_h: timeDiffHours.toFixed(2),
+                city: geoNew.city,
+              },
+              ip,
+              user_agent: userAgent,
+              is_success: false, // Đánh dấu là một vụ việc cần chú ý
+            });
           }
         }
 
@@ -141,6 +162,16 @@ export class SecurityMonitorInterceptor implements NestInterceptor {
             message: `Đăng nhập lạ từ thiết bị hoặc IP mới: ${ip}`,
             user_id: user.userId,
             ip: ip,
+          });
+
+          await this.auditLogsService.log({
+            action: 'NEW_DEVICE_LOGIN',
+            collection_name: Resource.SYSTEM,
+            actor_id: user.userId,
+            department: Department.MANAGEMENT,
+            detail: { ip, user_agent: userAgent, previous_ip: lastData.lastIp },
+            ip,
+            user_agent: userAgent,
           });
         }
       }

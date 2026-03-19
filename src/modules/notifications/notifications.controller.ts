@@ -5,23 +5,19 @@ import {
   Param,
   UseGuards,
   Req,
-  Post,
-  Body,
   Query,
 } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { Role } from 'src/common/enums/role.enum';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+import { Action, Resource } from 'src/common/enums/resource.enum';
 import { BaseResponse } from 'src/common/dtos/base-response.dto';
+import type { Request } from 'express';
 
 interface NotificationTrend {
-  _id: {
-    day: string;
-    type: string;
-  };
+  _id: { day: string; type: string };
   count: number;
 }
 
@@ -31,23 +27,20 @@ interface RequestUser {
   roles: string[];
 }
 
-// Định nghĩa Interface để dùng chung cho Req
 interface RequestWithUser extends Request {
   user: RequestUser;
 }
 
 @Controller('notifications')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class NotificationsController {
-  constructor(
-    private readonly service: NotificationsService,
-    private readonly eventEmitter: EventEmitter2,
-  ) {}
+  constructor(private readonly service: NotificationsService) {}
 
-  // AC11: Lấy danh sách thông báo khi reconnect
+  // AC11: Lấy danh sách thông báo cá nhân/theo role (Cơ chế Offline Queue)
   @Get('my-notifications')
+  @RequirePermissions(Resource.NOTIFICATIONS, Action.READ)
   async getMyNotifications(
-    @Req() req: RequestWithUser, // 2. Thay any bằng RequestWithUser để fix lỗi unsafe member
+    @Req() req: RequestWithUser,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
   ) {
@@ -62,10 +55,8 @@ export class NotificationsController {
 
   // AC7: Đánh dấu đã đọc & AC12: Đồng bộ thiết bị
   @Patch(':id/read')
-  async markAsRead(
-    @Param('id') id: string,
-    @Req() req: RequestWithUser, // 3. Fix unsafe member .user
-  ) {
+  @RequirePermissions(Resource.NOTIFICATIONS, Action.UPDATE)
+  async markAsRead(@Param('id') id: string, @Req() req: RequestWithUser) {
     const result = await this.service.markAsRead(id, req.user.userId);
     if (!result) return new BaseResponse(false, 'Không tìm thấy thông báo');
     return new BaseResponse(true, 'Đã đánh dấu đã đọc', result);
@@ -73,25 +64,22 @@ export class NotificationsController {
 
   // AC7: Đánh dấu đã đọc tất cả
   @Patch('read-all')
+  @RequirePermissions(Resource.NOTIFICATIONS, Action.UPDATE)
   async markAllAsRead(@Req() req: RequestWithUser) {
+    const ip = req.ip;
+    const userAgent = req.headers['user-agent'];
     const result = await this.service.markAllAsRead(
       req.user.userId,
       req.user.roles,
+      ip,
+      userAgent,
     );
     return new BaseResponse(true, 'Đã đánh dấu đọc tất cả', result);
   }
 
-  @Post('test-fire')
-  testFireEvent() {
-    this.eventEmitter.emit(NOTIFY_EVENTS.SECURITY_ALERT, {
-      severity: 'HIGH',
-      message: 'Có người đang cố đăng nhập trái phép vào tài khoản của bạn!',
-    });
-    return { message: 'Đã bắn sự kiện test!' };
-  }
-
-  // Lấy số lượng chưa đọc cho Badge (AC2 - US.18)
+  // Lấy số lượng chưa đọc cho Badge (AC2)
   @Get('unread-count')
+  @RequirePermissions(Resource.NOTIFICATIONS, Action.READ)
   async getUnreadCount(@Req() req: RequestWithUser) {
     const count = await this.service.getUnreadCount(
       req.user.userId,
@@ -104,7 +92,7 @@ export class NotificationsController {
 
   // Lấy dữ liệu biểu đồ cho Dashboard (AC12 - US.19)
   @Get('stats/trend')
-  @Roles(Role.SUPER_ADMIN, Role.WAREHOUSE_MANAGER)
+  @RequirePermissions(Resource.NOTIFICATIONS, Action.READ)
   async getTrend(): Promise<BaseResponse<NotificationTrend[]>> {
     const data = await this.service.get7DayTrend();
     return new BaseResponse(

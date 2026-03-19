@@ -1,3 +1,5 @@
+// src/modules/inventory/stock/stock.controller.ts
+
 import {
   Body,
   Controller,
@@ -7,75 +9,94 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { Request } from 'express';
+import type { Request } from 'express';
 import { StockService } from './stock.service';
-import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { GetStockDto } from './dto/get-stock.dto';
 import { ManualAdjustDto } from './dto/manual-adjust.dto';
 import { AcceptOrderDto } from './dto/accept-order.dto';
-import { Public } from 'src/common/decorators/public.decorator';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
-import { ReportIssueDto } from './dto/report-issue.dto';
 import { UpdateThresholdsDto } from './dto/update-thresholds.dto';
+import { ReportIssueDto } from './dto/report-issue.dto';
+import { AdjustStockDto } from './dto/adjust-stock.dto';
+
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+import { Action, Resource } from 'src/common/enums/resource.enum';
+import { Public } from 'src/common/decorators/public.decorator';
+import { BaseResponse } from 'src/common/dtos/base-response.dto';
+
+interface RequestUser {
+  email: string;
+  roles: string[];
+  userId: string;
+}
 
 interface RequestWithUser extends Request {
-  user?: {
-    id: string;
-    [key: string]: unknown;
-  };
+  user: RequestUser;
 }
 
 @Controller('inventory/stock')
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class StockController {
   constructor(private readonly stockService: StockService) {}
 
-  // [US1] Lấy danh sách tồn kho
-  @UseGuards(JwtAuthGuard)
+  // [US1] Lấy danh sách tồn kho (AC1)
   @Get()
+  @RequirePermissions(Resource.INVENTORY, Action.READ)
   async getStockList(@Query() query: GetStockDto) {
-    return this.stockService.getStockList(query);
+    const data = await this.stockService.getStockList(query);
+    return new BaseResponse(true, 'Lấy danh sách tồn kho thành công', data);
   }
 
-  // [US2] Điều chỉnh thủ công
-  @UseGuards(JwtAuthGuard)
+  // [US2] Điều chỉnh thủ công (AC1, AC2, AC5)
   @Post('adjust-manual')
+  @RequirePermissions(Resource.INVENTORY, Action.UPDATE)
   async manualAdjust(
     @Body() dto: ManualAdjustDto,
     @Req() req: RequestWithUser,
   ) {
-    // FIX: TypeScript giờ đã hiểu req có thể chứa user và id là string
-    // Thêm fallback 'SYSTEM' để đề phòng trường hợp không lấy được ID
-    const userId = req.user?.id || 'SYSTEM';
-    return this.stockService.manualAdjust(dto, userId);
+    const userId = req.user?.userId || 'SYSTEM';
+    const ip = req.ip;
+    const userAgent = req.headers['user-agent'];
+
+    return this.stockService.manualAdjust(dto, userId, ip, userAgent);
   }
 
-  // [US4] Tiếp nhận đơn hàng
-  @UseGuards(JwtAuthGuard)
+  // [US4] Tiếp nhận đơn hàng (AC1, AC6, AC8)
   @Post('accept-orders')
+  @RequirePermissions(Resource.TRANSFERS, Action.APPROVE)
   async acceptOrders(@Body() dto: AcceptOrderDto, @Req() req: RequestWithUser) {
-    const userId = req.user?.id || 'SYSTEM';
-    return this.stockService.acceptOrders(dto, userId);
+    const userId = req.user?.userId || 'SYSTEM';
+    const ip = req.ip;
+    const userAgent = req.headers['user-agent'];
+
+    return this.stockService.acceptOrders(dto, userId, ip, userAgent);
   }
 
   // [US3 - AC4] Thiết lập ngưỡng tồn kho Min/Max
-  @UseGuards(JwtAuthGuard)
   @Post('thresholds')
-  async updateThresholds(@Body() dto: UpdateThresholdsDto) {
-    return this.stockService.updateThresholds(dto);
+  @RequirePermissions(Resource.INVENTORY, Action.UPDATE)
+  async updateThresholds(
+    @Body() dto: UpdateThresholdsDto,
+    @Req() req: RequestWithUser,
+  ) {
+    const userId = req.user?.userId || 'SYSTEM';
+    return this.stockService.updateThresholds(dto, userId);
   }
 
-  // [US4 - AC2] Báo cáo vấn đề đơn hàng (Tạm giữ/Phản hồi)
-  @UseGuards(JwtAuthGuard)
+  // [US4 - AC2] Báo cáo vấn đề đơn hàng
   @Post('report-issue')
+  @RequirePermissions(Resource.TRANSFERS, Action.CANCEL)
   async reportOrderIssue(
     @Body() dto: ReportIssueDto,
     @Req() req: RequestWithUser,
   ) {
-    const userId = req.user?.id || 'SYSTEM';
+    const userId = req.user?.userId || 'SYSTEM';
     return this.stockService.reportOrderIssue(dto, userId);
   }
 
-  // CÁC API HỆ THỐNG NỘI BỘ cua module khác
+  // API NỘI BỘ HỆ THỐNG
   @Public()
   @Post('hold')
   async holdStock(@Body() dto: AdjustStockDto) {

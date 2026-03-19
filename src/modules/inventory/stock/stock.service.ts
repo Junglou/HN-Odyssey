@@ -32,6 +32,9 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ReportIssueDto } from './dto/report-issue.dto';
 import { UpdateThresholdsDto } from './dto/update-thresholds.dto';
 import { StockGateway } from './stock.gateway';
+import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
+import { Resource } from 'src/common/enums/resource.enum';
+import { Department } from 'src/common/enums/department.enum';
 
 interface VariantStockInfo {
   sku: string;
@@ -65,6 +68,7 @@ export class StockService {
     private transactionModel: Model<StockTransactionDocument>,
     private readonly eventEmitter: EventEmitter2,
     private readonly stockGateway: StockGateway,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   // [US1] HIỂN THỊ DANH SÁCH TỒN KHO
@@ -162,49 +166,47 @@ export class StockService {
   }
 
   // [US2] ĐIỀU CHỈNH TỒN KHO THỦ CÔNG
-  async manualAdjust(dto: ManualAdjustDto, actorId: string) {
+  async manualAdjust(
+    dto: ManualAdjustDto,
+    actorId: string,
+    ip?: string,
+    userAgent?: string,
+  ) {
     const { product_id, sku, adjustment_value, reason } = dto;
-
-    if (!reason || reason.trim() === '') {
-      throw new BadRequestException('Bắt buộc phải nhập lý do điều chỉnh.');
-    }
 
     const product = await this.productModel.findById(product_id);
     if (!product) throw new BadRequestException('Sản phẩm không tồn tại');
 
     let oldStock = 0;
-    let newStock = 0;
-    let updateQuery: UpdateQuery<ProductDocument> = {};
-    const filter: FilterQuery<ProductDocument> = {
-      _id: new Types.ObjectId(product_id),
-    };
-
     if (product.has_variants) {
       const variant = product.variants.find((v) => v.sku === sku);
       if (!variant)
         throw new BadRequestException(`Không tìm thấy biến thể ${sku}`);
-
       oldStock = variant.stock;
-      newStock = oldStock + adjustment_value;
-
-      if (newStock < 0)
-        throw new BadRequestException('Tồn kho không được phép âm.');
-
-      filter['variants.sku'] = sku;
-      updateQuery = {
-        $inc: {
-          'variants.$.stock': adjustment_value,
-          stock: adjustment_value,
-        },
-      };
     } else {
       oldStock = product.stock;
-      newStock = oldStock + adjustment_value;
+    }
 
-      if (newStock < 0)
-        throw new BadRequestException('Tồn kho không được phép âm.');
+    const newStock = oldStock + adjustment_value;
+    // AC7: Ngăn chặn lưu tồn kho về số âm
+    if (newStock < 0)
+      throw new BadRequestException(
+        'Tồn kho cuối cùng không được phép nhỏ hơn 0 (AC7).',
+      );
 
-      updateQuery = { $inc: { stock: adjustment_value } };
+    // Thực hiện update
+    const filter: FilterQuery<ProductDocument> = {
+      _id: new Types.ObjectId(product_id),
+    };
+    const updateQuery: UpdateQuery<ProductDocument> = {};
+    if (product.has_variants) {
+      filter['variants.sku'] = sku;
+      updateQuery.$inc = {
+        'variants.$.stock': adjustment_value,
+        stock: adjustment_value,
+      };
+    } else {
+      updateQuery.$inc = { stock: adjustment_value };
     }
 
     const updatedProduct = await this.productModel.findOneAndUpdate(
@@ -212,19 +214,31 @@ export class StockService {
       updateQuery,
       { new: true },
     );
+    if (!updatedProduct)
+      throw new BadRequestException('Không thể cập nhật tồn kho.');
 
-    if (!updatedProduct) {
-      throw new BadRequestException(
-        'Lỗi hệ thống: Không thể cập nhật tồn kho lúc này.',
-      );
-    }
+    // AC5: Ghi Audit Log chi tiết (Audit Trail)
+    await this.auditLogsService.log({
+      action: 'MANUAL_ADJUST_STOCK',
+      collection_name: Resource.INVENTORY,
+      actor_id: actorId,
+      target_id: product._id.toString(),
+      department: Department.WAREHOUSE,
+      detail: {
+        sku: sku || product.sku,
+        old_value: oldStock,
+        new_value: newStock,
+        adjustment: adjustment_value,
+        reason: reason, // AC3: Lý do bắt buộc
+      },
+      ip,
+      user_agent: userAgent,
+    });
 
-    this.stockGateway.emitStockUpdate(
-      updatedProduct._id.toString(),
-      sku || updatedProduct.sku,
-      newStock,
-    );
+    // Real-time update (AC2)
+    this.stockGateway.emitStockUpdate(product_id, sku, newStock);
 
+    // Ghi StockTransaction để tra cứu nội bộ module
     await this.transactionModel.create({
       product_id: product._id,
       sku: sku || product.sku,
@@ -233,9 +247,10 @@ export class StockService {
       new_value: newStock,
       changed_value: adjustment_value,
       reason,
-      actor_id: isValidObjectId(actorId) ? new Types.ObjectId(actorId) : null,
+      actor_id: new Types.ObjectId(actorId),
     });
 
+    // AC4: Kiểm tra ngưỡng cảnh báo
     await this.triggerStockAlert(updatedProduct, sku);
 
     return {
@@ -246,7 +261,12 @@ export class StockService {
   }
 
   // [US4] TIẾP NHẬN ĐƠN HÀNG
-  async acceptOrders(dto: AcceptOrderDto, actorId: string) {
+  async acceptOrders(
+    dto: AcceptOrderDto,
+    actorId: string,
+    ip?: string,
+    userAgent?: string,
+  ) {
     const { order_ids } = dto;
     const results = {
       success: 0,
@@ -349,6 +369,20 @@ export class StockService {
           note: 'Đã tiếp nhận đơn hàng',
         });
         await order.save();
+
+        await this.auditLogsService.log({
+          action: 'ACCEPT_ORDER',
+          collection_name: Resource.TRANSFERS,
+          actor_id: actorId,
+          target_id: order._id.toString(),
+          department: Department.WAREHOUSE,
+          detail: {
+            order_code: String(order.order_code),
+            message: `Tiếp nhận đơn hàng thành công. Trạng thái -> PROCESSING`,
+          },
+          ip,
+          user_agent: userAgent,
+        });
 
         results.success++;
       } catch (error: unknown) {
@@ -619,16 +653,16 @@ export class StockService {
   }
 
   // [US3 - AC4] THIẾT LẬP NGƯỠNG TỒN KHO
-  async updateThresholds(dto: UpdateThresholdsDto) {
+  async updateThresholds(dto: UpdateThresholdsDto, actorId: string) {
     const { product_id, sku, min_stock, max_stock } = dto;
+
+    const product = await this.productModel.findById(product_id);
+    if (!product) throw new BadRequestException('Sản phẩm không tồn tại');
 
     const filter: FilterQuery<ProductDocument> = {
       _id: new Types.ObjectId(product_id),
     };
     let update: UpdateQuery<ProductDocument> = {};
-
-    const product = await this.productModel.findById(product_id);
-    if (!product) throw new BadRequestException('Sản phẩm không tồn tại');
 
     if (product.has_variants && sku) {
       filter['variants.sku'] = sku;
@@ -647,12 +681,29 @@ export class StockService {
     const updatedProduct = await this.productModel.findOneAndUpdate(
       filter,
       update,
-      {
-        new: true,
-      },
+      { new: true },
     );
 
-    // Áp dụng ngay lập tức để kiểm tra trạng thái và tắt/mở cảnh báo
+    if (!updatedProduct)
+      throw new BadRequestException('Không thể cập nhật ngưỡng tồn kho.');
+
+    // Ghi Audit Log cho hành động thay đổi cấu hình kho (Rất quan trọng để đối soát)
+    await this.auditLogsService.log({
+      action: 'UPDATE_STOCK_THRESHOLDS',
+      collection_name: Resource.INVENTORY,
+      actor_id: actorId,
+      target_id: product._id,
+      department: Department.WAREHOUSE,
+      detail: {
+        sku: sku || product.sku,
+        new_min: min_stock,
+        new_max: max_stock,
+        message: `Thay đổi ngưỡng cảnh báo tồn kho cho ${sku || product.name}`,
+      },
+      is_success: true,
+    });
+
+    // Áp dụng ngay lập tức để kiểm tra trạng thái và tắt/mở cảnh báo (Real-time AC7, AC8)
     await this.triggerStockAlert(updatedProduct, sku || product.sku);
 
     return { success: true, message: 'Đã cập nhật ngưỡng cảnh báo tồn kho' };
@@ -676,10 +727,25 @@ export class StockService {
 
     await order.save();
 
+    // BỔ SUNG AUDIT LOG THEO AC6
+    await this.auditLogsService.log({
+      action: 'REPORT_ORDER_ISSUE',
+      collection_name: Resource.TRANSFERS,
+      actor_id: actorId,
+      target_id: order._id,
+      department: Department.WAREHOUSE,
+      detail: {
+        order_code: String(order.order_code),
+        reason: reason,
+        message: `Đơn hàng bị tạm giữ để xử lý vấn đề.`,
+      },
+      is_success: true,
+    });
+
     // Gửi Event cảnh báo cho bộ phận CSKH (Sales/Support)
     this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
-      error_code: `ORDER_HOLD_${order.order_code}`,
-      message: `Đơn hàng #${order.order_code} bị tạm giữ bởi kho. Lý do: ${reason}`,
+      error_code: `ORDER_HOLD_${String(order.order_code)}`,
+      message: `Đơn hàng #${String(order.order_code)} bị tạm giữ bởi kho. Lý do: ${reason}`,
       severity: 'HIGH',
     });
 
