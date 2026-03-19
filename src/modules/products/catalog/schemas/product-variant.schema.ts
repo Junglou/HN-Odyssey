@@ -39,6 +39,12 @@ export class ProductVariant {
   // AC6: Trạng thái riêng (Ví dụ: Size S ngừng kinh doanh)
   @Prop({ default: true })
   active: boolean;
+
+  @Prop({ type: Number, default: 0 })
+  min_stock: number;
+
+  @Prop({ type: Number, default: 0 })
+  max_stock: number;
 }
 
 export const ProductVariantSchema =

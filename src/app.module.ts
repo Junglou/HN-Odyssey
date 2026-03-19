@@ -28,6 +28,7 @@ import { PaymentMonitorInterceptor } from './common/interceptors/payment-monitor
 import { SecurityMonitorInterceptor } from './common/interceptors/security-monitor.interceptor';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { UebaMonitorInterceptor } from './common/interceptors/ueba-monitor.interceptor';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { UebaMonitorInterceptor } from './common/interceptors/ueba-monitor.inter
     SearchModule,
     MarketingModule,
     NotificationsModule,
+    ReportsModule,
     EventEmitterModule.forRoot(),
   ],
   controllers: [AppController],
