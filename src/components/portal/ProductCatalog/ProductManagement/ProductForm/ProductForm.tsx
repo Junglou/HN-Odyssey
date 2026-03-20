@@ -1,75 +1,51 @@
 import { useState, useEffect, useRef } from "react";
 import "./ProductForm.css";
 import TagModal from "../ProductManagementModal/TagModal";
-import VariantModal, {
-  type VariantAttribute,
-} from "../ProductManagementModal/VariantModal";
+import VariantModal from "../ProductManagementModal/VariantModal";
 import SetPriceModal from "../ProductManagementModal/SetPriceModal";
 import { ChevronDownIcon } from "../../../../../assets/icons/HeaderIcons";
 import { EditPenIcon } from "../../../../../assets/icons/ProductManagementIcons";
 
-export interface ProductData {
-  sku: string;
-  name: string;
-  status: "Active" | "Inactive" | "Draft";
-  description: string;
-  categoryId: string;
-}
+// import
+import {
+  type ProductData,
+  type PricingItem,
+  type CategoryNode,
+  type VariantAttribute,
+  AVAILABLE_TAGS,
+  MOCK_AVAILABLE_ATTRIBUTES,
+  MOCK_CATEGORIES,
+} from "../../../../../hooks/portal/ProductCatalog/ProductManagement/useProductForm";
 
-export interface PricingItem {
-  id: string;
-  variantName: string;
-  price: number;
-  status: "draft" | "pending" | "approved" | "rejected";
-}
-
-export interface CategoryNode {
-  id: string;
-  name: string;
-  children?: CategoryNode[];
-}
-
+// interface props
 interface ProductFormProps {
   mode: "add" | "edit" | "view";
-  initialData: ProductData;
+  formData: ProductData;
   pricingList: PricingItem[];
-  initialTags: string[];
-  // giả lập admin
+  tags: string[];
+  productVariants: VariantAttribute[];
+  categoryError: string;
   userRole?: "admin" | "employee";
-  onCancel: () => void;
-  onSave: (data: ProductData, tags: string[], pricing: PricingItem[]) => void;
+  actions: {
+    changeInput: (name: keyof ProductData, value: string) => void;
+    changeCategory: (categoryId: string) => void;
+    updateTags: (newTags: string[]) => void;
+    removeTag: (tagToRemove: string) => void;
+    confirmVariant: (
+      updatedAttributes: VariantAttribute[],
+      editingVariantId?: string,
+    ) => void;
+    savePrice: (priceId: string, newPrice: number) => void;
+    submitSinglePrice: (id: string) => void;
+    approveSinglePrice: (id: string) => void;
+    rejectSinglePrice: (id: string) => void;
+    viewApproval: () => void;
+    saveProduct: () => boolean;
+    cancel: () => void;
+  };
 }
 
-const AVAILABLE_TAGS = ["New Arrival", "Winter", "Summer", "Sale"];
-
-const MOCK_AVAILABLE_ATTRIBUTES: VariantAttribute[] = [
-  { id: "1", name: "Size", values: ["S", "M", "L", "XL", "XXL", "XXXL"] },
-  {
-    id: "2",
-    name: "Color",
-    values: ["Navy", "Grey", "Olive", "Black", "White"],
-  },
-  {
-    id: "3",
-    name: "Material",
-    values: ["Cotton", "Polyester", "Silk", "Denim"],
-  },
-];
-
-const MOCK_CATEGORIES: CategoryNode[] = [
-  {
-    id: "c1",
-    name: "Women",
-    children: [
-      {
-        id: "c1-1",
-        name: "Outerwear",
-        children: [{ id: "c1-1-1", name: "Jackets" }],
-      },
-    ],
-  },
-];
-
+// hàm tìm đường dẫn danh mục
 const findCategoryPath = (
   nodes: CategoryNode[],
   targetId: string,
@@ -86,23 +62,88 @@ const findCategoryPath = (
   return null;
 };
 
+// component dropdown
+function CustomFormDropdown({
+  value,
+  options,
+  onChange,
+  disabled = false,
+}: {
+  value: string;
+  options: { label: string; value: string }[];
+  onChange: (val: string) => void;
+  disabled?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedLabel =
+    options.find((opt) => opt.value === value)?.label || value;
+
+  return (
+    <div
+      className={`pf-custom-dropdown ${disabled ? "view-mode" : ""}`}
+      ref={dropdownRef}
+    >
+      <div
+        className={`pf-dropdown-trigger ${isOpen ? "active" : ""} ${disabled ? "view-mode" : ""}`}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+      >
+        <span>{selectedLabel}</span>
+        {!disabled && (
+          <span
+            style={{ color: "#6b7280", display: "flex", alignItems: "center" }}
+          >
+            <ChevronDownIcon
+              className={`pf-dropdown-arrow ${isOpen ? "open" : ""}`}
+            />
+          </span>
+        )}
+      </div>
+      {isOpen && !disabled && (
+        <div className="pf-dropdown-menu">
+          {options.map((opt) => (
+            <div
+              key={opt.value}
+              className={`pf-dropdown-item ${value === opt.value ? "selected" : ""}`}
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ProductForm({
   mode,
-  initialData,
+  formData,
   pricingList,
-  initialTags,
-  userRole = "admin", // Mock admin
-  onCancel,
-  onSave,
+  tags,
+  productVariants,
+  categoryError,
+  userRole = "admin",
+  actions,
 }: ProductFormProps) {
-  const [formData, setFormData] = useState<ProductData>(initialData);
-  const [tags, setTags] = useState<string[]>(initialTags);
-  const [localPricing, setLocalPricing] = useState<PricingItem[]>(pricingList);
-  const [productVariants, setProductVariants] = useState<VariantAttribute[]>(
-    [],
-  );
-
-  const [categoryError, setCategoryError] = useState<string>("");
+  // state quản lý cây danh mục
   const [isTreeOpen, setIsTreeOpen] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({
     c1: true,
@@ -122,16 +163,7 @@ export default function ProductForm({
 
   const isViewMode = mode === "view";
 
-  useEffect(() => {
-    setFormData(initialData);
-  }, [initialData]);
-  useEffect(() => {
-    setTags(initialTags);
-  }, [initialTags]);
-  useEffect(() => {
-    setLocalPricing(pricingList);
-  }, [pricingList]);
-
+  // xử lý click ra ngoài để đóng cây danh mục
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (treeRef.current && !treeRef.current.contains(e.target as Node))
@@ -141,114 +173,12 @@ export default function ProductForm({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleInputChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >,
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }) as ProductData);
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    if (isViewMode) return;
-    setTags((prev) => prev.filter((tag) => tag !== tagToRemove));
-  };
-
-  const handleOpenAddVariant = () => {
-    if (isViewMode) return;
-    setEditingVariant(null);
-    setIsVariantModalOpen(true);
-  };
-
-  const handleOpenEditVariant = (attr: VariantAttribute) => {
-    if (isViewMode) return;
-    setEditingVariant(attr);
-    setIsVariantModalOpen(true);
-  };
-
-  const handleConfirmVariant = (updatedAttributes: VariantAttribute[]) => {
-    if (editingVariant) {
-      setProductVariants((prev) =>
-        prev.map((v) =>
-          v.id === updatedAttributes[0]?.id ? updatedAttributes[0] : v,
-        ),
-      );
-    } else {
-      setProductVariants(updatedAttributes);
-    }
-    setIsVariantModalOpen(false);
-  };
-
-  const handleSaveClick = () => {
-    if (!formData.categoryId) {
-      setCategoryError("Vui lòng chọn ít nhất một danh mục cho sản phẩm.");
-      return;
-    }
-    setCategoryError("");
-    onSave(formData, tags, localPricing);
-  };
-
-  // Mở modal SetPrice
-  const handleOpenSetPrice = (item: PricingItem) => {
-    setEditingPriceItem(item);
-    setIsSetPriceModalOpen(true);
-  };
-
-  // Lưu giá mới từ modal và chuyển status về draft (bao gồm cả khi đang rejected)
-  const handleSavePrice = (newPrice: number) => {
-    if (editingPriceItem) {
-      setLocalPricing((prev) =>
-        prev.map((item) =>
-          item.id === editingPriceItem.id
-            ? { ...item, price: newPrice, status: "draft" }
-            : item,
-        ),
-      );
-    }
-    setIsSetPriceModalOpen(false);
-  };
-
-  // Nộp duyệt từng dòng
-  const handleSubmitSinglePrice = (id: string) => {
-    setLocalPricing((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, status: "pending" } : item,
-      ),
-    );
-  };
-
-  // Duyệt dành cho Admin
-  const handleApproveSinglePrice = (id: string) => {
-    setLocalPricing((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, status: "approved" } : item,
-      ),
-    );
-  };
-
-  // Từ chối dành cho Admin
-  const handleRejectSinglePrice = (id: string) => {
-    setLocalPricing((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, status: "rejected" } : item,
-      ),
-    );
-  };
-
-  // Nhân viên ấn xem chi tiết duyệt giá
-  const handleViewApproval = () => {
-    // navigate("/price-management"); // Mở comment này khi có trang Price Management
-    alert("Chức năng Price Management đang phát triển");
-  };
-
-  // kiểm tra trạng thái bảng để render nút và badge
-  // check theo trạng thái "pending" mới
-  const hasPendingApproval = localPricing.some((p) => p.status === "pending");
+  const hasPendingApproval = pricingList.some((p) => p.status === "pending");
   const categoryPath = formData.categoryId
     ? findCategoryPath(MOCK_CATEGORIES, formData.categoryId)?.join(" > ")
     : "";
 
+  // đệ quy render cây danh mục
   const renderTreeNodes = (nodes: CategoryNode[], level: number = 0) => {
     return nodes.map((node) => {
       const isExpanded = expandedNodes[node.id];
@@ -260,8 +190,7 @@ export default function ProductForm({
         if (hasChildren)
           setExpandedNodes((prev) => ({ ...prev, [node.id]: !isExpanded }));
         else {
-          setFormData((prev) => ({ ...prev, categoryId: node.id }));
-          setCategoryError("");
+          actions.changeCategory(node.id);
           setIsTreeOpen(false);
         }
       };
@@ -269,8 +198,7 @@ export default function ProductForm({
       const handleDoubleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (hasChildren) {
-          setFormData((prev) => ({ ...prev, categoryId: node.id }));
-          setCategoryError("");
+          actions.changeCategory(node.id);
           setIsTreeOpen(false);
         }
       };
@@ -329,7 +257,7 @@ export default function ProductForm({
               type="text"
               name="sku"
               value={formData.sku}
-              onChange={handleInputChange}
+              onChange={(e) => actions.changeInput("sku", e.target.value)}
               disabled={isViewMode}
             />
           </div>
@@ -339,30 +267,31 @@ export default function ProductForm({
               type="text"
               name="name"
               value={formData.name}
-              onChange={handleInputChange}
+              onChange={(e) => actions.changeInput("name", e.target.value)}
               disabled={isViewMode}
             />
           </div>
           <div className="pf-input-group">
             <label>Status</label>
-            <select
-              name="status"
+            <CustomFormDropdown
               value={formData.status}
-              onChange={handleInputChange}
+              options={[
+                { label: "Draft", value: "Draft" },
+                { label: "Active", value: "Active" },
+                { label: "Inactive", value: "Inactive" },
+              ]}
+              onChange={(val) => actions.changeInput("status", val)}
               disabled={isViewMode}
-              className="pf-custom-select"
-            >
-              <option value="Draft">Draft</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
+            />
           </div>
           <div className="pf-input-group pf-col-span-full">
             <label>Description</label>
             <textarea
               name="description"
               value={formData.description}
-              onChange={handleInputChange}
+              onChange={(e) =>
+                actions.changeInput("description", e.target.value)
+              }
               rows={3}
               disabled={isViewMode}
             />
@@ -435,7 +364,7 @@ export default function ProductForm({
                 </tr>
               </thead>
               <tbody>
-                {localPricing.map((item) => (
+                {pricingList.map((item) => (
                   <tr key={item.id}>
                     <td>{item.variantName}</td>
                     <td>${item.price.toFixed(2)}</td>
@@ -462,7 +391,11 @@ export default function ProductForm({
                               <button
                                 type="button"
                                 className="pf-btn-action white"
-                                onClick={() => handleOpenSetPrice(item)}
+                                onClick={(e) => {
+                                  setEditingPriceItem(item);
+                                  setIsSetPriceModalOpen(true);
+                                  e.currentTarget.blur();
+                                }}
                               >
                                 <EditPenIcon />
                                 Edit
@@ -471,7 +404,10 @@ export default function ProductForm({
                                 type="button"
                                 className="pf-btn-action blue"
                                 disabled={item.status === "rejected"}
-                                onClick={() => handleSubmitSinglePrice(item.id)}
+                                onClick={(e) => {
+                                  actions.submitSinglePrice(item.id);
+                                  e.currentTarget.blur();
+                                }}
                               >
                                 Submit
                               </button>
@@ -483,18 +419,20 @@ export default function ProductForm({
                                 <button
                                   type="button"
                                   className="pf-btn-action blue"
-                                  onClick={() =>
-                                    handleApproveSinglePrice(item.id)
-                                  }
+                                  onClick={(e) => {
+                                    actions.approveSinglePrice(item.id);
+                                    e.currentTarget.blur();
+                                  }}
                                 >
                                   Approve
                                 </button>
                                 <button
                                   type="button"
                                   className="pf-btn-action red"
-                                  onClick={() =>
-                                    handleRejectSinglePrice(item.id)
-                                  }
+                                  onClick={(e) => {
+                                    actions.rejectSinglePrice(item.id);
+                                    e.currentTarget.blur();
+                                  }}
                                 >
                                   Reject
                                 </button>
@@ -505,7 +443,10 @@ export default function ProductForm({
                               <button
                                 type="button"
                                 className="pf-btn-action blue"
-                                onClick={handleViewApproval}
+                                onClick={(e) => {
+                                  actions.viewApproval();
+                                  e.currentTarget.blur();
+                                }}
                               >
                                 View Approval
                               </button>
@@ -523,7 +464,10 @@ export default function ProductForm({
               <button
                 type="button"
                 className="pf-btn-full light-blue"
-                onClick={handleViewApproval}
+                onClick={(e) => {
+                  actions.viewApproval();
+                  e.currentTarget.blur();
+                }}
               >
                 Price Management
               </button>
@@ -569,7 +513,11 @@ export default function ProductForm({
                         <button
                           type="button"
                           className="pf-edit-icon-btn"
-                          onClick={() => handleOpenEditVariant(attr)}
+                          onClick={(e) => {
+                            setEditingVariant(attr);
+                            setIsVariantModalOpen(true);
+                            e.currentTarget.blur();
+                          }}
                         >
                           <EditPenIcon />
                         </button>
@@ -584,7 +532,11 @@ export default function ProductForm({
             <button
               type="button"
               className="pf-add-variant-btn"
-              onClick={handleOpenAddVariant}
+              onClick={(e) => {
+                setEditingVariant(null);
+                setIsVariantModalOpen(true);
+                e.currentTarget.blur();
+              }}
             >
               Manage Variant Options
             </button>
@@ -609,7 +561,13 @@ export default function ProductForm({
               >
                 {tag}
                 {!isViewMode && (
-                  <button type="button" onClick={() => removeTag(tag)}>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      actions.removeTag(tag);
+                      e.currentTarget.blur();
+                    }}
+                  >
                     ×
                   </button>
                 )}
@@ -626,18 +584,35 @@ export default function ProductForm({
 
       <div className="pf-footer-actions">
         {isViewMode ? (
-          <button type="button" className="pf-btn-outline" onClick={onCancel}>
+          <button
+            type="button"
+            className="pf-btn-outline"
+            onClick={(e) => {
+              actions.cancel();
+              e.currentTarget.blur();
+            }}
+          >
             Back to List
           </button>
         ) : (
           <>
-            <button type="button" className="pf-btn-outline" onClick={onCancel}>
+            <button
+              type="button"
+              className="pf-btn-outline"
+              onClick={(e) => {
+                actions.cancel();
+                e.currentTarget.blur();
+              }}
+            >
               Cancel
             </button>
             <button
               type="button"
               className="pf-btn-primary"
-              onClick={handleSaveClick}
+              onClick={(e) => {
+                actions.saveProduct();
+                e.currentTarget.blur();
+              }}
             >
               Save Product
             </button>
@@ -652,7 +627,7 @@ export default function ProductForm({
             onClose={() => setIsTagModalOpen(false)}
             availableTags={AVAILABLE_TAGS}
             selectedTags={tags}
-            onConfirm={(newTags) => setTags(newTags)}
+            onConfirm={(newTags) => actions.updateTags(newTags)}
           />
 
           <VariantModal
@@ -661,7 +636,10 @@ export default function ProductForm({
             initialAttribute={editingVariant}
             availableAttributes={MOCK_AVAILABLE_ATTRIBUTES}
             existingVariants={productVariants}
-            onConfirm={handleConfirmVariant}
+            onConfirm={(updatedAttributes) => {
+              actions.confirmVariant(updatedAttributes, editingVariant?.id);
+              setIsVariantModalOpen(false);
+            }}
           />
 
           <SetPriceModal
@@ -670,7 +648,12 @@ export default function ProductForm({
             productName={formData.name || "N/A"}
             sku={formData.sku || "N/A"}
             initialPrice={editingPriceItem?.price || 0}
-            onSave={handleSavePrice}
+            onSave={(newPrice) => {
+              if (editingPriceItem) {
+                actions.savePrice(editingPriceItem.id, newPrice);
+              }
+              setIsSetPriceModalOpen(false);
+            }}
           />
         </>
       )}

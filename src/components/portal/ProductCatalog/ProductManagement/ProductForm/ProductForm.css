@@ -1,4 +1,4 @@
-/* wrapper form */
+/* container */
 .pf-container {
   display: flex;
   flex-direction: column;
@@ -12,6 +12,7 @@
   box-sizing: border-box;
 }
 
+/* header */
 .pf-header {
   display: flex;
   justify-content: space-between;
@@ -65,7 +66,7 @@
   gap: 20px;
 }
 
-/* class span dài full */
+/* class hỗ trợ */
 .pf-col-span-full {
   grid-column: 1 / -1;
 }
@@ -93,26 +94,14 @@
   outline: none;
 }
 
-/* khối ui giả lập thẻ select */
-.pf-custom-select {
-  padding: 10px 14px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  background-color: #f9fafb;
-  color: #4b5563;
-  font-size: 0.9rem;
-}
-.pf-custom-select.view-mode {
-  opacity: 0.7;
-}
-
-/* layout 2 cột cho table */
+/* bố cục chia màn hình cho bảng giá và biến thể */
 .pf-grid-2-cols {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 24px;
 }
 
+/* thanh cuộn và định dạng cho bảng dữ liệu */
 .pf-table-wrapper {
   overflow-x: auto;
   border: 1px solid #e5e7eb;
@@ -138,25 +127,7 @@
   font-weight: 700;
 }
 
-/* wrapper input nhập giá đính kèm icon */
-.pf-price-input {
-  display: flex;
-  align-items: center;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  padding: 6px 10px;
-  width: 100px;
-}
-
-.pf-price-input input {
-  border: none;
-  outline: none;
-  width: 100%;
-  margin-left: 6px;
-  font-family: inherit;
-}
-
-/* tag và trạng thái */
+/* trạng thái tổng quát */
 .pf-badge {
   padding: 4px 10px;
   border-radius: 20px;
@@ -172,7 +143,7 @@
   color: #059669;
 }
 
-/* style các trạng thái của riêng pricing */
+/* trạng thái riêng cho bảng giá */
 .pf-badge.draft {
   background-color: #fef08a;
   color: #854d0e;
@@ -186,7 +157,7 @@
   color: #b91c1c;
 }
 
-/* nút bấm */
+/* button */
 .pf-btn-action {
   padding: 6px 14px;
   border: none;
@@ -247,14 +218,7 @@
   color: #374151;
 }
 
-.pf-icon-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1.1rem;
-}
-
-/* khung giá trị biến thể */
+/* giá trị của biến thể */
 .pf-variant-value-box {
   background-color: #f3f4f6;
   padding: 6px 12px;
@@ -266,7 +230,7 @@
   border: 1px solid #e5e7eb;
 }
 
-/* nút edit icon chỉnh sửa trong bảng */
+/* nút chỉnh sửa bảng biến thể */
 .pf-edit-icon-btn {
   background: none;
   border: none;
@@ -286,7 +250,7 @@
   color: #111827;
 }
 
-/* nút add variant option */
+/* nút gọi modal thêm biến thể */
 .pf-add-variant-btn {
   width: 100%;
   padding: 10px;
@@ -305,7 +269,7 @@
   border: 1px solid #000000;
 }
 
-/* khung container click chọn tag */
+/* thẻ tag */
 .pf-tags-container {
   display: flex;
   align-items: center;
@@ -359,7 +323,7 @@
   font-size: 0.95rem;
 }
 
-/* Category Tree */
+/* cấu trúc cây danh mục */
 .pf-tree-select {
   position: relative;
   width: 100%;
@@ -449,7 +413,7 @@
   transform: rotate(-90deg);
 }
 
-/* Dropdown status */
+/* Dropdown */
 .pf-custom-dropdown {
   position: relative;
   width: 100%;
@@ -509,7 +473,8 @@
   color: #000000;
   font-weight: 600;
 }
-/* button form */
+
+/* nút cuối màn hình */
 .pf-footer-actions {
   display: flex;
   justify-content: flex-end;
@@ -537,13 +502,14 @@
   font-family: inherit;
 }
 
-/* responsive tablet/mobile */
+/* Responsive */
 @media (max-width: 1024px) {
   .pf-grid-2-cols {
     grid-template-columns: 1fr;
   }
 }
 
+/* Animation */
 @keyframes pf-slideFadeIn {
   from {
     opacity: 0;

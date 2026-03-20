@@ -1,4 +1,4 @@
-/* base container cho toàn bộ component, cấu hình flexbox cơ bản */
+/* container */
 .pm-container {
   display: flex;
   flex-direction: column;
@@ -14,7 +14,7 @@
   box-sizing: border-box;
 }
 
-/* header section chứa title, breadcrumb và nút add */
+/* header */
 .pm-header {
   display: flex;
   justify-content: space-between;
@@ -33,7 +33,7 @@
   margin: 0;
 }
 
-/* style cho nút add new product */
+/* nút thêm sản phẩm */
 .pm-btn-add {
   background-color: #3b82f6;
   color: white;
@@ -51,7 +51,7 @@
   transition: all 0.2s ease;
 }
 
-/* wrapper dạng card nền trắng bọc ngoài filter và table */
+/* khung bọc ngoài bộ lọc và bảng dữ liệu */
 .pm-filters-card {
   background-color: #fff;
   border: 1px solid #e5e7eb;
@@ -64,7 +64,7 @@
   min-width: 0;
 }
 
-/* row chứa các control filter (input search, selects) */
+/* hàng chứa ô nhập tìm kiếm và chọn bộ lọc */
 .pm-filters-row {
   display: flex;
   flex-wrap: wrap;
@@ -85,7 +85,7 @@
   transition: border-color 0.2s;
 }
 
-/* Dropdown */
+/* menu tùy chọn */
 .pm-custom-dropdown {
   position: relative;
   font-family: inherit;
@@ -125,7 +125,7 @@
   transform: rotate(180deg);
 }
 
-/* animation menu dropdown */
+/* danh sách các mục trong menu */
 .pm-dropdown-options {
   position: absolute;
   top: calc(100% + 6px);
@@ -155,7 +155,7 @@
   font-weight: 600;
 }
 
-/* style cho nút clear filter */
+/* nút xóa bộ lọc */
 .pm-btn-clear {
   flex: 1 1 auto;
   padding: clamp(8px, 1.2vw, 10px) 20px;
@@ -173,7 +173,7 @@
   border-color: #000000;
 }
 
-/* container chứa các nút bulk action */
+/* nút thao tác hàng loạt */
 .pm-bulk-actions {
   display: flex;
   flex-wrap: wrap;
@@ -209,7 +209,7 @@
   border-color: #e1251b;
 }
 
-/* wrapper cuộn ngang cho table kèm style thanh cuộn đồng bộ */
+/* khung cuộn ngang cho bảng dữ liệu */
 .pm-table-wrapper {
   border: 1px solid #e5e7eb;
   border-radius: 12px;
@@ -265,7 +265,7 @@
   color: #111827;
 }
 
-/* flexbox và style cho nội dung thẻ th để sửa lỗi sort icon bị lệch */
+/* sort icon */
 .pm-th-content {
   display: flex;
   align-items: center;
@@ -289,9 +289,9 @@
   opacity: 1;
 }
 
-/* màu background khi row được check */
-.pm-selected-row {
-  background-color: #f5e1cd !important;
+/* màu nền khi dòng được chọn */
+.pm-table tr.pm-selected-row {
+  background-color: #f5e1cd;
 }
 
 .pm-td-flex {
@@ -305,7 +305,7 @@
   color: #666;
 }
 
-/* hình ảnh thu nhỏ */
+/* ảnh */
 .pm-img-placeholder {
   width: clamp(48px, 4vw, 56px);
   height: clamp(48px, 4vw, 56px);
@@ -324,7 +324,7 @@
   border-radius: 4px;
 }
 
-/* style cho status badge và các chấm màu (dot) */
+/* badge trạng thái */
 .pm-status-badge {
   display: inline-flex;
   align-items: center;
@@ -355,33 +355,35 @@
   color: #6b7280;
 }
 
-/* flex container cho cụm action buttons trong mỗi row */
+/* nút thao tác */
 .pm-action-group {
   display: flex;
   gap: clamp(4px, 0.8vw, 8px);
   align-items: center;
   min-width: max-content;
 }
-.pm-icon-btn {
+
+.pm-table td .pm-icon-btn {
   width: clamp(28px, 2.5vw, 32px);
   height: clamp(28px, 2.5vw, 32px);
   border-radius: 8px;
-  border: 1px solid #d1d5db !important;
-  background-color: #ffffff !important;
+  border: 1px solid #d1d5db;
+  background-color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #4b5563 !important;
+  color: #4b5563;
   padding: 0;
 }
+
 .pm-icon-btn svg {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
 }
 
-/* custom toggle switch cho status dùng clamp để co giãn */
+/* switch trạng thái */
 .pm-toggle-switch {
   width: clamp(36px, 3vw, 44px);
   height: clamp(20px, 2vw, 24px);
@@ -417,7 +419,7 @@
   cursor: not-allowed;
 }
 
-/* animation keyframes chung cho popup/dropdown */
+/* animation */
 @keyframes pm-slideFadeIn {
   from {
     opacity: 0;
@@ -428,9 +430,15 @@
     transform: translateY(0);
   }
 }
+
 .pm-dropdown-wrapper {
   position: relative;
 }
+
+.pm-dropdown-wrapper.is-open {
+  z-index: 50;
+}
+
 .pm-dropdown-menu {
   position: absolute;
   top: calc(100% + 4px);
@@ -475,7 +483,7 @@
   color: white;
 }
 
-/* container chứa pagination và select limit */
+/* phân trang ở dưới cùng */
 .pm-pagination {
   display: flex;
   flex-wrap: wrap;
@@ -508,7 +516,7 @@
   font-weight: 700;
 }
 
-/* responsive mobile */
+/* responsive */
 @media (max-width: 767px) {
   .pm-header {
     flex-direction: column;

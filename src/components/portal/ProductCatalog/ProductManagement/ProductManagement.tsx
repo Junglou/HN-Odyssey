@@ -7,25 +7,21 @@ import {
   DotsIcon,
   TrashIcon,
 } from "../../../../assets/icons/UserManagementIcons";
+import { ChevronDownIcon } from "../../../../assets/icons/HeaderIcons";
 
-// định nghĩa type
-export type ProductStatus = "Active" | "Inactive" | "Draft";
-export type FilterStatus = "all" | ProductStatus;
-export type FilterPrice = "default" | "high_to_low" | "low_to_high";
-export type BulkAction = "activate" | "deactivate" | "delete";
+// chỉ import type và cấu hình mảng tĩnh từ hook
+import {
+  type FilterStatus,
+  type FilterPrice,
+  type BulkAction,
+  type ProductRowData,
+  type DropdownOption,
+  STATUS_OPTIONS,
+  PRICE_OPTIONS,
+  PAGE_OPTIONS,
+} from "../../../../hooks/portal/ProductCatalog/ProductManagement/useProductManagement";
 
-// interface ui
-export interface ProductRowData {
-  id: number;
-  image: string;
-  sku: string;
-  name: string;
-  status: ProductStatus;
-  price: string;
-  selected: boolean;
-}
-
-// gom props
+// props
 interface ProductManagementProps {
   data: ProductRowData[];
   filters: {
@@ -57,13 +53,7 @@ interface ProductManagementProps {
   };
 }
 
-// option của dropdown tùy chỉnh
-interface DropdownOption {
-  label: string;
-  value: string;
-}
-
-// component CustomDropdown tái sử dụng từ UserManagement
+// component dropdown phụ trợ cho filter
 function CustomDropdown({
   value,
   options,
@@ -102,20 +92,9 @@ function CustomDropdown({
         onClick={() => setIsOpen(!isOpen)}
       >
         <span>{selectedLabel}</span>
-        <svg
+        <ChevronDownIcon
           className={`pm-dropdown-arrow ${isOpen ? "open" : ""}`}
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#333"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <polyline points="6 9 12 15 18 9"></polyline>
-        </svg>
+        />
       </div>
       {isOpen && (
         <div className="pm-dropdown-options">
@@ -137,26 +116,6 @@ function CustomDropdown({
   );
 }
 
-// data mock cho các dropdown filter và pagination
-const STATUS_OPTIONS: DropdownOption[] = [
-  { label: "All Status", value: "all" },
-  { label: "Active", value: "Active" },
-  { label: "Inactive", value: "Inactive" },
-  { label: "Draft", value: "Draft" },
-];
-
-const PRICE_OPTIONS: DropdownOption[] = [
-  { label: "Default Price", value: "default" },
-  { label: "High to Low", value: "high_to_low" },
-  { label: "Low to High", value: "low_to_high" },
-];
-
-const PAGE_OPTIONS: DropdownOption[] = [
-  { label: "10 / page", value: "10" },
-  { label: "20 / page", value: "20" },
-  { label: "50 / page", value: "50" },
-];
-
 export default function ProductManagement({
   data,
   filters,
@@ -176,6 +135,7 @@ export default function ProductManagement({
     return () => document.removeEventListener("click", handleClickOutside);
   }, [openDropdownId]);
 
+  // biến ui tính toán trạng thái
   const isAllSelected = data.length > 0 && data.every((p) => p.selected);
   const pageNumbers = Array.from(
     { length: pagination.totalPages },
@@ -332,7 +292,6 @@ export default function ProductManagement({
                       {prod.name}
                     </td>{" "}
                     <td data-label="Status">
-                      {/* Cập nhật class status để giống hệt UserManagement */}
                       <span className={`pm-status-badge status-${prod.status}`}>
                         <span className="pm-dot" aria-hidden="true"></span>{" "}
                         {prod.status}
@@ -371,7 +330,9 @@ export default function ProductManagement({
                           disabled={prod.status === "Draft"}
                         ></button>
 
-                        <div className="pm-dropdown-wrapper">
+                        <div
+                          className={`pm-dropdown-wrapper ${openDropdownId === prod.id ? "is-open" : ""}`}
+                        >
                           <button
                             type="button"
                             className="pm-icon-btn"
@@ -427,7 +388,6 @@ export default function ProductManagement({
             {pagination.totalFiltered} products
           </div>
           <div className="pm-page-numbers">
-            {/* Thêm nút chuyển trang "<" giống UserManagement */}
             <button
               type="button"
               className="pm-page-num"
@@ -455,7 +415,6 @@ export default function ProductManagement({
               </button>
             ))}
 
-            {/* Thêm nút chuyển trang ">" giống UserManagement */}
             <button
               type="button"
               className="pm-page-num"
