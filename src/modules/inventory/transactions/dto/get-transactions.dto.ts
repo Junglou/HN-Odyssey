@@ -25,4 +25,8 @@ export class GetTransactionsDto extends PaginationQueryDto {
   @IsOptional()
   @IsEnum(['asc', 'desc'])
   sort_order?: 'asc' | 'desc';
+
+  @IsOptional()
+  @IsString()
+  reason?: string; // Lọc theo lý do xuất kho
 }

@@ -29,9 +29,16 @@ export class StockTransaction {
 
   @Prop({
     required: true,
-    enum: ['MANUAL_ADJUST', 'ORDER_ACCEPTED', 'RESTOCK', 'IMPORT'],
+    enum: ['MANUAL_ADJUST', 'ORDER_ACCEPTED', 'RESTOCK', 'IMPORT', 'EXPORT'],
   })
   action_type: string; // Với phiếu nhập hàng, ta dùng 'IMPORT'
+
+  @Prop({
+    required: true,
+    enum: ['COMPLETED', 'CANCELLED'],
+    default: 'COMPLETED',
+  })
+  status: string; // Bổ sung thêm trường status để quản lý trạng thái Hủy phiếu
 
   // Mảng chi tiết các sản phẩm được nhập (AC4)
   @Prop({ type: [TransactionItemSchema], required: true, default: [] })
@@ -50,6 +57,9 @@ export class StockTransaction {
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   actor_id: Types.ObjectId; // AC5: Ghi nhận ID nhân viên thực hiện
+
+  created_at: Date;
+  updated_at: Date;
 
   // Đánh dấu đây là dữ liệu Read-only (AC4 - Lịch sử nhập hàng)
   // Thực tế MongoDB không có khoá cứng, ta sẽ dùng code Logic để block các hành vi Update/Delete
