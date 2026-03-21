@@ -24,6 +24,8 @@ import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.servi
 import { User, UserDocument } from 'src/modules/users/schemas/user.schema';
 import { CreateExportNoteDto } from './dto/create-export-note.dto';
 import PDFDocument from 'pdfkit';
+import * as path from 'path';
+import * as fs from 'fs';
 
 export interface UpdatedProductInfo {
   productId: string;
@@ -1542,8 +1544,11 @@ export class TransactionsService {
       doc.registerFont('Roboto-Bold', fontBoldPath);
       doc.registerFont('Roboto-Italic', fontItalicPath);
       doc.font('Roboto');
-    } catch {
-      console.error('Thiếu font trong src/common/fonts/');
+    } catch (error: unknown) {
+      console.error(
+        'Thiếu font trong src/common/fonts/ - Chi tiết:',
+        (error as Error).message,
+      );
     }
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -1553,7 +1558,7 @@ export class TransactionsService {
     );
     doc.pipe(res);
 
-    // 2. WATERMARK
+    // 2. WATERMARK (Nếu đơn bị hủy)
     if (detail.status === 'CANCELLED') {
       doc
         .save()
@@ -1565,23 +1570,42 @@ export class TransactionsService {
         .restore();
     }
 
-    // Khung viền trang
+    // Khung viền trang chuyên nghiệp
     doc.rect(20, 20, 555, 802).stroke('#CCCCCC');
 
-    // 3. HEADER
+    // 3. HEADER (TÍCH HỢP LOGO.JPG)
+    const logoPath = path.join(process.cwd(), 'src/common/assets/Logo.jpg');
+    let textStartX = 40;
+    const headerY = 40;
+
+    if (fs.existsSync(logoPath)) {
+      // Chèn Logo.jpg
+      doc.image(logoPath, 40, 35, { width: 55 });
+      textStartX = 105; // Đẩy chữ sang phải để nhường chỗ cho logo
+    }
+
     doc
       .font('Roboto-Bold')
       .fontSize(14)
       .fillColor('#1A237E')
-      .text('H&N ODYSSEY - E-COMMERCE SYSTEM', 40, 45);
+      .text('H&N ODYSSEY - E-COMMERCE SYSTEM', textStartX, headerY);
+
     doc
       .font('Roboto')
       .fontSize(9)
       .fillColor('#616161')
-      .text('Địa chỉ: 45 Nguyễn Khắc Nhu, P. Cô Giang, Q. 1, TP. HCM')
-      .text('Hotline: 1900 6789 | Website: hnodyssey.com');
+      .text(
+        'Địa chỉ: 45 Nguyễn Khắc Nhu, P. Cô Giang, Q. 1, TP. HCM',
+        textStartX,
+        headerY + 18,
+      )
+      .text(
+        'Hotline: 1900 6789 | Website: hnodyssey.com',
+        textStartX,
+        headerY + 30,
+      );
 
-    // Box mã phiếu (Góc phải)
+    // Box mã phiếu (Góc phải trên cùng)
     doc.rect(400, 40, 155, 45).stroke('#E0E0E0');
     doc
       .font('Roboto-Bold')
@@ -1596,7 +1620,7 @@ export class TransactionsService {
     doc.moveTo(40, 110).lineTo(555, 110).stroke('#EEEEEE');
 
     // 4. TIÊU ĐỀ PHIẾU
-    doc.y = 130; // Đặt vị trí bắt đầu cho tiêu đề
+    doc.y = 130;
     doc
       .font('Roboto-Bold')
       .fontSize(22)
@@ -1612,23 +1636,20 @@ export class TransactionsService {
       );
     doc.moveDown(1);
 
-    // 5. KHỐI THÔNG TIN CHUNG (Dùng Flow - Không dùng tọa độ cứng)
+    // 5. KHỐI THÔNG TIN CHUNG
     const startInfoY = doc.y;
     doc.fontSize(10).fillColor('#212121');
 
-    // Vẽ nội dung trước để tính chiều cao
     const reasonText = `Lý do xuất: ${detail.note || 'N/A'}`;
     const reasonHeight = doc.heightOfString(reasonText, { width: 490 });
     const infoBoxHeight = 45 + reasonHeight;
 
-    // Vẽ khung xám dựa trên chiều cao thực tế
     doc
       .rect(40, startInfoY, 515, infoBoxHeight)
       .fill('#FAFAFA')
       .stroke('#EEEEEE');
     doc.fillColor('#212121');
 
-    // Người lập và Trạng thái trên cùng một hàng
     doc
       .font('Roboto-Bold')
       .text('Người thực hiện:', 55, startInfoY + 10, { continued: true })
@@ -1642,7 +1663,6 @@ export class TransactionsService {
       .fillColor(detail.status === 'CANCELLED' ? '#D32F2F' : '#2E7D32')
       .text(` ${detail.status === 'CANCELLED' ? 'ĐÃ HỦY' : 'HOÀN TẤT'}`);
 
-    // Tham chiếu và Lý do
     doc
       .fillColor('#212121')
       .font('Roboto-Bold')
@@ -1657,46 +1677,42 @@ export class TransactionsService {
       .font('Roboto')
       .text(detail.note || 'N/A', 130, startInfoY + 25, { width: 220 });
 
-    // Cập nhật doc.y xuống dưới khung info
     doc.y = startInfoY + infoBoxHeight + 20;
 
-    // 6. BẢNG SẢN PHẨM (Sửa lỗi đè dòng)
+    // 6. BẢNG SẢN PHẨM (Đã canh lề chuẩn)
     const tableTop = doc.y;
     const col = { stt: 40, sku: 80, name: 180, qty: 470 };
 
-    // Header bảng
     doc.rect(40, tableTop, 515, 25).fill('#1A237E');
     doc.fillColor('#FFFFFF').font('Roboto-Bold');
-    doc.text('STT', col.stt + 5, tableTop + 7);
+    doc.text('STT', col.stt + 5, tableTop + 7, { width: 30, align: 'center' });
     doc.text('MÃ SKU', col.sku, tableTop + 7);
     doc.text('TÊN SẢN PHẨM / BIẾN THỂ', col.name, tableTop + 7);
     doc.text('SL XUẤT', col.qty, tableTop + 7, { width: 80, align: 'center' });
 
-    doc.y = tableTop + 25; // Di chuyển cursor xuống dưới header
+    doc.y = tableTop + 25;
     let totalQty = 0;
 
     detail.items.forEach((item, index) => {
       const rowY = doc.y;
-      // Tính chiều cao cần thiết cho dòng này (dựa vào tên SP dài)
       const nameHeight = doc.heightOfString(item.product_name, { width: 280 });
       const rowHeight = Math.max(25, nameHeight + 10);
 
-      // Kiểm tra nếu hết trang thì ngắt
       if (rowY + rowHeight > 760) {
         doc.addPage();
         doc.rect(20, 20, 555, 802).stroke('#CCCCCC');
         doc.y = 40;
       }
 
-      // Vẽ nền xen kẽ
       if (index % 2 === 0) {
         doc.rect(40, doc.y, 515, rowHeight).fill('#F9F9F9');
       }
 
       doc.fillColor('#212121').font('Roboto');
-
-      // In các cột (Dùng tọa độ y hiện tại của doc.y)
-      doc.text((index + 1).toString(), col.stt + 5, rowY + 7);
+      doc.text((index + 1).toString(), col.stt + 5, rowY + 7, {
+        width: 30,
+        align: 'center',
+      });
       doc.text(item.sku, col.sku, rowY + 7);
       doc.text(item.product_name, col.name, rowY + 7, { width: 280 });
       doc.text(item.quantity_exported.toString(), col.qty, rowY + 7, {
@@ -1705,10 +1721,8 @@ export class TransactionsService {
       });
 
       totalQty += item.quantity_exported;
-
-      // QUAN TRỌNG: Đẩy cursor xuống dưới cùng của dòng vừa in
       doc.y = rowY + rowHeight;
-      doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke('#EEEEEE');
+      doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#EEEEEE').stroke();
     });
 
     // 7. TỔNG CỘNG
