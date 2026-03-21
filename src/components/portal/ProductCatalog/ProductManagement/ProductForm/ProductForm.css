@@ -474,7 +474,7 @@
   font-weight: 600;
 }
 
-/* nút cuối màn hình */
+/* footer */
 .pf-footer-actions {
   display: flex;
   justify-content: flex-end;
@@ -483,23 +483,38 @@
 
 .pf-btn-outline {
   padding: 12px 24px;
-  background-color: white;
-  border: 1px solid #d1d5db;
+  background-color: #fff;
+  border: 1px solid #cccccc;
   border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #374151;
   cursor: pointer;
-  font-weight: 700;
   font-family: inherit;
+  transition: all 0.2s;
+}
+
+.pf-btn-outline:hover {
+  background-color: #f3f4f6;
+  border: 1px solid #000000;
 }
 
 .pf-btn-primary {
   padding: 12px 24px;
-  background-color: #3b82f6;
-  color: white;
+  background-color: #b6b7b8;
   border: none;
   border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #ffffff;
   cursor: pointer;
-  font-weight: 700;
   font-family: inherit;
+  transition: all 0.2s;
+}
+
+.pf-btn-primary:hover {
+  background-color: #111827;
+  color: #ffffff;
 }
 
 /* Responsive */

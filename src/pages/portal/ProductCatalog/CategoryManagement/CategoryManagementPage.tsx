@@ -49,6 +49,7 @@ export default function CategoryManagementPage() {
         initialData={drawerConfig.initialData}
         categories={categories}
         editingId={drawerConfig.editingId}
+        isSubmitting={drawerConfig.isSubmitting}
         onClose={closeDrawer}
         onSave={saveCategory}
       />

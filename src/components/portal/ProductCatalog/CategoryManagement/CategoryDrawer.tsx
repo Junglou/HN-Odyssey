@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import "./CategoryDrawer.css";
 import {
   BackArrowIcon,
@@ -25,6 +25,7 @@ interface CategoryDrawerProps {
   initialData?: CategoryFormData;
   categories: CategoryNode[];
   editingId?: string;
+  isSubmitting: boolean;
   onClose: () => void;
   onSave: (data: CategoryFormData) => void;
 }
@@ -35,6 +36,7 @@ export default function CategoryDrawer({
   initialData,
   categories,
   editingId,
+  isSubmitting,
   onClose,
   onSave,
 }: CategoryDrawerProps) {
@@ -52,6 +54,16 @@ export default function CategoryDrawer({
 
   // hook đóng khi click ra ngoài
   useClickOutside(treeRef, () => setIsTreeOpen(false));
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isSubmitting) {
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, isSubmitting]);
 
   // tạo map dữ liệu giúp tối ưu tìm kiếm
   const { categoryMap, parentMap } = useMemo(() => {
@@ -104,6 +116,7 @@ export default function CategoryDrawer({
 
     return path;
   };
+
   if (!isOpen) return null;
 
   // lấy data danh mục cha
@@ -193,7 +206,7 @@ export default function CategoryDrawer({
 
   // logic nút submit
   const handleSave = () => {
-    if (!formData.name.trim()) return;
+    if (!formData.name.trim() || isSubmitting) return;
     onSave(formData);
   };
 
@@ -203,10 +216,18 @@ export default function CategoryDrawer({
   return (
     <>
       {/* tạo overlay và phần nội dung chính của ngăn kéo */}
-      <div className="cd-overlay" onClick={onClose}></div>
+      <div
+        className="cd-overlay"
+        onClick={!isSubmitting ? onClose : undefined}
+      ></div>
       <div className="cd-drawer">
         <div className="cd-header">
-          <button type="button" className="cd-back-btn" onClick={onClose}>
+          <button
+            type="button"
+            className="cd-back-btn"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
             <BackArrowIcon />
           </button>
           <h2 className="cd-title">
@@ -226,6 +247,7 @@ export default function CategoryDrawer({
               onChange={(e) =>
                 setFormData({ ...formData, name: e.target.value })
               }
+              disabled={isSubmitting}
             />
           </div>
 
@@ -233,8 +255,8 @@ export default function CategoryDrawer({
             <label className="cd-label">Parent Category</label>
             <div className="cd-tree-select" ref={treeRef}>
               <div
-                className="cd-tree-trigger"
-                onClick={() => setIsTreeOpen(!isTreeOpen)}
+                className={`cd-tree-trigger ${isSubmitting ? "disabled" : ""}`}
+                onClick={() => !isSubmitting && setIsTreeOpen(!isTreeOpen)}
               >
                 <span
                   className={formData.parentId ? "" : "cd-tree-placeholder"}
@@ -245,7 +267,7 @@ export default function CategoryDrawer({
                 <FilterIcon />
               </div>
 
-              {isTreeOpen && (
+              {isTreeOpen && !isSubmitting && (
                 <div className="cd-tree-dropdown">
                   <div className="cd-tree-header-text">
                     Select parent category
@@ -286,11 +308,15 @@ export default function CategoryDrawer({
                 type="button"
                 className={`cd-toggle-switch ${formData.status === "Active" ? "on" : ""}`}
                 style={{
-                  opacity: isParentInactive ? 0.5 : 1,
-                  cursor: isParentInactive ? "not-allowed" : "pointer",
+                  opacity: isParentInactive || isSubmitting ? 0.5 : 1,
+                  cursor:
+                    isParentInactive || isSubmitting
+                      ? "not-allowed"
+                      : "pointer",
                 }}
+                disabled={isSubmitting}
                 onClick={() => {
-                  if (isParentInactive) return;
+                  if (isParentInactive || isSubmitting) return;
                   setFormData((prev) => ({
                     ...prev,
                     status: prev.status === "Active" ? "Inactive" : "Active",
@@ -308,16 +334,25 @@ export default function CategoryDrawer({
         </div>
 
         <div className="cd-footer">
-          <button type="button" className="cd-btn-cancel" onClick={onClose}>
+          <button
+            type="button"
+            className="cd-btn-cancel"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
             Cancel
           </button>
           <button
             type="button"
-            className={`cd-btn-submit ${isFormValid ? "active" : ""}`}
-            disabled={!isFormValid}
+            className="cd-btn-submit"
+            disabled={!isFormValid || isSubmitting}
             onClick={handleSave}
           >
-            {mode === "add" ? "Create Category" : "Save Changes"}
+            {isSubmitting
+              ? "Saving..."
+              : mode === "add"
+                ? "Create Category"
+                : "Save Changes"}
           </button>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import "./CategoryManagement.css";
 import CategoryTableRow, { type FlatCategoryNode } from "./CategoryTableRow";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
@@ -31,9 +31,25 @@ export default function CategoryManagement({
   // Gọi hook
   useClickOutside(tableRef, () => setOpenDropdownId(null));
 
-  const handleToggleDropdown = (id: string) => {
+  const handleToggleDropdown = useCallback((id: string) => {
     setOpenDropdownId((prev) => (prev === id ? null : id));
-  };
+  }, []);
+
+  const handleEdit = useCallback(
+    (id: string) => {
+      onEditClick(id);
+      setOpenDropdownId(null);
+    },
+    [onEditClick],
+  );
+
+  const handleDelete = useCallback(
+    (id: string) => {
+      onDeleteClick(id);
+      setOpenDropdownId(null);
+    },
+    [onDeleteClick],
+  );
 
   return (
     <div className="cm-container">
@@ -74,14 +90,8 @@ export default function CategoryManagement({
                     isDropdownOpen={openDropdownId === cat.id}
                     onToggleDropdown={handleToggleDropdown}
                     onToggleExpand={onToggleExpand}
-                    onEditClick={(id) => {
-                      onEditClick(id);
-                      setOpenDropdownId(null);
-                    }}
-                    onDeleteClick={(id) => {
-                      onDeleteClick(id);
-                      setOpenDropdownId(null);
-                    }}
+                    onEditClick={handleEdit}
+                    onDeleteClick={handleDelete}
                     onMoveCategory={onMoveCategory}
                   />
                 ))

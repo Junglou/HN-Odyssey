@@ -52,7 +52,7 @@
   transition: background-color 0.2s;
 }
 
-.cd-back-btn:hover {
+.cd-back-btn:hover:not(:disabled) {
   background-color: #f3f4f6;
 }
 
@@ -99,8 +99,13 @@
   transition: border-color 0.2s;
 }
 
-.cd-input:focus {
+.cd-input:focus:not(:disabled) {
   border-color: #000000;
+}
+
+.cd-input:disabled {
+  background-color: #f9fafb;
+  cursor: not-allowed;
 }
 
 /* danh sách danh mục */
@@ -122,8 +127,13 @@
   min-height: 46px;
 }
 
-.cd-tree-trigger:hover {
+.cd-tree-trigger:hover:not(.disabled) {
   border-color: #000000;
+}
+
+.cd-tree-trigger.disabled {
+  background-color: #f9fafb;
+  cursor: not-allowed;
 }
 
 .cd-tree-placeholder {
@@ -292,33 +302,48 @@
 
 .cd-btn-cancel {
   padding: 10px 20px;
-  background-color: white;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
+  background-color: #fff;
+  border: 1px solid #cccccc;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #374151;
   cursor: pointer;
-  font-weight: 700;
   font-family: inherit;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
 }
 
-.cd-btn-cancel:hover {
-  background-color: #f9fafb;
+.cd-btn-cancel:hover:not(:disabled) {
+  background-color: #f3f4f6;
+  border: 1px solid #000000;
+}
+
+.cd-btn-cancel:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .cd-btn-submit {
   padding: 10px 20px;
-  background-color: #d1d5db;
-  color: #ffffff;
+  background-color: #b6b7b8;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #ffffff;
   cursor: pointer;
-  font-weight: 700;
   font-family: inherit;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
 }
 
-.cd-btn-submit.active {
-  background-color: #3b82f6;
+.cd-btn-submit:hover:not(:disabled) {
+  background-color: #111827;
+  color: #ffffff;
+}
+
+.cd-btn-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 @keyframes cd-fadeIn {

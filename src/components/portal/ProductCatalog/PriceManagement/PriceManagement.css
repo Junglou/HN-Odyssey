@@ -1,0 +1,339 @@
+/* Layout chung */
+.pm-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  font-family: "Lexend Exa", sans-serif;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.pm-container * {
+  box-sizing: border-box;
+}
+
+.pm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.pm-title {
+  font-size: clamp(1.4rem, 2.5vw, 1.8rem);
+  font-weight: 800;
+  margin: 0 0 4px 0;
+  color: #111827;
+}
+
+.pm-breadcrumb {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Card chứa nội dung */
+.pm-card {
+  background-color: #f3f4f6; /* Nền card hơi xám nhạt theo mockup */
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Toolbar: Search, Filters, Bulk Actions */
+.pm-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.pm-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pm-search-input {
+  width: 250px;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  outline: none;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.pm-search-input:focus {
+  border-color: #3b82f6;
+}
+
+/* Dropdown tuỳ chỉnh */
+.pm-custom-select {
+  position: relative;
+  min-width: 140px;
+}
+
+.pm-select-trigger {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #374151;
+}
+
+.pm-custom-select.disabled .pm-select-trigger {
+  background-color: #f9fafb;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.pm-select-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 100%;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 50;
+  overflow: hidden;
+}
+
+.pm-select-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+
+.pm-select-item:hover {
+  background-color: #f3f4f6;
+}
+
+.pm-select-item.active {
+  background-color: #e5e7eb;
+  font-weight: 600;
+}
+
+.pm-btn-clear {
+  background: none;
+  border: 1px solid #d1d5db;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #374151;
+  font-family: inherit;
+  transition: background 0.2s;
+}
+
+.pm-btn-clear:hover {
+  background-color: #e5e7eb;
+}
+
+/* Nút bulk action */
+.pm-bulk-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.pm-btn-bulk {
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.pm-btn-bulk.outline {
+  background-color: transparent;
+  border: 1px solid #d1d5db;
+  color: #374151;
+}
+
+.pm-btn-bulk.outline:hover:not(:disabled) {
+  background-color: #e5e7eb;
+}
+
+.pm-btn-bulk:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Bảng dữ liệu */
+.pm-table-wrapper {
+  background-color: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+.pm-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  min-width: 900px;
+}
+
+.pm-table th,
+.pm-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.9rem;
+  color: #374151;
+}
+
+.pm-table th {
+  background-color: #d1d5db; /* Màu nền header xám đậm theo mockup */
+  font-weight: 700;
+  color: #111827;
+}
+
+.pm-table tr.selected-row td {
+  background-color: #f3ece1; /* Màu nền hơi vàng khi được tick chọn */
+}
+
+.font-medium {
+  font-weight: 600;
+  color: #111827;
+}
+
+/* Checkbox */
+.pm-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Badges */
+.pm-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.pm-badge-approve {
+  background-color: #d1fae5;
+  color: #059669;
+}
+
+.pm-badge-rejected {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.pm-badge-pending {
+  background-color: #e5e7eb;
+  color: #4b5563;
+}
+
+.pm-badge-draft {
+  background-color: #fef3c7;
+  color: #d97706;
+}
+
+/* Nút Action trong bảng */
+.pm-row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.pm-btn-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.pm-btn-action.edit {
+  background-color: transparent;
+  border: 1px solid #d1d5db;
+  color: #374151;
+}
+.pm-btn-action.edit:hover {
+  background-color: #f3f4f6;
+}
+
+.pm-btn-action.submit {
+  background-color: #3b82f6;
+  color: white;
+}
+.pm-btn-action.approve {
+  background-color: #3b82f6;
+  color: white;
+}
+.pm-btn-action.reject {
+  background-color: #ef4444;
+  color: white;
+}
+
+.pm-empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+/* Pagination */
+.pm-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+}
+
+.pm-pagination-info {
+  font-size: 0.9rem;
+  color: #374151;
+  font-weight: 600;
+}
+
+.pm-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pm-page-btn {
+  background: transparent;
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.pm-page-btn.active {
+  background-color: #e5e7eb;
+}
+
+.pm-page-select {
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
