@@ -23,6 +23,10 @@ import {
 import { ShippingModule } from 'src/modules/shipping/shipping.module';
 import { OrderStateMachine } from './flow/order-state-machine.service';
 import { OrderShippingListener } from './listeners/order-shipping.listener';
+import {
+  FlashSale,
+  FlashSaleSchema,
+} from 'src/modules/marketing/promotions/schemas/flash-sale.schema';
 
 @Module({
   imports: [
@@ -31,6 +35,7 @@ import { OrderShippingListener } from './listeners/order-shipping.listener';
       { name: Product.name, schema: ProductSchema },
       { name: Cart.name, schema: CartSchema },
       { name: ShippingConfig.name, schema: ShippingConfigSchema },
+      { name: FlashSale.name, schema: FlashSaleSchema },
     ]),
     AuditLogsModule,
     NotificationsModule,

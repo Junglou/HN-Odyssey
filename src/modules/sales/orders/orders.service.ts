@@ -47,6 +47,12 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { GhtkService } from 'src/modules/shipping/providers/ghtk.service';
 import { OrderStateMachine } from './flow/order-state-machine.service';
 import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
+import {
+  FlashSale,
+  FlashSaleDiscountType,
+  FlashSaleStatus,
+} from 'src/modules/marketing/promotions/schemas/flash-sale.schema';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 // type OrderDocWithShipping = MongooseOrderDoc & {
 //   waybillCode?: string;
@@ -76,6 +82,7 @@ export class OrdersService {
     private readonly ghtkService: GhtkService,
     private readonly eventEmitter: EventEmitter2,
     private readonly stateMachine: OrderStateMachine,
+    @InjectModel(FlashSale.name) private flashSaleModel: Model<FlashSale>,
   ) {}
 
   // US.121: DANH SÁCH ĐƠN HÀNG
@@ -213,10 +220,11 @@ export class OrdersService {
 
     // 1. Query DB tìm Voucher
     const voucher = await this.connection
-      .collection<Voucher>('promotions')
+      .collection<Voucher>('coupons') // Đổi 'promotions' thành 'coupons'
       .findOne({
         code: code.toUpperCase(),
         status: 'ACTIVE',
+        is_deleted: false,
         start_date: { $lte: new Date() },
         end_date: { $gte: new Date() },
       });
@@ -225,6 +233,15 @@ export class OrdersService {
       throw new BadRequestException('Mã giảm giá không hợp lệ hoặc đã hết hạn');
     }
 
+    // [FIX LỖI TYPESCRIPT & ESLINT]:
+    // Khai báo type mở rộng để bổ sung các thuộc tính có trong DB nhưng chưa có trong interface Voucher
+    type ExtendedVoucher = Voucher & {
+      user_usage_limit?: number;
+      applicable_category_ids?: string[];
+    };
+    // Ép kiểu an toàn
+    const extendedVoucher = voucher as ExtendedVoucher;
+
     if (userId) {
       const usedCountByUser = await this.orderModel.countDocuments({
         user_id: new Types.ObjectId(userId),
@@ -232,24 +249,21 @@ export class OrdersService {
         status: { $nin: ['CANCELLED', 'TEMPORARY'] },
       });
 
-      const limitPerUser = 1;
+      // Sử dụng extendedVoucher thay cho voucher để TypeScript không báo lỗi
+      const limitPerUser = extendedVoucher.user_usage_limit || 1;
+
       if (usedCountByUser >= limitPerUser) {
         throw new BadRequestException(
-          'Bạn đã hết lượt sử dụng mã giảm giá này.',
+          `Bạn đã vượt quá giới hạn sử dụng mã này (${limitPerUser} lần/người).`,
         );
       }
     }
 
-    // Định nghĩa type mở rộng cục bộ để tránh dùng 'any'
-    // Báo cho TS biết Voucher này có thể có thêm trường applicable_category_ids
-    type VoucherWithScope = Voucher & { applicable_category_ids?: string[] };
-    const voucherWithScope = voucher as VoucherWithScope;
-
     // 2. LOGIC CHECK DANH MỤC (SCOPE)
     if (
       items &&
-      voucherWithScope.applicable_category_ids &&
-      voucherWithScope.applicable_category_ids.length > 0
+      extendedVoucher.applicable_category_ids &&
+      extendedVoucher.applicable_category_ids.length > 0
     ) {
       const productIds = items.map((i) => i.product_id);
 
@@ -257,7 +271,7 @@ export class OrdersService {
       const validProducts = await this.productModel
         .find({
           _id: { $in: productIds },
-          categories: { $in: voucherWithScope.applicable_category_ids },
+          categories: { $in: extendedVoucher.applicable_category_ids },
         })
         .select('_id')
         .lean();
@@ -272,26 +286,26 @@ export class OrdersService {
         return sum;
       }, 0);
 
-      if (eligibleAmount < (voucher.min_order_value || 0)) {
+      if (eligibleAmount < (extendedVoucher.min_order_value || 0)) {
         throw new BadRequestException(
-          `Mã này chỉ áp dụng cho sản phẩm thuộc danh mục quy định (Tối thiểu ${voucher.min_order_value}đ).`,
+          `Mã này chỉ áp dụng cho sản phẩm thuộc danh mục quy định (Tối thiểu ${extendedVoucher.min_order_value}đ).`,
         );
       }
     } else {
       // Logic check giá trị tối thiểu thông thường
       if (
-        voucher.min_order_value !== undefined &&
-        originalTotal < voucher.min_order_value
+        extendedVoucher.min_order_value !== undefined &&
+        originalTotal < extendedVoucher.min_order_value
       ) {
         throw new BadRequestException(
-          `Đơn hàng chưa đủ ${voucher.min_order_value}đ để dùng mã này`,
+          `Đơn hàng chưa đủ ${extendedVoucher.min_order_value}đ để dùng mã này`,
         );
       }
     }
 
     if (
-      voucher.usage_limit !== undefined &&
-      voucher.used_count >= voucher.usage_limit
+      extendedVoucher.usage_limit !== undefined &&
+      extendedVoucher.usage_count >= extendedVoucher.usage_limit
     ) {
       throw new BadRequestException('Mã này đã hết lượt sử dụng');
     }
@@ -299,12 +313,12 @@ export class OrdersService {
     // 3. Tính mức giảm
     let discount = 0;
 
-    if (voucher.type === VoucherType.FIXED) {
-      discount = voucher.value;
-    } else if (voucher.type === VoucherType.PERCENT) {
-      discount = originalTotal * (voucher.value / 100);
-      if (voucher.max_discount_amount != null) {
-        discount = Math.min(discount, voucher.max_discount_amount);
+    if (extendedVoucher.type === VoucherType.FIXED) {
+      discount = extendedVoucher.value;
+    } else if (extendedVoucher.type === VoucherType.PERCENT) {
+      discount = Math.round(originalTotal * (extendedVoucher.value / 100));
+      if (extendedVoucher.max_discount_amount != null) {
+        discount = Math.min(discount, extendedVoucher.max_discount_amount);
       }
     }
 
@@ -406,11 +420,34 @@ export class OrdersService {
         throw new BadRequestException(`Hết hàng. Kho chỉ còn ${variant.stock}`);
       }
 
+      let currentUnitPrice =
+        variant.sale_price > 0 ? variant.sale_price : variant.price;
+
+      // Kiểm tra Flash Sale đang Active
+      const activeFlashSale = await this.flashSaleModel
+        .findOne({
+          status: FlashSaleStatus.ACTIVE,
+          product_ids: product._id,
+        })
+        .session(session);
+
+      if (activeFlashSale) {
+        if (
+          activeFlashSale.discount_type === FlashSaleDiscountType.PERCENTAGE
+        ) {
+          currentUnitPrice =
+            currentUnitPrice -
+            (currentUnitPrice * activeFlashSale.discount_value) / 100;
+        } else {
+          currentUnitPrice = activeFlashSale.discount_value;
+        }
+      }
+
       const rawItem = {
         productId: product._id.toString(),
         sku: variant.sku,
         quantity: data.quantity,
-        unitPrice: variant.sale_price > 0 ? variant.sale_price : variant.price,
+        unitPrice: currentUnitPrice > 0 ? currentUnitPrice : 0,
       };
 
       const { items: processedItems } = await this.promotionEngine.applyCombos([
@@ -680,190 +717,211 @@ export class OrdersService {
     ip: string,
     userAgent: string,
   ) {
-    // A. LUỒNG MUA NGAY (BUY_NOW)
-    if (dto.source === 'BUY_NOW') {
-      if (!dto.checkoutSessionToken) {
-        throw new BadRequestException('Thiếu Token phiên mua hàng');
-      }
-
-      const orderId = await this.redis.get(dto.checkoutSessionToken);
-      if (!orderId) {
-        throw new BadRequestException(
-          'Phiên mua hàng đã hết hạn hoặc không tồn tại',
-        );
-      }
-
-      const order = (await this.orderModel.findById(
-        orderId,
-      )) as unknown as MongooseOrderDoc;
-
-      if (!order || order.status !== 'TEMPORARY') {
-        throw new BadRequestException(
-          'Đơn hàng không hợp lệ hoặc đã hết hạn giữ hàng',
-        );
-      }
-
-      // 2. Tính phí vận chuyển
-      const shippingFee = await this.shippingService.calculateShippingFee(
-        dto.shippingInfo.city_code,
-        dto.shippingInfo.district_code,
-        order.items as unknown as (CartItem | OrderItem)[],
-        dto.isInstant,
-      );
-
-      // 3. Kiểm tra trọng lượng
-      const MAX_WEIGHT_KG = 50;
-      let totalWeight = 0;
-      for (const item of order.items) {
-        const itemAny = item as unknown as { weight?: number };
-        const w = itemAny.weight || 0.5;
-        totalWeight += w * item.quantity;
-      }
-
-      if (totalWeight > MAX_WEIGHT_KG) {
-        throw new BadRequestException(
-          `Đơn hàng quá nặng (${totalWeight}kg). Vui lòng liên hệ hotline.`,
-        );
-      }
-
-      // 4. Logic Voucher
-      const { finalTotal: totalAfterVoucher, discount } =
-        await this.applyVoucher(
-          order.total_amount,
-          dto.voucherCode,
-          userId,
-          order.items as unknown as OrderItem[], // Truyền items để check category
-        );
-
-      // 5. Tổng thanh toán
-      const finalOrderTotal = totalAfterVoucher + shippingFee;
-
-      // 6. Check COD Limit
-      if (dto.paymentMethod === 'COD' && finalOrderTotal > 5000000) {
-        throw new BadRequestException('Đơn hàng > 5 triệu không hỗ trợ COD.');
-      }
-
-      // 7. Cập nhật & Save
-      order.shipping_info = {
-        ...dto.shippingInfo,
-        email: dto.shippingInfo.email || '',
-        name: dto.shippingInfo.name || '',
-        phone: dto.shippingInfo.phone || '',
-        address: dto.shippingInfo.address || '',
-        city_code: Number(dto.shippingInfo.city_code),
-        district_code: Number(dto.shippingInfo.district_code),
-        ward_code: dto.shippingInfo.ward_code || '',
-      };
-
-      if (!order.guest_info) {
-        order.guest_info = {
-          name: dto.shippingInfo.name || '',
-          phone: dto.shippingInfo.phone || '',
-          email: dto.shippingInfo.email || '',
-        };
-      } else {
-        order.guest_info.email = dto.shippingInfo.email || '';
-      }
-
-      order.payment = {
-        method: dto.paymentMethod,
-        status: 'PENDING',
-      };
-
-      order.status = 'PENDING';
-      order.total_amount = finalOrderTotal;
-      order.shipping_fee = shippingFee;
-      order.discount_amount = discount;
-      order.voucher_code = dto.voucherCode || '';
-
-      if (dto.voucherCode) {
-        await this.connection
-          .collection('promotions')
-          .updateOne({ code: dto.voucherCode }, { $inc: { used_count: 1 } });
-      }
-
-      if (!order.timeline) {
-        order.timeline = [];
-      }
-
-      order.timeline.push({
-        status: 'PENDING',
-        timestamp: new Date(),
-        actor: userId ? 'Member' : 'Guest',
-        note: `BuyNow Order Created. Ship: ${shippingFee}`,
-      });
-
-      await order.save();
-      await this.redis.del(dto.checkoutSessionToken);
-
-      for (const item of order.items) {
-        await this.stockService.finalizeDeduction(
-          {
-            product_id: item.product_id.toString(),
-            sku: item.sku,
-            quantity: item.quantity,
-          },
-          // Lưu ý: BuyNow không dùng Mongoose Session ở bước createOrder này
-          // nên truyền undefined hoặc bỏ trống tham số session
-        );
-      }
-
-      // Tự động lấy cấu hình tạo Link theo phương thức
-      let paymentUrl: string | null = null;
-      if (order.payment.method !== 'COD') {
-        paymentUrl = await this.paymentService.createPaymentUrl(
-          order.payment.method,
-          {
-            orderCode: order.order_code,
-            amount: order.total_amount,
-            description: `Thanh toan don hang ${order.order_code}`,
-            ipAddr: ip,
-          },
-        );
-      }
-
-      const emailToSend = order.guest_info?.email || order.shipping_info?.email;
-      if (emailToSend) {
-        this.emailService
-          .sendInvoice(emailToSend, order as unknown as InvoiceOrder)
-          .catch((err: unknown) => {
-            const msg = err instanceof Error ? err.message : String(err);
-            this.logger.error(`Failed to send invoice email: ${msg}`);
-          });
-      }
-      await this.logCreateOrder(userId, order, dto.source, ip, userAgent);
-
-      this.eventEmitter.emit(NOTIFY_EVENTS.ORDER_CREATED, order);
-
-      return {
-        order: order,
-        paymentUrl: paymentUrl,
-        message: 'Tạo đơn hàng thành công',
-      };
-    }
-
-    // B. LUỒNG MUA TỪ GIỎ HÀNG (CART)
+    // 1. KHỞI TẠO TRANSACTION Ở NGAY ĐẦU HÀM CHO TẤT CẢ CÁC LUỒNG
     const session = await this.connection.startSession();
     session.startTransaction();
 
     try {
-      const cartQuery: { user_id?: Types.ObjectId; session_id?: string } = {};
-      let isGuestFlow = false;
-      let orderToUpdate: MongooseOrderDoc | null = null;
+      // A. LUỒNG MUA NGAY (BUY_NOW)
+      if (dto.source === 'BUY_NOW') {
+        if (!dto.checkoutSessionToken) {
+          throw new BadRequestException('Thiếu Token phiên mua hàng');
+        }
 
-      if (userId) {
-        const userCartExists = await this.cartModel.exists({
-          user_id: new Types.ObjectId(userId),
+        const orderId = await this.redis.get(dto.checkoutSessionToken);
+        if (!orderId) {
+          throw new BadRequestException(
+            'Phiên mua hàng đã hết hạn hoặc không tồn tại',
+          );
+        }
+
+        const order = (await this.orderModel
+          .findById(orderId)
+          .session(session)) as unknown as MongooseOrderDoc;
+
+        if (!order || order.status !== 'TEMPORARY') {
+          throw new BadRequestException(
+            'Đơn hàng không hợp lệ hoặc đã hết hạn giữ hàng',
+          );
+        }
+
+        // 2. Tính phí vận chuyển
+        const shippingFee = await this.shippingService.calculateShippingFee(
+          dto.shippingInfo.city_code,
+          dto.shippingInfo.district_code,
+          order.items as unknown as (CartItem | OrderItem)[],
+          dto.isInstant,
+        );
+
+        // 3. Kiểm tra trọng lượng
+        const MAX_WEIGHT_KG = 50;
+        let totalWeight = 0;
+        for (const item of order.items) {
+          const itemAny = item as unknown as { weight?: number };
+          const w = itemAny.weight || 0.5;
+          totalWeight += w * item.quantity;
+        }
+
+        if (totalWeight > MAX_WEIGHT_KG) {
+          throw new BadRequestException(
+            `Đơn hàng quá nặng (${totalWeight}kg). Vui lòng liên hệ hotline.`,
+          );
+        }
+
+        // 4. Logic Voucher
+        const { finalTotal: totalAfterVoucher, discount } =
+          await this.applyVoucher(
+            order.total_amount,
+            dto.voucherCode,
+            userId,
+            order.items as unknown as OrderItem[],
+          );
+
+        // 5. Tổng thanh toán
+        const finalOrderTotal = totalAfterVoucher + shippingFee;
+
+        // 6. Check COD Limit
+        if (dto.paymentMethod === 'COD' && finalOrderTotal > 5000000) {
+          throw new BadRequestException('Đơn hàng > 5 triệu không hỗ trợ COD.');
+        }
+
+        // 7. Cập nhật & Save
+        order.shipping_info = {
+          ...dto.shippingInfo,
+          email: dto.shippingInfo.email || '',
+          name: dto.shippingInfo.name || '',
+          phone: dto.shippingInfo.phone || '',
+          address: dto.shippingInfo.address || '',
+          city_code: Number(dto.shippingInfo.city_code),
+          district_code: Number(dto.shippingInfo.district_code),
+          ward_code: dto.shippingInfo.ward_code || '',
+        };
+
+        if (!order.guest_info) {
+          order.guest_info = {
+            name: dto.shippingInfo.name || '',
+            phone: dto.shippingInfo.phone || '',
+            email: dto.shippingInfo.email || '',
+          };
+        } else {
+          order.guest_info.email = dto.shippingInfo.email || '';
+        }
+
+        order.payment = {
+          method: dto.paymentMethod,
+          status: 'PENDING',
+        };
+
+        order.status = 'PENDING';
+        order.total_amount = finalOrderTotal;
+        order.shipping_fee = shippingFee;
+        order.discount_amount = discount;
+        order.voucher_code = dto.voucherCode || '';
+
+        // 8. Xử lý Voucher (Sử dụng Transaction Session)
+        if (dto.voucherCode) {
+          const voucher = await this.connection
+            .collection<Voucher>('coupons')
+            .findOne({ code: dto.voucherCode }, { session });
+
+          if (voucher) {
+            if (voucher.usage_limit && voucher.usage_limit > 0) {
+              const updateResult = await this.connection
+                .collection('coupons')
+                .updateOne(
+                  {
+                    code: dto.voucherCode,
+                    usage_count: { $lt: voucher.usage_limit },
+                  },
+                  { $inc: { usage_count: 1 } },
+                  { session },
+                );
+
+              if (updateResult.modifiedCount === 0) {
+                throw new BadRequestException(
+                  'Mã giảm giá đã hết lượt sử dụng ngay trong lúc bạn thanh toán.',
+                );
+              }
+
+              if (voucher.usage_count + 1 >= voucher.usage_limit) {
+                await this.connection
+                  .collection('coupons')
+                  .updateOne(
+                    { code: dto.voucherCode },
+                    { $set: { status: 'CANCELLED' } },
+                    { session },
+                  );
+              }
+            } else {
+              await this.connection
+                .collection('coupons')
+                .updateOne(
+                  { code: dto.voucherCode },
+                  { $inc: { usage_count: 1 } },
+                  { session },
+                );
+            }
+          }
+        }
+
+        if (!order.timeline) {
+          order.timeline = [];
+        }
+
+        order.timeline.push({
+          status: 'PENDING',
+          timestamp: new Date(),
+          actor: userId ? 'Member' : 'Guest',
+          note: `BuyNow Order Created. Ship: ${shippingFee}`,
         });
 
-        if (userCartExists) {
-          cartQuery.user_id = new Types.ObjectId(userId);
-        } else if (dto.guestSessionId) {
-          cartQuery.session_id = dto.guestSessionId;
-        } else {
-          cartQuery.user_id = new Types.ObjectId(userId);
+        await order.save({ session }); // BẮT BUỘC TRUYỀN SESSION
+
+        // CHỐT TRANSACTION THÀNH CÔNG CHO LUỒNG MUA NGAY
+        await session.commitTransaction();
+
+        await this.redis.del(dto.checkoutSessionToken);
+
+        // Tự động lấy cấu hình tạo Link theo phương thức
+        let paymentUrl: string | null = null;
+        if (order.payment.method !== 'COD') {
+          paymentUrl = await this.paymentService.createPaymentUrl(
+            order.payment.method,
+            {
+              orderCode: order.order_code,
+              amount: order.total_amount,
+              description: `Thanh toan don hang ${order.order_code}`,
+              ipAddr: ip,
+            },
+          );
         }
-      } else if (dto.guestSessionId) {
+
+        const emailToSend =
+          order.guest_info?.email || order.shipping_info?.email;
+        if (emailToSend) {
+          this.emailService
+            .sendInvoice(emailToSend, order as unknown as InvoiceOrder)
+            .catch((err: unknown) => {
+              const msg = err instanceof Error ? err.message : String(err);
+              this.logger.error(`Failed to send invoice email: ${msg}`);
+            });
+        }
+        await this.logCreateOrder(userId, order, dto.source, ip, userAgent);
+
+        this.eventEmitter.emit(NOTIFY_EVENTS.ORDER_CREATED, order);
+
+        return {
+          order: order,
+          paymentUrl: paymentUrl,
+          message: 'Tạo đơn hàng thành công',
+        };
+      }
+
+      // B. LUỒNG MUA TỪ GIỎ HÀNG (CART)
+      let savedOrder: MongooseOrderDoc;
+
+      // CASE 1: KHÁCH VÃNG LAI (GUEST)
+      if (!userId && dto.guestSessionId) {
         const isVerified = await this.redis.get(
           `guest_verified:${dto.guestSessionId}`,
         );
@@ -873,13 +931,14 @@ export class OrdersService {
           );
         }
 
-        const tempOrder = await this.orderModel
+        // Lấy đơn hàng tạm đã được tạo ở bước initGuestCheckout (Đã Hold kho sẵn)
+        const tempOrder = (await this.orderModel
           .findOne({
             session_id: dto.guestSessionId,
             status: 'TEMPORARY',
             isGuest: true,
           })
-          .session(session);
+          .session(session)) as unknown as MongooseOrderDoc;
 
         if (!tempOrder) {
           throw new BadRequestException(
@@ -887,151 +946,8 @@ export class OrdersService {
           );
         }
 
-        orderToUpdate = tempOrder as unknown as MongooseOrderDoc;
-        cartQuery.session_id = dto.guestSessionId;
-        isGuestFlow = true;
-      } else {
-        throw new BadRequestException('Không xác định được danh tính.');
-      }
-
-      const cart = await this.cartModel.findOne(cartQuery).session(session);
-      if (!cart || !cart.items.length) {
-        throw new BadRequestException('Giỏ hàng trống.');
-      }
-
-      const orderItems: OrderItem[] = [];
-      let itemsTotalAmount = 0;
-      let totalWeight = 0;
-
-      for (const item of cart.items) {
-        const product = await this.productModel
-          .findById(item.product_id)
-          .session(session);
-
-        if (!product || product.status !== ProductStatus.ACTIVE) {
-          throw new BadRequestException(`Sản phẩm ${item.sku} không khả dụng`);
-        }
-
-        await this.stockService.holdStock(
-          {
-            product_id: item.product_id.toString(),
-            sku: item.sku,
-            quantity: item.quantity,
-          },
-          session,
-        );
-
-        const variant = product.variants.find((v) => v.sku === item.sku);
-        if (!variant) throw new BadRequestException(`Lỗi biến thể ${item.sku}`);
-
-        if (product.is_member_only && !userId) {
-          throw new BadRequestException(
-            `Sản phẩm ${product.name} chỉ dành cho Member.`,
-          );
-        }
-        if (
-          product.max_purchase_qty &&
-          item.quantity > product.max_purchase_qty
-        ) {
-          throw new BadRequestException(
-            `Quá giới hạn mua ${product.max_purchase_qty}.`,
-          );
-        }
-
-        const productWithWeight = product as unknown as {
-          weight?: number;
-        };
-        const weight = productWithWeight.weight || 0.5;
-        totalWeight += weight * item.quantity;
-
-        if (isGuestFlow) {
-          await this.productModel
-            .updateOne(
-              { _id: product._id, 'variants.sku': item.sku },
-              { $inc: { 'variants.$.stock_on_hold': -item.quantity } },
-            )
-            .session(session);
-        } else {
-          if (variant.stock < item.quantity) {
-            throw new BadRequestException(`Sản phẩm ${product.name} hết hàng.`);
-          }
-        }
-
-        const currentPrice =
-          variant.sale_price > 0 ? variant.sale_price : variant.price;
-        const mainImage = product.images?.[0] || '';
-
-        orderItems.push({
-          product_id: product._id,
-          sku: variant.sku,
-          product_name: product.name,
-          price: currentPrice,
-          quantity: item.quantity,
-          image: mainImage,
-        });
-      }
-
-      if (totalWeight > 50) {
-        throw new BadRequestException(`Đơn hàng quá nặng (${totalWeight}kg).`);
-      }
-
-      const itemsForPromo = orderItems.map((i) => ({
-        productId: i.product_id.toString(),
-        sku: i.sku,
-        quantity: i.quantity,
-        unitPrice: i.price,
-      }));
-
-      const { items: discountedItems, totalDiscount: promoDiscount } =
-        await this.promotionEngine.applyCombos(itemsForPromo);
-
-      for (const item of orderItems) {
-        const promoItem = discountedItems.find(
-          (d) =>
-            d.productId.toString() === item.product_id.toString() &&
-            d.sku === item.sku,
-        );
-
-        if (promoItem) {
-          item.price = promoItem.discountedPrice || promoItem.unitPrice;
-        }
-        itemsTotalAmount += item.price * item.quantity;
-      }
-
-      const shippingFee = await this.shippingService.calculateShippingFee(
-        dto.shippingInfo?.city_code,
-        dto.shippingInfo?.district_code,
-        orderItems,
-        dto.isInstant,
-      );
-
-      const { finalTotal: totalAfterVoucher, discount: voucherDiscount } =
-        await this.applyVoucher(
-          itemsTotalAmount,
-          dto.voucherCode,
-          userId,
-          orderItems,
-        );
-
-      const finalOrderTotal = totalAfterVoucher + shippingFee;
-
-      if (dto.paymentMethod === 'COD' && finalOrderTotal > 5000000) {
-        throw new BadRequestException('Đơn hàng > 5 triệu không hỗ trợ COD.');
-      }
-
-      // Khởi tạo biến để tránh lỗi used before assigned
-      let savedOrder: MongooseOrderDoc;
-
-      // Block xử lý tạo đơn hàng (Bao gồm cả Guest và Member)
-      if (isGuestFlow && orderToUpdate) {
-        // CASE 1: GUEST (Đã verify OTP)
-        const orderDoc = orderToUpdate;
-
-        const confirmedItems = orderDoc.items as unknown as OrderItem[];
-
+        const confirmedItems = tempOrder.items as unknown as OrderItem[];
         let reCalcTotal = 0;
-        // Xóa reCalcWeight không dùng đến
-
         for (const item of confirmedItems) {
           reCalcTotal += item.price * item.quantity;
         }
@@ -1056,9 +972,13 @@ export class OrdersService {
 
         const finalOrderTotalGuest = totalAfterVoucherGuest + shippingFeeGuest;
 
-        // Cập nhật Order Doc
-        orderDoc.order_code = `ORD-${Date.now()}`;
-        orderDoc.shipping_info = {
+        if (dto.paymentMethod === 'COD' && finalOrderTotalGuest > 5000000) {
+          throw new BadRequestException('Đơn hàng > 5 triệu không hỗ trợ COD.');
+        }
+
+        // Cập nhật lại thông tin từ đơn tạm thành đơn chính thức
+        tempOrder.order_code = `ORD-${Date.now()}`;
+        tempOrder.shipping_info = {
           ...dto.shippingInfo,
           email: dto.shippingInfo.email || '',
           name: dto.shippingInfo.name || '',
@@ -1068,35 +988,64 @@ export class OrdersService {
           district_code: Number(dto.shippingInfo.district_code),
           ward_code: dto.shippingInfo.ward_code || '',
         };
-        orderDoc.guest_info = {
+        tempOrder.guest_info = {
           name: dto.shippingInfo.name || '',
           phone: dto.shippingInfo.phone || '',
           email: dto.shippingInfo.email || '',
         };
-        orderDoc.payment = {
+        tempOrder.payment = {
           method: dto.paymentMethod,
           status: 'PENDING',
         };
-        orderDoc.total_amount = finalOrderTotalGuest;
-        orderDoc.discount_amount =
-          (orderDoc.discount_amount || 0) + (voucherDiscountGuest || 0);
-        orderDoc.shipping_fee = shippingFeeGuest;
-        orderDoc.voucher_code = dto.voucherCode || '';
-        orderDoc.status = 'PENDING';
-        orderDoc.hold_expires_at = new Date(Date.now() + 15 * 60000);
+        tempOrder.total_amount = finalOrderTotalGuest;
+        tempOrder.discount_amount =
+          (tempOrder.discount_amount || 0) + (voucherDiscountGuest || 0);
+        tempOrder.shipping_fee = shippingFeeGuest;
+        tempOrder.voucher_code = dto.voucherCode || '';
+        tempOrder.status = 'PENDING';
 
-        if (!orderDoc.timeline) orderDoc.timeline = [];
-        orderDoc.timeline.push({
+        if (!tempOrder.timeline) tempOrder.timeline = [];
+        tempOrder.timeline.push({
           status: 'PENDING',
           timestamp: new Date(),
           actor: 'Guest',
           note: 'Guest confirmed order via Cart (OTP Verified)',
         });
 
-        // Xả kho giữ (Hold) -> Kho bán (Sold)
-        for (const item of confirmedItems) {
-          // Sử dụng finalizeDeduction để trừ stock_on_hold một cách chuyên nghiệp
-          await this.stockService.finalizeDeduction(
+        await tempOrder.save({ session });
+        savedOrder = tempOrder as unknown as MongooseOrderDoc;
+
+        await this.cartModel
+          .deleteOne({ session_id: dto.guestSessionId })
+          .session(session);
+      }
+
+      // CASE 2: KHÁCH THÀNH VIÊN (MEMBER)
+      else if (userId) {
+        const cart = await this.cartModel
+          .findOne({ user_id: new Types.ObjectId(userId) })
+          .session(session);
+        if (!cart || !cart.items.length) {
+          throw new BadRequestException('Giỏ hàng trống.');
+        }
+
+        const orderItems: OrderItem[] = [];
+        let itemsTotalAmount = 0;
+        let totalWeight = 0;
+
+        for (const item of cart.items) {
+          const product = await this.productModel
+            .findById(item.product_id)
+            .session(session);
+
+          if (!product || product.status !== ProductStatus.ACTIVE) {
+            throw new BadRequestException(
+              `Sản phẩm ${item.sku} không khả dụng`,
+            );
+          }
+
+          // CHỈ CÓ LUỒNG MEMBER MỚI GỌI HOLD KHO TẠI ĐÂY
+          await this.stockService.holdStock(
             {
               product_id: item.product_id.toString(),
               sku: item.sku,
@@ -1104,20 +1053,117 @@ export class OrdersService {
             },
             session,
           );
+
+          const variant = product.variants.find((v) => v.sku === item.sku);
+          if (!variant)
+            throw new BadRequestException(`Lỗi biến thể ${item.sku}`);
+
+          if (
+            product.max_purchase_qty &&
+            item.quantity > product.max_purchase_qty
+          ) {
+            throw new BadRequestException(
+              `Quá giới hạn mua ${product.max_purchase_qty}.`,
+            );
+          }
+
+          if (variant.stock < item.quantity) {
+            throw new BadRequestException(`Sản phẩm ${product.name} hết hàng.`);
+          }
+
+          const productWithWeight = product as unknown as { weight?: number };
+          const weight = productWithWeight.weight || 0.5;
+          totalWeight += weight * item.quantity;
+
+          // Xử lý giá Flash Sale
+          let currentPrice =
+            variant.sale_price > 0 ? variant.sale_price : variant.price;
+          const activeFlashSale = await this.flashSaleModel
+            .findOne({
+              status: FlashSaleStatus.ACTIVE,
+              product_ids: product._id,
+            })
+            .session(session);
+
+          if (activeFlashSale) {
+            if (
+              activeFlashSale.discount_type === FlashSaleDiscountType.PERCENTAGE
+            ) {
+              currentPrice =
+                currentPrice -
+                (currentPrice * activeFlashSale.discount_value) / 100;
+            } else {
+              currentPrice = activeFlashSale.discount_value;
+            }
+            currentPrice = currentPrice > 0 ? currentPrice : 0;
+          }
+
+          const mainImage = product.images?.[0] || '';
+
+          orderItems.push({
+            product_id: product._id,
+            sku: variant.sku,
+            product_name: product.name,
+            price: currentPrice,
+            quantity: item.quantity,
+            image: mainImage,
+          });
         }
 
-        await orderDoc.save({ session });
-        savedOrder = orderDoc;
+        if (totalWeight > 50) {
+          throw new BadRequestException(
+            `Đơn hàng quá nặng (${totalWeight}kg).`,
+          );
+        }
 
-        // Xóa Guest Cart
-        await this.cartModel
-          .deleteOne({ session_id: dto.guestSessionId })
-          .session(session);
-      } else {
-        // CASE 2: MEMBER (Hoặc Guest thường không qua Flow OTP)
+        // Xử lý Combo
+        const itemsForPromo = orderItems.map((i) => ({
+          productId: i.product_id.toString(),
+          sku: i.sku,
+          quantity: i.quantity,
+          unitPrice: i.price,
+        }));
+
+        const { items: discountedItems, totalDiscount: promoDiscount } =
+          await this.promotionEngine.applyCombos(itemsForPromo);
+
+        for (const item of orderItems) {
+          const promoItem = discountedItems.find(
+            (d) =>
+              d.productId.toString() === item.product_id.toString() &&
+              d.sku === item.sku,
+          );
+
+          if (promoItem) {
+            item.price = promoItem.discountedPrice || promoItem.unitPrice;
+          }
+          itemsTotalAmount += item.price * item.quantity;
+        }
+
+        const shippingFee = await this.shippingService.calculateShippingFee(
+          dto.shippingInfo?.city_code,
+          dto.shippingInfo?.district_code,
+          orderItems,
+          dto.isInstant,
+        );
+
+        const { finalTotal: totalAfterVoucher, discount: voucherDiscount } =
+          await this.applyVoucher(
+            itemsTotalAmount,
+            dto.voucherCode,
+            userId,
+            orderItems,
+          );
+
+        const finalOrderTotal = totalAfterVoucher + shippingFee;
+
+        if (dto.paymentMethod === 'COD' && finalOrderTotal > 5000000) {
+          throw new BadRequestException('Đơn hàng > 5 triệu không hỗ trợ COD.');
+        }
+
         const newOrder = new this.orderModel({
           order_code: `ORD-${Date.now()}`,
-          user_id: userId ? new Types.ObjectId(userId) : null,
+          user_id: new Types.ObjectId(userId),
           items: orderItems,
           shipping_info: {
             ...dto.shippingInfo,
@@ -1136,7 +1182,6 @@ export class OrdersService {
           voucher_code: dto.voucherCode || '',
           status: 'PENDING',
           isGuest: false,
-          hold_expires_at: new Date(Date.now() + 15 * 60000),
           timeline: [
             {
               status: 'PENDING',
@@ -1150,34 +1195,27 @@ export class OrdersService {
         await newOrder.save({ session });
         savedOrder = newOrder;
 
-        for (const item of orderItems) {
-          await this.stockService.finalizeDeduction(
-            {
-              product_id: item.product_id.toString(),
-              sku: item.sku,
-              quantity: item.quantity,
-            },
-            session,
-          );
-        }
+        await this.cartModel.deleteOne({ _id: cart._id }).session(session);
+      } else {
+        throw new BadRequestException('Không xác định được danh tính.');
       }
 
-      // Xử lý Voucher Usage Count
+      // C. TRỪ LƯỢT SỬ DỤNG VOUCHER (Chung cho Cart Guest & Member)
       if (dto.voucherCode) {
         const voucher = await this.connection
-          .collection<Voucher>('promotions')
+          .collection<Voucher>('coupons')
           .findOne({ code: dto.voucherCode }, { session });
 
         if (voucher) {
           if (voucher.usage_limit && voucher.usage_limit > 0) {
             const updateResult = await this.connection
-              .collection('promotions')
+              .collection('coupons')
               .updateOne(
                 {
                   code: dto.voucherCode,
-                  used_count: { $lt: voucher.usage_limit },
+                  usage_count: { $lt: voucher.usage_limit },
                 },
-                { $inc: { used_count: 1 } },
+                { $inc: { usage_count: 1 } },
                 { session },
               );
 
@@ -1186,27 +1224,37 @@ export class OrdersService {
                 'Mã giảm giá đã hết lượt sử dụng ngay trong lúc bạn thanh toán.',
               );
             }
+
+            if (voucher.usage_count + 1 >= voucher.usage_limit) {
+              await this.connection
+                .collection('coupons')
+                .updateOne(
+                  { code: dto.voucherCode },
+                  { $set: { status: 'CANCELLED' } },
+                  { session },
+                );
+            }
           } else {
             await this.connection
-              .collection('promotions')
+              .collection('coupons')
               .updateOne(
                 { code: dto.voucherCode },
-                { $inc: { used_count: 1 } },
+                { $inc: { usage_count: 1 } },
                 { session },
               );
           }
         }
       }
 
-      await this.cartModel.deleteOne({ _id: cart._id }).session(session);
+      // CHỐT TRANSACTION THÀNH CÔNG CHO LUỒNG GIỎ HÀNG
       await session.commitTransaction();
 
-      if (isGuestFlow && dto.guestSessionId) {
+      // D. CÁC TÁC VỤ SAU KHI TẠO ĐƠN THÀNH CÔNG
+      if (!userId && dto.guestSessionId) {
         await this.redis.del(`guest_verified:${dto.guestSessionId}`);
         await this.redis.del(`guest_temp_info:${dto.guestSessionId}`);
       }
 
-      // Tự động lấy cấu hình tạo Link theo phương thức
       let paymentUrl: string | null = null;
       if (savedOrder.payment.method !== 'COD') {
         paymentUrl = await this.paymentService.createPaymentUrl(
@@ -1240,22 +1288,26 @@ export class OrdersService {
         message: 'Tạo đơn hàng thành công',
       };
     } catch (error: unknown) {
+      // NẾU CÓ LỖI, TOÀN BỘ LOGIC KHO, VOUCHER, ĐƠN HÀNG SẼ BỊ HOÀN TÁC
       await session.abortTransaction();
+
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
 
       await this.auditLogsService.log({
         action: 'CREATE_ORDER_FAILED',
         collection_name: 'orders',
-        actor_id: userId,
+        actor_id: userId || undefined,
         department: Department.SALES,
         detail: { error: errorMessage },
         is_success: false,
         ip: ip,
         user_agent: userAgent,
       });
+
       throw error;
     } finally {
+      // ĐÓNG KẾT NỐI TRANSACTION
       await session.endSession();
     }
   }
@@ -1430,7 +1482,6 @@ export class OrdersService {
   }
 
   // HELPER: Tách riêng logic bắn event để code chính sạch hơn
-
   private handleOrderEvents(status: OrderStatus, orderDoc: OrderData) {
     // Tự động đẩy đơn sang GHN/GHTK
     if (status === OrderStatus.READY_TO_SHIP && !orderDoc.waybill_code) {
@@ -1612,19 +1663,7 @@ export class OrdersService {
     return results;
   }
 
-  // private async restoreStock(order: MongooseOrderDoc, session: ClientSession) {
-  //   for (const item of order.items) {
-  //     await this.productModel
-  //       .updateOne(
-  //         { _id: item.product_id, 'variants.sku': item.sku },
-  //         { $inc: { 'variants.$.stock': item.quantity } },
-  //       )
-  //       .session(session);
-  //   }
-  // }
-
-  // Helper
-
+  // Helper: Hàm log tạo đơn hàng (Dùng chung cho cả 2 luồng Cart & BuyNow)
   private async logCreateOrder(
     userId: string | null | undefined,
     order: MongooseOrderDoc,
@@ -1774,5 +1813,47 @@ export class OrdersService {
     );
 
     return { url };
+  }
+
+  // US/AC bổ sung: Tự động giải phóng giỏ hàng/đơn Mua Ngay bị treo quá 15 phút
+  @Cron(CronExpression.EVERY_MINUTE)
+  async releaseExpiredTemporaryOrders() {
+    const expiredOrders = await this.orderModel.find({
+      status: 'TEMPORARY',
+      hold_expires_at: { $lte: new Date() },
+    });
+
+    if (expiredOrders.length === 0) return;
+
+    for (const order of expiredOrders) {
+      const session = await this.connection.startSession();
+      session.startTransaction();
+      try {
+        // 1. Nhả tồn kho đã hold
+        for (const item of order.items) {
+          await this.stockService.restock(
+            {
+              product_id: item.product_id.toString(),
+              sku: item.sku,
+              quantity: item.quantity,
+            },
+            session,
+          );
+        }
+
+        // 2. Chuyển trạng thái sang Hủy để đánh dấu
+        order.status = 'CANCELLED';
+        order.cancel_reason =
+          'Hệ thống tự động hủy do quá hạn 15 phút giữ hàng';
+        await order.save({ session });
+
+        await session.commitTransaction();
+      } catch (error) {
+        await session.abortTransaction();
+        this.logger.error(`Lỗi giải phóng đơn tạm ${order.order_code}:`, error);
+      } finally {
+        await session.endSession();
+      }
+    }
   }
 }

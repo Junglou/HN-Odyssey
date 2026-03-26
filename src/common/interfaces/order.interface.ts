@@ -145,7 +145,7 @@ export interface Voucher {
   end_date: Date;
   min_order_value?: number;
   usage_limit?: number;
-  used_count: number;
+  usage_count: number;
   max_discount_amount?: number; // Mức giảm tối đa cho loại PERCENT
   applicable_category_ids?: string[]; // Áp dụng cho danh mục cụ thể
   applicable_product_ids?: string[]; // Áp dụng cho sản phẩm cụ thể
