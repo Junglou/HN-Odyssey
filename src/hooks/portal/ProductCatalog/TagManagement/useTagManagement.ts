@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { toast } from "react-toastify";
 
-// định nghĩa type cho tag
+// prop
 export type TagStatus = "Active" | "Inactive";
 
 export interface Tag {
@@ -17,7 +17,7 @@ export interface TagFormData {
   status: TagStatus;
 }
 
-// dữ liệu giả lập bám sát thiết kế
+// mock data
 const INITIAL_TAGS: Tag[] = [
   {
     id: 1,
@@ -50,7 +50,7 @@ export function useTagManagement() {
   const [tags, setTags] = useState<Tag[]>(INITIAL_TAGS);
   const [search, setSearch] = useState<string>("");
 
-  // quản lý trạng thái thanh trượt thêm/sửa
+  // quản lý drawer
   const [drawerConfig, setDrawerConfig] = useState<{
     isOpen: boolean;
     mode: "add" | "edit";
@@ -63,7 +63,7 @@ export function useTagManagement() {
     tagId: number | null;
   }>({ isOpen: false, tagId: null });
 
-  // lọc danh sách theo từ khóa tìm kiếm (tìm trên cả tên và mô tả)
+  // bộ lọc
   const filteredTags = useMemo(() => {
     if (!search.trim()) return tags;
     return tags.filter(
@@ -73,7 +73,7 @@ export function useTagManagement() {
     );
   }, [tags, search]);
 
-  // nhóm các hành động tương tác từ giao diện
+  // nút action
   const actions = {
     changeSearch: (val: string) => setSearch(val),
 
@@ -108,7 +108,6 @@ export function useTagManagement() {
     },
   };
 
-  // xử lý lưu dữ liệu từ thanh trượt
   const handleDrawerSubmit = (data: TagFormData) => {
     if (drawerConfig.mode === "add") {
       const newTag: Tag = {

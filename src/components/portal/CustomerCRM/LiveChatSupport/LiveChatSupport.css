@@ -1,0 +1,558 @@
+/* wrapper */
+.lcs-page-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding-bottom: 20px;
+}
+
+/* header*/
+.lcs-page-header {
+  margin-bottom: 20px;
+}
+
+.lcs-page-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 8px 0;
+  font-family: "Lexend Exa", sans-serif;
+}
+
+.lcs-page-breadcrumb {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+  font-family: "Lexend Exa", sans-serif;
+}
+
+/* container */
+.lcs-container {
+  display: flex;
+  height: calc(100vh - 180px);
+  min-height: 600px;
+  background-color: #fff;
+  border-radius: 12px;
+  border: 2px solid #e5e7eb;
+  overflow: hidden;
+  font-family: "Lexend Exa", sans-serif;
+  box-sizing: border-box;
+}
+
+.lcs-container * {
+  box-sizing: border-box;
+}
+
+/* cột trái: danh sách chat */
+.lcs-sidebar {
+  width: var(--sidebar-width, 350px);
+  display: flex;
+  flex-direction: column;
+  background-color: #ffffff;
+  flex-shrink: 0;
+}
+
+.lcs-tabs {
+  display: flex;
+  padding: 20px 20px 16px 20px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lcs-tab-btn {
+  border: none;
+  background-color: #f3f4f6;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.lcs-badge {
+  background-color: #fff;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  color: inherit;
+}
+
+.lcs-tab-btn.active.waitlist {
+  background-color: #fef08a;
+  color: #854d0e;
+}
+.lcs-tab-btn.active.ongoing {
+  background-color: #bbf7d0;
+  color: #166534;
+}
+.lcs-tab-btn.active.complete {
+  background-color: #9ca3af;
+  color: #ffffff;
+}
+.lcs-tab-btn.active.complete .lcs-badge {
+  color: #374151;
+}
+
+/* search */
+.lcs-search-wrapper {
+  margin: 0 20px 16px 20px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.lcs-search-wrapper svg {
+  position: absolute;
+  right: 12px;
+  left: auto;
+  color: #9ca3af;
+}
+
+.lcs-search-input {
+  width: 100%;
+  padding: 10px 36px 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  outline: none;
+  font-family: inherit;
+  font-size: 0.85rem;
+  transition: border-color 0.2s;
+}
+
+.lcs-search-input::placeholder {
+  color: #9ca3af;
+  opacity: 0.5;
+}
+
+.lcs-search-input:focus {
+  border-color: #3b82f6;
+}
+
+/* khu vực danh sách các cuộc hội thoại cho phép cuộn độc lập */
+.lcs-session-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.lcs-session-item {
+  display: flex;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  position: relative;
+}
+
+.lcs-session-item:hover {
+  background-color: #f9fafb;
+}
+
+.lcs-session-item.selected {
+  background-color: #eff6ff;
+}
+
+/* avatar giả lập bằng vòng tròn */
+.lcs-avatar-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid #111827;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  flex-shrink: 0;
+  color: #111827;
+}
+
+.lcs-session-info {
+  flex: 1;
+  min-width: 0;
+}
+.lcs-session-name-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+  gap: 8px;
+}
+
+.lcs-session-name {
+  margin: 0 0 2px 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lcs-session-handle {
+  margin: 0 0 4px 0;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.lcs-session-preview {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lcs-session-time {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.lcs-empty-list {
+  padding: 40px 20px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+/* cột phải: khu vực hiển thị chi tiết nội dung tin nhắn */
+.lcs-chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: #f9fafb;
+}
+
+.lcs-no-chat-selected {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  font-size: 1rem;
+}
+
+/* header trong khung chat hiển thị thông tin người đang nhắn */
+.lcs-chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.lcs-chat-header-user {
+  display: flex;
+  align-items: center;
+}
+
+.lcs-chat-name {
+  margin: 0 0 2px 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.lcs-chat-handle {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.lcs-action-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  transition: opacity 0.2s;
+}
+
+.lcs-action-btn.dark {
+  background-color: #1f2937;
+  color: #ffffff;
+}
+
+.lcs-action-btn:hover {
+  opacity: 0.9;
+}
+
+/* khu vực cuộn chứa các đoạn hội thoại */
+.lcs-chat-messages {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.lcs-chat-date-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin: 16px 0;
+}
+.lcs-chat-date-divider::before,
+.lcs-chat-date-divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.lcs-chat-date-divider::before {
+  margin-right: 12px;
+}
+
+.lcs-chat-date-divider::after {
+  margin-left: 12px;
+}
+
+/* định dạng chung cho từng dòng tin nhắn */
+.lcs-message-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 75%;
+}
+
+.lcs-message-row.customer {
+  align-self: flex-start;
+}
+
+.lcs-message-row.consultant {
+  align-self: flex-end;
+  justify-content: flex-end;
+}
+
+.lcs-message-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: white;
+}
+
+.lcs-message-avatar.customer-avatar {
+  background-color: #eab308;
+}
+
+.lcs-message-avatar.consultant-avatar {
+  background-color: #ea580c;
+}
+
+/* định dạng khối bong bóng tin nhắn */
+.lcs-message-content {
+  padding: 12px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+.lcs-message-content p {
+  margin: 0;
+}
+
+/* phân tách màu nền bong bóng giữa khách hàng và tư vấn viên */
+.customer-bg {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #111827;
+}
+
+.consultant-bg {
+  background-color: #0ea5e9;
+  color: #ffffff;
+}
+
+/* định dạng cho tin nhắn chứa ảnh */
+.lcs-message-image {
+  margin-top: 8px;
+}
+.lcs-message-image img {
+  max-width: 100%;
+  border-radius: 8px;
+  display: block;
+}
+
+/* định dạng hiển thị thẻ thông tin sản phẩm đính kèm */
+.lcs-product-card {
+  margin-top: 10px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
+  color: #111827;
+}
+
+.lcs-product-card img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.lcs-product-info {
+  padding: 12px;
+}
+
+.lcs-product-info h4 {
+  margin: 0 0 4px 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.lcs-product-info p {
+  margin: 0 0 8px 0;
+  font-size: 0.8rem;
+  color: #6b7280;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.lcs-product-info a {
+  font-size: 0.8rem;
+  color: #3b82f6;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.lcs-message-time {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  margin-bottom: 4px;
+}
+
+/* thanh nhập tin nhắn bên dưới */
+.lcs-chat-input-area {
+  padding: 16px 24px;
+  background-color: #ffffff;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lcs-chat-input-area input {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 10px 0;
+  font-size: 0.95rem;
+  font-family: inherit;
+  background-color: transparent;
+}
+
+.lcs-input-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lcs-icon-btn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.lcs-icon-btn:hover {
+  background-color: #f3f4f6;
+  color: #4b5563;
+}
+
+.lcs-send-btn {
+  background-color: #3b82f6;
+  color: #ffffff;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.lcs-send-btn:hover {
+  background-color: #2563eb;
+}
+.lcs-icon-btn:focus,
+.lcs-send-btn:focus,
+.lcs-icon-btn:active,
+.lcs-send-btn:active {
+  outline: none;
+  box-shadow: none;
+}
+
+/* thanh chia cắt và hỗ trợ kéo thả */
+.lcs-resizer {
+  width: 4px;
+  background-color: #e5e7eb;
+  cursor: col-resize;
+  flex-shrink: 0;
+  transition: background-color 0.2s;
+  z-index: 10;
+}
+
+.lcs-resizer:hover,
+.lcs-resizer.active {
+  background-color: #3b82f6;
+}
+
+/* khi đang kéo thả, khóa việc bôi đen text để không làm khó chịu người dùng */
+.is-resizing-container {
+  user-select: none;
+}
+
+/* cấu hình responsive cho màn hình nhỏ và thiết bị di động */
+@media (max-width: 900px) {
+  .lcs-container {
+    flex-direction: column;
+    height: auto;
+    min-height: calc(100vh - 100px);
+  }
+
+  .lcs-sidebar {
+    width: 100%; /* do không bị style inline đè nữa nên nó sẽ nhận 100% một cách tự nhiên */
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .lcs-resizer {
+    display: none; /* ẩn thanh kéo trên thiết bị nhỏ */
+  }
+
+  .lcs-session-list {
+    max-height: 250px;
+  }
+}
+
+@media (max-width: 480px) {
+  .lcs-tab-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}

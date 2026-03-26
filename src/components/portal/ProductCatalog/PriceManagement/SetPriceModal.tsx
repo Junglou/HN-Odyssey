@@ -1,14 +1,8 @@
 import { useState, useEffect } from "react";
 import "./SetPriceModal.css";
+import type { PriceFormData } from "../../../../hooks/portal/ProductCatalog/PriceManagement/usePriceManagement";
 
-// định nghĩa type khớp với hook usePriceManagement
-export interface PriceFormData {
-  priceAmount: number;
-  currency: string;
-  effectiveDate: string;
-}
-
-// Props
+//prop
 export interface SetPriceModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -19,16 +13,14 @@ export interface SetPriceModalProps {
   onSave: (data: PriceFormData) => void;
 }
 
-// component bọc ngoài để xử lý key khởi tạo lại modal một cách an toàn
 export default function SetPriceModal(props: SetPriceModalProps) {
   if (!props.isOpen) return null;
 
-  // sử dụng key để ép react tạo lại component mỗi khi mở hoặc đổi sản phẩm (tránh dùng useEffect gây lỗi)
   const modalKey = props.sku || "new-price";
   return <SetPriceModalContent key={modalKey} {...props} />;
 }
 
-// component nội dung chính của modal
+// component modal
 function SetPriceModalContent({
   onClose,
   productName,
@@ -37,22 +29,23 @@ function SetPriceModalContent({
   isSubmitting,
   onSave,
 }: Omit<SetPriceModalProps, "isOpen">) {
-  // khởi tạo giá trị trực tiếp ngay từ đầu, không cần useEffect
   const [priceAmount, setPriceAmount] = useState<string>(
     initialPrice > 0 ? initialPrice.toString() : "",
   );
+
+  const [currency, setCurrency] = useState<string>("USD");
   const [error, setError] = useState<string>("");
 
-  // khởi tạo ngày hiện tại một lần duy nhất theo định dạng YYYY-MM-DD
-  const [currentDate] = useState<string>(() => {
+  const getTodayString = () => {
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, "0");
     const dd = String(today.getDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
-  });
+  };
 
-  // lắng nghe phím tắt để đóng (đây là side effect hợp lệ để đăng ký event listener)
+  const [effectiveDate, setEffectiveDate] = useState<string>(getTodayString());
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !isSubmitting) {
@@ -72,13 +65,19 @@ function SetPriceModalContent({
       setError("Price amount must be greater than 0.");
       return;
     }
+
+    if (!effectiveDate) {
+      setError("Effective date is required.");
+      return;
+    }
+
     setError("");
 
-    // trả về object chứa đầy đủ thông tin
+    // Trả về dữ liệu thực tế thay vì hardcode USD và ngày hiện tại
     onSave({
       priceAmount: numPrice,
-      currency: "USD",
-      effectiveDate: currentDate,
+      currency,
+      effectiveDate,
     });
   };
 
@@ -111,16 +110,18 @@ function SetPriceModalContent({
 
         <div className="spm-input-grid">
           <div className="spm-input-group">
-            <label>Price Amount (USD)</label>
+            <label>
+              Price Amount <span style={{ color: "#ef4444" }}>*</span>
+            </label>
             <input
               type="number"
               min="0.01"
               step="0.01"
-              className={error ? "spm-input-error" : ""}
+              className={error.includes("Price") ? "spm-input-error" : ""}
               value={priceAmount}
               onChange={(e) => {
                 setPriceAmount(e.target.value);
-                if (error) setError(""); // xóa lỗi khi gõ lại
+                if (error) setError("");
               }}
               placeholder="0.00"
               disabled={isSubmitting}
@@ -128,13 +129,33 @@ function SetPriceModalContent({
           </div>
           <div className="spm-input-group">
             <label>Currency</label>
-            <select disabled>
+            {/* Đã gỡ readonly/disabled, cho phép chọn ngoại tệ */}
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              disabled={isSubmitting}
+            >
               <option value="USD">USD</option>
+              <option value="VND">VND</option>
+              <option value="EUR">EUR</option>
             </select>
           </div>
           <div className="spm-input-group">
-            <label>Effective Date</label>
-            <input type="date" value={currentDate} readOnly disabled />
+            <label>
+              Effective Date <span style={{ color: "#ef4444" }}>*</span>
+            </label>
+            {/* Đã gỡ readonly/disabled, cho phép chọn ngày áp dụng (không được chọn ngày trong quá khứ) */}
+            <input
+              type="date"
+              min={getTodayString()}
+              value={effectiveDate}
+              onChange={(e) => {
+                setEffectiveDate(e.target.value);
+                if (error) setError("");
+              }}
+              disabled={isSubmitting}
+              className={error.includes("date") ? "spm-input-error" : ""}
+            />
           </div>
         </div>
 

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import "./ProductManagement.css";
+import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 
 import {
   ViewIcon,
@@ -18,7 +19,6 @@ import {
   type DropdownOption,
   STATUS_OPTIONS,
   PRICE_OPTIONS,
-  PAGE_OPTIONS,
 } from "../../../../hooks/portal/ProductCatalog/ProductManagement/useProductManagement";
 
 // props
@@ -123,25 +123,14 @@ export default function ProductManagement({
   actions,
 }: ProductManagementProps) {
   const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
-
-  // tắt dropdown menu khi click ra ngoài bảng
-  useEffect(() => {
-    const handleClickOutside = () => {
-      if (openDropdownId !== null) {
-        setOpenDropdownId(null);
-      }
-    };
-    document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
-  }, [openDropdownId]);
+  const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
+  const limitRef = useRef<HTMLDivElement>(null);
+  useClickOutside(limitRef, () => setIsLimitDropdownOpen(false));
 
   // biến ui tính toán trạng thái
   const isAllSelected = data.length > 0 && data.every((p) => p.selected);
-  const pageNumbers = Array.from(
-    { length: pagination.totalPages },
-    (_, i) => i + 1,
-  );
-
+  // biến kiểm tra để khóa các nút thao tác hàng loạt
+  const hasSelection = data.some((p) => p.selected);
   return (
     <div className="pm-container">
       <div className="pm-header">
@@ -200,6 +189,7 @@ export default function ProductManagement({
               actions.bulk("activate");
               e.currentTarget.blur();
             }}
+            disabled={!hasSelection}
           >
             Bulk Activate
           </button>
@@ -210,6 +200,7 @@ export default function ProductManagement({
               actions.bulk("deactivate");
               e.currentTarget.blur();
             }}
+            disabled={!hasSelection}
           >
             Bulk Deactivate
           </button>
@@ -220,6 +211,7 @@ export default function ProductManagement({
               actions.bulk("delete");
               e.currentTarget.blur();
             }}
+            disabled={!hasSelection}
           >
             Bulk Delete
           </button>
@@ -388,6 +380,7 @@ export default function ProductManagement({
             {pagination.totalFiltered} products
           </div>
           <div className="pm-page-numbers">
+            {/* Nút lùi trang */}
             <button
               type="button"
               className="pm-page-num"
@@ -401,20 +394,21 @@ export default function ProductManagement({
             >
               &lt;
             </button>
-
-            {pageNumbers.map((num) => (
-              <button
-                key={num}
-                type="button"
-                aria-label={`Go to page ${num}`}
-                aria-current={pagination.page === num ? "page" : undefined}
-                className={`pm-page-num ${pagination.page === num ? "active" : ""}`}
-                onClick={() => actions.changePage(num)}
-              >
-                {num}
-              </button>
-            ))}
-
+            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(
+              (num) => (
+                <button
+                  key={num}
+                  type="button"
+                  aria-label={`Go to page ${num}`}
+                  aria-current={pagination.page === num ? "page" : undefined}
+                  className={`pm-page-num ${pagination.page === num ? "active" : ""}`}
+                  onClick={() => actions.changePage(num)}
+                >
+                  {num}
+                </button>
+              ),
+            )}
+            {/* Nút tiến trang */}
             <button
               type="button"
               className="pm-page-num"
@@ -439,12 +433,36 @@ export default function ProductManagement({
               &gt;
             </button>
 
-            <CustomDropdown
-              value={pagination.limit.toString()}
-              options={PAGE_OPTIONS}
-              onChange={(val) => actions.changeLimit(Number(val))}
-              className="pm-page-dropdown"
-            />
+            {/* pagination mới (vừa update, đổi tên) */}
+            <div className="pm-limit-dropdown" ref={limitRef}>
+              <div
+                className={`pm-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}
+                onClick={() => setIsLimitDropdownOpen(!isLimitDropdownOpen)}
+              >
+                <span>{pagination.limit} / page</span>
+                <div
+                  className={`pm-limit-icon ${isLimitDropdownOpen ? "open" : ""}`}
+                >
+                  <ChevronDownIcon />
+                </div>
+              </div>
+              {isLimitDropdownOpen && (
+                <div className="pm-limit-options">
+                  {[10, 20, 50].map((val) => (
+                    <div
+                      key={val}
+                      className={`pm-limit-option ${pagination.limit === val ? "active" : ""}`}
+                      onClick={() => {
+                        actions.changeLimit(val);
+                        setIsLimitDropdownOpen(false);
+                      }}
+                    >
+                      {val} / page
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

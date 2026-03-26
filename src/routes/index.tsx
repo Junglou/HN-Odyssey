@@ -29,6 +29,11 @@ import CategoryManagementPage from "../pages/portal/ProductCatalog/CategoryManag
 import TagManagementPage from "../pages/portal/ProductCatalog/TagManagement/TagManagementPage";
 import PriceManagementPage from "../pages/portal/ProductCatalog/PriceManagement/PriceManagementPage";
 
+import CustomerManagementPage from "../pages/portal/CustomerCRM/CustomerManagement/CustomerManagementPage";
+import LiveChatSupportPage from "../pages/portal/CustomerCRM/LiveChatSupport/LiveChatSupportPage";
+
+import PromotionManagementPage from "../pages/portal/MarketingSuite/PromotionManagement/PromotionManagementPage";
+
 export const router = createBrowserRouter([
   // route auth
   {
@@ -154,6 +159,18 @@ export const router = createBrowserRouter([
       {
         path: "prices",
         element: <PriceManagementPage />,
+      },
+      {
+        path: "customers",
+        element: <CustomerManagementPage />,
+      },
+      {
+        path: "live-chat",
+        element: <LiveChatSupportPage />,
+      },
+      {
+        path: "promotion",
+        element: <PromotionManagementPage />,
       },
     ],
   },

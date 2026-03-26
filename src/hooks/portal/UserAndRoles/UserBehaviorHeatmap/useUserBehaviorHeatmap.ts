@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 
-// khai báo type
+// type
 export type DeviceType = "Desktop" | "Mobile" | "Tablet";
 export type InteractionType = "Click" | "Scroll" | "Hover";
 
-// dữ liệu giả lập mặc định
+// mock data
 const DEFAULT_STATS = {
   visits: "15,240",
   clicks: "4,580",
@@ -18,20 +18,18 @@ const STATS_DATA_MAP: Record<InteractionType, typeof DEFAULT_STATS> = {
 };
 
 export function useUserBehaviorHeatmap() {
-  // state điều khiển filter
+  // state filter
   const [selectedPage, setSelectedPage] =
     useState<string>("Homepage (Current)");
   const [device, setDevice] = useState<DeviceType>("Desktop");
   const [interactionType, setInteractionType] =
     useState<InteractionType>("Click");
 
-  // state lưu dữ liệu thống kê đang hiển thị
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-
   const [stats, setStats] = useState(DEFAULT_STATS);
 
-  // tự động cập nhật số liệu khi filter thay đổi
+  // tự động cập nhật số liệu filter
   useEffect(() => {
     const fetchStatsData = () => {
       setStats(STATS_DATA_MAP[interactionType]);

@@ -60,8 +60,6 @@ export const useCategory = () => {
   const [categories, setCategories] =
     useState<CategoryNode[]>(INITIAL_CATEGORIES);
   const [searchQuery, setSearchQuery] = useState("");
-
-  // lưu trữ id của các danh mục đang mở
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
     new Set(["c2", "c2-1", "c3", "c3-1"]),
   );
@@ -82,7 +80,6 @@ export const useCategory = () => {
     isDeleting: boolean;
   }>({ isOpen: false, categoryId: null, isDeleting: false });
 
-  // tính toán và định dạng lại mảng danh mục thành mảng một chiều
   const visibleCategories = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
     if (normalizedQuery) {
@@ -122,7 +119,6 @@ export const useCategory = () => {
 
   const openEditDrawer = useCallback(
     (id: string) => {
-      // sử dụng hàm tìm kiếm dùng chung
       const found = findNodeAndParent(categories, id);
       if (found) {
         setDrawerConfig({
@@ -197,7 +193,6 @@ export const useCategory = () => {
           }
           toast.success("Đã thêm danh mục mới!");
         } else if (currentMode === "edit" && currentEditingId) {
-          // cắt danh mục ra khỏi cây hiện tại để chuẩn bị dán vào vị trí mới nếu có thay đổi thư mục cha
           const { newNodes, draggedNode } = removeNodeFromTree(
             categories,
             currentEditingId,
@@ -220,7 +215,7 @@ export const useCategory = () => {
           if (!formData.parentId) {
             setCategories([...newNodes, updatedNode]);
           } else {
-            // nếu có thư mục cha mới thì duyệt cây và nhét danh mục vào đúng vị trí của cha đó
+            // nếu có thư mục cha mới thì duyệt cây và nhét danh mục vào đúng vị trí đó
             const insertRecursive = (nodes: CategoryNode[]): CategoryNode[] => {
               return nodes.map((n) => {
                 if (n.id === formData.parentId) {

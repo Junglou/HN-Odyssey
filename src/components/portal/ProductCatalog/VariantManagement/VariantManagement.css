@@ -65,8 +65,13 @@
 /* thanh tìm kiếm */
 .vm-filters-row {
   display: flex;
+  justify-content: flex-start;
+  align-items: center;
   width: 100%;
+  margin: 0;
+  padding: 0;
 }
+
 .vm-search-input {
   width: 100%;
   max-width: 400px;
@@ -77,7 +82,10 @@
   font-family: inherit;
   font-size: 0.9rem;
   transition: border-color 0.2s;
+  margin: 0;
+  box-sizing: border-box;
 }
+
 .vm-search-input:focus {
   border-color: #3b82f6;
 }

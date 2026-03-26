@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 
-// interface và dữ liệu mẫu
+// interface
 export interface ProductData {
   sku: string;
   name: string;
@@ -79,39 +79,43 @@ const MOCK_DB = [
     price: 15.0,
     categoryId: "c2-1",
   },
-  {
-    id: "3",
-    sku: "PNT-008",
-    name: "Denim Jeans",
-    status: "Draft",
-    price: 35.0,
-    categoryId: "c2-2",
-  },
-  {
-    id: "4",
-    sku: "SHS-004",
-    name: "Running Sneakers",
-    status: "Active",
-    price: 50.0,
-    categoryId: "c1-2",
-  },
-  {
-    id: "5",
-    sku: "ACC-099",
-    name: "Leather Belt",
-    status: "Inactive",
-    price: 12.0,
-    categoryId: "c2-2",
-  },
-  {
-    id: "6",
-    sku: "HAT-002",
-    name: "Summer Fedora",
-    status: "Draft",
-    price: 8.5,
-    categoryId: "c1-1-2",
-  },
 ];
+
+const generatePricingVariants = (
+  variants: VariantAttribute[],
+  currentPricing: PricingItem[],
+): PricingItem[] => {
+  const validAttrs = variants.filter((v) => v.values.length > 0);
+  let variantNames: string[] = [];
+
+  if (validAttrs.length === 0) {
+    variantNames = ["Default / Base Product"];
+  } else {
+    const combinations = validAttrs.reduce((acc: string[][], attr) => {
+      if (acc.length === 0) return attr.values.map((v) => [v]);
+      const newAcc: string[][] = [];
+      acc.forEach((combo) => {
+        attr.values.forEach((val) => {
+          newAcc.push([...combo, val]);
+        });
+      });
+      return newAcc;
+    }, []);
+    variantNames = combinations.map((combo) => combo.join(" / "));
+  }
+
+  return variantNames.map((name, index) => {
+    const existing = currentPricing.find((p) => p.variantName === name);
+    if (existing) return existing;
+
+    return {
+      id: `p-${Date.now()}-${index}`,
+      variantName: name,
+      price: 0, // Giá mặc định cho biến thể mới
+      status: "draft",
+    };
+  });
+};
 
 export function useProductForm() {
   const { id } = useParams<{ id: string }>();
@@ -210,20 +214,30 @@ export function useProductForm() {
     removeTag: (tagToRemove: string) => {
       setTags((prev) => prev.filter((tag) => tag !== tagToRemove));
     },
+
+    // logic variant
     confirmVariant: (
       updatedAttributes: VariantAttribute[],
       editingVariantId?: string,
     ) => {
-      if (editingVariantId) {
-        setProductVariants((prev) =>
-          prev.map((v) =>
+      setProductVariants((prev) => {
+        let nextVariants: VariantAttribute[];
+        if (editingVariantId) {
+          nextVariants = prev.map((v) =>
             v.id === updatedAttributes[0]?.id ? updatedAttributes[0] : v,
-          ),
+          );
+        } else {
+          nextVariants = updatedAttributes;
+        }
+
+        setPricingList((currentPricing) =>
+          generatePricingVariants(nextVariants, currentPricing),
         );
-      } else {
-        setProductVariants(updatedAttributes);
-      }
+
+        return nextVariants;
+      });
     },
+
     savePrice: (priceId: string, newPrice: number) => {
       setPricingList((prev) =>
         prev.map((item) =>

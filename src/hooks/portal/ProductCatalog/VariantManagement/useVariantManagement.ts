@@ -45,7 +45,6 @@ const INITIAL_VARIANTS: Variant[] = [
   },
 ];
 
-// tách chuỗi thành mảng, loại bỏ khoảng trắng dư/trùng lặp
 const parseVariantValues = (valuesStr: string): string[] => {
   const parsed = valuesStr
     .split(",")
@@ -62,8 +61,6 @@ const validateVariant = (data: VariantFormData): boolean => {
 export function useVariantManagement() {
   const [variants, setVariants] = useState<Variant[]>(INITIAL_VARIANTS);
   const [search, setSearch] = useState<string>("");
-
-  // ref để tạo id mới cho biến thể, tránh xung đột với id cũ
   const nextIdCounter = useRef<number>(5);
 
   // quản lý trạng thái drawer thêm/sửa
@@ -199,7 +196,7 @@ export function useVariantManagement() {
     }
   };
 
-  // hlogic xóa trực tiếp
+  // logic xóa trực tiếp
   const executeDelete = () => {
     if (!deleteConfig.variantId || deleteConfig.isDeleting) return;
     setDeleteConfig((prev) => ({ ...prev, isDeleting: true }));

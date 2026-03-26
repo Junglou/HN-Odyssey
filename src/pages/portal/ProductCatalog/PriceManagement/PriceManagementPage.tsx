@@ -5,7 +5,8 @@ import "./PriceManagementPage.css";
 
 export default function PriceManagementPage() {
   const {
-    filteredRecords,
+    currentRecords,
+    pagination,
     search,
     statusFilter,
     selectedIds,
@@ -20,7 +21,8 @@ export default function PriceManagementPage() {
     <div className="pm-page-container">
       {/* Component chính hiển thị bảng danh sách */}
       <PriceManagement
-        data={filteredRecords}
+        data={currentRecords}
+        pagination={pagination}
         search={search}
         statusFilter={statusFilter}
         selectedIds={selectedIds}

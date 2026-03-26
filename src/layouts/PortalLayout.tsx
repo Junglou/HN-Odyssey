@@ -25,7 +25,9 @@ const PortalLayout = () => {
   // state quản lý đóng mở các menu cha
   const [isUsersRolesOpen, setIsUsersRolesOpen] = useState(false);
   const [isProductCatalogOpen, setIsProductCatalogOpen] = useState(true);
+  const [isCustomerCRMOpen, setIsCustomerCRMOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isMarketingSuiteOpen, setIsMarketingSuiteOpen] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
   const isParentActive = (basePath: string) =>
@@ -64,7 +66,7 @@ const PortalLayout = () => {
             <ChevronIcon open={false} />
           </div>
 
-          {/* new: Bọc menu Product Catalog vào menu-group để căn khoảng cách đều */}
+          {/* Product Catalog */}
           <div className="menu-group">
             <div
               className={`menu-item ${isParentActive("/portal/products") || isParentActive("/portal/categories") || isParentActive("/portal/variants") || isParentActive("/portal/prices") || isParentActive("/portal/tags") ? "active-parent" : ""}`}
@@ -134,21 +136,89 @@ const PortalLayout = () => {
             <ChevronIcon open={false} />
           </div>
 
-          <div className="menu-item">
-            <div className="menu-item-left">
-              <CRMIcon /> Customer CRM
+          {/* Customer CRM */}
+          <div className="menu-group">
+            <div
+              className={`menu-item ${isParentActive("/portal/customers") || isParentActive("/portal/live-chat") ? "active-parent" : ""}`}
+              onClick={() => setIsCustomerCRMOpen(!isCustomerCRMOpen)}
+            >
+              <div className="menu-item-left">
+                <CRMIcon /> Customer CRM
+              </div>
+              <ChevronIcon open={isCustomerCRMOpen} />
             </div>
-            <ChevronIcon open={false} />
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateRows: isCustomerCRMOpen ? "1fr" : "0fr",
+                transition:
+                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+                overflow: "hidden",
+              }}
+            >
+              <div className="submenu" style={{ minHeight: 0 }}>
+                <div
+                  className={`submenu-item ${isActive("/portal/customers") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/customers")}
+                >
+                  Customer Management
+                </div>
+                <div
+                  className={`submenu-item ${isActive("/portal/live-chat") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/live-chat")}
+                >
+                  Live Chat Support
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="menu-item">
-            <div className="menu-item-left">
-              <MarketingIcon /> Marketing Suite
+          {/* Marketing Suite */}
+          <div className="menu-group">
+            <div
+              className={`menu-item ${isParentActive("/portal/promotion") ? "active-parent" : ""}`}
+              onClick={() => setIsMarketingSuiteOpen(!isMarketingSuiteOpen)}
+            >
+              <div className="menu-item-left">
+                <MarketingIcon /> Marketing Suite
+              </div>
+              <ChevronIcon open={isMarketingSuiteOpen} />
             </div>
-            <ChevronIcon open={false} />
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateRows: isMarketingSuiteOpen ? "1fr" : "0fr",
+                transition:
+                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+                overflow: "hidden",
+              }}
+            >
+              <div className="submenu" style={{ minHeight: 0 }}>
+                <div
+                  className={`submenu-item ${isActive("/portal/promotion") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/promotion")}
+                >
+                  Promotion Management
+                </div>
+                <div
+                  className={`submenu-item ${isActive("/portal/ReviewAndRating") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/ReviewAndRating")}
+                >
+                  Review & Rating Moderation
+                </div>
+                <div
+                  className={`submenu-item ${isActive("/portal/coupon") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/coupon")}
+                >
+                  Coupon Management
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* new: Bọc menu Users & Roles vào menu-group để căn khoảng cách đều */}
+          {/* Users & Roles */}
           <div className="menu-group">
             <div
               className={`menu-item ${isParentActive("/portal/user") || isParentActive("/portal/role") || isParentActive("/portal/heatmap") ? "active-parent" : ""}`}

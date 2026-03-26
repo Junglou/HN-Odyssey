@@ -13,7 +13,7 @@
   animation: spm-fadeIn 0.2s ease-out;
 }
 
-/* Khung nội dung chính của modal */
+/* Khung nội dung modal */
 .spm-modal-content {
   background-color: #fff;
   border-radius: 8px;
@@ -55,7 +55,7 @@
   color: #111827;
 }
 
-/* Thông tin sản phẩm cơ bản */
+/* Thông tin sản phẩm */
 .spm-product-info {
   margin-bottom: 20px;
   font-size: 0.95rem;
@@ -146,7 +146,6 @@
   gap: 12px;
 }
 
-/* áp dụng chuẩn màu cancel tuyệt đối */
 .spm-btn-cancel {
   padding: 10px 20px;
   background-color: #fff;
@@ -170,7 +169,6 @@
   cursor: not-allowed;
 }
 
-/* áp dụng chuẩn màu save tuyệt đối (xám sang đen) */
 .spm-btn-save {
   padding: 10px 20px;
   background-color: #b6b7b8;

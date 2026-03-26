@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import "./UserModal.css";
+import { ChevronDownSmallIcon } from "../../../../assets/icons/UserManagementIcons";
 
 // model user chung
 export interface User {
@@ -82,20 +83,10 @@ function CustomModalSelect({
         <span className={!selectedLabel ? "placeholder" : ""}>
           {selectedLabel || placeholder}
         </span>
-        <svg
+        <ChevronDownSmallIcon
           className={`um-modal-dropdown-arrow ${isOpen ? "open" : ""}`}
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={disabled ? "#9ca3af" : "#333"}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <polyline points="6 9 12 15 18 9"></polyline>
-        </svg>
+          style={{ color: disabled ? "#9ca3af" : "#333" }}
+        />
       </div>
       {isOpen && !disabled && (
         <div className="um-modal-dropdown-options">

@@ -7,7 +7,7 @@ import type {
 
 export type BulkAction = "activate" | "deactivate" | "delete";
 
-// mock data => đợi API
+// mock data
 const INITIAL_MOCK_USERS: User[] = [
   {
     id: 1,
@@ -66,7 +66,7 @@ const INITIAL_MOCK_USERS: User[] = [
 ];
 
 export function useUserManagement() {
-  // Role: Admin (tạm thời, trong quá trình kiểm thử UI)
+  // Role: Admin
   const loggedInUserRole = "Administrator";
 
   // Các state chính
@@ -91,7 +91,6 @@ export function useUserManagement() {
     userId: number | null;
   }>({ isOpen: false, type: "single", userId: null });
 
-  // Tính lại mỗi khi state user/filter thay đổi để hiển thị
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
       const matchSearch =

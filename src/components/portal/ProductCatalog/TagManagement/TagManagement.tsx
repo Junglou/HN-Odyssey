@@ -1,10 +1,8 @@
 import { useState, useEffect } from "react";
 import "./TagManagement.css";
 
-import {
-  DotsIcon,
-  TrashIcon,
-} from "../../../../assets/icons/UserManagementIcons";
+import { DotsIcon } from "../../../../assets/icons/UserManagementIcons";
+import { CleanTrashIcon } from "../../../../assets/icons/VariantManagementIcons";
 import { EditPenIcon } from "../../../../assets/icons/ProductManagementIcons";
 
 // import type từ hook
@@ -112,7 +110,7 @@ export default function TagManagement({
                             e.currentTarget.blur();
                           }}
                         >
-                          <TrashIcon fill="#111827" />
+                          <CleanTrashIcon />
                         </button>
 
                         <div

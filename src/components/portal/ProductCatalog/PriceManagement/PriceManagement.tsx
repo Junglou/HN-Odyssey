@@ -20,6 +20,13 @@ interface PriceManagementProps {
   search: string;
   statusFilter: PriceStatus | "All";
   selectedIds: Set<string>;
+  pagination: {
+    page: number;
+    limit: number;
+    totalPages: number;
+    totalFiltered: number;
+    startIndex: number;
+  };
   actions: {
     changeSearch: (val: string) => void;
     changeStatusFilter: (status: PriceStatus | "All") => void;
@@ -27,6 +34,8 @@ interface PriceManagementProps {
     toggleSelection: (id: string) => void;
     toggleSelectAll: (isSelectAll: boolean) => void;
     openSetPriceModal: (record: PriceRecord) => void;
+    changePage: (page: number) => void;
+    changeLimit: (limit: number) => void;
   };
   rowActions: {
     submitPrice: (id: string) => void;
@@ -44,43 +53,47 @@ export default function PriceManagement({
   search,
   statusFilter,
   selectedIds,
+  pagination,
   actions,
   rowActions,
   bulkActions,
 }: PriceManagementProps) {
-  // quản lý trạng thái mở dropdown lọc
+  // dropdown
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const statusRef = useRef<HTMLDivElement>(null);
   useClickOutside(statusRef, () => setIsStatusDropdownOpen(false));
+
+  const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
+  const limitRef = useRef<HTMLDivElement>(null);
+  useClickOutside(limitRef, () => setIsLimitDropdownOpen(false));
 
   const isAllSelected = data.length > 0 && selectedIds.size === data.length;
   const isPartiallySelected =
     selectedIds.size > 0 && selectedIds.size < data.length;
 
-  // hàm render huy hiệu trạng thái tùy theo status
   const renderStatusBadge = (status: PriceStatus) => {
     switch (status) {
-      case "Approve":
+      case "Approved":
         return (
-          <span className="pm-badge pm-badge-approve">
+          <span className="prm-badge prm-badge-approve">
             <CheckCircleIcon /> Approve
           </span>
         );
       case "Rejected":
         return (
-          <span className="pm-badge pm-badge-rejected">
+          <span className="prm-badge prm-badge-rejected">
             <XCircleIcon /> Rejected
           </span>
         );
       case "Pending":
         return (
-          <span className="pm-badge pm-badge-pending">
+          <span className="prm-badge prm-badge-pending">
             <ClockIcon /> Pending
           </span>
         );
       case "Draft":
         return (
-          <span className="pm-badge pm-badge-draft">
+          <span className="prm-badge prm-badge-draft">
             <DraftIcon /> Draft
           </span>
         );
@@ -90,42 +103,42 @@ export default function PriceManagement({
   };
 
   return (
-    <div className="pm-container">
-      <div className="pm-header">
+    <div className="prm-container">
+      <div className="prm-header">
         <div>
-          <h1 className="pm-title">Price Management</h1>
-          <p className="pm-breadcrumb">Product Catalog / Price Management</p>
+          <h1 className="prm-title">Price Management</h1>
+          <p className="prm-breadcrumb">Product Catalog / Price Management</p>
         </div>
       </div>
 
-      <div className="pm-card">
-        {/* thanh công cụ bộ lọc */}
-        <div className="pm-toolbar">
-          <div className="pm-filters">
+      <div className="prm-card">
+        {/* toolbar */}
+        <div className="prm-toolbar">
+          <div className="prm-filters">
             <input
               type="text"
-              className="pm-search-input"
-              placeholder="🔍 Search by name, SKU"
+              className="prm-search-input"
+              placeholder="Search by name, SKU"
               value={search}
               onChange={(e) => actions.changeSearch(e.target.value)}
             />
 
-            <div className="pm-custom-select" ref={statusRef}>
+            <div className="prm-custom-select" ref={statusRef}>
               <div
-                className="pm-select-trigger"
+                className="prm-select-trigger"
                 onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
               >
                 <span>{statusFilter === "All" ? "Status" : statusFilter}</span>
                 <ChevronDownSmallIcon />
               </div>
               {isStatusDropdownOpen && (
-                <div className="pm-select-dropdown">
+                <div className="prm-select-dropdown">
                   {(
-                    ["All", "Approve", "Pending", "Rejected", "Draft"] as const
+                    ["All", "Approved", "Pending", "Rejected", "Draft"] as const
                   ).map((opt) => (
                     <div
                       key={opt}
-                      className={`pm-select-item ${statusFilter === opt ? "active" : ""}`}
+                      className={`prm-select-item ${statusFilter === opt ? "active" : ""}`}
                       onClick={() => {
                         actions.changeStatusFilter(opt);
                         setIsStatusDropdownOpen(false);
@@ -138,8 +151,8 @@ export default function PriceManagement({
               )}
             </div>
 
-            <div className="pm-custom-select disabled">
-              <div className="pm-select-trigger">
+            <div className="prm-custom-select disabled">
+              <div className="prm-select-trigger">
                 <span>Price</span>
                 <ChevronDownSmallIcon />
               </div>
@@ -147,17 +160,17 @@ export default function PriceManagement({
 
             <button
               type="button"
-              className="pm-btn-clear"
+              className="prm-btn-clear"
               onClick={actions.clearFilters}
             >
               Clear Filter
             </button>
           </div>
 
-          <div className="pm-bulk-actions">
+          <div className="prm-bulk-actions">
             <button
               type="button"
-              className="pm-btn-bulk outline"
+              className="prm-btn-bulk outline"
               onClick={bulkActions.bulkApprove}
               disabled={selectedIds.size === 0}
             >
@@ -165,7 +178,7 @@ export default function PriceManagement({
             </button>
             <button
               type="button"
-              className="pm-btn-bulk outline"
+              className="prm-btn-bulk outline"
               onClick={bulkActions.bulkReject}
               disabled={selectedIds.size === 0}
             >
@@ -174,15 +187,15 @@ export default function PriceManagement({
           </div>
         </div>
 
-        {/* bảng danh sách giá */}
-        <div className="pm-table-wrapper">
-          <table className="pm-table">
+        {/* bảng duyệt giá */}
+        <div className="prm-table-wrapper">
+          <table className="prm-table">
             <thead>
               <tr>
                 <th style={{ width: "5%" }}>
                   <input
                     type="checkbox"
-                    className="pm-checkbox"
+                    className="prm-checkbox"
                     checked={isAllSelected}
                     ref={(input) => {
                       if (input) input.indeterminate = isPartiallySelected;
@@ -208,7 +221,7 @@ export default function PriceManagement({
                     <td>
                       <input
                         type="checkbox"
-                        className="pm-checkbox"
+                        className="prm-checkbox"
                         checked={selectedIds.has(record.id)}
                         onChange={() => actions.toggleSelection(record.id)}
                       />
@@ -219,20 +232,19 @@ export default function PriceManagement({
                     <td>{renderStatusBadge(record.status)}</td>
                     <td>${record.price.toFixed(2)}</td>
                     <td>
-                      <div className="pm-row-actions">
-                        {/* logic hiển thị nút theo từng trạng thái bám sát mockup */}
+                      <div className="prm-row-actions">
                         {record.status === "Draft" && (
                           <>
                             <button
                               type="button"
-                              className="pm-btn-action edit"
+                              className="prm-btn-action edit"
                               onClick={() => actions.openSetPriceModal(record)}
                             >
                               <EditIcon /> Edit
                             </button>
                             <button
                               type="button"
-                              className="pm-btn-action submit"
+                              className="prm-btn-action submit"
                               onClick={() => rowActions.submitPrice(record.id)}
                             >
                               Submit
@@ -243,14 +255,14 @@ export default function PriceManagement({
                           <>
                             <button
                               type="button"
-                              className="pm-btn-action approve"
+                              className="prm-btn-action approve"
                               onClick={() => rowActions.approvePrice(record.id)}
                             >
                               Approve
                             </button>
                             <button
                               type="button"
-                              className="pm-btn-action reject"
+                              className="prm-btn-action reject"
                               onClick={() => rowActions.rejectPrice(record.id)}
                             >
                               Reject
@@ -260,20 +272,19 @@ export default function PriceManagement({
                         {record.status === "Rejected" && (
                           <button
                             type="button"
-                            className="pm-btn-action edit"
+                            className="prm-btn-action edit"
                             onClick={() => actions.openSetPriceModal(record)}
                           >
                             <EditIcon /> Edit
                           </button>
                         )}
-                        {/* trạng thái Approve không hiện nút thao tác */}
                       </div>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="pm-empty-state">
+                  <td colSpan={7} className="prm-empty-state">
                     No records found matching your criteria.
                   </td>
                 </tr>
@@ -281,21 +292,76 @@ export default function PriceManagement({
             </tbody>
           </table>
         </div>
+        <div className="prm-pagination">
+          <span className="prm-pagination-info">
+            Showing{" "}
+            {pagination.totalFiltered === 0 ? 0 : pagination.startIndex + 1} to{" "}
+            {Math.min(
+              pagination.startIndex + pagination.limit,
+              pagination.totalFiltered,
+            )}{" "}
+            of {pagination.totalFiltered} items
+          </span>
+          <div className="prm-pagination-controls">
+            <button
+              className="prm-page-btn"
+              disabled={pagination.page === 1}
+              onClick={() => actions.changePage(pagination.page - 1)}
+            >
+              &lt;
+            </button>
+            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(
+              (num) => (
+                <button
+                  key={num}
+                  className={`prm-page-btn ${pagination.page === num ? "active" : ""}`}
+                  onClick={() => actions.changePage(num)}
+                >
+                  {num}
+                </button>
+              ),
+            )}
+            <button
+              className="prm-page-btn"
+              disabled={
+                pagination.page === pagination.totalPages ||
+                pagination.totalPages === 0
+              }
+              onClick={() => actions.changePage(pagination.page + 1)}
+            >
+              &gt;
+            </button>
 
-        {/* phân trang tĩnh mô phỏng */}
-        <div className="pm-pagination">
-          <span className="pm-pagination-info">Showing 1-10 of 100 items</span>
-          <div className="pm-pagination-controls">
-            <button className="pm-page-btn active">1</button>
-            <button className="pm-page-btn">2</button>
-            <button className="pm-page-btn">3</button>
-            <span>...</span>
-            <button className="pm-page-btn">15</button>
-            <select className="pm-page-select">
-              <option>10 / page</option>
-              <option>20 / page</option>
-              <option>50 / page</option>
-            </select>
+            {/* CUSTOM DROPDOWN CHO PHÂN TRANG */}
+            <div className="prm-limit-dropdown" ref={limitRef}>
+              <div
+                className={`prm-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}
+                onClick={() => setIsLimitDropdownOpen(!isLimitDropdownOpen)}
+              >
+                <span>{pagination.limit} / page</span>
+                <div
+                  className={`prm-limit-icon ${isLimitDropdownOpen ? "open" : ""}`}
+                >
+                  <ChevronDownSmallIcon />
+                </div>
+              </div>
+              {isLimitDropdownOpen && (
+                <div className="prm-limit-options">
+                  {[10, 20, 50].map((val) => (
+                    <div
+                      key={val}
+                      className={`prm-limit-option ${pagination.limit === val ? "active" : ""}`}
+                      onClick={() => {
+                        actions.changeLimit(val);
+                        setIsLimitDropdownOpen(false);
+                      }}
+                    >
+                      {val} / page
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

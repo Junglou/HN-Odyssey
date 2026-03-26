@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import "./ProductForm.css";
 import TagModal from "../ProductManagementModal/TagModal";
 import VariantModal from "../ProductManagementModal/VariantModal";
@@ -143,6 +144,8 @@ export default function ProductForm({
   userRole = "admin",
   actions,
 }: ProductFormProps) {
+  const navigate = useNavigate();
+
   // state quản lý cây danh mục
   const [isTreeOpen, setIsTreeOpen] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({
@@ -177,6 +180,13 @@ export default function ProductForm({
   const categoryPath = formData.categoryId
     ? findCategoryPath(MOCK_CATEGORIES, formData.categoryId)?.join(" > ")
     : "";
+
+  // check các trường bắt buộc trước khi lưu
+  const isFormValid = Boolean(
+    formData.sku.trim() !== "" &&
+    formData.name.trim() !== "" &&
+    formData.categoryId !== "",
+  );
 
   // đệ quy render cây danh mục
   const renderTreeNodes = (nodes: CategoryNode[], level: number = 0) => {
@@ -443,10 +453,7 @@ export default function ProductForm({
                               <button
                                 type="button"
                                 className="pf-btn-action blue"
-                                onClick={(e) => {
-                                  actions.viewApproval();
-                                  e.currentTarget.blur();
-                                }}
+                                onClick={() => navigate("/portal/prices")}
                               >
                                 View Approval
                               </button>
@@ -464,10 +471,7 @@ export default function ProductForm({
               <button
                 type="button"
                 className="pf-btn-full light-blue"
-                onClick={(e) => {
-                  actions.viewApproval();
-                  e.currentTarget.blur();
-                }}
+                onClick={() => navigate("/portal/prices")}
               >
                 Price Management
               </button>
@@ -608,7 +612,7 @@ export default function ProductForm({
             </button>
             <button
               type="button"
-              className="pf-btn-primary"
+              className={`pf-btn-primary ${isFormValid ? "valid" : ""}`}
               onClick={(e) => {
                 actions.saveProduct();
                 e.currentTarget.blur();

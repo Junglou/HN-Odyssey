@@ -165,7 +165,7 @@ export function useProductManagement() {
       selected: selectedIds.includes(p.id),
     }));
 
-  // nhóm các hàm xử lý hành động truyền xuống component giao diện
+  // nhóm nút action
   const actions = {
     changeFilter: (key: keyof typeof filters, val: string) => {
       setFilters((prev) => ({ ...prev, [key]: val }) as typeof filters);

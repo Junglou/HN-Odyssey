@@ -1,5 +1,5 @@
 import "./VariantManagement.css";
-import { TrashIcon } from "../../../../assets/icons/UserManagementIcons";
+import { CleanTrashIcon } from "../../../../assets/icons/VariantManagementIcons";
 import { EditPenIcon } from "../../../../assets/icons/ProductManagementIcons";
 
 // type và logic quản lý biến thể
@@ -104,7 +104,7 @@ export default function VariantManagement({
                           title="Delete Variant"
                           onClick={() => actions.deleteSingle(variant.id)}
                         >
-                          <TrashIcon fill="#111827" />
+                          <CleanTrashIcon />
                         </button>
                       </div>
                     </td>

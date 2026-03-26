@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
 import { toast } from "react-toastify";
 
-// định nghĩa các kiểu dữ liệu cho bảng giá
-export type PriceStatus = "Approve" | "Pending" | "Rejected" | "Draft";
+// props và type
+export type PriceStatus = "Approved" | "Pending" | "Rejected" | "Draft";
 
 export interface PriceRecord {
   id: string;
@@ -13,21 +13,20 @@ export interface PriceRecord {
   price: number;
 }
 
-// dữ liệu form trả về từ modal set price
 export interface PriceFormData {
   priceAmount: number;
   currency: string;
   effectiveDate: string;
 }
 
-// dữ liệu giả lập bám sát hình ảnh thiết kế
+// mock data
 const INITIAL_PRICES: PriceRecord[] = [
   {
     id: "1",
     productName: "Grey Slim Jacket",
     sku: "CWT-001",
     variant: "Size: M / Color: Grey",
-    status: "Approve",
+    status: "Approved",
     price: 20.0,
   },
   {
@@ -51,7 +50,7 @@ const INITIAL_PRICES: PriceRecord[] = [
     productName: "Grey Slim Jacket",
     sku: "CWT-004",
     variant: "Size: M / Color: Grey",
-    status: "Approve",
+    status: "Approved",
     price: 20.0,
   },
   {
@@ -75,7 +74,7 @@ const INITIAL_PRICES: PriceRecord[] = [
     productName: "Grey Slim Jacket",
     sku: "CWT-007",
     variant: "Size: M / Color: Grey",
-    status: "Approve",
+    status: "Approved",
     price: 20.0,
   },
   {
@@ -90,31 +89,26 @@ const INITIAL_PRICES: PriceRecord[] = [
 
 export function usePriceManagement() {
   const [records, setRecords] = useState<PriceRecord[]>(INITIAL_PRICES);
-
-  // trạng thái bộ lọc
   const [search, setSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<PriceStatus | "All">("All");
-
-  // trạng thái chọn nhiều hàng (bulk actions)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [pagination, setPagination] = useState({ page: 1, limit: 10 });
 
-  // quản lý trạng thái modal cập nhật giá
+  // quản lý trạng thái modal
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
     editingRecord: PriceRecord | null;
     isSubmitting: boolean;
   }>({ isOpen: false, editingRecord: null, isSubmitting: false });
 
-  // logic lọc dữ liệu dựa trên tìm kiếm và trạng thái
+  // logic lọc dữ liệu
   const filteredRecords = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
     return records.filter((record) => {
-      // kiểm tra khớp trạng thái
       const matchStatus =
         statusFilter === "All" || record.status === statusFilter;
 
-      // kiểm tra khớp từ khóa (tìm theo tên hoặc sku)
       const matchSearch =
         !normalizedSearch ||
         record.productName.toLowerCase().includes(normalizedSearch) ||
@@ -124,7 +118,13 @@ export function usePriceManagement() {
     });
   }, [records, search, statusFilter]);
 
-  // nhóm các hàm tương tác cơ bản trên giao diện
+  const totalPages = Math.ceil(filteredRecords.length / pagination.limit);
+  const startIndex = (pagination.page - 1) * pagination.limit;
+  const currentRecords = filteredRecords.slice(
+    startIndex,
+    startIndex + pagination.limit,
+  );
+
   const actions = {
     changeSearch: (val: string) => setSearch(val),
     changeStatusFilter: (status: PriceStatus | "All") =>
@@ -134,7 +134,6 @@ export function usePriceManagement() {
       setStatusFilter("All");
     },
 
-    // logic chọn từng dòng hoặc chọn tất cả
     toggleSelection: (id: string) => {
       setSelectedIds((prev) => {
         const next = new Set(prev);
@@ -150,6 +149,9 @@ export function usePriceManagement() {
         setSelectedIds(new Set());
       }
     },
+
+    changePage: (page: number) => setPagination((p) => ({ ...p, page })),
+    changeLimit: (limit: number) => setPagination({ page: 1, limit }),
 
     // quản lý đóng mở modal
     openSetPriceModal: (record: PriceRecord) => {
@@ -168,14 +170,12 @@ export function usePriceManagement() {
     },
   };
 
-  // hàm thay đổi trạng thái của một dòng cụ thể (dùng chung cho submit, approve, reject)
   const updateRecordStatus = (id: string, newStatus: PriceStatus) => {
     setRecords((prev) =>
       prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r)),
     );
   };
 
-  // logic xử lý khi người dùng nhấn lưu trên modal
   const handleSavePrice = async (data: PriceFormData) => {
     const targetRecord = modalConfig.editingRecord;
     if (!targetRecord) return;
@@ -183,13 +183,13 @@ export function usePriceManagement() {
     setModalConfig((prev) => ({ ...prev, isSubmitting: true }));
 
     try {
-      // giả lập thời gian xử lý api
+      // giả lập xử lý api
       await new Promise((resolve) => setTimeout(resolve, 600));
 
       setRecords((prev) =>
         prev.map((r) =>
           r.id === targetRecord.id
-            ? { ...r, price: data.priceAmount, status: "Pending" } // giá mới lưu thường sẽ về trạng thái chờ duyệt
+            ? { ...r, price: data.priceAmount, status: "Pending" }
             : r,
         ),
       );
@@ -201,14 +201,14 @@ export function usePriceManagement() {
     }
   };
 
-  // các hàm chức năng cho từng nút bấm trên từng dòng
+  // button
   const rowActions = {
     submitPrice: (id: string) => {
       updateRecordStatus(id, "Pending");
       toast.success("Đã gửi yêu cầu duyệt giá!");
     },
     approvePrice: (id: string) => {
-      updateRecordStatus(id, "Approve");
+      updateRecordStatus(id, "Approved");
       toast.success("Đã duyệt giá thành công!");
     },
     rejectPrice: (id: string) => {
@@ -217,22 +217,30 @@ export function usePriceManagement() {
     },
   };
 
-  // logic xử lý duyệt/từ chối hàng loạt
+  // logic xử lý duyệt/từ chối (bulk action)
   const bulkActions = {
     bulkApprove: () => {
-      if (selectedIds.size === 0) return;
+      const targets = records.filter(
+        (r) => selectedIds.has(r.id) && r.status === "Pending",
+      );
+      if (targets.length === 0) return;
+
       setRecords((prev) =>
         prev.map((r) =>
           selectedIds.has(r.id) && r.status === "Pending"
-            ? { ...r, status: "Approve" }
+            ? { ...r, status: "Approved" }
             : r,
         ),
       );
-      toast.success(`Đã duyệt ${selectedIds.size} mục được chọn!`);
-      setSelectedIds(new Set()); // dọn dẹp selection sau khi xử lý xong
+      toast.success(`Đã duyệt ${targets.length} mục được chọn!`);
+      setSelectedIds(new Set());
     },
     bulkReject: () => {
-      if (selectedIds.size === 0) return;
+      const targets = records.filter(
+        (r) => selectedIds.has(r.id) && r.status === "Pending",
+      );
+      if (targets.length === 0) return;
+
       setRecords((prev) =>
         prev.map((r) =>
           selectedIds.has(r.id) && r.status === "Pending"
@@ -240,13 +248,19 @@ export function usePriceManagement() {
             : r,
         ),
       );
-      toast.warning(`Đã từ chối ${selectedIds.size} mục được chọn!`);
+      toast.warning(`Đã từ chối ${targets.length} mục được chọn!`);
       setSelectedIds(new Set());
     },
   };
 
   return {
-    filteredRecords,
+    currentRecords,
+    pagination: {
+      ...pagination,
+      totalPages,
+      totalFiltered: filteredRecords.length,
+      startIndex,
+    },
     search,
     statusFilter,
     selectedIds,

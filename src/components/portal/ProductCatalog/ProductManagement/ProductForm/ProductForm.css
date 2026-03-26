@@ -207,10 +207,9 @@
   font-family: inherit;
   cursor: pointer;
   border: none;
-}
-.pf-btn-full.light-blue {
-  background-color: #86aff5;
+  background-color: #3b82f6;
   color: #ffffff;
+  transition: background-color 0.2s;
 }
 .pf-btn-full.outline {
   background-color: transparent;
@@ -515,6 +514,12 @@
 .pf-btn-primary:hover {
   background-color: #111827;
   color: #ffffff;
+}
+.pf-btn-primary:hover:not(.valid) {
+  background-color: #b6b7b8;
+}
+.pf-btn-primary.valid {
+  background-color: #111827;
 }
 
 /* Responsive */
