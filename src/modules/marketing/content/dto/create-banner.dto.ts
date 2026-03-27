@@ -5,7 +5,6 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  IsUrl,
 } from 'class-validator';
 
 export class CreateBannerDto {
@@ -13,14 +12,9 @@ export class CreateBannerDto {
   @IsNotEmpty()
   title: string;
 
-  // AC5: Kiểm tra tính hợp lệ của liên kết (Syntax Check HTTP/HTTPS)
-  @IsUrl(
-    { require_protocol: true },
-    {
-      message: 'Đường dẫn phải đúng định dạng và bắt đầu bằng http hoặc https',
-    },
-  )
-  @IsNotEmpty()
+  // AC5: Cho phép lưu cả đường dẫn tuyệt đối (HTTP/HTTPS) và đường dẫn tương đối nội bộ
+  @IsString({ message: 'Đường dẫn phải là một chuỗi ký tự' })
+  @IsNotEmpty({ message: 'Đường dẫn không được để trống' })
   link: string;
 
   @IsString()
