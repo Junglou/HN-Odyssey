@@ -13,6 +13,8 @@ import {
   ReviewReport,
   ReviewReportSchema,
 } from './schemas/review-report.schema';
+import { ReviewEventListener } from './review.listener';
+import { NotificationsModule } from 'src/modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -23,8 +25,9 @@ import {
       { name: Order.name, schema: OrderSchema },
     ]),
     AuditLogsModule,
+    NotificationsModule,
   ],
   controllers: [ReviewsController],
-  providers: [ReviewsService],
+  providers: [ReviewsService, ReviewEventListener],
 })
 export class ReviewsModule {}

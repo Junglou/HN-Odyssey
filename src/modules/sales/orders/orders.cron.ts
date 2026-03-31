@@ -28,31 +28,68 @@ export class OrdersCronService {
     });
 
     for (const order of expiredOrders) {
-      try {
-        await this.ordersService.updateStatusAdvanced(
-          String(order._id),
-          {
-            status: OrderStatus.CANCELLED,
-            reason: 'Hệ thống tự động hủy do hết hạn thanh toán (15 phút).',
-          },
-          'SYSTEM',
-          'SYSTEM_CRON',
-          '127.0.0.1',
-          'Cronjob',
-        );
-      } catch (e: unknown) {
-        const errorMessage = e instanceof Error ? e.message : String(e);
+      const MAX_RETRIES = 3;
+      let attempt = 0;
+      let success = false;
 
-        this.logger.error(
-          `Lỗi hủy đơn hết hạn ${order.order_code}: ${errorMessage}`,
-        );
+      while (attempt < MAX_RETRIES && !success) {
+        try {
+          attempt++;
+          await this.ordersService.updateStatusAdvanced(
+            String(order._id),
+            {
+              status: OrderStatus.CANCELLED,
+              reason: 'Hệ thống tự động hủy do hết hạn thanh toán (15 phút).',
+            },
+            'SYSTEM',
+            'SYSTEM_CRON',
+            '127.0.0.1',
+            'Cronjob',
+          );
 
-        this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
-          severity: 'HIGH',
-          error_code: 'CRON_EXPIRED_ORDERS_FAILED',
-          message: `Lỗi khi chạy Job hủy đơn tự động (Đơn: ${order.order_code}): ${errorMessage}`,
-          stack_trace: e instanceof Error ? e.stack : undefined,
-        });
+          success = true; // Thành công thì đánh dấu để thoát vòng lặp while
+        } catch (e: unknown) {
+          const errorMessage = e instanceof Error ? e.message : String(e);
+
+          // Xử lý Type-safe để vượt qua các strict rules của ESLint
+          let isTransientError = false;
+          if (typeof e === 'object' && e !== null && 'hasErrorLabel' in e) {
+            const mongoErr = e as Record<string, unknown>;
+            if (typeof mongoErr.hasErrorLabel === 'function') {
+              isTransientError = (
+                mongoErr.hasErrorLabel as (label: string) => boolean
+              )('TransientTransactionError');
+            }
+          }
+
+          // Xử lý cơ chế Retry nếu gặp lỗi Write Conflict từ MongoDB
+          if (isTransientError || errorMessage.includes('Write conflict')) {
+            if (attempt < MAX_RETRIES) {
+              this.logger.warn(
+                `Xung đột dữ liệu tại đơn ${order.order_code}, thử lại lần ${attempt}...`,
+              );
+              // Delay một khoảng thời gian ngắn để tiến trình khác hoàn tất, sau đó thử lại
+              await new Promise((resolve) =>
+                setTimeout(resolve, 150 * attempt),
+              );
+              continue;
+            }
+          }
+
+          // Nếu không phải lỗi xung đột hoặc đã hết lượt thử (attempt >= MAX_RETRIES)
+          this.logger.error(
+            `Lỗi hủy đơn hết hạn ${order.order_code}: ${errorMessage}`,
+          );
+
+          this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
+            severity: 'HIGH',
+            error_code: 'CRON_EXPIRED_ORDERS_FAILED',
+            message: `Lỗi khi chạy Job hủy đơn tự động (Đơn: ${order.order_code}): ${errorMessage}`,
+            stack_trace: e instanceof Error ? e.stack : undefined,
+          });
+
+          break; // Thoát vòng while, tiếp tục với đơn hàng tiếp theo (order)
+        }
       }
     }
   }

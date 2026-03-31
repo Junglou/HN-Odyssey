@@ -46,6 +46,6 @@ import { UsersModule } from '../users/users.module';
     NotificationsGateway,
     NotificationListener,
   ],
-  exports: [EmailService, SmsService, WebhookService],
+  exports: [EmailService, SmsService, WebhookService, NotificationsService],
 })
 export class NotificationsModule {}
