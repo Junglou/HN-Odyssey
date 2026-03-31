@@ -1,11 +1,13 @@
 import {
   IsBoolean,
   IsEmail,
+  IsInt,
   IsNotEmpty,
   IsObject,
   IsOptional,
   IsString,
   Matches,
+  Min,
   MinLength,
   ValidateNested,
 } from 'class-validator';
@@ -67,4 +69,9 @@ export class CreateOrderDto {
   @IsOptional()
   @IsBoolean()
   isInstant?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  pointsToUse?: number;
 }

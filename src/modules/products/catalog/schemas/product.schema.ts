@@ -119,6 +119,18 @@ export class Product {
   @Prop({ default: false })
   is_member_only: boolean;
 
+  // THÊM: AC4 - Giá riêng cho từng hạng thành viên (VD: { "GOLD": 90000 })
+  @Prop({ type: Object, default: {} })
+  member_prices: Record<string, number>;
+
+  // THÊM: AC5 - Yêu cầu rank tối thiểu để mua sớm
+  @Prop({ default: 0 })
+  rank_required: number;
+
+  // THÊM: AC10 - Chỉ cho phép các hạng cụ thể đổi quà
+  @Prop({ type: [String], default: [] })
+  allowed_tiers: string[];
+
   //PHÂN LOẠI & TAGS
   @Prop({
     type: [{ type: MongooseSchema.Types.ObjectId, ref: 'Category' }],

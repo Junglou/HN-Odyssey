@@ -1,4 +1,3 @@
-// src/modules/notifications/schemas/notification-log.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
@@ -7,6 +6,7 @@ export enum NotificationType {
   STOCK = 'STOCK',
   SYSTEM = 'SYSTEM',
   SECURITY = 'SECURITY',
+  LOYALTY = 'LOYALTY',
 }
 
 export enum NotificationPriority {

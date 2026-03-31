@@ -60,6 +60,9 @@ export class Coupon extends Document {
   })
   status: CouponStatus;
 
+  @Prop({ default: false })
+  is_stackable: boolean; // True = cho phép dùng kèm voucher khác
+
   // AC8: Soft Delete
   @Prop({ default: false, index: true })
   is_deleted: boolean;
@@ -67,6 +70,8 @@ export class Coupon extends Document {
   @Prop({ default: null })
   deleted_at: Date;
 }
+
+export type CouponDocument = Coupon & Document;
 
 export const CouponSchema = SchemaFactory.createForClass(Coupon);
 

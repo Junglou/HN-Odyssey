@@ -1,8 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  HttpException,
-  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -50,6 +48,15 @@ import {
   ProductQueryParam,
   VariantInput,
 } from 'src/common/interfaces/product.interface';
+import { LoyaltyService } from 'src/modules/marketing/loyalty/loyalty.service';
+import {
+  Customer,
+  CustomerDocument,
+} from 'src/modules/users/customers/schemas/customer.schema';
+import {
+  MemberTier,
+  MemberTierDocument,
+} from 'src/modules/marketing/loyalty/schemas/member-tier.schema';
 
 @Injectable()
 export class ProductsService {
@@ -62,6 +69,9 @@ export class ProductsService {
     private readonly categoriesService: CategoriesService,
     @InjectModel(Attribute.name)
     private attributeModel: Model<AttributeDocument>,
+    private readonly loyaltyService: LoyaltyService, // <--- THÊM
+    @InjectModel(Customer.name) private customerModel: Model<CustomerDocument>,
+    @InjectModel(MemberTier.name) private tierModel: Model<MemberTierDocument>,
   ) {}
 
   // HELPER METHODS
@@ -491,43 +501,102 @@ export class ProductsService {
     return relatedProducts;
   }
 
-  async findBySlug(slug: string) {
-    // 1. Tìm Slug hiện tại
+  async findBySlug(slug: string, userId?: string) {
+    // 1. Tìm Sản phẩm theo Slug
     const product = await this.productModel
       .findOne({ slug, status: ProductStatus.ACTIVE, is_deleted: false })
       .populate('categories', 'name slug')
-      .lean();
+      .lean()
+      .exec();
 
-    if (product) {
-      return product;
+    if (!product) {
+      // Logic tìm old_slugs
+      throw new NotFoundException('Sản phẩm không tìm thấy');
     }
 
-    // 2.Nếu không thấy, tìm trong lịch sử old_slugs
-    const movedProduct = await this.productModel
-      .findOne({
-        old_slugs: slug,
-        status: ProductStatus.ACTIVE,
-        is_deleted: false,
-      })
-      .select('slug') // Chỉ cần lấy slug mới
-      .lean();
+    let estimatedPoints = 0;
+    let memberDiscountApplied = false;
+    // Tạo bản sao của sale_price để tính toán
+    let finalSalePrice = product.sale_price || product.price;
 
-    if (movedProduct) {
-      // Tìm thấy sản phẩm, nhưng link khách truy cập là link cũ
-      // Throw Exception đặc biệt để Controller bắt được và trả về Header 301
-      throw new HttpException(
-        {
-          message: 'Moved Permanently',
-          new_slug: movedProduct.slug, // Trả về slug mới cho FE
-        },
-        HttpStatus.MOVED_PERMANENTLY,
+    // 2. TÍCH HỢP LOYALTY (AC4, AC5, AC13)
+    if (userId) {
+      const customer = await this.customerModel
+        .findById(userId)
+        .select('loyalty')
+        .lean()
+        .exec();
+      const userTierCode = customer?.loyalty?.tier || 'SILVER';
+
+      // Ép kiểu MemberTierDocument
+      const tierConfig = (await this.tierModel
+        .findOne({ code: userTierCode })
+        .lean()
+        .exec()) as MemberTierDocument | null;
+
+      if (tierConfig) {
+        // Định nghĩa Type an toàn để xử lý triệt để lỗi ESLint "no-unsafe-assignment" và "no-unsafe-member-access"
+        interface ExtendedProductData {
+          rank_required?: number;
+          is_member_only?: boolean;
+          member_prices?: Record<string, number>;
+        }
+
+        interface ExtendedTierData {
+          rank_level?: number;
+          upgrade_reward?: {
+            is_active: boolean;
+            discount_value: number;
+          };
+        }
+
+        // Chuyển đổi qua unknown trước khi ép về Type chuẩn để đảm bảo an toàn tuyệt đối
+        const prodData = product as unknown as ExtendedProductData;
+        const tierData = tierConfig as unknown as ExtendedTierData;
+
+        // AC5: Quyền truy cập sớm (Early Access)
+        const userRank = tierData.rank_level ?? 0;
+        const requiredRank = prodData.rank_required ?? 0;
+
+        if (prodData.is_member_only && userRank < requiredRank) {
+          throw new BadRequestException(
+            'Sản phẩm này chỉ dành cho thành viên hạng cao mua sớm.',
+          );
+        }
+
+        // AC4: Giá thành viên (Member Pricing)
+        // Ưu tiên 1: Lấy giá thiết lập riêng cho hạng này trong member_prices
+        if (prodData.member_prices && prodData.member_prices[userTierCode]) {
+          finalSalePrice = prodData.member_prices[userTierCode];
+          memberDiscountApplied = true;
+        } else {
+          // Ưu tiên 2: Giảm giá theo % mặc định của hạng (Upgrade Reward)
+          const upgradeReward = tierData.upgrade_reward;
+          if (
+            upgradeReward?.is_active &&
+            (upgradeReward.discount_value ?? 0) > 0
+          ) {
+            finalSalePrice =
+              finalSalePrice * (1 - upgradeReward.discount_value / 100);
+            memberDiscountApplied = true;
+          }
+        }
+      }
+
+      // AC13: Tính điểm dự kiến (Dùng LoyaltyService đã Inject)
+      const pointResult = await this.loyaltyService.estimateCheckoutPoints(
+        userId,
+        finalSalePrice,
       );
+      estimatedPoints = pointResult.data?.earnedPoints || 0;
     }
 
-    // 3. Không thấy đâu cả -> 404
-    throw new NotFoundException(
-      'Sản phẩm không tìm thấy hoặc chưa được mở bán',
-    );
+    return {
+      ...product,
+      sale_price: Math.floor(finalSalePrice), // Làm tròn giá cuối
+      estimated_points: estimatedPoints,
+      is_member_pricing: memberDiscountApplied,
+    };
   }
 
   // UPDATE THÔNG TIN

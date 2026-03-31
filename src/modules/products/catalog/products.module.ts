@@ -20,6 +20,12 @@ import {
   AttributeSchema,
 } from '../attributes/schemas/attribute.schema';
 import { ProductFilterService } from '../products-filter.service';
+import { LoyaltyModule } from 'src/modules/marketing/loyalty/loyalty.module';
+import { UsersModule } from 'src/modules/users/users.module';
+import {
+  MemberTier,
+  MemberTierSchema,
+} from 'src/modules/marketing/loyalty/schemas/member-tier.schema';
 
 @Module({
   imports: [
@@ -29,10 +35,13 @@ import { ProductFilterService } from '../products-filter.service';
       { name: Category.name, schema: CategorySchema },
       { name: Order.name, schema: OrderSchema },
       { name: Attribute.name, schema: AttributeSchema },
+      { name: MemberTier.name, schema: MemberTierSchema },
     ]),
     CategoriesModule,
     AuditLogsModule,
     TagsModule,
+    LoyaltyModule,
+    UsersModule,
   ],
   controllers: [ProductsController],
   providers: [ProductsService, ProductFilterService],

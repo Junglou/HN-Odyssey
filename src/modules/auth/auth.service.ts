@@ -11,7 +11,7 @@ import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Connection, Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
-import { User, UserDocument } from '../users/schemas/user.schema';
+import { Gender, User, UserDocument } from '../users/schemas/user.schema';
 import { Customer } from '../users/customers/schemas/customer.schema';
 import { Verification } from '../auth/schema/verification.schema';
 import { RegisterDto } from './dto/register.dto';
@@ -110,6 +110,8 @@ export class AuthService {
         email: email,
         phone: phoneNumber,
         password: hashedPassword,
+        dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
+        gender: dto.gender || Gender.OTHER,
         is_subscribed: dto.isSubscribed ?? false, // Xử lý trường hợp "thích thì tích"
         roles: ['CUSTOMER'],
         is_active: false,

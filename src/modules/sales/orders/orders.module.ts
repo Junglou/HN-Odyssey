@@ -27,6 +27,7 @@ import {
   FlashSale,
   FlashSaleSchema,
 } from 'src/modules/marketing/promotions/schemas/flash-sale.schema';
+import { LoyaltyModule } from 'src/modules/marketing/loyalty/loyalty.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import {
     forwardRef(() => PaymentModule),
     ShippingModule,
     JwtModule.register({}),
+    LoyaltyModule,
   ],
   controllers: [OrdersController],
   providers: [

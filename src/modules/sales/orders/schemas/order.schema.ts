@@ -119,6 +119,10 @@ export class Order extends Document {
   @Prop({ default: 0 })
   print_count: number; //AC8 (Bản chính/Bản sao)
 
+  // Lưu lại số điểm khách đã dùng để trừ tiền trong đơn này (phục vụ hoàn điểm khi hủy)
+  @Prop({ default: 0 })
+  points_used: number;
+
   @Prop()
   createdAt?: Date;
 

@@ -53,6 +53,8 @@ import {
   FlashSaleStatus,
 } from 'src/modules/marketing/promotions/schemas/flash-sale.schema';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { LoyaltyService } from 'src/modules/marketing/loyalty/loyalty.service';
+import { LoyaltyHistory } from 'src/modules/marketing/loyalty/schemas/loyalty-history.schema';
 
 // type OrderDocWithShipping = MongooseOrderDoc & {
 //   waybillCode?: string;
@@ -83,6 +85,9 @@ export class OrdersService {
     private readonly eventEmitter: EventEmitter2,
     private readonly stateMachine: OrderStateMachine,
     @InjectModel(FlashSale.name) private flashSaleModel: Model<FlashSale>,
+    private readonly loyaltyService: LoyaltyService,
+    @InjectModel(LoyaltyHistory.name)
+    private loyaltyHistoryModel: Model<LoyaltyHistory>,
   ) {}
 
   // US.121: DANH SÁCH ĐƠN HÀNG
@@ -402,6 +407,29 @@ export class OrdersService {
         throw new BadRequestException('Sản phẩm này chỉ dành cho thành viên');
       }
 
+      // [BỔ SUNG FIX 3]: Check Quà tặng độc quyền theo allowed_tiers
+      if (product.allowed_tiers && product.allowed_tiers.length > 0) {
+        if (!data.userId) {
+          throw new BadRequestException(
+            `Sản phẩm này là đặc quyền dành riêng cho hạng: ${product.allowed_tiers.join(', ')}`,
+          );
+        }
+
+        // Lấy thông tin khách hàng để check tier
+        const customerInfo = (await this.connection
+          .collection('customers')
+          .findOne({ _id: new Types.ObjectId(data.userId) })) as unknown as {
+          loyalty?: { tier?: string };
+        } | null;
+        const userTierCode = customerInfo?.loyalty?.tier || 'SILVER';
+
+        if (!product.allowed_tiers.includes(userTierCode)) {
+          throw new BadRequestException(
+            `Sản phẩm này là đặc quyền cho hạng ${product.allowed_tiers.join(', ')}. Bạn đang là hạng ${String(userTierCode)}.`,
+          );
+        }
+      }
+
       //Check giới hạn mua
       if (product.max_purchase_qty && product.max_purchase_qty > 0) {
         if (data.quantity > product.max_purchase_qty) {
@@ -616,6 +644,13 @@ export class OrdersService {
           throw new BadRequestException('Sản phẩm trong giỏ không hợp lệ');
         }
 
+        // [BỔ SUNG FIX 3]: Chặn Guest mua quà độc quyền đang nằm trong giỏ
+        if (product.allowed_tiers && product.allowed_tiers.length > 0) {
+          throw new BadRequestException(
+            `Sản phẩm "${product.name}" là quà tặng độc quyền, không hỗ trợ mua thanh toán cho khách vãng lai.`,
+          );
+        }
+
         // Tìm variant để lấy giá chính xác
         const variant = product.variants.find((v) => v.sku === cartItem.sku);
         const realPrice = variant ? variant.sale_price || variant.price : 0;
@@ -777,8 +812,17 @@ export class OrdersService {
             order.items as unknown as OrderItem[],
           );
 
+        let pointsDiscount = 0;
+        if (dto.pointsToUse && dto.pointsToUse > 0) {
+          pointsDiscount = dto.pointsToUse * 100; // Giả sử 1 điểm = 100đ
+          if (pointsDiscount > totalAfterVoucher) {
+            pointsDiscount = totalAfterVoucher; // Tránh âm tiền
+          }
+        }
+
         // 5. Tổng thanh toán
-        const finalOrderTotal = totalAfterVoucher + shippingFee;
+        const finalOrderTotal =
+          totalAfterVoucher - pointsDiscount + shippingFee;
 
         // 6. Check COD Limit
         if (dto.paymentMethod === 'COD' && finalOrderTotal > 5000000) {
@@ -815,7 +859,10 @@ export class OrdersService {
         order.status = 'PENDING';
         order.total_amount = finalOrderTotal;
         order.shipping_fee = shippingFee;
-        order.discount_amount = discount;
+        (
+          order as unknown as MongooseOrderDoc & { points_used: number }
+        ).points_used = dto.pointsToUse || 0;
+        order.discount_amount = discount + pointsDiscount;
         order.voucher_code = dto.voucherCode || '';
 
         // 8. Xử lý Voucher (Sử dụng Transaction Session)
@@ -876,6 +923,24 @@ export class OrdersService {
         });
 
         await order.save({ session }); // BẮT BUỘC TRUYỀN SESSION
+
+        if (userId && dto.pointsToUse && dto.pointsToUse > 0) {
+          await this.connection
+            .collection('users')
+            .updateOne(
+              { _id: new Types.ObjectId(userId) },
+              { $inc: { 'loyalty.point': -dto.pointsToUse } },
+              { session },
+            );
+        }
+
+        if (userId) {
+          await this.loyaltyService.addPendingPoints(
+            userId,
+            String(order._id),
+            totalAfterVoucher - pointsDiscount,
+          );
+        }
 
         // CHỐT TRANSACTION THÀNH CÔNG CHO LUỒNG MUA NGAY
         await session.commitTransaction();
@@ -1155,7 +1220,16 @@ export class OrdersService {
             orderItems,
           );
 
-        const finalOrderTotal = totalAfterVoucher + shippingFee;
+        // TÍNH ĐIỂM SỬ DỤNG
+        let pointsDiscount = 0;
+        if (dto.pointsToUse && dto.pointsToUse > 0) {
+          pointsDiscount = dto.pointsToUse * 100;
+          if (pointsDiscount > totalAfterVoucher)
+            pointsDiscount = totalAfterVoucher;
+        }
+
+        const finalOrderTotal =
+          totalAfterVoucher - pointsDiscount + shippingFee;
 
         if (dto.paymentMethod === 'COD' && finalOrderTotal > 5000000) {
           throw new BadRequestException('Đơn hàng > 5 triệu không hỗ trợ COD.');
@@ -1177,9 +1251,11 @@ export class OrdersService {
             status: 'PENDING',
           },
           total_amount: finalOrderTotal,
-          discount_amount: promoDiscount + (voucherDiscount || 0),
+          discount_amount:
+            promoDiscount + (voucherDiscount || 0) + pointsDiscount,
           shipping_fee: shippingFee,
           voucher_code: dto.voucherCode || '',
+          points_used: dto.pointsToUse || 0,
           status: 'PENDING',
           isGuest: false,
           timeline: [
@@ -1194,6 +1270,24 @@ export class OrdersService {
 
         await newOrder.save({ session });
         savedOrder = newOrder;
+
+        // AC1: Điểm thưởng ghi nhận trên giá trị thực trả (Không bao gồm Ship)
+        await this.loyaltyService.addPendingPoints(
+          userId,
+          String(newOrder._id),
+          totalAfterVoucher - pointsDiscount,
+        );
+
+        // NẾU CÓ DÙNG ĐIỂM -> TRỪ ĐIỂM CỦA USER NGAY LẬP TỨC
+        if (pointsDiscount > 0) {
+          await this.connection
+            .collection('users')
+            .updateOne(
+              { _id: new Types.ObjectId(userId) },
+              { $inc: { 'loyalty.point': -(dto.pointsToUse || 0) } },
+              { session },
+            );
+        }
 
         await this.cartModel.deleteOne({ _id: cart._id }).session(session);
       } else {
@@ -1395,6 +1489,63 @@ export class OrdersService {
           finalStatusToSave = OrderStatus.REFUND_PENDING;
         }
         order.cancel_reason = dto.reason || 'Hủy bởi Admin';
+
+        // [BỔ SUNG FIX 2]: HOÀN TRẢ LẠI ĐIỂM KHÁCH ĐÃ TIÊU
+        const orderWithPoints = order as unknown as MongooseOrderDoc & {
+          points_used?: number;
+        };
+        if (
+          orderWithPoints.user_id &&
+          !orderWithPoints.isGuest &&
+          orderWithPoints.points_used &&
+          orderWithPoints.points_used > 0
+        ) {
+          await this.connection.collection('users').updateOne(
+            { _id: new Types.ObjectId(String(orderWithPoints.user_id)) },
+            {
+              $inc: { 'loyalty.point': Number(orderWithPoints.points_used) },
+            },
+            { session },
+          );
+
+          await this.loyaltyHistoryModel.create({
+            user_id: orderWithPoints.user_id,
+            order_id: order._id,
+            points: Number(orderWithPoints.points_used),
+            action: 'REVOKE',
+            reason: 'Hủy đơn hàng',
+          });
+        }
+
+        if (order.user_id && !order.isGuest) {
+          await this.loyaltyService.cancelPendingPoints(
+            String(order.user_id),
+            String(order._id),
+          );
+        }
+      }
+
+      // 2.5 LOGIC TRẢ HÀNG TỪNG PHẦN (AC15)
+      if (
+        nextStatus === OrderStatus.RETURNED &&
+        oldStatus !== OrderStatus.RETURNED
+      ) {
+        finalStatusToSave = OrderStatus.RETURNED;
+        order.internal_note = dto.note || 'Khách hàng trả lại sản phẩm.';
+
+        if (order.user_id && !order.isGuest) {
+          // Ép kiểu an toàn (Safe Type Casting) để bypass lỗi ESLint no-unsafe-assignment
+          const safeDto = dto as unknown as { refund_amount?: number };
+
+          // Tính toán số tiền hoàn dựa trên Dto truyền lên (Nếu ko truyền thì tính cả đơn)
+          const refundValue = safeDto.refund_amount || order.total_amount;
+
+          await this.loyaltyService.revokePointsForRefund(
+            String(order.user_id),
+            String(order._id),
+            Number(refundValue), // Ép kiểu dứt khoát về Number để tránh lỗi no-unsafe-argument
+          );
+        }
       }
 
       // 3. LOGIC ADMIN OVERRIDE (KHÔI PHỤC ĐƠN HỦY)
@@ -1505,6 +1656,11 @@ export class OrdersService {
         userId: String(orderDoc.user_id),
         totalAmount: orderDoc.total_amount,
       });
+
+      // [TÍCH HỢP LOYALTY]: Xác nhận chuyển điểm từ PENDING sang AVAILABLE
+      this.loyaltyService
+        .confirmPendingPoints(String(orderDoc.user_id), String(orderDoc._id))
+        .catch((e) => this.logger.error('Lỗi duyệt điểm Loyalty:', e));
     }
 
     // 1. Luồng hoàn tiền
@@ -1747,15 +1903,21 @@ export class OrdersService {
       null,
     );
 
-    // 5. Kết quả cuối
-    const totalAmount = totalAfterVoucher + shippingFee;
+    // 4.1. Tính giá trị quy đổi từ Điểm thưởng (AC9) (Giả sử 1 điểm = 100đ)
+    let pointsDiscount = 0;
+    if (dto.pointsToUse && dto.pointsToUse > 0) {
+      pointsDiscount = dto.pointsToUse * 100;
+      if (pointsDiscount > totalAfterVoucher)
+        pointsDiscount = totalAfterVoucher; // Tránh âm tiền
+    }
 
+    // 5. Kết quả cuối
+    const totalAmount = totalAfterVoucher - pointsDiscount + shippingFee;
     return {
       subtotal: itemsTotal,
       shipping_fee: shippingFee,
-      discount_amount: discount,
       voucher_code: dto.voucherCode || null,
-      total_amount: totalAmount,
+      discount_amount: discount + pointsDiscount,
       shipping_method: dto.isInstant ? 'Hỏa tốc' : 'Tiêu chuẩn',
       can_cod: totalAmount <= 5000000,
     };

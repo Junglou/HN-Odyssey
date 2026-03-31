@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Schema as MongooseSchema } from 'mongoose';
+import { Schema as MongooseSchema, Document } from 'mongoose';
 import { User } from '../../schemas/user.schema';
 
 // Sub-document cho địa chỉ (US.10, US.05)
@@ -53,4 +53,5 @@ export class Customer extends User {
   is_subscribed: boolean;
 }
 
+export type CustomerDocument = Customer & Document;
 export const CustomerSchema = SchemaFactory.createForClass(Customer);

@@ -1,5 +1,6 @@
 import {
   IsBoolean,
+  IsDateString,
   IsEmail,
   IsNotEmpty,
   IsOptional,
@@ -70,4 +71,12 @@ export class RegisterDto {
   @IsOptional()
   @IsBoolean({ message: 'Giá trị phải là kiểu đúng/sai' })
   isSubscribed?: boolean;
+
+  @IsDateString({}, { message: 'Ngày sinh không đúng định dạng YYYY-MM-DD' })
+  @IsOptional()
+  dateOfBirth?: string;
+
+  @IsString({ message: 'Giới tính phải là dạng chuỗi ký tự' })
+  @IsOptional()
+  gender?: string;
 }

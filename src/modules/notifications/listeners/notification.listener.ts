@@ -225,4 +225,83 @@ export class NotificationListener {
       metadata: { error_code: data.error_code, stack: data.stack_trace },
     });
   }
+
+  // XỬ LÝ SỰ KIỆN TỪ MODULE LOYALTY (US2 - AC17)
+  @OnEvent('loyalty.points_earned')
+  async handlePointsEarned(data: {
+    userId: string;
+    orderId: string;
+    pointsAmount: number;
+  }) {
+    await this.notificationsService.createAndSend({
+      recipient_role: 'CUSTOMER', // Bắn đích danh cho role Khách Hàng
+      recipient_id: data.userId,
+      title: 'Nhận điểm thưởng thành công! 🎉',
+      message: `Bạn vừa được cộng thêm ${data.pointsAmount} điểm từ đơn hàng ${data.orderId}.`,
+      type: NotificationType.LOYALTY, // Dùng đúng Type chuẩn xác
+      priority: NotificationPriority.LOW, // Sự kiện bình thường
+      metadata: { target_url: '/wallet/loyalty', order_id: data.orderId },
+    });
+  }
+
+  @OnEvent('loyalty.tier_upgraded')
+  async handleTierUpgraded(data: {
+    userId: string;
+    tierName: string;
+    rewardValue: number;
+    discountType: string;
+  }) {
+    const symbol = data.discountType === 'PERCENTAGE' ? '%' : 'đ';
+    await this.notificationsService.createAndSend({
+      recipient_role: 'CUSTOMER',
+      recipient_id: data.userId,
+      title: `Chúc mừng bạn đã lên hạng ${data.tierName}!`,
+      message: `Bạn đã nhận được 1 Voucher giảm ${data.rewardValue}${symbol}. Kiểm tra Kho Voucher ngay nhé!`,
+      type: NotificationType.LOYALTY,
+      priority: NotificationPriority.HIGH, // Ưu tiên cao để đẩy nổi bật
+      metadata: { target_url: '/wallet/vouchers' },
+    });
+  }
+
+  @OnEvent('loyalty.reward_redeemed')
+  async handleRewardRedeemed(data: {
+    userId: string;
+    pointsUsed: number;
+    rewardType: string;
+  }) {
+    const itemName =
+      data.rewardType === 'VOUCHER' ? 'Voucher giảm giá' : 'Quà tặng hiện vật';
+    await this.notificationsService.createAndSend({
+      recipient_role: 'CUSTOMER',
+      recipient_id: data.userId,
+      title: 'Đổi thưởng thành công!',
+      message: `Bạn đã sử dụng ${data.pointsUsed} điểm để đổi ${itemName}.`,
+      type: NotificationType.LOYALTY,
+      priority: NotificationPriority.MEDIUM,
+      metadata: { target_url: '/wallet/loyalty' },
+    });
+  }
+
+  @OnEvent('loyalty.birthday_rewarded')
+  async handleBirthdayRewarded(data: {
+    userId: string;
+    tier: string;
+    voucherValue: number;
+    hasPhysicalGift: boolean;
+  }) {
+    let message = `Tặng bạn Voucher ${data.voucherValue.toLocaleString()}đ mừng sinh nhật sắp tới. Hãy sử dụng ngay trong 30 ngày tới nhé!`;
+    if (data.hasPhysicalGift) {
+      message += ` Đặc biệt, cửa hàng có chuẩn bị một phần quà hiện vật cho hạng ${data.tier}, CSKH sẽ liên hệ bạn sớm!`;
+    }
+
+    await this.notificationsService.createAndSend({
+      recipient_role: 'CUSTOMER',
+      recipient_id: data.userId,
+      title: 'Chúc mừng sinh nhật sớm!',
+      message: message,
+      type: NotificationType.LOYALTY,
+      priority: NotificationPriority.HIGH,
+      metadata: { target_url: '/wallet/vouchers', event: 'birthday' },
+    });
+  }
 }
