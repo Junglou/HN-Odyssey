@@ -1,5 +1,5 @@
 /* --- MAIN CARD --- */
-.history-card {
+.wishlist-card {
   background-color: #ffffff;
   border-radius: 24px;
 
@@ -17,13 +17,13 @@
 }
 
 /* Header */
-.history-header {
+.wishlist-header {
   padding: 2.5rem 3rem 1rem 3rem;
   background: #fff;
   display: flex;
   justify-content: space-between;
 }
-.history-title {
+.wishlist-title {
   font-size: 2rem;
   font-weight: 700;
   margin: 0;
@@ -31,19 +31,19 @@
 }
 
 /* --- GRID SYSTEM --- */
-.history-internal-grid {
+.wishlist-internal-grid {
   display: grid;
   /* Content | Recommend */
   grid-template-columns: 65% 35%;
 }
 
 /* --- CỘT 1: Order Box --- */
-.section-history
+.section-wishlist
 {
   padding-left: 1rem;
   height: fit-content;
   display: grid;
-  grid-template-columns: auto auto;
+  grid-template-columns: auto auto auto;
   column-gap: 1rem;
   row-gap: 1rem;
 }
@@ -63,11 +63,26 @@
 }
 
 /* RESPONSIVE */
+@media (max-width: 2200px) {
+  .wishlist-internal-grid {
+    grid-template-columns: 65% 35%;
+  }
+  .section-wishlist
+  {
+    padding-left: 1rem;
+    height: fit-content;
+    display: grid;
+    grid-template-columns: auto auto;
+    column-gap: 1rem;
+    row-gap: 1rem;
+  }
+}
+
 @media (max-width: 1500px) {
-  .history-internal-grid {
+  .wishlist-internal-grid {
     grid-template-columns: 100%;
   }
-  .section-history {
+  .section-wishlist {
   padding: 0 1rem;
   height: fit-content;
   display: grid;
@@ -76,11 +91,15 @@
   row-gap: 1rem;
   }
 }
-@media (max-width: 1024px) {
-  .history-internal-grid {
+@media (max-width: 1120px) {
+  .wishlist-header
+  {
+    padding: 2rem 2rem 1rem 2rem;
+  }
+  .wishlist-internal-grid {
     grid-template-columns: 1fr;
   }
-  .section-history {
+  .section-wishlist {
   padding-left: 1rem;
   height: fit-content;
   display: grid;
@@ -92,5 +111,31 @@
   .section-recs {
     border-top: none;
     flex-direction: column;
+  }
+}
+@media (max-width: 990px) {
+  .wishlist-internal-grid {
+    grid-template-columns: 1fr;
+  }
+  .section-wishlist {
+  padding: 0 1rem;
+  height: fit-content;
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: 1rem;
+  row-gap: 1rem;
+  }
+}
+@media (max-width: 700px) {
+  .wishlist-internal-grid {
+    grid-template-columns: 1fr;
+  }
+  .section-wishlist {
+  padding: 0 1rem;
+  height: fit-content;
+  display: grid;
+  grid-template-columns: auto;
+  column-gap: 1rem;
+  row-gap: 1rem;
   }
 }

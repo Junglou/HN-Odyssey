@@ -14,14 +14,14 @@ const OrderDetail= ({
 }: OrderDetailProps) => {
 
   return (
-    <div className="my-order-card">
-      <div className="order-header">
-        <h1 className="order-title">Order Management</h1>
+    <div className="my-detail-card">
+      <div className="detail-header">
+        <h1 className="detail-title">Order Management</h1>
       </div>
 
-      <div className="order-box-internal-grid">
+      <div className="detail-box-internal-grid">
         {/* CỘT 1: Đơn hàng */}
-        <div className="grid-section section-order">
+        <div className="grid-section section-detail">
           <div className="order-detail-container">
 
             <div className="order-detail">

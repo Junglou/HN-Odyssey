@@ -222,7 +222,6 @@
   }
   .section-recs {
     grid-column: span 3;
-    border-top: 1px solid #f0f0f0; /* Giữ border top khi xuống dòng */
     display: flex;
     gap: 2rem;
     flex-wrap: wrap;

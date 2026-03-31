@@ -22,6 +22,7 @@
   background: #fff;
   display: flex;
   justify-content: space-between;
+  flex-wrap: wrap;
 }
 .order-title {
   font-size: 2rem;
@@ -53,7 +54,7 @@
 }
 
 /* --- GRID SYSTEM --- */
-.address-box-internal-grid {
+.order-box-internal-grid {
   display: grid;
   /* Content | Recommend */
   grid-template-columns: 65% 35%;
@@ -65,7 +66,7 @@
   padding-left: 1rem;
   height: fit-content;
   display: grid;
-  grid-template-columns: auto auto;
+  grid-template-columns: auto auto auto;
   column-gap: 1rem;
   row-gap: 1rem;
 }
@@ -81,33 +82,44 @@
   margin: 0;
 }
 
-.bottom-link-container
-{
-  margin-left: 1rem;
-  margin-top: 1rem;
-  display: grid;
-  grid-template-columns: auto auto;
+@media (max-width: 2200px) {
+  .order-box-internal-grid {
+    grid-template-columns: 65% 35%;
+  }
+  .section-order
+  {
+    padding-left: 1rem;
+    height: fit-content;
+    display: grid;
+    grid-template-columns: auto auto;
+    column-gap: 1rem;
+    row-gap: 1rem;
+  }
 }
 
 /* RESPONSIVE */
 @media (max-width: 1500px) {
-  .address-box-internal-grid {
+  .order-box-internal-grid {
     grid-template-columns: 100%;
   }
-  .section-address {
+  .section-order {
   padding: 0 1rem;
   height: fit-content;
   display: grid;
-  grid-template-columns: auto auto auto;
+  grid-template-columns: auto auto;
   column-gap: 1rem;
   row-gap: 1rem;
   }
 }
-@media (max-width: 1024px) {
-  .address-box-internal-grid {
+@media (max-width: 1120px) {
+  .order-header
+  {
+    padding: 2rem 2rem 1rem 2rem;
+  }
+  .order-box-internal-grid {
     grid-template-columns: 1fr;
   }
-  .section-address {
+  .section-order {
   padding-left: 1rem;
   height: fit-content;
   display: grid;
@@ -119,5 +131,31 @@
   .section-recs {
     border-top: none;
     flex-direction: column;
+  }
+}
+@media (max-width: 990px) {
+  .order-internal-grid {
+    grid-template-columns: 1fr;
+  }
+  .section-order {
+  padding: 0 1rem;
+  height: fit-content;
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: 1rem;
+  row-gap: 1rem;
+  }
+}
+@media (max-width: 700px) {
+  .order-internal-grid {
+    grid-template-columns: 1fr;
+  }
+  .section-order {
+  padding: 0 1rem;
+  height: fit-content;
+  display: grid;
+  grid-template-columns: auto;
+  column-gap: 1rem;
+  row-gap: 1rem;
   }
 }

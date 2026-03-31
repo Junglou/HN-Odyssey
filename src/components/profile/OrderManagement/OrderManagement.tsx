@@ -29,7 +29,7 @@ const OrderManagement = ({
         </div>
       </div>
 
-      <div className="address-box-internal-grid">
+      <div className="order-box-internal-grid">
         {/* CỘT 1: Box quản lý đơn hàng */}
         <div className="grid-section section-order">
           {

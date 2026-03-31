@@ -1,5 +1,5 @@
 /* --- MAIN CARD --- */
-.my-order-card {
+.my-detail-card {
   background-color: #ffffff;
   border-radius: 24px;
 
@@ -17,13 +17,13 @@
 }
 
 /* Header */
-.order-header {
+.detail-header {
   padding: 2.5rem 3rem 1rem 3rem;
   background: #fff;
   display: flex;
   justify-content: space-between;
 }
-.order-title {
+.detail-title {
   font-size: 2rem;
   font-weight: 700;
   margin: 0;
@@ -31,14 +31,14 @@
 }
 
 /* --- GRID SYSTEM --- */
-.order-box-internal-grid {
+.detail-box-internal-grid {
   display: grid;
   /* Content | Recommend */
   grid-template-columns: 65% 35%;
 }
 
 /* --- CỘT 1: Order Box --- */
-.section-order
+.section-detail
 {
   padding-left: 1rem;
   height: max-content;

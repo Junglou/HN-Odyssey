@@ -13,6 +13,7 @@ import AccountRecoveryPage from "../pages/auth/AccountRecoveryPage";
 import AccountRecoVerifiedPage from "../pages/auth/AccountRecoVerifiedPage";
 import MyProfilePage from "../pages/profile/MyProfilePage";
 import AddressMangementPage from "../pages/profile/AddressManagementPage";
+import RecentViewPage from "../pages/profile/RecentViewPage";
 
 import UserManagementPage from "../pages/portal/UsersAndRoles/UserManagement/UserManagementPage";
 import RoleManagementPage from "../pages/portal/UsersAndRoles/RoleManagement/RoleManagementPage";
@@ -81,6 +82,10 @@ export const router = createBrowserRouter([
       {
         path: "/profile/wishlist",
         element: <MyWishlistPage />,
+      },
+      {
+        path: "/profile/recent",
+        element: <RecentViewPage />,
       },
       {
         index: true, // Route mặc định của path: "/"

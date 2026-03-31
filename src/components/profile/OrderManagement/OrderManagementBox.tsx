@@ -11,7 +11,7 @@ interface OrderBoxProp {
 const OrderManagementBox = ({id, address, order}:OrderBoxProp) => {
   
   return (
-    <div className="box-container">
+    <div className="order-box-container">
 
       <div className="box-content">
         <div className="box-infor">
@@ -30,13 +30,13 @@ const OrderManagementBox = ({id, address, order}:OrderBoxProp) => {
               <span className="lbl-thumb-text">{order.product[0].name}</span>
               <div className="des-container">
                 <span className="span-text">
-                  <strong>Description:</strong> 
+                  <strong>Description: </strong> 
                   {order.product[0].description}
                 </span>
               </div>
               <div className="price-container">
                 <span className="span-text">
-                  <strong>Price:</strong> 
+                  <strong>Price: </strong> 
                   {order.product[0].price}
                 </span>
               </div>

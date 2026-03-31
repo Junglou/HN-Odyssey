@@ -63,7 +63,7 @@ const PurchaseHistoryPage = () => {
       receiverName: "John",
       address: "28 whatever Str",
       city: "Ho Chi Minh",
-      country: "Vietnam",
+      country: "VN",
     },
     {
       receiverName: "Alex",
@@ -75,7 +75,7 @@ const PurchaseHistoryPage = () => {
       receiverName: "Jenny",
       address: "90 whatever Str",
       city: "Ha Noi",
-      country: "Vietnam",
+      country: "VN",
     },
     {
       receiverName: "Jake",

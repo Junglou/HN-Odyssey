@@ -1,5 +1,5 @@
 import type { ProductRecommendation } from "../../../types/user";
-import "./MyWishlistBox.css";
+import "./RecentViewBox.css";
 
 interface MyWishlistProp {
   product: ProductRecommendation;

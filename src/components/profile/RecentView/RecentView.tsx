@@ -1,31 +1,31 @@
-import "./MyWishlist.css";
+import "./RecentView.css";
 import type { UserProfile, ProductRecommendation, UserOrder } from "../../../types/user";
 import RecommendationList from "../../common/RecommendationList";
-import WishlistBox from "./MyWishlistBox";
+import RecentViewBox from "./RecentViewBox";
 
-interface MyWishlistProps {
+interface RecentViewProps {
   user: UserProfile;
   recommendations: ProductRecommendation[];
   order: UserOrder[];
 }
 
-const MyWishlist = ({
+const RecentView = ({
   recommendations,
 
-}: MyWishlistProps) => {
+}: RecentViewProps) => {
 
   return (
-    <div className="wishlist-card">
-      <div className="wishlist-header">
-        <h1 className="wishlist-title">Wishlist Management</h1>
+    <div className="recent-card">
+      <div className="recent-header">
+        <h1 className="recent-title">Recently Viewed</h1>
       </div>
 
-      <div className="wishlist-internal-grid">
+      <div className="recent-internal-grid">
         {/* CỘT 1: Box quản lý đơn hàng */}
-        <div className="grid-section section-wishlist">
+        <div className="grid-section section-recent">
           {
             recommendations.map((product) => (
-              <WishlistBox product={product}/>
+              <RecentViewBox product={product}/>
             ))
           }
         </div>
@@ -39,4 +39,4 @@ const MyWishlist = ({
   );
 };
 
-export default MyWishlist;
+export default RecentView;

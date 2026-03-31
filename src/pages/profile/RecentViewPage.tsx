@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import AccountSidebar from "../../components/profile/AccountSidebar";
-import OrderManagement from "../../components/profile/OrderManagement/OrderManagement"; // Import Component mới đổi tên
-import "./OrderManagementPage.css"; // CSS Layout trang
+import RecentView from "../../components/profile/RecentView/RecentView"; // Import Component mới đổi tên
+import "./RecentViewPage.css"; // CSS Layout trang
 import type {
   UserProfile,
   ProductRecommendation,
@@ -9,7 +9,7 @@ import type {
   UserOrder,
 } from "../../types/user";
 
-const OrderMangementPage = () => {
+const RecentViewPage = () => {
   // 1. Quản lý State
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,7 +63,7 @@ const OrderMangementPage = () => {
       receiverName: "John",
       address: "28 whatever Str",
       city: "Ho Chi Minh",
-      country: "VN",
+      country: "Vietnam",
     },
     {
       receiverName: "Alex",
@@ -75,7 +75,7 @@ const OrderMangementPage = () => {
       receiverName: "Jenny",
       address: "90 whatever Str",
       city: "Ha Noi",
-      country: "VN",
+      country: "Vietnam",
     },
     {
       receiverName: "Jake",
@@ -124,7 +124,7 @@ const OrderMangementPage = () => {
 
   // 4. Render
   return (
-    <div className="my-profile-page-container">
+    <div className="recent-view-page-container">
       {/* Sidebar (Menu trái) */}
       <div className="sidebar-wrapper">
         <AccountSidebar />
@@ -132,7 +132,7 @@ const OrderMangementPage = () => {
 
       {/* Content (Nội dung phải) */}
       <div className="content-wrapper">
-        <OrderManagement
+        <RecentView
           user={user}
           recommendations={recommendations}
           order={order}
@@ -142,4 +142,4 @@ const OrderMangementPage = () => {
   );
 };
 
-export default OrderMangementPage;
+export default RecentViewPage;

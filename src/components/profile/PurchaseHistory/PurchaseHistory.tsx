@@ -18,7 +18,7 @@ const PurchaseHistory = ({
   return (
     <div className="history-card">
       <div className="history-header">
-        <h1 className="history-title">Order Management</h1>
+        <h1 className="history-title">Purchase History</h1>
       </div>
 
       <div className="history-internal-grid">

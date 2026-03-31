@@ -46,6 +46,20 @@
   align-items: center;
 }
 
+.edit-btn
+{
+  background-color: white;
+  border: solid #cfcfcf 0.1rem;
+  border-radius: 0.8rem;
+}
+
+.remove-btn
+{
+  background-color: white;
+  border: solid #cfcfcf 0.1rem;
+  border-radius: 0.8rem;
+}
+
 .order-thumbnail-container
 {
   width: 100%;
@@ -105,13 +119,6 @@
   width: 100%;
   display: flex;
   justify-content: space-between;
-}
-
-.btn-container button
-{
-  background-color: white;
-  border: solid #cfcfcf 0.1rem;
-  border-radius: 0.8rem;
 }
 
 .btn-container button:hover
