@@ -10,6 +10,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  animation: spm-fadeIn 0.2s ease-out;
 }
 
 /* Khung nội dung chính của modal */
@@ -23,6 +24,7 @@
   overflow: hidden;
   padding: 20px;
   box-sizing: border-box;
+  animation: spm-slideUp 0.3s ease-out;
 }
 
 /* Title, close button */
@@ -98,7 +100,7 @@
 }
 
 .spm-input-error {
-  border-color: #ef4444 !important;
+  border-color: #ef4444;
 }
 
 /* Cảnh báo */
@@ -152,4 +154,25 @@
 .spm-btn-save:disabled {
   background-color: #9ca3af;
   cursor: not-allowed;
+}
+
+/* Animation */
+@keyframes spm-fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes spm-slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

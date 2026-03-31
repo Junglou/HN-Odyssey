@@ -13,19 +13,26 @@ import AccountRecoveryPage from "../pages/auth/AccountRecoveryPage";
 import AccountRecoVerifiedPage from "../pages/auth/AccountRecoVerifiedPage";
 import MyProfilePage from "../pages/profile/MyProfilePage";
 import AddressMangementPage from "../pages/profile/AddressManagementPage";
-import RecentViewPage from "../pages/profile/RecentViewPage";
+import OrderMangementPage from "../pages/profile/OrderManagementPage";
+import OrderDetailPage from "../pages/profile/OrderDetailPage";
+import PurchaseHistoryPage from "../pages/profile/PurchaseHistoryPage";
+import MyWishlistPage from "../pages/profile/MyWishlistPage";
 
 import UserManagementPage from "../pages/portal/UsersAndRoles/UserManagement/UserManagementPage";
 import RoleManagementPage from "../pages/portal/UsersAndRoles/RoleManagement/RoleManagementPage";
 import UserBehaviorHeatmapPage from "../pages/portal/UsersAndRoles/UserBehaviorHeatmap/UserBehaviorHeatmapPage";
 
-import OrderMangementPage from "../pages/profile/OrderManagementPage";
-import OrderDetailPage from "../pages/profile/OrderDetailPage";
-import PurchaseHistoryPage from "../pages/profile/PurchaseHistoryPage";
-import MyWishlistPage from "../pages/profile/MyWishlistPage";
+import VariantManagementPage from "../pages/portal/ProductCatalog/VariantManagement/VariantManagementPage";
 import ProductManagementPage from "../pages/portal/ProductCatalog/ProductManagement/ProductManagementPage";
 import ProductFormPage from "../pages/portal/ProductCatalog/ProductManagement/ProductFormPage";
 import CategoryManagementPage from "../pages/portal/ProductCatalog/CategoryManagement/CategoryManagementPage";
+import TagManagementPage from "../pages/portal/ProductCatalog/TagManagement/TagManagementPage";
+import PriceManagementPage from "../pages/portal/ProductCatalog/PriceManagement/PriceManagementPage";
+
+import CustomerManagementPage from "../pages/portal/CustomerCRM/CustomerManagement/CustomerManagementPage";
+import LiveChatSupportPage from "../pages/portal/CustomerCRM/LiveChatSupport/LiveChatSupportPage";
+
+import PromotionManagementPage from "../pages/portal/MarketingSuite/PromotionManagement/PromotionManagementPage";
 
 export const router = createBrowserRouter([
   // route auth
@@ -84,10 +91,6 @@ export const router = createBrowserRouter([
         element: <MyWishlistPage />,
       },
       {
-        path: "/profile/recent",
-        element: <RecentViewPage />,
-      },
-      {
         index: true, // Route mặc định của path: "/"
         element: <Navigate to="/login" replace />, // Redirect về login
       },
@@ -144,6 +147,30 @@ export const router = createBrowserRouter([
       {
         path: "categories",
         element: <CategoryManagementPage />,
+      },
+      {
+        path: "variants",
+        element: <VariantManagementPage />,
+      },
+      {
+        path: "tags",
+        element: <TagManagementPage />,
+      },
+      {
+        path: "prices",
+        element: <PriceManagementPage />,
+      },
+      {
+        path: "customers",
+        element: <CustomerManagementPage />,
+      },
+      {
+        path: "live-chat",
+        element: <LiveChatSupportPage />,
+      },
+      {
+        path: "promotion",
+        element: <PromotionManagementPage />,
       },
     ],
   },

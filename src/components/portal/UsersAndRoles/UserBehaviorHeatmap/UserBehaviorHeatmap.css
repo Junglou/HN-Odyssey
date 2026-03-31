@@ -1,4 +1,4 @@
-/* container gốc cho heatmap */
+/* container cho heatmap */
 .ubh-container {
   display: flex;
   flex-direction: column;
@@ -14,7 +14,7 @@
   box-sizing: border-box;
 }
 
-/* Header tiêu đề */
+/* header tiêu đề */
 .ubh-header {
   display: flex;
   justify-content: space-between;
@@ -73,7 +73,7 @@
   background-size: 20px 20px;
 }
 
-/* đốm nhiệt (hotspot) */
+/* đốm nhiệt hotspot */
 .ubh-hotspot {
   position: absolute;
   border-radius: 50%;
@@ -81,7 +81,7 @@
   opacity: 0.8;
 }
 
-/* mock hotspot */
+/* mock dữ liệu vị trí hotspot */
 .header-zone {
   width: 150px;
   height: 150px;
@@ -132,7 +132,7 @@
   color: #6b7280;
 }
 
-/* panel giới hạn chiều rộng (form nhập và stat cards) */
+/* panel chứa form input */
 .ubh-right-panel {
   flex: 0 0 clamp(300px, 25vw, 360px);
   display: flex;
@@ -152,17 +152,91 @@
   color: #111827;
 }
 
-/* Dropdown */
-.ubh-select {
+/* thiết kế custom dropdown */
+.ubh-custom-dropdown {
+  position: relative;
+  width: 100%;
+  user-select: none;
+}
+
+.ubh-custom-dropdown.is-open {
+  z-index: 101;
+}
+
+.ubh-dropdown-trigger {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   width: 100%;
   padding: 10px 16px;
   border: 1px solid #d1d5db;
   border-radius: 8px;
+  background-color: #ffffff;
   font-family: inherit;
   font-size: 0.9rem;
-  background-color: #fff;
-  outline: none;
+  color: #111827;
   cursor: pointer;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.ubh-dropdown-trigger:hover,
+.ubh-dropdown-trigger.active {
+  border-color: #000000;
+}
+
+.ubh-dropdown-arrow {
+  transition: transform 0.3s ease;
+}
+
+.ubh-dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+/* menu dropdown */
+.ubh-dropdown-options {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  overflow: hidden;
+  animation: ubh-slideFadeIn 0.2s ease-out forwards;
+  transform-origin: top center;
+}
+
+.ubh-dropdown-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  color: #374151;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.ubh-dropdown-item:hover {
+  background-color: #f3f4f6;
+}
+
+.ubh-dropdown-item.selected {
+  background-color: #e9e9e9;
+  color: #000000;
+  font-weight: 600;
+}
+
+/* hiệu ứng mờ dần */
+@keyframes ubh-slideFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* layout cho ô nhập ngày tháng */
@@ -170,26 +244,62 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
+
 .ubh-date-box {
-  flex: 1;
-  padding: 10px;
+  flex: 1 1 130px;
+  padding: 8px 12px;
   border: 1px solid #d1d5db;
   border-radius: 8px;
   background-color: #fff;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
   color: #6b7280;
+  transition: border-color 0.2s;
+  position: relative;
+}
+.ubh-date-box:focus-within {
+  border-color: #000000;
+}
+.ubh-date-box svg {
+  pointer-events: none;
+  z-index: 1;
+}
+.ubh-date-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: #111827;
+  width: 100%;
   cursor: pointer;
+  position: relative;
+  z-index: 1;
+}
+.ubh-date-input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  color: transparent;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
 }
 
-/* nút chuyển chế độ (desktop, mobile) */
+/* chọn thiết bị */
 .ubh-device-toggles {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 .ubh-device-btn {
-  flex: 1;
+  flex: 1 1 80px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -210,11 +320,17 @@
   color: #111827;
   font-weight: 700;
 }
+.ubh-device-btn:hover {
+  background-color: #f9fafb;
+  border-color: #9ca3af;
+  color: #111827;
+}
 
-/* radio button */
+/* radio button loại tương tác */
 .ubh-radio-group {
   display: flex;
   gap: 16px;
+  flex-wrap: wrap;
 }
 .ubh-radio-label {
   display: flex;
@@ -254,14 +370,14 @@
   transform: scale(1);
 }
 
-/* summary card */
+/* grid bao bọc thẻ thống kê */
 .ubh-stats-grid {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-/* Statistics card */
+/* thẻ hiển thị số liệu */
 .ubh-stat-card {
   background-color: #fff;
   border: 1px solid #e5e7eb;
@@ -296,8 +412,8 @@
   color: #111827;
 }
 
-/* responsive */
-@media (max-width: 1024px) {
+/* responsive điện thoại và máy tính bảng */
+@media (max-width: 1366px) {
   .ubh-layout {
     flex-direction: column;
   }

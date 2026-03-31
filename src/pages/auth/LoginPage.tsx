@@ -40,7 +40,6 @@ const LoginPage = () => {
           onForgotPasswordClick={() =>
             navigate("/verify-otp", { state: { type: "FORGOT_PASSWORD" } })
           }
-          // GẮN LINK SUPPORT
           onSupportClick={() => navigate("/account-recovery")}
         />
       </div>
@@ -98,7 +97,6 @@ const LoginPage = () => {
               Reach out to support anytime for help or guidance.
             </li>
           </ul>
-          {/* ĐÃ GẮN LINK EXPLORE -> Về trang chủ hoặc trang sản phẩm */}
           <button className="explore-btn" onClick={() => navigate("/")}>
             Explore
           </button>

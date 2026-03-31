@@ -2,6 +2,7 @@ import UserManagement from "../../../../components/portal/UsersAndRoles/UserMana
 import UserModal from "../../../../components/portal/UsersAndRoles/UserManagement/UserModal";
 import ConfirmDeleteModal from "../../../../components/portal/common/ConfirmDeleteModal";
 import { useUserManagement } from "../../../../hooks/portal/UserAndRoles/UserManagement/useUserManagement";
+import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 import "./UserManagementPage.css";
 
 export default function UserManagementPage() {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { ChevronDownIcon } from "../../../../assets/icons/HeaderIcons";
 import { DotsIcon } from "../../../../assets/icons/UserManagementIcons";
 import { DragHandleIcon } from "../../../../assets/icons/CategoryIcons";
@@ -25,7 +25,7 @@ interface CategoryTableRowProps {
   onMoveCategory: (draggedId: string, targetId: string) => void;
 }
 
-export default function CategoryTableRow({
+const CategoryTableRow = memo(function CategoryTableRow({
   node,
   isDropdownOpen,
   onToggleDropdown,
@@ -170,4 +170,6 @@ export default function CategoryTableRow({
       </td>
     </tr>
   );
-}
+});
+
+export default CategoryTableRow;

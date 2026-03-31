@@ -10,6 +10,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  animation: tm-fadeIn 0.2s ease-out;
 }
 
 .tm-modal-content {
@@ -20,6 +21,7 @@
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
   font-family: inherit;
   overflow: hidden;
+  animation: tm-slideUp 0.3s ease-out;
 }
 
 .tm-modal-header {
@@ -154,4 +156,25 @@
 
 .tm-btn-confirm:hover {
   background-color: #2563eb;
+}
+
+/* Animation */
+@keyframes tm-fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tm-slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

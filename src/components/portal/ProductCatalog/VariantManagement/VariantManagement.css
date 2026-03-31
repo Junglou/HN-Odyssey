@@ -1,0 +1,213 @@
+/* container */
+.vm-container {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2vw, 20px);
+  font-family: "Lexend Exa", sans-serif;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.vm-container * {
+  box-sizing: border-box;
+}
+
+/* header và breadcrumb */
+.vm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.vm-title {
+  font-size: clamp(1.4rem, 2.5vw, 1.8rem);
+  font-weight: 800;
+  margin: 0 0 4px 0;
+  color: #111827;
+}
+
+.vm-breadcrumb {
+  font-size: clamp(0.75rem, 1vw, 0.85rem);
+  color: #6b7280;
+  margin: 0;
+}
+
+/* nút thêm mới */
+.vm-btn-add {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.2s;
+  font-family: inherit;
+}
+.vm-btn-add:hover {
+  background-color: #2563eb;
+}
+
+.vm-card {
+  background-color: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* thanh tìm kiếm */
+.vm-filters-row {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.vm-search-input {
+  width: 100%;
+  max-width: 400px;
+  padding: 10px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  outline: none;
+  font-family: inherit;
+  font-size: 0.9rem;
+  transition: border-color 0.2s;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.vm-search-input:focus {
+  border-color: #3b82f6;
+}
+
+/* bảng dữ liệu */
+.vm-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+.vm-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  min-width: 600px;
+}
+.vm-table th,
+.vm-table td {
+  padding: 14px 16px;
+  font-size: 0.9rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+.vm-table th {
+  background-color: #f3f4f6;
+  font-weight: 700;
+  color: #374151;
+}
+.vm-table td {
+  color: #111827;
+  vertical-align: middle;
+}
+
+/* value biến thể */
+.vm-values-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.vm-chip {
+  background-color: #e5e7eb;
+  color: #374151;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.vm-empty-text {
+  color: #9ca3af;
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+/* switch trạng thái */
+.vm-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+.vm-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.status-Active .vm-dot {
+  background-color: #10b981;
+}
+.status-Active {
+  color: #10b981;
+}
+
+.status-Inactive .vm-dot {
+  background-color: #6b7280;
+}
+.status-Inactive {
+  color: #6b7280;
+}
+
+/* nút thao tác */
+.vm-action-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+.vm-icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background-color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+}
+.vm-icon-btn:hover {
+  background-color: #f3f4f6;
+  border-color: #9ca3af;
+}
+.vm-icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ô trống */
+.vm-td-empty {
+  text-align: center;
+  padding: 32px;
+  color: #6b7280;
+}
+
+/* responsive */
+@media (max-width: 768px) {
+  .vm-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .vm-search-input {
+    max-width: 100%;
+  }
+}

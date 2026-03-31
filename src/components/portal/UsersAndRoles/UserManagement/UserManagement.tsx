@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import "./UserManagement.css";
+import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 
 import {
   ViewIcon,
@@ -8,6 +9,7 @@ import {
   TrashIcon,
   LockIcon,
   UnlockIcon,
+  ChevronDownSmallIcon,
 } from "../../../../assets/icons/UserManagementIcons";
 import type { User } from "./UserModal";
 import type { BulkAction } from "../../../../hooks/portal/UserAndRoles/UserManagement/useUserManagement";
@@ -59,7 +61,7 @@ function CustomDropdown({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Tắt dropdown khi click ngoài vùng dropdown
+  // tắt dropdown khi click ngoài vùng dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -86,20 +88,10 @@ function CustomDropdown({
         onClick={() => setIsOpen(!isOpen)}
       >
         <span>{selectedLabel}</span>
-        <svg
+        <ChevronDownSmallIcon
           className={`um-dropdown-arrow ${isOpen ? "open" : ""}`}
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#333"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <polyline points="6 9 12 15 18 9"></polyline>
-        </svg>
+          style={{ color: "#333" }}
+        />
       </div>
       {isOpen && (
         <div className="um-dropdown-options">
@@ -136,13 +128,6 @@ const ROLE_OPTIONS: DropdownOption[] = [
   { label: "Sale Staff", value: "Sale Staff" },
 ];
 
-const PAGE_OPTIONS: DropdownOption[] = [
-  { label: "5 / page", value: "5" },
-  { label: "10 / page", value: "10" },
-  { label: "20 / page", value: "20" },
-  { label: "50 / page", value: "50" },
-];
-
 // ui chính của bảng người dùng
 export default function UserManagement({
   data,
@@ -151,15 +136,14 @@ export default function UserManagement({
   actions,
 }: UserManagementProps) {
   const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
-
-  // Tắt menu "..." khi click ra ngoài
-  useEffect(() => {
-    const handleGlobalClick = () => setOpenDropdownId(null);
-    document.addEventListener("click", handleGlobalClick);
-    return () => document.removeEventListener("click", handleGlobalClick);
-  }, []);
+  const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
+  const limitRef = useRef<HTMLDivElement>(null);
+  useClickOutside(limitRef, () => setIsLimitDropdownOpen(false));
 
   const isAllSelected = data.length > 0 && data.every((user) => user.selected);
+  // biến kiểm tra xem có dòng nào đang được chọn hay không để disable nút
+  const hasSelection = data.some((user) => user.selected);
+
   const pageNumbers = Array.from(
     { length: pagination.totalPages },
     (_, i) => i + 1,
@@ -226,6 +210,7 @@ export default function UserManagement({
               actions.bulk("activate");
               e.currentTarget.blur();
             }}
+            disabled={!hasSelection}
           >
             Bulk Activate
           </button>
@@ -236,6 +221,7 @@ export default function UserManagement({
               actions.bulk("deactivate");
               e.currentTarget.blur();
             }}
+            disabled={!hasSelection}
           >
             Bulk Deactivate
           </button>
@@ -246,6 +232,7 @@ export default function UserManagement({
               actions.bulk("delete");
               e.currentTarget.blur();
             }}
+            disabled={!hasSelection}
           >
             Bulk Delete
           </button>
@@ -401,13 +388,15 @@ export default function UserManagement({
 
         {/* phân trang */}
         <div className="um-pagination">
-          <div>
+          <span>
             Showing{" "}
-            {pagination.totalFiltered === 0 ? 0 : pagination.startIndex + 1}-
+            {pagination.totalFiltered === 0 ? 0 : pagination.startIndex + 1} -{" "}
             {Math.min(pagination.endIndex, pagination.totalFiltered)} of{" "}
             {pagination.totalFiltered} users
-          </div>
+          </span>
+
           <div className="um-page-numbers">
+            {/* nút lùi trang */}
             <button
               type="button"
               className="um-page-num"
@@ -422,6 +411,7 @@ export default function UserManagement({
               &lt;
             </button>
 
+            {/* danh sách các số trang */}
             {pageNumbers.map((num) => (
               <button
                 type="button"
@@ -433,6 +423,7 @@ export default function UserManagement({
               </button>
             ))}
 
+            {/* nút tiến trang */}
             <button
               type="button"
               className="um-page-num"
@@ -457,12 +448,36 @@ export default function UserManagement({
               &gt;
             </button>
 
-            <CustomDropdown
-              value={pagination.limit.toString()}
-              options={PAGE_OPTIONS}
-              onChange={(val) => actions.changeLimit(Number(val))}
-              className="um-page-dropdown"
-            />
+            {/* custom dropdown chọn số lượng hiển thị */}
+            <div className="um-limit-dropdown" ref={limitRef}>
+              <div
+                className={`um-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}
+                onClick={() => setIsLimitDropdownOpen(!isLimitDropdownOpen)}
+              >
+                <span>{pagination.limit} / page</span>
+                <div
+                  className={`um-limit-icon ${isLimitDropdownOpen ? "open" : ""}`}
+                >
+                  <ChevronDownSmallIcon />
+                </div>
+              </div>
+              {isLimitDropdownOpen && (
+                <div className="um-limit-options">
+                  {[5, 10, 20, 50].map((val) => (
+                    <div
+                      key={val}
+                      className={`um-limit-option ${pagination.limit === val ? "active" : ""}`}
+                      onClick={() => {
+                        actions.changeLimit(val);
+                        setIsLimitDropdownOpen(false);
+                      }}
+                    >
+                      {val} / page
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

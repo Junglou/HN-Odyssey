@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from "react";
 import "./UserBehaviorHeatmap.css";
 import {
   DesktopIcon,
@@ -8,10 +9,12 @@ import {
   CursorIcon,
   ClockIcon,
 } from "../../../../assets/icons/HeatmapIcons";
+
+// lấy type từ hook để đồng bộ dữ liệu
 import type {
   DeviceType,
   InteractionType,
-} from "../../../../pages/portal/UsersAndRoles/UserBehaviorHeatmap/UserBehaviorHeatmapPage";
+} from "../../../../hooks/portal/UserAndRoles/UserBehaviorHeatmap/useUserBehaviorHeatmap";
 
 // định nghĩa props cho dữ liệu đầu vào
 interface UserBehaviorHeatmapProps {
@@ -21,6 +24,10 @@ interface UserBehaviorHeatmapProps {
   onDeviceChange: (device: DeviceType) => void;
   interactionType: InteractionType;
   onInteractionChange: (type: InteractionType) => void;
+  startDate: string;
+  onStartDateChange: (date: string) => void;
+  endDate: string;
+  onEndDateChange: (date: string) => void;
   stats: {
     visits: string;
     clicks: string;
@@ -29,7 +36,93 @@ interface UserBehaviorHeatmapProps {
 }
 
 const INTERACTION_OPTIONS: InteractionType[] = ["Click", "Scroll", "Hover"];
-// component render UI từ props
+
+const PAGE_OPTIONS = [
+  { label: "Homepage (Current)", value: "Homepage (Current)" },
+  {
+    label: "Product Page - Hiking Boots",
+    value: "Product Page - Hiking Boots",
+  },
+  { label: "Cart", value: "Cart" },
+  { label: "Checkout", value: "Checkout" },
+];
+
+// component custom dropdown thay thế cho thẻ select mặc định
+function CustomHeatmapSelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: { label: string; value: string }[];
+  onChange: (value: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // xử lý đóng menu khi click ra ngoài vùng dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedLabel =
+    options.find((opt) => opt.value === value)?.label || value;
+
+  return (
+    <div
+      className={`ubh-custom-dropdown ${isOpen ? "is-open" : ""}`}
+      ref={dropdownRef}
+    >
+      <div
+        className={`ubh-dropdown-trigger ${isOpen ? "active" : ""}`}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span>{selectedLabel}</span>
+        <svg
+          className={`ubh-dropdown-arrow ${isOpen ? "open" : ""}`}
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#111827"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </div>
+      {isOpen && (
+        <div className="ubh-dropdown-options">
+          {options.map((opt) => (
+            <div
+              key={opt.value}
+              className={`ubh-dropdown-item ${value === opt.value ? "selected" : ""}`}
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// component render giao diện chính
 export default function UserBehaviorHeatmap({
   selectedPage,
   onPageChange,
@@ -38,6 +131,10 @@ export default function UserBehaviorHeatmap({
   interactionType,
   onInteractionChange,
   stats,
+  startDate,
+  onStartDateChange,
+  endDate,
+  onEndDateChange,
 }: UserBehaviorHeatmapProps) {
   return (
     <div className="ubh-container">
@@ -50,23 +147,23 @@ export default function UserBehaviorHeatmap({
         </div>
       </div>
 
-      {/* chia layout màn hình: bản đồ heatmap, thanh điều khiển */}
+      {/* chia layout heatmap và thanh điều khiển */}
       <div className="ubh-layout">
         {/* khung hiện biểu đồ nhiệt */}
         <div className="ubh-left-panel">
           <div className="ubh-visual-preview">
-            {/* background giả lập giao diện 1 trang web */}
+            {/* background mock data */}
             <div className="ubh-website-preview">
               <div className="ubh-preview-header"></div>
               <div className="ubh-preview-content">
-                {/* Vùng heatmap (hotspot) */}
+                {/* vùng hotspot mô phỏng tương tác người dùng */}
                 <div className="ubh-hotspot header-zone"></div>
                 <div className="ubh-hotspot content-zone"></div>
                 <div className="ubh-hotspot footer-zone"></div>
               </div>
             </div>
 
-            {/* thanh chú thích màu sắc */}
+            {/* thanh chú thích màu sắc biểu đồ */}
             <div className="ubh-color-scale-wrapper">
               <div className="ubh-color-bar"></div>
               <div className="ubh-color-labels">
@@ -81,22 +178,16 @@ export default function UserBehaviorHeatmap({
           </div>
         </div>
 
-        {/* form điều khiển (filter) và bảng tóm tắt số liệu */}
+        {/* form điều khiển filter và bảng tóm tắt số liệu */}
         <div className="ubh-right-panel">
           <div className="ubh-control-group">
             <label className="ubh-label">Select Page</label>
-            <select
-              className="ubh-select"
+            {/* sử dụng custom dropdown thay cho thẻ select */}
+            <CustomHeatmapSelect
               value={selectedPage}
-              onChange={(e) => onPageChange(e.target.value)}
-            >
-              <option value="Homepage (Current)">Homepage (Current)</option>
-              <option value="Product Page - Hiking Boots">
-                Product Page - Hiking Boots
-              </option>
-              <option value="Cart">Cart</option>
-              <option value="Checkout">Checkout</option>
-            </select>
+              options={PAGE_OPTIONS}
+              onChange={onPageChange}
+            />
           </div>
 
           <div className="ubh-control-group">
@@ -104,15 +195,27 @@ export default function UserBehaviorHeatmap({
             <div className="ubh-date-inputs">
               <div className="ubh-date-box">
                 <CalendarIcon />
+                <input
+                  type="date"
+                  className="ubh-date-input"
+                  value={startDate}
+                  onChange={(e) => onStartDateChange(e.target.value)}
+                />
               </div>
               <span>-</span>
               <div className="ubh-date-box">
                 <CalendarIcon />
+                <input
+                  type="date"
+                  className="ubh-date-input"
+                  value={endDate}
+                  onChange={(e) => onEndDateChange(e.target.value)}
+                />
               </div>
             </div>
           </div>
 
-          {/* Button */}
+          {/* cụm nút chọn loại thiết bị */}
           <div className="ubh-control-group">
             <label className="ubh-label">Device</label>
             <div className="ubh-device-toggles">
@@ -140,7 +243,7 @@ export default function UserBehaviorHeatmap({
           <div className="ubh-control-group">
             <label className="ubh-label">Interaction Type</label>
             <div className="ubh-radio-group">
-              {/* 3 radio button */}
+              {/* lặp để tạo các radio button */}
               {INTERACTION_OPTIONS.map((type) => (
                 <label key={type} className="ubh-radio-label">
                   <div
@@ -160,7 +263,7 @@ export default function UserBehaviorHeatmap({
             </div>
           </div>
 
-          {/* render 3 card thống kê */}
+          {/* hiển thị thẻ thống kê */}
           <div className="ubh-control-group" style={{ marginTop: "16px" }}>
             <label className="ubh-label">Statistics Summary</label>
             <div className="ubh-stats-grid">
