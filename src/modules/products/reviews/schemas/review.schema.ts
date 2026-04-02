@@ -1,13 +1,10 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-import type {
-  IReviewEditHistory,
-  IReviewReply,
-} from 'src/common/interfaces/review.interface';
+import { ReviewStatus } from 'src/common/enums/review.enum';
 
-// 1. Tạo Sub-Schema cho Media (Quan trọng!)
-@Schema({ _id: false }) // Không cần tạo _id riêng cho từng ảnh/video
-class ReviewMedia {
+// Sub-schema cho Media (AC4 - Customer)
+@Schema({ _id: false })
+export class ReviewMedia {
   @Prop({ required: true })
   url: string;
 
@@ -21,12 +18,12 @@ const ReviewMediaSchema = SchemaFactory.createForClass(ReviewMedia);
 
 export type ReviewDocument = Review & Document;
 
-@Schema({ timestamps: true })
+@Schema({ timestamps: true, collection: 'reviews' })
 export class Review extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Product', required: true, index: true })
   product_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
   user_id: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: 'Order', required: true })
@@ -38,20 +35,16 @@ export class Review extends Document {
   @Prop({ required: true, min: 1, max: 5 })
   rating: number;
 
-  @Prop()
+  @Prop({ type: String, maxlength: 1000 })
   content: string;
 
-  @Prop({
-    type: [ReviewMediaSchema], // Sử dụng Schema thay vì Object literal
-    default: [],
-  })
+  @Prop({ type: [ReviewMediaSchema], default: [] })
   media: ReviewMedia[];
 
-  // AC9: Đánh giá ẩn danh
+  // Storefront Features
   @Prop({ default: false })
   is_anonymous: boolean;
 
-  // AC2: Lịch sử chỉnh sửa đánh giá
   @Prop({
     type: [
       {
@@ -62,27 +55,54 @@ export class Review extends Document {
     ],
     default: [],
   })
-  edit_history: IReviewEditHistory[];
-
-  @Prop({
-    type: { content: String, staff_id: Types.ObjectId, replied_at: Date },
-    default: null,
-  })
-  reply?: IReviewReply;
-
-  @Prop({ default: 'APPROVED', enum: ['PENDING', 'APPROVED', 'HIDDEN'] })
-  status: string;
+  edit_history: { old_rating: number; old_content: string; edited_at: Date }[];
 
   @Prop({ default: 0 })
   helpful_count: number;
 
   @Prop({ type: [String], default: [] })
   liked_by_users: string[];
+
+  // Admin & Moderation Features
+  @Prop({
+    type: {
+      content: String,
+      staff_id: { type: Types.ObjectId, ref: 'User' },
+      replied_at: Date,
+    },
+    default: null,
+  })
+  reply?: { content: string; staff_id: Types.ObjectId; replied_at: Date };
+
+  @Prop({
+    required: true,
+    enum: ReviewStatus,
+    default: ReviewStatus.NEW,
+    index: true,
+  })
+  status: ReviewStatus;
+
+  @Prop({ default: false, index: true })
+  is_pinned: boolean;
+
+  @Prop({ type: Date, default: null })
+  pinned_at?: Date | null;
+
+  @Prop({ default: true })
+  is_verified_purchase: boolean;
 }
 
 export const ReviewSchema = SchemaFactory.createForClass(Review);
-ReviewSchema.index({ product_id: 1, status: 1, createdAt: -1 });
+
+// Indexes tối ưu hóa
+ReviewSchema.index({
+  product_id: 1,
+  status: 1,
+  is_pinned: -1,
+  pinned_at: -1,
+  createdAt: -1,
+});
 ReviewSchema.index(
   { order_id: 1, product_id: 1, variant_sku: 1 },
   { unique: true },
-); // Chống spam AC2
+);

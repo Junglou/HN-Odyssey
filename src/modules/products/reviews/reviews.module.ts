@@ -15,6 +15,9 @@ import {
 } from './schemas/review-report.schema';
 import { ReviewEventListener } from './review.listener';
 import { NotificationsModule } from 'src/modules/notifications/notifications.module';
+import { AdminReviewsController } from './admin-reviews.controller';
+import { AdminReviewsService } from './admin-reviews.service';
+import { UsersModule } from 'src/modules/users/users.module';
 
 @Module({
   imports: [
@@ -24,10 +27,11 @@ import { NotificationsModule } from 'src/modules/notifications/notifications.mod
       { name: Product.name, schema: ProductSchema },
       { name: Order.name, schema: OrderSchema },
     ]),
+    UsersModule,
     AuditLogsModule,
     NotificationsModule,
   ],
-  controllers: [ReviewsController],
-  providers: [ReviewsService, ReviewEventListener],
+  controllers: [ReviewsController, AdminReviewsController],
+  providers: [ReviewsService, ReviewEventListener, AdminReviewsService],
 })
 export class ReviewsModule {}

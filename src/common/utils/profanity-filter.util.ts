@@ -1,26 +1,23 @@
-// Danh sách từ cấm mẫu (Admin có thể cấu hình chuyển vào DB sau)
-const BLACKLIST_KEYWORDS = ['tục tĩu', 'lừa đảo', 'quảng cáo'];
+export const filterProfanity = (
+  text: string,
+): { isClean: boolean; filteredText: string } => {
+  if (!text) return { isClean: true, filteredText: text };
 
-export interface ProfanityFilterResult {
-  isClean: boolean;
-  cleanText: string;
-}
+  // Danh sách từ cấm (Blacklist) có thể lấy từ DB hoặc cấu hình tĩnh
+  const blacklist = ['từ_cấm_1', 'từ_cấm_2', 'chửi_thề'];
 
-export const filterProfanity = (text: string): ProfanityFilterResult => {
-  if (!text) return { isClean: true, cleanText: text };
-
-  let cleanText = text;
   let isClean = true;
+  let filteredText = text;
 
-  BLACKLIST_KEYWORDS.forEach((word) => {
-    // Tìm kiếm không phân biệt hoa thường
-    const regex = new RegExp(word, 'gi');
-    if (regex.test(cleanText)) {
+  blacklist.forEach((badWord) => {
+    // Regex tìm từ cấm không phân biệt hoa thường
+    const regex = new RegExp(badWord, 'gi');
+    if (regex.test(filteredText)) {
       isClean = false;
-      // Tự động thay thế từ cấm bằng ***
-      cleanText = cleanText.replace(regex, '***');
+      // AC7: Thay thế từ cấm bằng ***
+      filteredText = filteredText.replace(regex, '***');
     }
   });
 
-  return { isClean, cleanText };
+  return { isClean, filteredText };
 };

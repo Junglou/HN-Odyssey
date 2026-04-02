@@ -20,6 +20,6 @@ import { AuditLogsModule } from 'src/modules/system/audit-logs/audit-logs.module
   ],
   controllers: [CustomersController],
   providers: [CustomersService],
-  exports: [CustomersService],
+  exports: [CustomersService, MongooseModule],
 })
 export class CustomersModule {}

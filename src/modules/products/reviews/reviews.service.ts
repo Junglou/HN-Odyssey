@@ -21,10 +21,10 @@ import { sanitizeReviewContent } from 'src/common/utils/xss-filter.util';
 import { filterProfanity } from 'src/common/utils/profanity-filter.util';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { IReviewEditHistory } from 'src/common/interfaces/review.interface';
-import { ReplyReviewDto } from './dto/reply-review.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
 import { ReviewQueryDto } from './dto/review-query.dto';
+import { ReviewStatus } from 'src/common/enums/review.enum';
 
 // 1. Interface Query Params
 export interface ReviewQueryParam {
@@ -34,7 +34,7 @@ export interface ReviewQueryParam {
   has_media?: string;
   sort_by?: string;
   variant_sku?: string;
-  [key: string]: unknown; // Dùng unknown thay cho any
+  [key: string]: unknown;
 }
 
 // 2. Định nghĩa Type cho Aggregation Kết quả Rating
@@ -44,7 +44,7 @@ export interface RatingAggregationResult {
   totalReviews: number;
 }
 
-// 3. Định nghĩa Type an toàn cho Aggregation Danh sách (Tránh lỗi Unsafe member access của ESLint)
+// 3. Định nghĩa Type an toàn cho Aggregation Danh sách
 export interface AggregatedUser {
   _id: Types.ObjectId;
   full_name: string;
@@ -75,7 +75,7 @@ interface ReviewListAggregationResult {
 // 4. Định nghĩa Filter Type
 interface ReviewFilter {
   product_id: Types.ObjectId;
-  status: string;
+  status: string | ReviewStatus | { $in: ReviewStatus[] };
   rating?: number;
   variant_sku?: string;
   media?: { $not: { $size: number } };
@@ -147,12 +147,13 @@ export class ReviewsService {
 
     let safeContent = '';
     if (dto.content) {
+      // 1. Chống XSS
       safeContent = sanitizeReviewContent(dto.content);
+
+      // 2. Auto-Moderation (AC7): Thay thế từ cấm bằng *** thay vì báo lỗi
       const profanityCheck = filterProfanity(safeContent);
-      if (!profanityCheck.isClean) {
-        throw new BadRequestException(
-          'Nội dung chứa từ ngữ không phù hợp, vui lòng chỉnh sửa lại.',
-        );
+      if (!profanityCheck.isClean && profanityCheck.filteredText) {
+        safeContent = profanityCheck.filteredText;
       }
     }
 
@@ -165,7 +166,7 @@ export class ReviewsService {
       content: safeContent,
       media: dto.media ? dto.media.map((m) => ({ ...m })) : [],
       is_anonymous: dto.is_anonymous || false,
-      status: 'APPROVED',
+      status: ReviewStatus.NEW,
     });
 
     await this.updateProductRating(dto.productId);
@@ -224,13 +225,14 @@ export class ReviewsService {
     review.edit_history.push(historyEntry);
 
     if (dto.content !== undefined) {
-      const safeContent = sanitizeReviewContent(dto.content);
+      let safeContent = sanitizeReviewContent(dto.content);
+
+      // Auto-Moderation (AC7): Xử lý che từ cấm khi update
       const profanityCheck = filterProfanity(safeContent);
-      if (!profanityCheck.isClean) {
-        throw new BadRequestException(
-          'Nội dung chứa từ ngữ không phù hợp, vui lòng chỉnh sửa lại.',
-        );
+      if (!profanityCheck.isClean && profanityCheck.filteredText) {
+        safeContent = profanityCheck.filteredText;
       }
+
       review.content = safeContent;
     }
 
@@ -292,23 +294,14 @@ export class ReviewsService {
       user_agent: userAgent,
     });
 
+    this.eventEmitter.emit('review.deleted_or_hidden', {
+      userId: userId,
+      reviewId: reviewId,
+      orderId: review.order_id.toString(),
+      reason: 'USER_DELETED',
+    });
+
     return { message: 'Đã xóa đánh giá.' };
-  }
-
-  async replyReview(reviewId: string, staffId: string, dto: ReplyReviewDto) {
-    const review = await this.reviewModel.findById(reviewId);
-    if (!review) throw new NotFoundException('Đánh giá không tồn tại.');
-
-    const safeReply = sanitizeReviewContent(dto.content);
-
-    review.reply = {
-      content: safeReply,
-      staff_id: new Types.ObjectId(staffId),
-      replied_at: new Date(),
-    };
-
-    await review.save();
-    return { message: 'Đã phản hồi đánh giá', data: review };
   }
 
   async updateProductRating(productId: string): Promise<void> {
@@ -316,7 +309,13 @@ export class ReviewsService {
       {
         $match: {
           product_id: new Types.ObjectId(productId),
-          status: 'APPROVED',
+          status: {
+            $in: [
+              ReviewStatus.NEW,
+              ReviewStatus.APPROVED,
+              ReviewStatus.REPLIED,
+            ],
+          },
         },
       },
       {
@@ -359,11 +358,11 @@ export class ReviewsService {
     const pageNumber = Number(page);
     const limitNumber = Number(limit);
     const skip = (pageNumber - 1) * limitNumber;
-
-    // Type an toàn với Interface đã cấu hình
     const matchFilter: ReviewFilter = {
       product_id: new Types.ObjectId(productId),
-      status: 'APPROVED',
+      status: {
+        $in: [ReviewStatus.NEW, ReviewStatus.APPROVED, ReviewStatus.REPLIED],
+      },
     };
 
     if (star) matchFilter.rating = Number(star);
@@ -373,12 +372,23 @@ export class ReviewsService {
     }
 
     let sortStage: Record<string, 1 | -1> = { createdAt: -1 };
-    if (sort_by === 'oldest') sortStage = { createdAt: 1 };
-    if (sort_by === 'highest_rating') sortStage = { rating: -1, createdAt: -1 };
-    if (sort_by === 'lowest_rating') sortStage = { rating: 1, createdAt: -1 };
-    if (sort_by === 'helpful') sortStage = { helpful_count: -1, createdAt: -1 };
+    // Luôn ưu tiên Ghim lên đầu tiên theo đúng AC8
+    if (sort_by === 'newest')
+      sortStage = { is_pinned: -1, pinned_at: -1, createdAt: -1 };
+    if (sort_by === 'oldest')
+      sortStage = { is_pinned: -1, pinned_at: -1, createdAt: 1 };
+    if (sort_by === 'highest_rating')
+      sortStage = { is_pinned: -1, pinned_at: -1, rating: -1, createdAt: -1 };
+    if (sort_by === 'lowest_rating')
+      sortStage = { is_pinned: -1, pinned_at: -1, rating: 1, createdAt: -1 };
+    if (sort_by === 'helpful')
+      sortStage = {
+        is_pinned: -1,
+        pinned_at: -1,
+        helpful_count: -1,
+        createdAt: -1,
+      };
 
-    // Sử dụng Interface Generic cho hàm aggregate để trả ra Array đúng kiểu
     const [result] =
       await this.reviewModel.aggregate<ReviewListAggregationResult>([
         { $match: matchFilter },
@@ -408,7 +418,6 @@ export class ReviewsService {
     const reviewsDocs = result?.data || [];
     const total = result?.totalCount?.[0]?.count || 0;
 
-    // Đã gán type chuẩn, doc giờ đây có các thuộc tính gợi ý sẵn
     const finalReviews = reviewsDocs.map((doc: AggregatedReview) => {
       if (doc.is_anonymous && doc.user) {
         const nameParts = (doc.user.full_name || 'User').split(' ');
@@ -430,40 +439,6 @@ export class ReviewsService {
         totalPages: Math.ceil(total / limitNumber),
       },
     };
-  }
-
-  async approveReview(
-    reviewId: string,
-    status: 'APPROVED' | 'HIDDEN',
-    adminId: string,
-    ip: string,
-    userAgent: string,
-  ) {
-    const review = await this.reviewModel.findByIdAndUpdate(
-      reviewId,
-      { status },
-      { new: true },
-    );
-    if (!review) throw new NotFoundException('Review không tồn tại');
-
-    await this.updateProductRating(review.product_id.toString());
-
-    await this.auditLogsService.log({
-      action: 'APPROVE_REVIEW',
-      collection_name: 'reviews',
-      actor_id: adminId,
-      target_id: review._id.toString(),
-      department: Department.SUPPORT,
-      detail: { new_status: status },
-      ip,
-      user_agent: userAgent,
-    });
-
-    return review;
-  }
-
-  async getPendingReviews() {
-    return this.reviewModel.find({ status: 'PENDING' }).sort({ createdAt: 1 });
   }
 
   async reportReview(
@@ -542,7 +517,13 @@ export class ReviewsService {
       {
         $match: {
           product_id: objectId,
-          status: { $in: ['APPROVED', 'HIDDEN'] },
+          status: {
+            $in: [
+              ReviewStatus.NEW,
+              ReviewStatus.APPROVED,
+              ReviewStatus.REPLIED,
+            ],
+          },
         },
       },
       {

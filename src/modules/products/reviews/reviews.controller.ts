@@ -18,11 +18,8 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { ReviewsService } from './reviews.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
-import { ReplyReviewDto } from './dto/reply-review.dto';
 import { ReportReviewDto } from './dto/report-review.dto';
 import { ReviewQueryDto } from './dto/review-query.dto';
-import { Roles } from '../../../common/decorators/roles.decorator';
-import { Role } from '../../../common/enums/role.enum';
 import { Public } from '../../../common/decorators/public.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { UserAgent } from '../../../common/decorators/user-agent.decorator';
@@ -103,17 +100,6 @@ export class ReviewsController {
     );
   }
 
-  @Post(':id/reply')
-  @Roles(Role.SUPER_ADMIN)
-  async replyReview(
-    @Param('id') reviewId: string,
-    @CurrentUser() user: ICurrentUser,
-    @Body() dto: ReplyReviewDto,
-  ) {
-    const staffId = this.getUserId(user);
-    return this.reviewsService.replyReview(reviewId, staffId, dto);
-  }
-
   @Post('upload-media')
   @UseInterceptors(
     FilesInterceptor('files', 5, {
@@ -177,31 +163,5 @@ export class ReviewsController {
   @Get('stats/:productId')
   async getStats(@Param('productId') productId: string) {
     return this.reviewsService.getStats(productId);
-  }
-
-  @Patch(':id/approve')
-  @Roles(Role.SUPER_ADMIN) // Chỉ Admin mới có quyền ẩn/duyệt
-  async approveReview(
-    @Param('id') id: string,
-    @Body('status') status: 'APPROVED' | 'HIDDEN',
-    @CurrentUser() user: ICurrentUser,
-    @Ip() ip: string,
-    @UserAgent() userAgent: string,
-  ) {
-    // Validate nhanh trạng thái gửi lên
-    if (!['APPROVED', 'HIDDEN'].includes(status)) {
-      throw new BadRequestException(
-        'Trạng thái không hợp lệ, chỉ nhận APPROVED hoặc HIDDEN',
-      );
-    }
-
-    const adminId = this.getUserId(user);
-    return this.reviewsService.approveReview(
-      id,
-      status,
-      adminId,
-      ip,
-      userAgent,
-    );
   }
 }
