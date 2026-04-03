@@ -19,6 +19,7 @@ import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../../common/decorators/permissions.decorator';
 import { Resource, Action } from '../../../common/enums/resource.enum';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { AdminSendEmailDto } from 'src/modules/users/customers/dto/admin-send-email.dto';
 
 interface IAdminUser {
   userId?: string;
@@ -31,7 +32,7 @@ interface IAdminUser {
 export class AdminReviewsController {
   constructor(private readonly adminReviewsService: AdminReviewsService) {}
 
-  // Helper function để lấy ID chính xác tránh dùng any
+  // Helper function để lấy ID chính xác
   private getAdminId(user: IAdminUser): string {
     const id = user.userId || user._id || user.sub;
     if (!id) {
@@ -75,9 +76,23 @@ export class AdminReviewsController {
     return this.adminReviewsService.confirmAction(id, dto, adminId);
   }
 
+  // AC5: CẬP NHẬT GHI CHÚ NỘI BỘ
+  @Patch(':id/note')
+  @RequirePermissions(Resource.REVIEWS, Action.UPDATE)
+  async updateNote(@Param('id') id: string, @Body('note') note: string) {
+    return this.adminReviewsService.updateInternalNote(id, note);
+  }
+
+  // AC7: GỬI EMAIL RIÊNG
+  @Post(':id/email')
+  @RequirePermissions(Resource.REVIEWS, Action.UPDATE)
+  async sendEmail(@Param('id') id: string, @Body() dto: AdminSendEmailDto) {
+    return this.adminReviewsService.sendPrivateEmailResponse(id, dto);
+  }
+
   // AC6: Thao tác xử lý hàng loạt (Bulk Actions)
   @Post('bulk-actions')
-  @RequirePermissions(Resource.REVIEWS, Action.DELETE) // Gom chung vào quyền DELETE hoặc MANAGE
+  @RequirePermissions(Resource.REVIEWS, Action.DELETE)
   async bulkActions(
     @Body() dto: BulkActionDto,
     @CurrentUser() user: IAdminUser,

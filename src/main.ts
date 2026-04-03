@@ -1,6 +1,8 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+import { MongoExceptionFilter } from './common/filters/mongo-exception.filter';
+import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -9,6 +11,8 @@ async function bootstrap() {
     origin: true,
     credentials: true,
   });
+  app.useGlobalFilters(new MongoExceptionFilter());
+  app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true, // Tự động ép kiểu chuỗi sang số/boolean theo DTO

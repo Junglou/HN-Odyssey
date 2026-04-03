@@ -25,6 +25,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
 import { ReviewQueryDto } from './dto/review-query.dto';
 import { ReviewStatus } from 'src/common/enums/review.enum';
+import { User, UserDocument } from 'src/modules/users/schemas/user.schema';
 
 // 1. Interface Query Params
 export interface ReviewQueryParam {
@@ -98,6 +99,7 @@ export class ReviewsService {
     @InjectModel(ReviewReport.name)
     private reviewReportModel: Model<ReviewReportDocument>,
     private readonly eventEmitter: EventEmitter2,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
   ) {}
 
   async create(
@@ -106,6 +108,16 @@ export class ReviewsService {
     ip: string,
     userAgent: string,
   ) {
+    const user = (await this.userModel
+      .findById(userId)
+      .select('review_access')
+      .lean()) as { review_access?: string } | null;
+
+    if (user && user.review_access === 'RESTRICTED') {
+      throw new ForbiddenException(
+        'Tài khoản của bạn đã bị hạn chế quyền đánh giá do vi phạm tiêu chuẩn cộng đồng.',
+      );
+    }
     const order = await this.orderModel
       .findOne({
         _id: dto.orderId,

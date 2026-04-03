@@ -18,6 +18,6 @@ import { AuditLogsViewSetup } from './audit-logs-view.setup';
   ],
   controllers: [AuditLogsController],
   providers: [AuditLogsService, AuditLogsViewSetup],
-  exports: [AuditLogsService],
+  exports: [AuditLogsService, MongooseModule],
 })
 export class AuditLogsModule {}

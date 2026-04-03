@@ -1,12 +1,69 @@
-// 4. Module Core System / Health (src/common/filters/http-exception.filter.ts & src/modules/system/health/...)
-// Đóng vai trò giám sát sự cố vận hành toàn hệ thống (System AC1, AC2, AC4).
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
+import { Response, Request } from 'express';
 
-// Sự kiện kích hoạt: NOTIFY_EVENTS.SYSTEM_ERROR và notification.system.resolve
+interface MongoError {
+  code?: number;
+  keyPattern?: Record<string, number>;
+}
 
-// Vị trí đặt Emitter:
+interface NestErrorResponse {
+  message?: string | string[];
+  error?: string;
+  statusCode?: number;
+}
 
-// Global Exception Filter: Bắt tất cả các lỗi có HTTP Status Code 500 (Internal Server Error) chưa được xử lý -> Bắn cảnh báo System Error.
+@Catch()
+export class AllExceptionsFilter implements ExceptionFilter {
+  private readonly logger = new Logger(AllExceptionsFilter.name);
 
-// Axios Interceptors / Providers (VNPAY, GHTK): Nếu request bị Timeout hoặc trả về lỗi kết nối quá 3 lần -> Bắn cảnh báo Lỗi Đối Tác.
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
 
-// Cronjobs/Task Scheduling: Bọc try-catch ở các job chạy ngầm (ví dụ: job xóa token hết hạn, job đồng bộ kho), catch được lỗi -> Bắn cảnh báo.
+    let status = HttpStatus.INTERNAL_SERVER_ERROR;
+    let message: string | string[] = 'Internal Server Error';
+
+    // TH 1: Nếu là lỗi chuẩn của NestJS (HttpException)
+    if (exception instanceof HttpException) {
+      status = exception.getStatus();
+      const resBody = exception.getResponse() as NestErrorResponse | string;
+
+      message =
+        typeof resBody === 'object'
+          ? resBody.message || exception.message
+          : resBody;
+    }
+    // TH 2: Nếu là lỗi từ MongoDB (ép kiểu qua interface MongoError)
+    else if ((exception as MongoError).code === 11000) {
+      status = HttpStatus.CONFLICT;
+      const mongoErr = exception as MongoError;
+      const keyPattern = mongoErr.keyPattern || {};
+      const field = Object.keys(keyPattern)[0] || 'dữ liệu';
+      message = `Dữ liệu bị trùng lặp: Trường [${field}] đã tồn tại trên hệ thống.`;
+    }
+    // TH 3: Các lỗi kế thừa từ class Error thông thường
+    else if (exception instanceof Error) {
+      message = exception.message;
+      this.logger.error(
+        `Unhandled Error: ${exception.message}`,
+        exception.stack,
+      );
+    }
+
+    // Gửi phản hồi về Postman
+    response.status(status).json({
+      statusCode: status,
+      timestamp: new Date().toISOString(),
+      path: request.url,
+      message: message,
+    });
+  }
+}

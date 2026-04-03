@@ -18,6 +18,18 @@ import {
   ReviewStatus,
   BulkReviewAction,
 } from 'src/common/enums/review.enum';
+import { EmailService } from 'src/modules/notifications/channels/email.service';
+import { AdminSendEmailDto } from 'src/modules/users/customers/dto/admin-send-email.dto';
+import { Coupon } from 'src/modules/marketing/promotions/schemas/coupon.schema';
+
+interface IReviewUpdate {
+  reply?: {
+    content: string;
+    staff_id: Types.ObjectId;
+    replied_at: Date;
+  };
+  status?: ReviewStatus;
+}
 
 @Injectable()
 export class AdminReviewsService {
@@ -27,6 +39,8 @@ export class AdminReviewsService {
     @InjectConnection() private readonly connection: Connection,
     private readonly auditLogsService: AuditLogsService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly emailService: EmailService,
+    @InjectModel('Coupon') private couponModel: Model<Coupon>,
   ) {}
 
   // AC1: Danh sách quản trị
@@ -58,7 +72,7 @@ export class AdminReviewsService {
     return { items, meta: { total, page, limit } };
   }
 
-  // AC3, AC4, AC5: Phản hồi & Khóa tài khoản (Transaction)
+  // AC3, AC4, AC5: Phản hồi & Khóa tài khoản (Gia cố bằng $set)
   async confirmAction(
     reviewId: string,
     dto: AdminConfirmActionDto,
@@ -66,19 +80,22 @@ export class AdminReviewsService {
   ) {
     const session = await this.connection.startSession();
     session.startTransaction();
+
     try {
       const review = await this.reviewModel.findById(reviewId).session(session);
       if (!review) throw new BadRequestException('Đánh giá không tồn tại');
+      const updateData: IReviewUpdate = {};
 
-      // Phản hồi (AC4)
+      // XỬ LÝ PHẢN HỒI (AC4)
       if (dto.reply_content && dto.reply_content.trim() !== '') {
-        review.reply = {
+        updateData.reply = {
           content: dto.reply_content.trim(),
           staff_id: new Types.ObjectId(adminId),
           replied_at: new Date(),
         };
-        review.status = ReviewStatus.REPLIED;
+        updateData.status = ReviewStatus.REPLIED;
 
+        // Bắn sự kiện thông báo (Notification)
         this.eventEmitter.emit('review.replied_by_admin', {
           userId: review.user_id.toString(),
           reviewId: review._id.toString(),
@@ -87,7 +104,7 @@ export class AdminReviewsService {
         });
       }
 
-      // Khóa Customer (AC5)
+      // XỬ LÝ KHÓA TÀI KHOẢN (AC5)
       if (dto.block_customer) {
         const reason =
           dto.block_reason === BlockReason.OTHER
@@ -100,37 +117,49 @@ export class AdminReviewsService {
           );
         }
 
+        // Cập nhật trạng thái khách hàng sang bị khóa
         await this.customerModel.updateOne(
           { _id: review.user_id },
           { $set: { is_active: false, lock_reason: reason } },
           { session },
         );
 
-        // Ẩn tất cả đánh giá của user này
+        // AC5: Tự động ẩn tất cả đánh giá của user này khỏi hệ thống công khai
         await this.reviewModel.updateMany(
           { user_id: review.user_id },
           { $set: { status: ReviewStatus.HIDDEN, is_pinned: false } },
           { session },
         );
 
-        // Ghi Audit Log
+        // Ghi Audit Log cho hành động khóa user
         await this.auditLogsService.log({
           action: Action.UPDATE,
           collection_name: Resource.CUSTOMERS,
           actor_id: adminId,
           department: Department.SUPPORT,
           target_id: String(review.user_id),
-          detail: { reason },
+          detail: { reason, source_review: reviewId },
         });
       }
 
-      await review.save({ session });
+      // CẬP NHẬT REVIEW
+      // Dùng updateOne + $set để Mongoose KHÔNG kiểm tra lại mảng media cũ
+      if (Object.keys(updateData).length > 0) {
+        await this.reviewModel.updateOne(
+          { _id: reviewId },
+          { $set: updateData as Record<string, unknown> },
+          { session },
+        );
+      }
+
       await session.commitTransaction();
-      return { success: true };
+      return { success: true, message: 'Xử lý đánh giá thành công' };
     } catch (error: unknown) {
+      // Nếu có bất kỳ lỗi nào, hủy bỏ mọi thay đổi trong DB
       await session.abortTransaction();
       throw error;
     } finally {
+      // Kết thúc phiên làm việc với DB
       await session.endSession();
     }
   }
@@ -253,5 +282,162 @@ export class AdminReviewsService {
     } finally {
       await session.endSession();
     }
+  }
+
+  // Bổ sung vào AdminReviewsService.ts
+  async updateInternalNote(reviewId: string, note: string) {
+    const updatedReview = await this.reviewModel.findByIdAndUpdate(
+      reviewId,
+      { $set: { internal_note: note } }, // AC5: Lưu ghi chú riêng tư
+      { new: true },
+    );
+
+    // FIX: Kiểm tra null trước khi trả về
+    if (!updatedReview) {
+      throw new BadRequestException(
+        'Đánh giá không tồn tại để cập nhật ghi chú',
+      );
+    }
+
+    return updatedReview;
+  }
+
+  async sendPrivateEmailResponse(reviewId: string, dto: AdminSendEmailDto) {
+    const review = await this.reviewModel
+      .findById(reviewId)
+      .populate('user_id');
+    if (!review || !review.user_id)
+      throw new BadRequestException('Dữ liệu không hợp lệ');
+
+    const customer = review.user_id as unknown as CustomerDocument;
+    let htmlContent = '';
+    let internalNoteStr = '';
+    let giftCode: string | null = null;
+
+    // LUỒNG 1: GỬI EMAIL KÈM MÃ GIẢM GIÁ (Trường hợp đền bù)
+    if (dto.is_gift_included) {
+      const config = dto.coupon_config;
+      const randomStr = Math.random()
+        .toString(36)
+        .substring(2, 6)
+        .toUpperCase();
+      // Xử lý tên: Bỏ dấu tiếng Việt, bỏ ký tự đặc biệt, chỉ lấy A-Z
+      let cleanName = 'VIP';
+      if (customer.last_Name) {
+        cleanName = customer.last_Name
+          .normalize('NFD') // Tách dấu ra khỏi chữ cái
+          .replace(/[\u0300-\u036f]/g, '') // Xóa các dấu vừa tách
+          .replace(/đ/g, 'd')
+          .replace(/Đ/g, 'D')
+          .replace(/[^a-zA-Z0-9]/g, '') // Chỉ giữ lại chữ cái và số, xóa khoảng trắng
+          .substring(0, 3)
+          .toUpperCase();
+      }
+
+      // Phòng trường hợp tên chứa toàn ký tự đặc biệt bị xóa sạch
+      if (cleanName.length === 0) cleanName = 'VIP';
+
+      giftCode = `HN-${cleanName}-${randomStr}`;
+
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + (config?.days_valid || 30));
+
+      // Tạo mã thật trong DB
+      await this.couponModel.create({
+        code: giftCode,
+        discount_type: config?.discount_type || 'FIXED',
+        discount_value: config?.discount_value || 50000,
+        min_order_value: config?.min_order_value || 0,
+        start_date: new Date(),
+        end_date: endDate,
+        usage_limit: 1,
+        is_active: true,
+        owner_id: customer._id,
+        description: `Quà tặng CSKH từ Review #${reviewId.slice(-6)}`,
+      });
+
+      const discountDisplay =
+        config?.discount_type === 'PERCENTAGE'
+          ? `${config.discount_value}%`
+          : `${config?.discount_value?.toLocaleString()}đ`;
+
+      // Template có hiển thị khung Mã giảm giá
+      htmlContent = this.generateEmailHtml(
+        customer.first_Name || 'Quý khách',
+        dto.content,
+        { code: giftCode, discount: discountDisplay, expiry: endDate },
+      );
+
+      internalNoteStr = `Đã gửi email CSKH (Kèm mã đền bù: ${giftCode})`;
+    }
+
+    // LUỒNG 2: GỬI EMAIL THÔNG THƯỜNG (Mặc định)
+    else {
+      htmlContent = this.generateEmailHtml(
+        customer.first_Name || 'Quý khách',
+        dto.content,
+        null,
+      );
+      internalNoteStr = 'Đã gửi email phản hồi cá nhân.';
+    }
+
+    // Gửi Email
+    await this.emailService.sendRaw(
+      customer.email,
+      '[H&N Odyssey] Phản hồi đánh giá sản phẩm',
+      htmlContent,
+    );
+
+    // Lưu nhật ký vào review
+    await this.reviewModel.updateOne(
+      { _id: reviewId },
+      { $set: { internal_note: internalNoteStr } },
+    );
+
+    return {
+      success: true,
+      message: 'Đã gửi email thành công',
+      coupon_code: giftCode,
+    };
+  }
+
+  // HÀM TẠO HTML DÙNG CHUNG CHO CẢ 2 LUỒNG
+  private generateEmailHtml(
+    name: string,
+    content: string,
+    gift: { code: string; discount: string; expiry: Date } | null,
+  ): string {
+    let giftSection = '';
+
+    // Nếu có thông tin quà tặng mới vẽ khung đỏ
+    if (gift) {
+      giftSection = `
+      <div style="background: #fffafa; border: 2px dashed #d32f2f; padding: 20px; text-align: center; margin-top: 30px;">
+        <p style="margin: 0 0 10px; color: #666; font-size: 14px;">MÃ GIẢM GIÁ ĐỀN BÙ SỰ CỐ</p>
+        <div style="font-size: 24px; font-weight: bold; color: #d32f2f; letter-spacing: 2px;">${gift.code}</div>
+        <p style="margin: 5px 0 0; font-weight: bold;">Giảm: ${gift.discount}</p>
+        <p style="margin: 5px 0 0; font-size: 12px; color: #888;">Hạn sử dụng: ${gift.expiry.toLocaleDateString('vi-VN')}</p>
+      </div>
+    `;
+    }
+
+    return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 8px;">
+      <div style="background: #1a1a1a; color: #fff; padding: 20px; text-align: center;">
+        <h2 style="margin: 0; letter-spacing: 2px;">H&N ODYSSEY</h2>
+      </div>
+      <div style="padding: 30px; line-height: 1.6; color: #333;">
+        <p>Chào <b>${name}</b>,</p>
+        <p>H&N Odyssey đã nhận được đánh giá của bạn về đơn hàng vừa qua.</p>
+        <div style="background: #f9f9f9; border-left: 4px solid #1a1a1a; padding: 15px; margin: 20px 0; font-style: italic;">
+          "${content}"
+        </div>
+        ${giftSection}
+      </div>
+      <div style="background: #f1f1f1; padding: 15px; text-align: center; font-size: 12px; color: #888;">
+        H&N Odyssey Customer Support Team
+      </div>
+    </div>
+  `;
   }
 }

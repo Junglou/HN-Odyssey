@@ -51,6 +51,12 @@ export class Customer extends User {
 
   @Prop({ default: false })
   is_subscribed: boolean;
+
+  @Prop({ default: 'ALLOWED', enum: ['ALLOWED', 'RESTRICTED'] })
+  review_access: string; // AC5-AC7: Quản lý quyền đánh giá
+
+  @Prop({ default: '' })
+  status_reason: string; // AC4: Lý do thay đổi trạng thái (Bắt buộc)
 }
 
 export type CustomerDocument = Customer & Document;

@@ -9,17 +9,31 @@ import {
 import { NotificationsModule } from 'src/modules/notifications/notifications.module';
 import { UsersModule } from '../users.module';
 import { AuditLogsModule } from 'src/modules/system/audit-logs/audit-logs.module';
+import { CustomersAdminService } from './admin-customer.service';
+import { CustomersAdminController } from './admin-customer.controller';
+import {
+  Review,
+  ReviewSchema,
+} from 'src/modules/products/reviews/schemas/review.schema';
+import {
+  AuditLog,
+  AuditLogSchema,
+} from 'src/modules/system/audit-logs/schemas/audit-log.schema';
 
 @Module({
   imports: [
     forwardRef(() => UsersModule),
 
-    MongooseModule.forFeature([{ name: Order.name, schema: OrderSchema }]),
+    MongooseModule.forFeature([
+      { name: Order.name, schema: OrderSchema },
+      { name: Review.name, schema: ReviewSchema },
+      { name: AuditLog.name, schema: AuditLogSchema },
+    ]),
     NotificationsModule,
     AuditLogsModule,
   ],
-  controllers: [CustomersController],
-  providers: [CustomersService],
-  exports: [CustomersService, MongooseModule],
+  controllers: [CustomersController, CustomersAdminController],
+  providers: [CustomersService, CustomersAdminService],
+  exports: [CustomersService, CustomersAdminService],
 })
 export class CustomersModule {}

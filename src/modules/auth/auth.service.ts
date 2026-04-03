@@ -60,6 +60,17 @@ export class AuthService {
 
   //1. ĐĂNG KÝ TÀI KHOẢN (US.01)
   async register(dto: RegisterDto, ip: string, userAgent: string) {
+    const isBlacklisted = await this.userModel.findOne({
+      $or: [{ email: dto.email }, { phone: dto.phoneNumber }],
+      status: 'BANNED', // Trạng thái US.120 - AC3
+    });
+
+    if (isBlacklisted) {
+      throw new ForbiddenException(
+        'Thông tin này đã bị đưa vào danh sách đen do vi phạm nghiêm trọng.',
+      );
+    }
+
     // 1. Kiểm tra logic đơn giản trước (Tránh tốn CPU hash mật khẩu)
     if (dto.password !== dto.confirmPassword) {
       throw new BadRequestException('Mật khẩu xác nhận không khớp');
@@ -102,11 +113,16 @@ export class AuthService {
     const session = await this.connection.startSession();
     session.startTransaction();
 
+    const generatedUsername = email
+      ? `${email.split('@')[0]}_${Date.now().toString().slice(-4)}`
+      : `user_${phoneNumber}`;
+
     try {
       // AC7: Tạo Customer
       const newCustomer = new this.customerModel({
         first_Name: dto.firstName,
         last_Name: dto.lastName,
+        username: generatedUsername,
         email: email,
         phone: phoneNumber,
         password: hashedPassword,
@@ -776,7 +792,11 @@ export class AuthService {
         }
       }
 
+      const oauthUsername =
+        email.split('@')[0] + '_' + randomBytes(2).toString('hex');
+
       const newUser = new this.customerModel({
+        username: oauthUsername,
         email: email,
         first_Name: saveFirstName,
         last_Name: saveLastName,

@@ -3,7 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from './schemas/user.schema';
 import { Customer, CustomerSchema } from './customers/schemas/customer.schema';
 import { Staff, StaffSchema } from './admin/schemas/staff.schema';
-import { UsersService } from '../users/user.Service';
+import { UsersService } from './user.Service';
 import { AdminModule } from './admin/admin.module';
 import { RolesModule } from './roles/roles.module';
 import { AddressesModule } from './addresses/addresses.module';
@@ -11,6 +11,7 @@ import { WishlistModule } from './wishlist/wishlist.module';
 import { CustomersModule } from './customers/customers.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
+// Định nghĩa tập trung các Model liên quan đến User
 const userModels = MongooseModule.forFeature([
   {
     name: User.name,
@@ -29,10 +30,9 @@ const userModels = MongooseModule.forFeature([
     RolesModule,
     WishlistModule,
     AddressesModule,
-    CustomersModule,
+    forwardRef(() => CustomersModule), // Dùng forwardRef để tránh vòng lặp
     forwardRef(() => NotificationsModule),
   ],
-
   providers: [UsersService],
   exports: [
     UsersService,

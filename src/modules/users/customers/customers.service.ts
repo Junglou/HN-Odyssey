@@ -5,7 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model, Types, FilterQuery, isValidObjectId } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import {
   Order,
@@ -21,7 +21,6 @@ import {
   ContactType,
 } from './dto/change-contact.dto';
 import { GetMyOrdersDto, OrderStatus } from './dto/get-my-orders.dto';
-import { FilterQuery, isValidObjectId } from 'mongoose';
 import { EmailService } from 'src/modules/notifications/channels/email.service';
 import { SmsService } from 'src/modules/notifications/channels/sms.service';
 import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
@@ -36,6 +35,7 @@ export class CustomersService {
     private readonly auditLogsService: AuditLogsService,
   ) {}
 
+  // CHUYỂN KHÁCH VÃNG LAI THÀNH THÀNH VIÊN
   async convertGuestToMember(orderId: string, password: string) {
     const order = await this.orderModel.findById(orderId);
     if (!order) throw new NotFoundException('Không tìm thấy đơn hàng');
@@ -60,8 +60,13 @@ export class CustomersService {
     const firstName =
       nameParts.length > 1 ? nameParts[0] : order.guest_info.name;
     const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+    const guestUsername =
+      order.guest_info.email.split('@')[0] +
+      '_' +
+      Date.now().toString().slice(-4);
 
     const newUser = await this.userModel.create({
+      username: guestUsername,
       email: order.guest_info.email,
       password: hashedPassword,
       first_Name: firstName,
@@ -76,15 +81,28 @@ export class CustomersService {
     order.isGuest = false;
     await order.save();
 
+    // Gửi email thông báo tài khoản kèm mật khẩu cho khách hàng
+    await this.emailService.sendRaw(
+      order.guest_info.email,
+      '[H&N Odyssey] Chào mừng bạn trở thành thành viên!',
+      `<p>Xin chào ${order.guest_info.name},</p>
+       <p>Hệ thống đã tự động tạo tài khoản thành viên cho bạn dựa trên thông tin đơn hàng <b>${order.order_code}</b>.</p>
+       <p><b>Thông tin đăng nhập của bạn:</b></p>
+       <ul>
+         <li>Tên đăng nhập / Email: <b>${order.guest_info.email}</b></li>
+         <li>Mật khẩu: <b>${password}</b></li>
+       </ul>
+       <p>Vui lòng đăng nhập và tiến hành đổi mật khẩu để bảo mật tài khoản.</p>`,
+    );
+
     return {
       success: true,
-      message: 'Tạo tài khoản thành công',
+      message: 'Tạo tài khoản thành công. Đã gửi email thông báo.',
       userId: newUser._id,
     };
   }
 
-  // US.04: QUẢN LÝ TÀI KHOẢN
-
+  // US.04: QUẢN LÝ TÀI KHOẢN VÀ BẢO MẬT
   async getProfile(userId: string) {
     const user = await this.userModel.findById(userId).exec();
     if (!user) throw new NotFoundException('Không tìm thấy người dùng');
@@ -105,8 +123,6 @@ export class CustomersService {
     await this.userModel.findByIdAndUpdate(userId, { avatar: avatarUrl });
     return { success: true, avatar: avatarUrl };
   }
-
-  //  US.04: BẢO MẬT & ĐỔI MẬT KHẨU
 
   async changePassword(userId: string, dto: ChangePasswordDto) {
     const user = await this.userModel
@@ -170,7 +186,6 @@ export class CustomersService {
   }
 
   // US.04: THAY ĐỔI EMAIL / SĐT BẰNG OTP/LINK
-
   async requestChangeContact(userId: string, dto: RequestChangeContactDto) {
     const user = await this.userModel
       .findById(userId)
@@ -198,7 +213,6 @@ export class CustomersService {
     });
     if (existingContact) {
       throw new BadRequestException(
-        // Sửa lỗi so sánh Enum
         `${dto.type === ContactType.EMAIL ? 'Email' : 'Số điện thoại'} này đã được sử dụng trong hệ thống`,
       );
     }
@@ -219,7 +233,6 @@ export class CustomersService {
     const expiresAt = new Date(now.getTime() + 5 * 60000);
 
     await this.userModel.findByIdAndUpdate(userId, {
-      // Sửa lỗi so sánh Enum
       ...(dto.type === ContactType.EMAIL
         ? { pending_email: dto.newValue }
         : { pending_phone: dto.newValue }),
@@ -276,7 +289,6 @@ export class CustomersService {
     const isCodeValid = await bcrypt.compare(dto.code, user.verification_code);
 
     if (!isCodeValid) {
-      // Update trực tiếp DB để đếm chính xác, chặn Race Condition
       const updatedUser = await this.userModel.findByIdAndUpdate(
         userId,
         { $inc: { failed_otp_attempts: 1 } },
@@ -308,7 +320,6 @@ export class CustomersService {
 
     const targetEmail = user.pending_email ? user.pending_email : user.email;
 
-    // Sửa lỗi Type 'undefined' is not assignable to type 'string' / 'Date'
     await this.userModel.updateOne(
       { _id: userId },
       {
@@ -351,22 +362,18 @@ export class CustomersService {
   }
 
   // US.121: LỊCH SỬ ĐƠN HÀNG
-
   async getMyOrders(userId: string, dto: GetMyOrdersDto) {
     const { status, keyword, page = 1, limit = 10 } = dto;
     const skip = (page - 1) * limit;
 
-    // AC10: Ép cứng điều kiện user_id để không ai xem được đơn người khác
     const query: FilterQuery<OrderDocument> = {
       user_id: new Types.ObjectId(userId),
     };
 
-    // AC5: Lọc theo trạng thái
     if (status && status !== OrderStatus.ALL) {
       query.status = status;
     }
 
-    // AC8: Tìm kiếm theo mã đơn hàng hoặc tên sản phẩm
     if (keyword) {
       const searchConditions: any[] = [
         { order_code: { $regex: keyword, $options: 'i' } },
@@ -378,7 +385,6 @@ export class CustomersService {
       query.$or = searchConditions;
     }
 
-    // Định nghĩa Interface: Sửa _id thành type an toàn thay vì 'any' để diệt lỗi ESLint
     interface LeanOrder {
       _id: import('mongoose').Types.ObjectId | string;
       order_code: string;
@@ -391,7 +397,6 @@ export class CustomersService {
       }>;
     }
 
-    // AC4, AC9: Sắp xếp giảm dần theo thời gian (Mới nhất) và Phân trang (Pagination)
     const [orders, total] = await Promise.all([
       this.orderModel
         .find(query)
@@ -403,7 +408,6 @@ export class CustomersService {
       this.orderModel.countDocuments(query),
     ]);
 
-    // AC3: Format dữ liệu trả về (Gom nhóm danh sách sản phẩm tóm tắt)
     const formattedOrders = orders.map((order: LeanOrder) => {
       const firstItem =
         order.items && order.items.length > 0 ? order.items[0] : null;
@@ -437,7 +441,6 @@ export class CustomersService {
   }
 
   // US.122: THEO DÕI ĐƠN HÀNG (CHI TIẾT & TIMELINE)
-
   async getMyOrderDetail(userId: string, orderId: string) {
     if (!isValidObjectId(orderId)) {
       throw new BadRequestException('Mã đơn hàng không hợp lệ');
@@ -449,16 +452,9 @@ export class CustomersService {
       throw new NotFoundException('Không tìm thấy đơn hàng');
     }
 
-    // AC1 (US.122) & AC10 (US.121): Kiểm tra chặt chẽ quyền sở hữu (Chống IDOR)
-    // Fix lỗi 'possibly undefined' bằng Optional Chaining và cast to String
     if (order?.user_id?.toString() !== userId.toString()) {
       throw new ForbiddenException('Bạn không có quyền truy cập đơn hàng này');
     }
-
-    /* AC2: Timeline, AC5: Vận đơn (Tracking), AC6: Lý do hủy 
-      Sẽ được thiết kế sẵn trong Schema Order (ví dụ: order.timeline, order.tracking_info, order.cancel_reason).
-      Vì lean() trả về toàn bộ Document gốc, nên Front-end sẽ tự động nhận được các trường read-only này (AC8).
-    */
 
     return {
       success: true,

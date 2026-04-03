@@ -18,6 +18,10 @@ import { NotificationsModule } from 'src/modules/notifications/notifications.mod
 import { AdminReviewsController } from './admin-reviews.controller';
 import { AdminReviewsService } from './admin-reviews.service';
 import { UsersModule } from 'src/modules/users/users.module';
+import {
+  Coupon,
+  CouponSchema,
+} from 'src/modules/marketing/promotions/schemas/coupon.schema';
 
 @Module({
   imports: [
@@ -26,6 +30,7 @@ import { UsersModule } from 'src/modules/users/users.module';
       { name: ReviewReport.name, schema: ReviewReportSchema },
       { name: Product.name, schema: ProductSchema },
       { name: Order.name, schema: OrderSchema },
+      { name: Coupon.name, schema: CouponSchema },
     ]),
     UsersModule,
     AuditLogsModule,

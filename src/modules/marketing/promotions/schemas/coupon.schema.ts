@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export enum DiscountType {
   PERCENTAGE = 'PERCENTAGE',
@@ -62,6 +62,9 @@ export class Coupon extends Document {
 
   @Prop({ default: false })
   is_stackable: boolean; // True = cho phép dùng kèm voucher khác
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  owner_id: Types.ObjectId;
 
   // AC8: Soft Delete
   @Prop({ default: false, index: true })
