@@ -31,13 +31,13 @@ export class UploadController {
   @UseInterceptors(
     FileInterceptor('file', {
       ...storageConfig,
-      limits: { fileSize: 5 * 1024 * 1024 }, // Max 5MB cho ảnh
+      limits: { fileSize: 20 * 1024 * 1024 }, // Max 20MB cho ảnh
     }),
   )
   uploadFile(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException(
-        'File không hợp lệ hoặc quá dung lượng (Max 5MB)',
+        'File không hợp lệ hoặc quá dung lượng (Max 20MB)',
       );
     }
 
@@ -53,10 +53,10 @@ export class UploadController {
   @Public()
   @Post('multiple')
   @UseInterceptors(
-    FilesInterceptor('files', 10, {
-      // Max 10 file cùng lúc
+    FilesInterceptor('files', 50, {
+      // Max 50 file cùng lúc
       ...storageConfig,
-      limits: { fileSize: 50 * 1024 * 1024 }, // Max 50MB (để hỗ trợ video)
+      limits: { fileSize: 200 * 1024 * 1024 }, // Max 200MB (để hỗ trợ video)
     }),
   )
   uploadMultipleFiles(@UploadedFiles() files: Array<Express.Multer.File>) {

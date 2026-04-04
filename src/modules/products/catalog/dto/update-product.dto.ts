@@ -2,6 +2,7 @@ import { OmitType, PartialType } from '@nestjs/mapped-types';
 import { CreateProductDto } from './create-product.dto';
 import {
   IsArray,
+  IsDateString,
   IsEnum,
   IsNotEmpty,
   IsNumber,
@@ -33,42 +34,24 @@ export class UpdateProductStatusDto {
   status: ProductStatus;
 }
 
+//TRƯỜNG HỢP 3: Cập nhật Giá (Gửi yêu cầu duyệt)
 class UpdateVariantPriceItem {
-  @IsNotEmpty()
-  @IsString()
-  sku: string;
-
+  @IsNotEmpty() @IsString() sku: string;
   @IsNotEmpty()
   @IsNumber()
-  @Min(0)
+  @Min(1, { message: 'Giá phải lớn hơn 0' })
   price: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  sale_price?: number;
 }
 
-//TRƯỜNG HỢP 3: Cập nhật Giá (Gửi yêu cầu duyệt)
-// Dùng cho API: POST /products/:id/price-request (US.75)
 export class UpdateProductPriceDto {
   @IsNotEmpty()
   @IsNumber()
-  @Min(0)
+  @Min(1, { message: 'Giá bán phải là số dương (> 0)' }) // AC1 & AC7
   price: number;
 
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  sale_price?: number;
-
-  @IsOptional()
-  @IsString()
-  sale_start_date?: string;
-
-  @IsOptional()
-  @IsString()
-  sale_end_date?: string;
+  @IsNotEmpty({ message: 'Ngày áp dụng không được để trống' })
+  @IsDateString()
+  effective_date: string; // AC1: Ngày bắt đầu có hiệu lực
 
   @IsOptional()
   @IsArray()

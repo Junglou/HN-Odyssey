@@ -13,9 +13,9 @@ import { ReorderBannersDto } from './dto/reorder-banner.dto';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { BlogPost, PostStatus } from './schemas/blog-post.schema';
-import { StaticPage, PageStatus } from './schemas/static-page.schema'; // FIX: Thêm PageStatus
+import { StaticPage, PageStatus } from './schemas/static-page.schema';
 import { CreatePostDto } from './dto/create-post.dto';
-import { CreateStaticPageDto } from './dto/create-static-page.dto'; // FIX: Thêm CreateStaticPageDto
+import { CreateStaticPageDto } from './dto/create-static-page.dto';
 import { MenuConfig } from './schemas/menu-config.schema';
 
 import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
@@ -26,6 +26,17 @@ import {
   UpdatePostDto,
   UpdateStaticPageDto,
 } from './dto/update-content.dto';
+import * as fs from 'fs';
+import * as path from 'path';
+import sharp from 'sharp';
+
+export interface UploadOptions {
+  subFolder: string; // Tên thư mục con (VD: 'products', 'users')
+  maxImageSize?: number; // Dung lượng tối đa cho ảnh (byte)
+  maxVideoSize?: number; // Dung lượng tối đa cho video (byte)
+  generateThumbnail?: boolean; // Có tạo ảnh thumb không?
+  generateMedium?: boolean; // Có tạo ảnh medium không?
+}
 
 export interface QueryBannerDto {
   page?: number | string;
@@ -42,7 +53,6 @@ export interface QueryPostDto {
   search?: string;
 }
 
-// FIX: Thêm QueryPageDto (dự phòng cho Static Page sau này)
 export interface QueryPageDto {
   page?: number | string;
   limit?: number | string;
@@ -110,7 +120,7 @@ export class ContentService {
       collection_name: Resource.BLOG,
       actor_id: userId,
       actor_email: email,
-      target_id: savedPost._id, // FIX: Bỏ "as Types.ObjectId" vì _id mặc định đã là ObjectId
+      target_id: savedPost._id,
       department: Department.MARKETING,
       detail: { title: savedPost.title, slug: savedPost.slug },
     });
@@ -126,7 +136,6 @@ export class ContentService {
     const filter: FilterQuery<BlogPost> = { is_deleted: false };
     if (query.status) filter.status = query.status;
     if (query.category_id) {
-      // FIX: Ép kiểu string sang chuỗi trước khi parse ObjectId (tránh lỗi unsafe-argument)
       filter.category_id = new Types.ObjectId(String(query.category_id));
     }
     if (query.search) {
@@ -170,7 +179,7 @@ export class ContentService {
       collection_name: Resource.BLOG,
       actor_id: userId,
       actor_email: email,
-      target_id: post._id, // FIX: Bỏ ép kiểu
+      target_id: post._id,
       department: Department.MARKETING,
       detail: { reason: 'Soft delete bài viết' },
     });
@@ -204,8 +213,18 @@ export class ContentService {
   // XỬ LÝ STATIC PAGES (US.126)
 
   async createPage(dto: CreateStaticPageDto, userId: string, email: string) {
-    // FIX: Ép kiểu rõ ràng tham số dto.slug thành string (chặn unsafe-argument)
     await this.checkSlugExist(String(dto.slug));
+
+    if (!dto.meta_description && dto.content) {
+      // Loại bỏ HTML tags
+      const plainText = dto.content.replace(/<[^>]*>?/gm, '').trim();
+
+      // Lấy 150 ký tự đầu và thêm '...' nếu nội dung gốc dài hơn
+      dto.meta_description =
+        plainText.length > 150
+          ? plainText.substring(0, 150).trim() + '...'
+          : plainText;
+    }
 
     const newPage = new this.pageModel(dto);
     const savedPage = await newPage.save();
@@ -244,7 +263,7 @@ export class ContentService {
       collection_name: Resource.BLOG,
       actor_id: userId,
       actor_email: email,
-      target_id: page._id, // FIX: Bỏ ép kiểu
+      target_id: page._id,
       department: Department.MARKETING,
       detail: { reason: 'Soft delete trang tĩnh' },
     });
@@ -254,10 +273,15 @@ export class ContentService {
 
   // XỬ LÝ BANNERS
 
-  async createBanner(dto: CreateBannerDto) {
+  async createBanner(dto: CreateBannerDto, userId: string, email: string) {
     const start = new Date(dto.start_date);
     const end = new Date(dto.end_date);
     const now = new Date();
+
+    // RÀNG BUỘC LOGIC NGÀY
+    if (start >= end) {
+      throw new BadRequestException('Ngày kết thúc phải lớn hơn ngày bắt đầu');
+    }
 
     const newBanner = new this.bannerModel({
       ...dto,
@@ -265,10 +289,23 @@ export class ContentService {
         start <= now && now <= end ? BannerStatus.ACTIVE : BannerStatus.WAITING,
     });
 
-    return newBanner.save();
+    const savedBanner = await newBanner.save();
+
+    // BỔ SUNG AUDIT LOG
+    await this.auditLogsService.log({
+      action: 'CREATE',
+      collection_name: 'banners',
+      actor_id: userId,
+      actor_email: email,
+      target_id: savedBanner._id,
+      department: Department.MARKETING,
+      detail: { title: savedBanner.title, position: savedBanner.position },
+    });
+
+    return savedBanner;
   }
 
-  async softDeleteBanner(id: string) {
+  async softDeleteBanner(id: string, userId: string, email: string) {
     const banner = await this.bannerModel.findById(id);
     if (!banner || banner.is_deleted) {
       throw new NotFoundException('Không tìm thấy Banner');
@@ -278,6 +315,17 @@ export class ContentService {
     banner.deleted_at = new Date();
     banner.status = BannerStatus.HIDDEN;
     await banner.save();
+
+    // BỔ SUNG AUDIT LOG (AC6)
+    await this.auditLogsService.log({
+      action: 'DELETE',
+      collection_name: 'banners',
+      actor_id: userId,
+      actor_email: email,
+      target_id: banner._id,
+      department: Department.MARKETING,
+      detail: { reason: 'Soft delete banner' },
+    });
 
     return { message: 'Đã xóa mềm banner thành công' };
   }
@@ -543,5 +591,118 @@ export class ContentService {
     if (!post)
       throw new NotFoundException('Không tìm thấy nội dung để xem trước');
     return post;
+  }
+
+  // 1. Logic xử lý và lưu file
+  async processAndSaveFiles(
+    files: Array<Express.Multer.File>,
+    options: UploadOptions,
+  ) {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('Không có file nào được tải lên');
+    }
+
+    const processedFiles: any[] = [];
+    // Lưu vào thư mục tương ứng dựa trên options.subFolder
+    const uploadDir = path.join(process.cwd(), `uploads/${options.subFolder}`);
+
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    // Default limits nếu không truyền vào
+    const maxImageSize = options.maxImageSize || 50 * 1024 * 1024; // 50MB default
+    const maxVideoSize = options.maxVideoSize || 200 * 1024 * 1024; // 200MB default
+
+    for (const file of files) {
+      const isVideo = file.mimetype.startsWith('video/');
+
+      // Kiểm tra dung lượng
+      if (!isVideo && file.size > maxImageSize) {
+        throw new BadRequestException(
+          `Ảnh "${file.originalname}" vượt quá giới hạn dung lượng`,
+        );
+      }
+      if (isVideo && file.size > maxVideoSize) {
+        throw new BadRequestException(
+          `Video "${file.originalname}" vượt quá giới hạn dung lượng`,
+        );
+      }
+
+      // Tạo tên file
+      const filename = `${options.subFolder}-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+      const ext = path.extname(file.originalname).toLowerCase();
+      const originalPath = path.join(uploadDir, `${filename}${ext}`);
+      const relativePath = `/uploads/${options.subFolder}/${filename}${ext}`;
+
+      if (isVideo) {
+        // XỬ LÝ VIDEO
+        fs.writeFileSync(originalPath, file.buffer);
+        processedFiles.push({
+          originalName: file.originalname,
+          filename: `${filename}${ext}`,
+          path: relativePath,
+          thumbnail: relativePath, // Video dùng link gốc
+          medium: relativePath,
+          mimetype: file.mimetype,
+          size: file.size,
+          type: 'VIDEO',
+        });
+      } else {
+        // XỬ LÝ ẢNH
+        await sharp(file.buffer).toFile(originalPath);
+
+        let thumbPathRelative = relativePath;
+        let mediumPathRelative = relativePath;
+
+        if (options.generateThumbnail) {
+          const thumbName = `${filename}-thumb${ext}`;
+          const thumbPath = path.join(uploadDir, thumbName);
+          await sharp(file.buffer)
+            .resize(200, 200, { fit: 'cover' })
+            .toFile(thumbPath);
+          thumbPathRelative = `/uploads/${options.subFolder}/${thumbName}`;
+        }
+
+        if (options.generateMedium) {
+          const mediumName = `${filename}-medium${ext}`;
+          const mediumPath = path.join(uploadDir, mediumName);
+          await sharp(file.buffer)
+            .resize(800, null, { withoutEnlargement: true })
+            .toFile(mediumPath);
+          mediumPathRelative = `/uploads/${options.subFolder}/${mediumName}`;
+        }
+
+        processedFiles.push({
+          originalName: file.originalname,
+          filename: `${filename}${ext}`,
+          path: relativePath,
+          thumbnail: thumbPathRelative,
+          medium: mediumPathRelative,
+          mimetype: file.mimetype,
+          size: file.size,
+          type: 'IMAGE',
+        });
+      }
+    }
+
+    return {
+      message: 'Tải lên và xử lý file thành công',
+      data: processedFiles,
+    };
+  }
+
+  // 2. Logic xóa file vật lý (Chuyển từ ProductsService sang)
+  deletePhysicalFile(relativePath: string) {
+    if (!relativePath) return;
+    try {
+      const absolutePath = path.join(process.cwd(), relativePath);
+      if (fs.existsSync(absolutePath)) {
+        fs.unlinkSync(absolutePath);
+        console.log(`[FILE] Deleted: ${absolutePath}`);
+      }
+    } catch (error) {
+      console.error(`[FILE] Error deleting file: ${relativePath}`, error);
+    }
   }
 }

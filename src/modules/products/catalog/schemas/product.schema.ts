@@ -59,17 +59,43 @@ export class PendingVariantPrice {
   @Prop({ default: 0 }) sale_price: number;
 }
 
+// Enum định nghĩa 4 trạng thái của Yêu cầu giá
+export enum PriceRequestStatus {
+  DRAFT = 'DRAFT',
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+}
+
 @Schema({ _id: false })
-export class PendingPriceChange {
+export class PriceRequest {
   @Prop({ required: true }) price: number;
-  @Prop({ default: 0 }) sale_price: number;
-  @Prop() sale_start_date?: Date;
-  @Prop() sale_end_date?: Date;
+
   @Prop({ type: [PendingVariantPrice], default: [] })
   variants?: PendingVariantPrice[];
+
+  // AC1: Ngày áp dụng
+  @Prop({ required: true })
+  effective_date: Date;
+
+  @Prop({
+    required: true,
+    enum: PriceRequestStatus,
+    default: PriceRequestStatus.DRAFT,
+  })
+  status: PriceRequestStatus;
+
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
   requester_id: Types.ObjectId;
-  @Prop({ default: Date.now }) requested_at: Date;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
+  approver_id?: Types.ObjectId;
+
+  @Prop({ default: Date.now })
+  requested_at: Date;
+
+  @Prop()
+  reject_reason?: string;
 }
 
 @Schema({ timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } })
@@ -210,8 +236,8 @@ export class Product {
   @Prop({ default: 0 })
   review_count: number;
 
-  @Prop({ type: PendingPriceChange, default: null })
-  pending_price_change: PendingPriceChange | null;
+  @Prop({ type: PriceRequest, default: null })
+  price_request: PriceRequest | null;
 
   @Prop({ default: false, index: true })
   is_deleted: boolean;

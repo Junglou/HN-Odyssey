@@ -5,6 +5,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
 } from 'class-validator';
 
 export class CreateBannerDto {
@@ -15,6 +16,10 @@ export class CreateBannerDto {
   // AC5: Cho phép lưu cả đường dẫn tuyệt đối (HTTP/HTTPS) và đường dẫn tương đối nội bộ
   @IsString({ message: 'Đường dẫn phải là một chuỗi ký tự' })
   @IsNotEmpty({ message: 'Đường dẫn không được để trống' })
+  @Matches(/^(https?:\/\/[^\s]+|^\/[^\s]*)$/, {
+    message:
+      'Đường dẫn không hợp lệ. Phải là URL chuẩn (http/https) hoặc đường dẫn nội bộ (bắt đầu bằng /)',
+  })
   link: string;
 
   @IsString()

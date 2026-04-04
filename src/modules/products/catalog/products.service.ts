@@ -10,7 +10,8 @@ import {
   Product,
   ProductDocument,
   ProductAttributeParams,
-  PendingVariantPrice,
+  PriceRequestStatus,
+  PriceRequest,
 } from './schemas/product.schema';
 import {
   CreateProductDto,
@@ -24,8 +25,6 @@ import {
 import defaultSlugify from 'slugify';
 import { ProductStatus } from 'src/common/enums/product-status.enum';
 import { AuditLogsService } from '../../system/audit-logs/audit-logs.service';
-import * as fs from 'fs';
-import * as path from 'path';
 import { TagsService } from '../tags/tags.service';
 import { Role } from 'src/common/enums/role.enum';
 import sanitizeHtml from 'sanitize-html';
@@ -57,6 +56,8 @@ import {
   MemberTier,
   MemberTierDocument,
 } from 'src/modules/marketing/loyalty/schemas/member-tier.schema';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { ContentService } from 'src/modules/marketing/content/content.service';
 
 @Injectable()
 export class ProductsService {
@@ -69,9 +70,10 @@ export class ProductsService {
     private readonly categoriesService: CategoriesService,
     @InjectModel(Attribute.name)
     private attributeModel: Model<AttributeDocument>,
-    private readonly loyaltyService: LoyaltyService, // <--- THÊM
+    private readonly loyaltyService: LoyaltyService,
     @InjectModel(Customer.name) private customerModel: Model<CustomerDocument>,
     @InjectModel(MemberTier.name) private tierModel: Model<MemberTierDocument>,
+    private readonly contentService: ContentService,
   ) {}
 
   // HELPER METHODS
@@ -780,6 +782,7 @@ export class ProductsService {
   }
 
   // REQUEST PRICE
+  // AC1 & AC5: Tạo mới hoặc cập nhật form Yêu cầu giá
   async requestPriceUpdate(
     id: string,
     dto: UpdateProductPriceDto,
@@ -793,64 +796,41 @@ export class ProductsService {
     });
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
-    const inputSalePrice = dto.sale_price ?? 0;
-    if (inputSalePrice > 0 && inputSalePrice >= dto.price) {
+    // AC5: Ràng buộc trạng thái - Không cho sửa nếu đang Pending hoặc Approved
+    const currentRequest = product.price_request;
+    if (
+      currentRequest &&
+      (currentRequest.status === PriceRequestStatus.PENDING ||
+        currentRequest.status === PriceRequestStatus.APPROVED)
+    ) {
       throw new BadRequestException(
-        'Giá khuyến mãi phải nhỏ hơn giá niêm yết (Sản phẩm chính)',
+        'Không thể sửa yêu cầu giá đang chờ duyệt hoặc đã được duyệt.',
       );
     }
 
-    const pendingVariants: PendingVariantPrice[] = [];
-    if (dto.variants && dto.variants.length > 0) {
-      if (!product.has_variants) {
-        throw new BadRequestException(
-          'Sản phẩm này không có biến thể để sửa giá',
-        );
-      }
-
-      for (const vDto of dto.variants) {
-        const existVariant = product.variants.find((v) => v.sku === vDto.sku);
-        if (!existVariant) {
-          throw new BadRequestException(
-            `SKU biến thể '${vDto.sku}' không tồn tại trong sản phẩm này`,
-          );
-        }
-
-        const variantSalePrice = vDto.sale_price ?? 0;
-        if (variantSalePrice > 0 && variantSalePrice >= vDto.price) {
-          throw new BadRequestException(
-            `Biến thể ${vDto.sku}: Giá khuyến mãi phải nhỏ hơn giá niêm yết`,
-          );
-        }
-
-        pendingVariants.push({
-          sku: vDto.sku,
-          price: vDto.price,
-          sale_price: variantSalePrice,
-        });
-      }
-    }
-
-    const startDate = dto.sale_start_date
-      ? new Date(dto.sale_start_date)
-      : undefined;
-    const endDate = dto.sale_end_date ? new Date(dto.sale_end_date) : undefined;
-
-    if (startDate && endDate && startDate >= endDate) {
+    // AC1: Kiểm tra ngày trong quá khứ
+    const effectiveDate = new Date(dto.effective_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Đưa về đầu ngày để so sánh chuẩn
+    if (effectiveDate < today) {
       throw new BadRequestException(
-        'Ngày kết thúc khuyến mãi phải sau ngày bắt đầu',
+        'Ngày áp dụng không được nằm trong quá khứ.',
       );
     }
 
-    product.pending_price_change = {
+    const pendingVariants = dto.variants
+      ? dto.variants.map((v) => ({ sku: v.sku, price: v.price, sale_price: 0 }))
+      : [];
+
+    // Lưu vào bản nháp chờ (Tự động set PENDING khi vừa tạo xong)
+    product.price_request = {
       price: dto.price,
-      sale_price: inputSalePrice,
-      sale_start_date: startDate,
-      sale_end_date: endDate,
       variants: pendingVariants,
+      effective_date: effectiveDate,
+      status: PriceRequestStatus.PENDING,
       requester_id: new Types.ObjectId(userId),
       requested_at: new Date(),
-    };
+    } as PriceRequest;
 
     await product.save();
 
@@ -860,75 +840,81 @@ export class ProductsService {
       actor_id: userId,
       target_id: id,
       department: Department.WAREHOUSE,
-      detail: {
-        message: 'Gửi yêu cầu đổi giá',
-        new_price: dto.price,
-        variants_count: pendingVariants.length,
-      },
-      ip: ip,
+      detail: { new_price: dto.price, effective_date: effectiveDate },
+      ip,
       user_agent: userAgent,
     });
 
-    return {
-      message: 'Đã gửi yêu cầu phê duyệt giá thành công',
-      product_id: id,
-    };
+    return { message: 'Đã gửi yêu cầu phê duyệt giá thành công' };
   }
 
-  // APPROVE PRICE
+  // AC4: Chuyển Draft -> Pending trực tiếp
+  async submitPriceRequest(
+    id: string,
+    userId: string,
+    ip: string,
+    userAgent: string,
+  ) {
+    const product = await this.productModel.findById(id);
+    if (!product || !product.price_request)
+      throw new NotFoundException('Không tìm thấy yêu cầu giá');
+
+    if (product.price_request.status !== PriceRequestStatus.DRAFT) {
+      throw new BadRequestException(
+        'Chỉ có thể Submit các bản ghi ở trạng thái Draft',
+      );
+    }
+
+    product.price_request.status = PriceRequestStatus.PENDING;
+    await product.save();
+
+    // Thêm Log để giải quyết lỗi unused vars
+    await this.auditLogsService.log({
+      action: 'SUBMIT_PRICE_REQUEST',
+      collection_name: 'products',
+      actor_id: userId,
+      target_id: id,
+      department: Department.WAREHOUSE,
+      detail: { message: 'Đẩy yêu cầu nháp lên chờ phê duyệt' },
+      ip,
+      user_agent: userAgent,
+    });
+
+    return { message: 'Đã đẩy yêu cầu lên chờ phê duyệt' };
+  }
+
+  // AC2: Phê duyệt giá ĐƠN LẺ
   async approvePriceChange(
     id: string,
     isApproved: boolean,
     userId: string,
     ip: string,
     userAgent: string,
+    reason?: string,
   ) {
     const product = await this.productModel.findOne({
       _id: id,
       is_deleted: false,
     });
-    if (!product) throw new NotFoundException('SP không tồn tại');
-    if (!product.pending_price_change) {
+    if (!product || !product.price_request)
+      throw new NotFoundException('Không có yêu cầu giá');
+
+    // AC5: Chỉ duyệt những cái đang Pending
+    if (product.price_request.status !== PriceRequestStatus.PENDING) {
       throw new BadRequestException(
-        'Không có yêu cầu thay đổi giá nào đang chờ',
+        'Bản ghi này không ở trạng thái chờ duyệt (Pending)',
       );
     }
 
-    const pending = product.pending_price_change;
+    product.price_request.status = isApproved
+      ? PriceRequestStatus.APPROVED
+      : PriceRequestStatus.REJECTED;
+    product.price_request.approver_id = new Types.ObjectId(userId);
+    if (!isApproved && reason) product.price_request.reject_reason = reason;
 
-    if (isApproved) {
-      product.price = pending.price;
-      product.sale_price =
-        pending.sale_price && pending.sale_price > 0
-          ? pending.sale_price
-          : pending.price;
-
-      // FIX: Dùng kỹ thuật "unknown -> Date" để bypass lỗi type undefined và unsafe any
-      product.sale_start_date = pending.sale_start_date
-        ? new Date(pending.sale_start_date)
-        : (null as unknown as Date);
-
-      product.sale_end_date = pending.sale_end_date
-        ? new Date(pending.sale_end_date)
-        : (null as unknown as Date);
-
-      if (pending.variants && pending.variants.length > 0) {
-        pending.variants.forEach((pV) => {
-          const variantIndex = product.variants.findIndex(
-            (v) => v.sku === pV.sku,
-          );
-          if (variantIndex !== -1) {
-            product.variants[variantIndex].price = pV.price;
-            product.variants[variantIndex].sale_price =
-              pV.sale_price > 0 ? pV.sale_price : pV.price;
-          }
-        });
-      }
-    }
-
-    product.pending_price_change = null;
     await product.save();
 
+    // AC8: Audit Log chi tiết
     await this.auditLogsService.log({
       action: isApproved ? 'APPROVE_PRICE' : 'REJECT_PRICE',
       collection_name: 'products',
@@ -936,19 +922,82 @@ export class ProductsService {
       target_id: id,
       department: Department.WAREHOUSE,
       detail: {
-        result: isApproved ? 'APPROVED' : 'REJECTED',
-        requester_id: pending.requester_id,
-        applied_price: isApproved ? pending.price : 'N/A',
+        result: product.price_request.status,
+        old_price: product.price,
+        new_price: product.price_request.price,
+        effective_date: product.price_request.effective_date,
       },
-      ip: ip,
+      ip,
       user_agent: userAgent,
     });
 
     return {
-      message: isApproved
-        ? 'Đã phê duyệt và áp dụng giá mới'
-        : 'Đã từ chối yêu cầu đổi giá',
+      message: isApproved ? 'Đã duyệt yêu cầu giá' : 'Đã từ chối yêu cầu giá',
     };
+  }
+
+  // AC3: Phê duyệt giá HÀNG LOẠT (Bulk)
+  async bulkApprovePriceChanges(
+    productIds: string[],
+    isApproved: boolean,
+    reason: string,
+    userId: string,
+    ip: string,
+    userAgent: string,
+  ) {
+    let successCount = 0;
+    for (const id of productIds) {
+      try {
+        await this.approvePriceChange(
+          id,
+          isApproved,
+          userId,
+          ip,
+          userAgent,
+          reason,
+        );
+        successCount++;
+      } catch (error) {
+        // Bỏ qua lỗi lẻ tẻ để duyệt các sản phẩm hợp lệ khác
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        console.error(`Bulk action failed for product ${id}:`, errorMessage);
+      }
+    }
+    return {
+      message: `Đã xử lý thành công ${successCount}/${productIds.length} bản ghi.`,
+    };
+  }
+
+  // CRONJOB: Bơm giá
+  @Cron(CronExpression.EVERY_MINUTE)
+  async applyScheduledPrices() {
+    const now = new Date();
+    const products = await this.productModel.find({
+      'price_request.status': PriceRequestStatus.APPROVED,
+      'price_request.effective_date': { $lte: now },
+      is_deleted: false,
+    });
+
+    for (const p of products) {
+      const request = p.price_request;
+
+      // Fix lỗi "request is possibly null" của TypeScript
+      if (!request) continue;
+
+      p.price = request.price;
+
+      if (request.variants && request.variants.length > 0) {
+        request.variants.forEach((reqVar) => {
+          const vIndex = p.variants.findIndex((v) => v.sku === reqVar.sku);
+          if (vIndex !== -1) p.variants[vIndex].price = reqVar.price;
+        });
+      }
+
+      p.price_request = null;
+      await p.save();
+      console.log(`[CRON] Đã áp dụng giá mới tự động cho sản phẩm: ${p.sku}`);
+    }
   }
 
   //SOFT DELETE
@@ -998,12 +1047,6 @@ export class ProductsService {
     });
 
     return { message: 'Đã xóa vĩnh viễn sản phẩm và dữ liệu liên quan.' };
-  }
-
-  // API hỗ trợ xóa lẻ file
-  async removeMediaFile(filePath: string) {
-    this.deletePhysicalFile(filePath);
-    return { message: 'Đã xóa file vật lý' };
   }
 
   // Các hàm Tags giữ nguyên
@@ -1080,17 +1123,9 @@ export class ProductsService {
     };
   }
 
-  private deletePhysicalFile(relativePath: string) {
-    if (!relativePath) return;
-    try {
-      const absolutePath = path.join(process.cwd(), relativePath);
-      if (fs.existsSync(absolutePath)) {
-        fs.unlinkSync(absolutePath);
-        console.log(`[FILE] Deleted: ${absolutePath}`);
-      }
-    } catch (error) {
-      console.error(`[FILE] Error deleting file: ${relativePath}`, error);
-    }
+  async removeMediaFile(filePath: string) {
+    this.contentService.deletePhysicalFile(filePath); // Dùng code dùng chung
+    return { message: 'Đã xóa file vật lý' };
   }
 
   //Hàm findByCategory hoàn chỉnh
@@ -1228,5 +1263,36 @@ export class ProductsService {
 
     crumbs.unshift({ name: 'Trang chủ', slug: '' });
     return crumbs;
+  }
+
+  // AC4: Tự động gỡ giá khuyến mãi khi qua Ngày kết thúc
+  @Cron(CronExpression.EVERY_MINUTE)
+  async handleExpiredSales() {
+    const now = new Date();
+
+    try {
+      // Tìm các SP đã qua ngày kết thúc khuyến mãi nhưng vẫn đang có giá sale > 0
+      const result = await this.productModel.updateMany(
+        {
+          sale_end_date: { $lt: now },
+          sale_price: { $gt: 0 },
+          is_deleted: false,
+        },
+        {
+          $set: {
+            sale_price: 0, // Trả SP chính về giá niêm yết
+            'variants.$[].sale_price': 0, // Trả toàn bộ biến thể về giá niêm yết
+          },
+        },
+      );
+
+      if (result.modifiedCount > 0) {
+        console.log(
+          `[CRON] Đã tự động tắt khuyến mãi cho ${result.modifiedCount} sản phẩm hết hạn.`,
+        );
+      }
+    } catch (error) {
+      console.error('[CRON] Lỗi khi xử lý giá khuyến mãi hết hạn:', error);
+    }
   }
 }

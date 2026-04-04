@@ -8,7 +8,7 @@ import {
   ProductSchema,
 } from 'src/modules/products/catalog/schemas/product.schema';
 import { AuditLogsModule } from 'src/modules/system/audit-logs/audit-logs.module';
-import { PromotionsModule } from 'src/modules/marketing/promotions/promotions.module';
+import { PromotionsModule } from '../../marketing/promotions/promotions.module';
 
 @Module({
   imports: [

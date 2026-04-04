@@ -11,7 +11,6 @@ import {
   Headers as HttpHeaders,
   UploadedFiles,
   UseInterceptors,
-  BadRequestException,
   Res,
   HttpStatus,
   HttpException,
@@ -32,18 +31,17 @@ import { RequirePermissions } from 'src/common/decorators/permissions.decorator'
 import { Action, Resource } from 'src/common/enums/resource.enum';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import type { IUser } from 'src/common/interfaces/user.interface';
-import * as fs from 'fs';
-import * as path from 'path';
-import sharp from 'sharp';
 import { FilterProductDto } from './dto/filter-product.dto';
 import { FilterOutput, ProductFilterService } from '../products-filter.service';
 import type { ProductQueryParam } from 'src/common/interfaces/product.interface';
+import { ContentService } from 'src/modules/marketing/content/content.service';
 
 @Controller('products')
 export class ProductsController {
   constructor(
     private readonly productsService: ProductsService,
     private readonly productFilterService: ProductFilterService,
+    private readonly contentService: ContentService,
   ) {}
 
   // PUBLIC API (STOREFRONT)
@@ -225,60 +223,103 @@ export class ProductsController {
 
   @Post('upload')
   @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
-  @UseInterceptors(FilesInterceptor('files'))
-  async uploadFiles(
-    @UploadedFiles()
-    files: Array<Express.Multer.File>,
-  ) {
-    if (!files || files.length === 0)
-      throw new BadRequestException('Không có file nào được tải lên');
-    const processedFiles: any[] = [];
-    const uploadDir = path.join(process.cwd(), 'uploads/products');
+  @UseInterceptors(
+    FilesInterceptor('files', 15, {
+      // Tối đa 15 file 1 lần
+      // Set limit tổng ở mức cao nhất là 200MB (để Multer không chặn video)
+      limits: { fileSize: 200 * 1024 * 1024 },
+    }),
+  )
 
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
+  // async uploadFiles(
+  //   @UploadedFiles()
+  //   files: Array<Express.Multer.File>,
+  // ) {
+  //   if (!files || files.length === 0)
+  //     throw new BadRequestException('Không có file nào được tải lên');
 
-    for (const file of files) {
-      // Tạo tên file ngẫu nhiên
-      const filename = `prod-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-      const ext = path.extname(file.originalname).toLowerCase();
+  //   const processedFiles: any[] = [];
+  //   const uploadDir = path.join(process.cwd(), 'uploads/products');
 
-      // 1. Lưu ảnh gốc (High Quality)
-      const originalPath = path.join(uploadDir, `${filename}${ext}`);
-      await sharp(file.buffer).toFile(originalPath);
+  //   if (!fs.existsSync(uploadDir)) {
+  //     fs.mkdirSync(uploadDir, { recursive: true });
+  //   }
 
-      // 2. Tạo ảnh Thumbnail (200x200)
-      const thumbPath = path.join(uploadDir, `${filename}-thumb${ext}`);
-      await sharp(file.buffer)
-        .resize(200, 200, { fit: 'cover' })
-        .toFile(thumbPath);
+  //   for (const file of files) {
+  //     // Xác định file này là Ảnh hay Video
+  //     const isVideo = file.mimetype.startsWith('video/');
 
-      // 3. Tạo ảnh Medium (800px width - auto height)
-      const mediumPath = path.join(uploadDir, `${filename}-medium${ext}`);
-      await sharp(file.buffer)
-        .resize(800, null, { withoutEnlargement: true })
-        .toFile(mediumPath);
+  //     // 1. KIỂM TRA DUNG LƯỢNG RIÊNG BIỆT (Ảnh 50MB, Video 200MB)
+  //     const maxImageSize = 50 * 1024 * 1024; // 50MB
+  //     const maxVideoSize = 200 * 1024 * 1024; // 200MB
 
-      //Push vào mảng đã khai báo type
-      processedFiles.push({
-        originalName: file.originalname,
-        filename: `${filename}${ext}`,
-        path: `/uploads/products/${filename}${ext}`,
-        thumbnail: `/uploads/products/${filename}-thumb${ext}`,
-        medium: `/uploads/products/${filename}-medium${ext}`,
-        mimetype: file.mimetype,
-        size: file.size,
-        type: 'IMAGE',
-      });
-    }
+  //     if (!isVideo && file.size > maxImageSize) {
+  //       throw new BadRequestException(
+  //         `Ảnh "${file.originalname}" vượt quá 50MB`,
+  //       );
+  //     }
+  //     if (isVideo && file.size > maxVideoSize) {
+  //       throw new BadRequestException(
+  //         `Video "${file.originalname}" vượt quá 200MB`,
+  //       );
+  //     }
 
-    return {
-      message: 'Tải lên và xử lý ảnh thành công',
-      data: processedFiles,
-    };
-  }
+  //     // Tạo tên file ngẫu nhiên
+  //     const filename = `prod-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+  //     const ext = path.extname(file.originalname).toLowerCase();
+  //     const originalPath = path.join(uploadDir, `${filename}${ext}`);
 
+  //     // 2. PHÂN NHÁNH XỬ LÝ (ẢNH vs VIDEO)
+  //     if (isVideo) {
+  //       // --- XỬ LÝ VIDEO ---
+  //       // Video không thể dùng Sharp để cắt. Chỉ lưu file vật lý thẳng vào ổ cứng.
+  //       fs.writeFileSync(originalPath, file.buffer);
+
+  //       processedFiles.push({
+  //         originalName: file.originalname,
+  //         filename: `${filename}${ext}`,
+  //         path: `/uploads/products/${filename}${ext}`,
+  //         thumbnail: `/uploads/products/${filename}${ext}`, // Video không cắt được thumb, dùng luôn link gốc
+  //         medium: `/uploads/products/${filename}${ext}`,
+  //         mimetype: file.mimetype,
+  //         size: file.size,
+  //         type: 'VIDEO', // Đánh dấu là VIDEO
+  //       });
+  //     } else {
+  //       // --- XỬ LÝ ẢNH ---
+  //       // 1. Lưu ảnh gốc
+  //       await sharp(file.buffer).toFile(originalPath);
+
+  //       // 2. Tạo ảnh Thumbnail (200x200)
+  //       const thumbPath = path.join(uploadDir, `${filename}-thumb${ext}`);
+  //       await sharp(file.buffer)
+  //         .resize(200, 200, { fit: 'cover' })
+  //         .toFile(thumbPath);
+
+  //       // 3. Tạo ảnh Medium (800px width)
+  //       const mediumPath = path.join(uploadDir, `${filename}-medium${ext}`);
+  //       await sharp(file.buffer)
+  //         .resize(800, null, { withoutEnlargement: true })
+  //         .toFile(mediumPath);
+
+  //       processedFiles.push({
+  //         originalName: file.originalname,
+  //         filename: `${filename}${ext}`,
+  //         path: `/uploads/products/${filename}${ext}`,
+  //         thumbnail: `/uploads/products/${filename}-thumb${ext}`,
+  //         medium: `/uploads/products/${filename}-medium${ext}`,
+  //         mimetype: file.mimetype,
+  //         size: file.size,
+  //         type: 'IMAGE', // Đánh dấu là IMAGE
+  //       });
+  //     }
+  //   }
+
+  //   return {
+  //     message: 'Tải lên và xử lý file thành công',
+  //     data: processedFiles,
+  //   };
+  // }
   @Patch(':id/tags')
   @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
   async updateTags(
@@ -325,5 +366,60 @@ export class ProductsController {
         throw error;
       }
     }
+  }
+
+  // AC4: Nhân viên submit Draft thành Pending
+  @Patch(':id/price-request/submit')
+  @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
+  submitPriceDraft(
+    @Param('id') id: string,
+    @CurrentUser() user: IUser,
+    @Ip() ip: string,
+    @HttpHeaders('user-agent') userAgent: string,
+  ) {
+    return this.productsService.submitPriceRequest(id, user._id, ip, userAgent);
+  }
+
+  // AC3: Quản lý duyệt/từ chối HÀNG LOẠT
+  @Patch('price-requests/bulk-action')
+  @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
+  @Roles(Role.SUPER_ADMIN)
+  bulkApprovePrice(
+    @Body()
+    body: {
+      product_ids: string[];
+      action: 'approve' | 'reject';
+      reason?: string;
+    },
+    @CurrentUser() user: IUser,
+    @Ip() ip: string,
+    @HttpHeaders('user-agent') userAgent: string,
+  ) {
+    return this.productsService.bulkApprovePriceChanges(
+      body.product_ids,
+      body.action === 'approve',
+      body.reason || '',
+      user._id,
+      ip,
+      userAgent,
+    );
+  }
+
+  @Post('upload')
+  @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
+  @UseInterceptors(
+    FilesInterceptor('files', 15, {
+      limits: { fileSize: 200 * 1024 * 1024 }, // Vẫn chặn giới hạn ở mức server Multer
+    }),
+  )
+  async uploadFiles(@UploadedFiles() files: Array<Express.Multer.File>) {
+    // Chỉ cần gọi hàm từ ContentService và truyền Options cấu hình cho Product
+    return this.contentService.processAndSaveFiles(files, {
+      subFolder: 'products',
+      maxImageSize: 50 * 1024 * 1024, // 50MB
+      maxVideoSize: 200 * 1024 * 1024, // 200MB
+      generateThumbnail: true, // Product thì cần thumbnail
+      generateMedium: true, // Product thì cần size vừa
+    });
   }
 }

@@ -26,6 +26,7 @@ import {
   MemberTier,
   MemberTierSchema,
 } from 'src/modules/marketing/loyalty/schemas/member-tier.schema';
+import { MarketingModule } from 'src/modules/marketing/marketing.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import {
     TagsModule,
     LoyaltyModule,
     UsersModule,
+    MarketingModule,
   ],
   controllers: [ProductsController],
   providers: [ProductsService, ProductFilterService],

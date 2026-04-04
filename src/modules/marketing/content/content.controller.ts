@@ -188,8 +188,15 @@ export class ContentController {
   @Post('banners')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions(Resource.BLOG, Action.CREATE)
-  async createBanner(@Body() dto: CreateBannerDto) {
-    const data = await this.contentService.createBanner(dto);
+  async createBanner(
+    @Body() dto: CreateBannerDto,
+    @Req() req: RequestWithUser,
+  ) {
+    const data = await this.contentService.createBanner(
+      dto,
+      req.user.userId,
+      req.user.email,
+    );
     return new BaseResponse(true, 'Tạo banner thành công', data);
   }
 
@@ -228,8 +235,12 @@ export class ContentController {
   @Delete('banners/:id')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions(Resource.BLOG, Action.DELETE)
-  async softDeleteBanner(@Param('id') id: string) {
-    const result = await this.contentService.softDeleteBanner(id);
+  async softDeleteBanner(@Param('id') id: string, @Req() req: RequestWithUser) {
+    const result = await this.contentService.softDeleteBanner(
+      id,
+      req.user.userId,
+      req.user.email,
+    );
     return new BaseResponse(true, result.message);
   }
 
