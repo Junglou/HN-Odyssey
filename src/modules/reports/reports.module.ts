@@ -1,18 +1,17 @@
 import { Module } from '@nestjs/common';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { InventoryReportsModule } from './inventory/inventory-reports.module';
-// Import thêm BusinessReportsModule, ExportModule... sau này
+import { BusinessReportsModule } from './business/business-reports.module';
 
 @Module({
   imports: [
     DashboardModule,
     InventoryReportsModule,
-    // Bỏ comment các dòng dưới khi code xong các module tương ứng
-    // BusinessReportsModule,
+    BusinessReportsModule,
     // ExportModule,
   ],
   controllers: [],
   providers: [],
-  exports: [DashboardModule, InventoryReportsModule],
+  exports: [DashboardModule, InventoryReportsModule, BusinessReportsModule],
 })
 export class ReportsModule {}

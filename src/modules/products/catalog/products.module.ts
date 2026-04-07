@@ -27,6 +27,7 @@ import {
   MemberTierSchema,
 } from 'src/modules/marketing/loyalty/schemas/member-tier.schema';
 import { MarketingModule } from 'src/modules/marketing/marketing.module';
+import { PriceHistorySchema } from './schemas/price-history.schema.ts';
 
 @Module({
   imports: [
@@ -37,6 +38,10 @@ import { MarketingModule } from 'src/modules/marketing/marketing.module';
       { name: Order.name, schema: OrderSchema },
       { name: Attribute.name, schema: AttributeSchema },
       { name: MemberTier.name, schema: MemberTierSchema },
+      {
+        name: 'PriceHistory',
+        schema: PriceHistorySchema,
+      },
     ]),
     CategoriesModule,
     AuditLogsModule,
