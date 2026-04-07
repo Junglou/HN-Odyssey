@@ -1,12 +1,10 @@
 import "./RecentView.css";
-import type { UserProfile, ProductRecommendation, UserOrder } from "../../../types/user";
+import type { Product } from "../../../types/product";
 import RecommendationList from "../../common/RecommendationList";
 import RecentViewBox from "./RecentViewBox";
 
 interface RecentViewProps {
-  user: UserProfile;
-  recommendations: ProductRecommendation[];
-  order: UserOrder[];
+  recommendations: Product[];
 }
 
 const RecentView = ({

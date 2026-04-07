@@ -33,6 +33,7 @@ import CustomerManagementPage from "../pages/portal/CustomerCRM/CustomerManageme
 import LiveChatSupportPage from "../pages/portal/CustomerCRM/LiveChatSupport/LiveChatSupportPage";
 
 import PromotionManagementPage from "../pages/portal/MarketingSuite/PromotionManagement/PromotionManagementPage";
+import RecentViewPage from "../pages/profile/RecentViewPage";
 
 export const router = createBrowserRouter([
   // route auth
@@ -89,6 +90,10 @@ export const router = createBrowserRouter([
       {
         path: "/profile/wishlist",
         element: <MyWishlistPage />,
+      },
+      {
+        path: "/profile/recent",
+        element: <RecentViewPage />
       },
       {
         index: true, // Route mặc định của path: "/"

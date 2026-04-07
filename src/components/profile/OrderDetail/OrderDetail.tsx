@@ -1,14 +1,12 @@
 import "./OrderDetail.css";
-import type { UserProfile, UserOrder } from "../../../types/user";
+import type { UserProfile } from "../../../types/user";
 import OrderShipping from "./OrderShipping";
 
 interface OrderDetailProps {
   user: UserProfile;
-  order: UserOrder;
 }
 
 const OrderDetail= ({
-  order,
   user
 
 }: OrderDetailProps) => {
@@ -44,9 +42,9 @@ const OrderDetail= ({
                   <span>{user.username}</span>
                   <span>{user.phone}</span>
                   <span>{user.email}</span>
-                  <span>{order.orderDate}</span>
-                  <span>{order.shipDate}</span>
-                  <span>{order.address.address}, {order.address.city}</span>
+                  <span>{user.userOrders[0].orderDate}</span>
+                  <span>{user.userOrders[0].shipDate}</span>
+                  <span>{user.userOrders[0].address.address}, {user.userOrders[0].address.city}</span>
                 </div>
               </div>
               <div className="order-total-container">
@@ -57,7 +55,7 @@ const OrderDetail= ({
                 </div>
                 <div className="order-total-txt">
                   <span>125.99$</span>
-                  <span>{order.shipFee}</span>
+                  <span>{user.userOrders[0].shipFee}</span>
                   <span>135.99$</span>
                 </div>
               </div>
@@ -66,7 +64,7 @@ const OrderDetail= ({
               <div className="order-product-lbl">
                 <span className="lbl-text">Order item</span>
               </div>
-              {order.product.map((product, index) => (
+              {user.userOrders[0].product.map((product, index) => (
                 <div className="order-product">
                   <div className="thumbnail-img-container">
                     <img src={product.image} className="order-img" />

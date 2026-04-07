@@ -1,9 +1,9 @@
 import "./RecommendationList.css";
-import type { ProductRecommendation } from "../../types/user";
+import type { Product } from "../../types/product";
 
 interface RecommendationListProps {
   title?: string;
-  products: ProductRecommendation[];
+  products: Product[];
 }
 
 const RecommendationList = ({

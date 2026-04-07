@@ -1,5 +1,5 @@
 import "./MyProfile.css";
-import type { UserProfile, ProductRecommendation } from "../../types/user";
+import type { UserProfile} from "../../types/user";
 import RecommendationList from "../common/RecommendationList";
 import { useNavigate } from "react-router-dom"; // Import useNavigate
 import {
@@ -8,10 +8,11 @@ import {
   TiktokIcon,
   XIcon,
 } from "../../assets/icons/ProfileIcons";
+import type { Product } from "../../types/product";
 
 interface MyProfileProps {
   user: UserProfile;
-  recommendations: ProductRecommendation[];
+  recommendations: Product[];
   onEditProfile: () => void;
   onEditAccount: () => void;
   onChangeAvatar: () => void;
@@ -39,7 +40,7 @@ const MyProfile = ({
           <div className="avatar-frame">
             <img src={user.avatar} alt="Avatar" className="avatar-img" />
           </div>
-          <h2 className="user-fullname">{user.firstName}</h2>
+          <h2 className="user-fullname">{user.displayName}</h2>
 
           <div className="avatar-actions">
             <button className="btn-avatar-action" onClick={onChangeAvatar}>
@@ -63,23 +64,23 @@ const MyProfile = ({
             <div className="info-grid-row">
               <div className="info-item">
                 <label>First name</label>
-                <div className="info-value">name</div>
+                <div className="info-value">{user.firstName}</div>
               </div>
               <div className="info-item">
                 <label>Last name</label>
-                <div className="info-value">name</div>
+                <div className="info-value">{user.lastName}</div>
               </div>
               <div className="info-item">
                 <label>Gender</label>
-                <div className="info-value">Male</div>
+                <div className="info-value">{user.gender}</div>
               </div>
               <div className="info-item">
                 <label>Birthday</label>
-                <div className="info-value">dd/mm/yyyy</div>
+                <div className="info-value">{user.birthday}</div>
               </div>
               <div className="info-item">
                 <label>Display Name</label>
-                <div className="info-value">name</div>
+                <div className="info-value">{user.displayName}</div>
               </div>
             </div>
             {/* ... */}
@@ -93,7 +94,7 @@ const MyProfile = ({
             <div className="info-grid-row">
               <div className="info-item">
                 <label>Username</label>
-                <div className="info-value">username</div>
+                <div className="info-value">{user.username}</div>
               </div>
               <div className="info-item">
                 <label>Password</label>
@@ -101,11 +102,11 @@ const MyProfile = ({
               </div>
               <div className="info-item">
                 <label>Email</label>
-                <div className="info-value">useremail@gmail.com</div>
+                <div className="info-value">{user.email}</div>
               </div>
               <div className="info-item">
                 <label>Phone</label>
-                <div className="info-value">1234567890</div>
+                <div className="info-value">{user.phone}</div>
               </div>
             </div>
             <button className="btn-edit-pill" onClick={onEditAccount}>

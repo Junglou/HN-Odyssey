@@ -1,17 +1,16 @@
-import type { ProductRecommendation } from "../../../types/user";
+import type { Product } from "../../../types/product";
 import "./MyWishlistBox.css";
 
 interface MyWishlistProp {
-  product: ProductRecommendation;
+  product: Product;
+  onDelete: () => void;
 }
 
-const WishlistBox = ({product}:MyWishlistProp) => {
-  
+const WishlistBox = ({ product, onDelete }: MyWishlistProp) => {
   return (
     <div className="box-container">
-
       <div className="box-content">
-        <div className="box-infor">  
+        <div className="box-infor">
           <div className="order-thumbnail-container">
             <div className="thumbnail-img-container">
               <img src={product.image} className="order-img" />
@@ -34,12 +33,13 @@ const WishlistBox = ({product}:MyWishlistProp) => {
           </div>
 
           <div className="btn-container">
-            <button className="edit-btn">Remove</button>
+            <button className="edit-btn" onClick={onDelete}>
+              Remove
+            </button>
             <button className="remove-btn">Add to cart</button>
           </div>
         </div>
       </div>
-
     </div>
   );
 };

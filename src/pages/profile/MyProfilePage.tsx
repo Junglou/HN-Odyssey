@@ -1,82 +1,54 @@
-import { useState, useEffect } from "react";
 import AccountSidebar from "../../components/profile/AccountSidebar";
-import MyProfile from "../../components/profile/MyProfile"; // Import Component mới đổi tên
-import "./MyProfilePage.css"; // CSS Layout trang
-import type { UserProfile, ProductRecommendation } from "../../types/user";
+import MyProfile from "../../components/profile/MyProfile";
+import MyProfileModal from "../../components/profile/ProfileModal/MyProfileModal";
+import AccountInformationModal from "../../components/profile/ProfileModal/AccountInformationModal";
+import AvatarModal from "../../components/profile/ProfileModal/AvatarModal";
+import "./MyProfilePage.css";
+import { useProfileManagement } from "../../hooks/profile/useProfileManagement";
+import type { Product } from "../../types/product";
+import { productList } from "../../hooks/profile/productData";
 
 const MyProfilePage = () => {
-  // 1. Quản lý State
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const {
+    user,
+    profileModal,
+    accountModal,
+    avatarModal,
+    openProfileEdit,
+    openAccountEdit,
+    openAvatarEdit,
+  } = useProfileManagement();
 
-  // 2. Giả lập API
-  useEffect(() => {
-    // Gọi API thật ở đây. Tạm thời setTimeout giả lập
-    setTimeout(() => {
-      setUser({
-        avatar: "https://placehold.co/150",
-        firstName: "Huy",
-        lastName: "Nguyen",
-        gender: "Male",
-        birthday: "01/01/2000",
-        displayName: "Huy Odyssey",
-        username: "huynguyen",
-        email: "user@gmail.com",
-        phone: "028 4532 6499",
-      });
-      setLoading(false);
-    }, 500);
-  }, []);
+  const getRandomProducts = (count: number = 3): Product[] => {
+    const shuffled = [...productList].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
+  };
 
   // Data mẫu cho RecommendationList
-  const recommendations: ProductRecommendation[] = [
-    {
-      id: 1,
-      name: "Ration 1",
-      description: "Instant energy supply...",
-      price: 5.99,
-      image: "https://placehold.co/100",
-    },
-    {
-      id: 2,
-      name: "Solo kit 1",
-      description: "Knife, fire starter...",
-      price: 15.99,
-      image: "https://placehold.co/100",
-    },
-    {
-      id: 3,
-      name: "Vital 1",
-      description: "Basic wound care...",
-      price: 35.99,
-      image: "https://placehold.co/100",
-    },
-  ];
+  const recommendations: Product[] = getRandomProducts();
 
-  // 3. Handlers
-  const handleEditProfile = () => console.log("Edit Profile");
-  const handleEditAccount = () => console.log("Edit Account");
-  const handleChangeAvatar = () => console.log("Change Avatar");
+  const handleChangeAvatar = () => {
+    openAvatarEdit();
+  };
 
-  if (loading || !user) return <div>Loading...</div>;
-
-  // 4. Render
   return (
     <div className="my-profile-page-container">
-      {/* Sidebar (Menu trái) */}
       <div className="sidebar-wrapper">
         <AccountSidebar />
       </div>
 
-      {/* Content (Nội dung phải) */}
       <div className="content-wrapper">
         <MyProfile
           user={user}
           recommendations={recommendations}
-          onEditProfile={handleEditProfile}
-          onEditAccount={handleEditAccount}
+          onEditProfile={openProfileEdit}
+          onEditAccount={openAccountEdit}
           onChangeAvatar={handleChangeAvatar}
         />
+
+        <MyProfileModal {...profileModal} />
+        <AccountInformationModal {...accountModal} />
+        <AvatarModal {...avatarModal} />
       </div>
     </div>
   );

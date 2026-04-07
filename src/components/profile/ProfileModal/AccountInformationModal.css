@@ -1,0 +1,312 @@
+/* overlay */
+.um-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 2000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: "Lexend Exa", sans-serif;
+}
+
+/* main box modal chứa content form */
+.um-modal-box {
+  background-color: #ffffff;
+  width: 100%;
+  max-width: 480px;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* title modal */
+.um-modal-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #000000;
+  margin: 0;
+}
+
+/* container chứa form */
+.um-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* wrapper cho từng field input (label + control) */
+.um-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.um-form-group label {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #000000;
+}
+
+/* Dấu sao required (*) */
+.req {
+  color: #e1251b;
+  margin-left: 2px;
+}
+
+.um-form-group input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  outline: none;
+  box-sizing: border-box;
+  font-family: "Lexend Exa", sans-serif;
+  font-size: 0.95rem;
+  color: #333333;
+  transition: border-color 0.2s ease;
+}
+
+.um-form-group input:focus {
+  border-color: #000000;
+}
+
+/* input ở mode view (disabled) */
+.um-form-group input:disabled {
+  background-color: #f9fafb;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+/* layout row chia 2 cột cho các input */
+.um-form-row {
+  display: flex;
+  gap: 16px;
+}
+
+.um-form-row .um-form-group {
+  flex: 1;
+}
+
+/* container bọc switch + status text */
+.um-modal-status-flex {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.um-modal-status-text {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #000000;
+}
+
+/* Nút Switch */
+.um-modal-switch {
+  width: 48px;
+  height: 26px;
+  border-radius: 20px;
+  position: relative;
+  cursor: pointer;
+  background-color: #d1d5db;
+  transition: background-color 0.3s ease;
+  border: 1px solid transparent;
+}
+
+.um-modal-switch-handle {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  transition: transform 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.um-modal-switch.on {
+  background-color: #6b46c1;
+}
+
+.um-modal-switch.on .um-modal-switch-handle {
+  transform: translateX(22px);
+}
+
+.um-modal-switch.disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* nút submit và cancel */
+.um-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.um-btn-modal-submit {
+  background-color: #cccccc;
+  color: #ffffff;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.um-btn-modal-submit:hover {
+  background-color: #000000;
+}
+
+.um-btn-modal-cancel {
+  background-color: #ffffff;
+  color: #000000;
+  border: 1px solid #000000;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.um-btn-modal-cancel:hover {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+/* gender: radio row (thay cho custom dropdown đã gỡ) */
+.um-modal-field-label {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #000000;
+}
+
+.um-modal-gender-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.um-modal-gender-options.is-disabled {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.um-modal-gender-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #333333;
+  cursor: pointer;
+}
+
+.um-modal-gender-label input[type="radio"] {
+  width: auto;
+  margin: 0;
+  accent-color: #4f46e5;
+}
+
+/*
+  --- Giữ nguyên comment block gốc cho dropdown (UI đã không dùng; tham khảo) ---
+  dropdown
+  .um-modal-custom-dropdown {
+    position: relative;
+    width: 100%;
+    user-select: none;
+  }
+
+  chống đè layer
+  .um-modal-custom-dropdown.is-open {
+    z-index: 101;
+  }
+
+  .um-modal-dropdown-trigger {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background-color: #ffffff;
+    font-family: "Lexend Exa", sans-serif;
+    font-size: 0.95rem;
+    color: #333333;
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+    box-sizing: border-box;
+  }
+
+  .um-modal-dropdown-trigger:focus,
+  .um-modal-dropdown-trigger.active {
+    border-color: #000000;
+  }
+
+  .um-modal-custom-dropdown.disabled .um-modal-dropdown-trigger {
+    background-color: #f9fafb;
+    color: #9ca3af;
+    cursor: not-allowed;
+  }
+
+  .um-modal-dropdown-trigger .placeholder {
+    color: #6b7280;
+  }
+
+  .um-modal-dropdown-arrow {
+    transition: transform 0.3s ease;
+  }
+
+  .um-modal-dropdown-arrow.open {
+    transform: rotate(180deg);
+  }
+
+  .um-modal-dropdown-options {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: 100%;
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 100;
+    overflow: hidden;
+    animation: um-slideFadeIn 0.2s ease-out forwards;
+    transform-origin: top center;
+  }
+
+  .um-modal-dropdown-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    color: #333333;
+    font-size: 0.95rem;
+    transition: background-color 0.2s;
+  }
+
+  .um-modal-dropdown-item:hover {
+    background-color: #f3f4f6;
+  }
+
+  .um-modal-dropdown-item.selected {
+    background-color: #e9e9e9;
+    color: #000000;
+    font-weight: 600;
+  }
+*/

@@ -1,11 +1,11 @@
 import "./PurchaseHistory.css";
-import type { UserProfile, ProductRecommendation, UserOrder } from "../../../types/user";
+import type { UserOrder } from "../../../types/user";
+import type { Product } from "../../../types/product";
 import RecommendationList from "../../common/RecommendationList";
 import PurchaseBox from "./PurchaseHistoryBox";
 
 interface HistoryProps {
-  user: UserProfile;
-  recommendations: ProductRecommendation[];
+  recommendations: Product[];
   order: UserOrder[];
 }
 

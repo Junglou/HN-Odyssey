@@ -1,19 +1,19 @@
 import "./MyWishlist.css";
-import type { UserProfile, ProductRecommendation, UserOrder } from "../../../types/user";
+import type { Product } from "../../../types/product";
 import RecommendationList from "../../common/RecommendationList";
 import WishlistBox from "./MyWishlistBox";
 
 interface MyWishlistProps {
-  user: UserProfile;
-  recommendations: ProductRecommendation[];
-  order: UserOrder[];
+  wishlist: Product[];
+  recommendations: Product[];
+  onDeleteItem: (productId: string) => void;
 }
 
 const MyWishlist = ({
+  wishlist,
   recommendations,
-
+  onDeleteItem,
 }: MyWishlistProps) => {
-
   return (
     <div className="wishlist-card">
       <div className="wishlist-header">
@@ -23,11 +23,13 @@ const MyWishlist = ({
       <div className="wishlist-internal-grid">
         {/* CỘT 1: Box quản lý đơn hàng */}
         <div className="grid-section section-wishlist">
-          {
-            recommendations.map((product) => (
-              <WishlistBox product={product}/>
-            ))
-          }
+          {wishlist.map((product) => (
+            <WishlistBox
+              key={product.id}
+              product={product}
+              onDelete={() => onDeleteItem(product.id)}
+            />
+          ))}
         </div>
 
         {/* CỘT 2: RECOMMENDATIONS */}

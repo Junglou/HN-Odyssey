@@ -1,19 +1,25 @@
 import "./AddressManagement.css";
-import type { UserProfile, ProductRecommendation, UserAddress } from "../../../types/user";
+import type { UserAddress } from "../../../types/user";
 import RecommendationList from "../../common/RecommendationList";
 import AddressBox from "./AddressBox";
 import { useNavigate } from "react-router-dom"; // Import useNavigate
+import type { Product } from "../../../types/product";
 
-interface MyProfileProps {
-  user: UserProfile;
+interface AddressProps {
   address: UserAddress[];
-  recommendations: ProductRecommendation[];
+  recommendations: Product[];
+  onAddAddress?: () => void;
+  onEditAddress?: (index: number) => void;
+  onDeleteAddress?: (index: number) => void;
 }
 
 const AddressManagement = ({
   address,
   recommendations,
-}: MyProfileProps) => {
+  onAddAddress,
+  onEditAddress,
+  onDeleteAddress,
+}: AddressProps) => {
   const navigate = useNavigate(); // Hook điều hướng
 
   return (
@@ -25,10 +31,16 @@ const AddressManagement = ({
       <div className="address-box-internal-grid">
         {/* CỘT 1: Box quản lý địa chỉ */}
         <div className="grid-section section-address">
-          {address.map((items) => (
-            <AddressBox address={items}/>
+          {address.map((items, index) => (
+            <AddressBox
+              key={index}
+              address={items}
+              index={index}
+              onEdit={onEditAddress}
+              onDelete={onDeleteAddress}
+            />
           ))}
-          <AddressBox />
+          <AddressBox onAdd={onAddAddress} />
         </div>
 
         {/* CỘT 2: RECOMMENDATIONS */}

@@ -1,8 +1,8 @@
-import type { ProductRecommendation } from "../../../types/user";
+import type { Product } from "../../../types/product";
 import "./RecentViewBox.css";
 
 interface MyWishlistProp {
-  product: ProductRecommendation;
+  product: Product;
 }
 
 const WishlistBox = ({product}:MyWishlistProp) => {

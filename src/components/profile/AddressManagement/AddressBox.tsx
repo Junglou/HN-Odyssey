@@ -3,15 +3,19 @@ import "./AddressBox.css";
 
 interface AddressBoxProp {
   address?: UserAddress;
+  index?: number;
+  onAdd?: () => void;
+  onEdit?: (index: number) => void;
+  onDelete?: (index: number) => void;
 }
 
-const AddressBox = ({address}:AddressBoxProp) => {
+const AddressBox = ({ address, index, onAdd, onEdit, onDelete }: AddressBoxProp) => {
   {if(address == null)
     {
       return (
         <div className="address-box-container">
           <div className="add-address-box-btn-container">
-            <button className="add-new-address-btn">+</button>
+            <button className="add-new-address-btn" onClick={onAdd}>+</button>
           </div>
           <div className="add-new-address-txt-container">
             <span className="lbl-text">Add new address</span>
@@ -41,8 +45,18 @@ const AddressBox = ({address}:AddressBoxProp) => {
           </div>
         </div>
         <div className="address-box-btn-container">
-          <button className="address-box-edit-btn">Edit</button>
-          <button className="address-box-remove-btn">Remove</button>
+          <button
+            className="address-box-edit-btn"
+            onClick={() => index !== undefined && onEdit?.(index)}
+          >
+            Edit
+          </button>
+          <button
+            className="address-box-remove-btn"
+            onClick={() => index !== undefined && onDelete?.(index)}
+          >
+            Remove
+          </button>
         </div>
       </div>
     </div>

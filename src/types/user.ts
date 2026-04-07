@@ -1,14 +1,23 @@
+import type { Product } from "./product";
+
 // UserProfile
 export interface UserProfile {
-  avatar: string;
+  id: string;
+  avatar: string; 
   firstName: string;
   lastName: string;
   gender: "Male" | "Female" | "Other";
   birthday: string; // DD/MM/YYYY
   displayName: string;
   username: string;
+  password: string;
   email: string;
   phone: string;
+  amountSpent: number;
+  userAddresses: UserAddress[];
+  userOrders: UserOrder[];
+  userFinishedOrders: UserOrder[];
+  userWishlist: Product[];
 }
 
 export interface ProductRecommendation {
@@ -28,7 +37,7 @@ export interface UserAddress {
 
 export interface UserOrder {
   address: UserAddress;
-  product: ProductRecommendation[];
+  product: Product[];
   orderDate: string;
   shipDate: string;
   shipFee: string;
