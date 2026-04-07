@@ -28,6 +28,7 @@ const PortalLayout = () => {
   const [isCustomerCRMOpen, setIsCustomerCRMOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isMarketingSuiteOpen, setIsMarketingSuiteOpen] = useState(false);
+  const [isCommunicationOpen, setIsCommunicationOpen] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
   const isParentActive = (basePath: string) =>
@@ -203,10 +204,10 @@ const PortalLayout = () => {
                   Promotion Management
                 </div>
                 <div
-                  className={`submenu-item ${isActive("/portal/ReviewAndRating") ? "active" : ""}`}
-                  onClick={() => handleNavigate("/portal/ReviewAndRating")}
+                  className={`submenu-item ${isActive("/portal/review-rating") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/review-rating")}
                 >
-                  Review & Rating Moderation
+                  Review & Rating Management
                 </div>
                 <div
                   className={`submenu-item ${isActive("/portal/coupon") ? "active" : ""}`}
@@ -264,11 +265,61 @@ const PortalLayout = () => {
             </div>
           </div>
 
-          <div className="menu-item">
-            <div className="menu-item-left">
-              <CommunicationIcon /> Communication
+          {/* Communication */}
+          <div className="menu-group">
+            <div
+              className={`menu-item ${
+                isParentActive("/portal/static-pages") ||
+                isParentActive("/portal/image-management") ||
+                isParentActive("/portal/banner-management") ||
+                isParentActive("/portal/blog-news")
+                  ? "active-parent"
+                  : ""
+              }`}
+              onClick={() => setIsCommunicationOpen(!isCommunicationOpen)}
+            >
+              <div className="menu-item-left">
+                <CommunicationIcon /> Communication
+              </div>
+              <ChevronIcon open={isCommunicationOpen} />
             </div>
-            <ChevronIcon open={false} />
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateRows: isCommunicationOpen ? "1fr" : "0fr",
+                transition:
+                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+                overflow: "hidden",
+              }}
+            >
+              <div className="submenu" style={{ minHeight: 0 }}>
+                <div
+                  className={`submenu-item ${isActive("/portal/static-pages") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/static-pages")}
+                >
+                  Static Page Management
+                </div>
+                <div
+                  className={`submenu-item ${isActive("/portal/media-management") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/media-management")}
+                >
+                  Media Management
+                </div>
+                <div
+                  className={`submenu-item ${isActive("/portal/banner-management") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/banner-management")}
+                >
+                  Banner Management
+                </div>
+                <div
+                  className={`submenu-item ${isActive("/portal/blog-news") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/blog-news")}
+                >
+                  Blog&News Management
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="menu-item">

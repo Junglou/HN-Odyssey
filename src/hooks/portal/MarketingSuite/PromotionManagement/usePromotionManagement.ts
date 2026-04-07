@@ -292,13 +292,33 @@ export function usePromotionManagement() {
       return;
     }
 
+    if (data.applicableScopeValues.length === 0) {
+      toast.error(
+        `Vui lòng chọn ít nhất một ${data.applicableScopeType} để áp dụng khuyến mãi.`,
+      );
+      return;
+    }
+
     const startDateObj = new Date(data.startDate);
     const endDateObj = new Date(data.endDate);
+    const today = new Date();
+
+    today.setHours(0, 0, 0, 0);
+    startDateObj.setHours(0, 0, 0, 0);
+    endDateObj.setHours(23, 59, 59, 999);
 
     if (endDateObj < startDateObj) {
       toast.error("Ngày kết thúc không được nhỏ hơn ngày bắt đầu.");
       return;
     }
+
+    const computeStatus = (statusIntent: PromotionStatus): PromotionStatus => {
+      if (statusIntent === "Draft" || statusIntent === "Inactive")
+        return statusIntent;
+      if (today > endDateObj) return "Expired";
+      if (today < startDateObj) return "Scheduled";
+      return "Active";
+    };
 
     setModalConfig((prev) => ({ ...prev, isSubmitting: true }));
 
@@ -310,6 +330,8 @@ export function usePromotionManagement() {
             ? `${data.discountValueNum}% OFF`
             : `$${data.discountValueNum} Fixed`;
 
+        const finalStatus = computeStatus(data.status);
+
         if (mode === "add") {
           const newRecord: PromotionRecord = {
             id: nextIdCounter.current.toString(),
@@ -318,7 +340,7 @@ export function usePromotionManagement() {
             discountValue: formattedDiscountValue,
             applicableScopeType: data.applicableScopeType,
             applicableScopeValues: data.applicableScopeValues,
-            status: data.status,
+            status: finalStatus,
             startDate: data.startDate,
             endDate: data.endDate,
             description: data.description,
@@ -338,7 +360,7 @@ export function usePromotionManagement() {
                     discountValue: formattedDiscountValue,
                     applicableScopeType: data.applicableScopeType,
                     applicableScopeValues: data.applicableScopeValues,
-                    status: data.status,
+                    status: finalStatus,
                     startDate: data.startDate,
                     endDate: data.endDate,
                     description: data.description,
@@ -365,11 +387,18 @@ export function usePromotionManagement() {
       if (targets.length === 0) return;
 
       setRecords((prev) =>
-        prev.map((r) =>
-          selectedIds.has(r.id) && r.status !== "Expired"
-            ? { ...r, status: "Active" }
-            : r,
-        ),
+        prev.map((r) => {
+          if (selectedIds.has(r.id) && r.status !== "Expired") {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const sDate = new Date(r.startDate);
+            sDate.setHours(0, 0, 0, 0);
+
+            const newStatus = today < sDate ? "Scheduled" : "Active";
+            return { ...r, status: newStatus };
+          }
+          return r;
+        }),
       );
       toast.success(`Đã kích hoạt ${targets.length} khuyến mãi!`);
       setSelectedIds(new Set());

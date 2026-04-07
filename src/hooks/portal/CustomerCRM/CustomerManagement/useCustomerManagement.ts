@@ -9,6 +9,7 @@ export type CustomerType =
   | "Silver"
   | "Gold"
   | "VIP";
+export type ReviewAccessStatus = "Allowed" | "Restricted";
 
 export interface CustomerRecord {
   id: string;
@@ -17,6 +18,7 @@ export interface CustomerRecord {
   username: string;
   customerType: CustomerType;
   status: CustomerStatus;
+  reviewAccess: ReviewAccessStatus;
   lastLogin: string;
   phone: string;
 }
@@ -29,9 +31,10 @@ export interface CustomerFormData {
   customerType: CustomerType;
   phone: string;
   status: CustomerStatus;
+  reviewAccess: ReviewAccessStatus;
 }
 
-// mock data
+// mock data được cập nhật
 const INITIAL_CUSTOMERS: CustomerRecord[] = [
   {
     id: "1",
@@ -40,6 +43,7 @@ const INITIAL_CUSTOMERS: CustomerRecord[] = [
     username: "johndoe",
     customerType: "Standard",
     status: "Active",
+    reviewAccess: "Allowed",
     lastLogin: "2 hours ago",
     phone: "+84 123 456 789",
   },
@@ -50,6 +54,7 @@ const INITIAL_CUSTOMERS: CustomerRecord[] = [
     username: "sarahs",
     customerType: "Trade-in Customer",
     status: "Inactive",
+    reviewAccess: "Restricted",
     lastLogin: "Yesterday",
     phone: "+84 987 654 321",
   },
@@ -60,6 +65,7 @@ const INITIAL_CUSTOMERS: CustomerRecord[] = [
     username: "mikeb",
     customerType: "Silver",
     status: "Locked",
+    reviewAccess: "Restricted",
     lastLogin: "Dec 15, 2025",
     phone: "+84 555 666 777",
   },
@@ -70,6 +76,7 @@ const INITIAL_CUSTOMERS: CustomerRecord[] = [
     username: "emilyw",
     customerType: "Gold",
     status: "Active",
+    reviewAccess: "Allowed",
     lastLogin: "2 hours ago",
     phone: "+84 111 222 333",
   },
@@ -80,6 +87,7 @@ const INITIAL_CUSTOMERS: CustomerRecord[] = [
     username: "davidc",
     customerType: "VIP",
     status: "Inactive",
+    reviewAccess: "Allowed",
     lastLogin: "Yesterday",
     phone: "+84 333 444 555",
   },
@@ -219,11 +227,15 @@ export function useCustomerManagement() {
           next.delete(id);
           return next;
         });
-        toast.success("Đã xóa khách hàng thành công!");
+        toast.success("Đã xóa khách hàng thành công!", {
+          toastId: `del-${id}`,
+        });
       } else {
         const deletedCount = selectedIds.size;
         setRecords((prev) => prev.filter((r) => !selectedIds.has(r.id)));
-        toast.success(`Đã xóa ${deletedCount} khách hàng thành công!`);
+        toast.success(`Đã xóa ${deletedCount} khách hàng thành công!`, {
+          toastId: "del-bulk",
+        });
         setSelectedIds(new Set());
       }
       setModalConfig((prev) => ({ ...prev, isOpen: false }));
@@ -241,13 +253,16 @@ export function useCustomerManagement() {
       );
       toast.success(
         `Đã ${currentStatus === "Locked" ? "mở khóa" : "khóa"} tài khoản!`,
+        { toastId: `lock-${id}` },
       );
     },
   };
 
   const toggleRowStatus = (id: string, currentStatus: CustomerStatus) => {
     if (currentStatus === "Locked") {
-      toast.warning("Tài khoản đang bị khóa, không thể thay đổi trạng thái!");
+      toast.warning("Tài khoản đang bị khóa, không thể thay đổi trạng thái!", {
+        toastId: `warn-${id}`,
+      });
       return;
     }
     setRecords((prev) =>
@@ -257,14 +272,18 @@ export function useCustomerManagement() {
           : r,
       ),
     );
-    toast.success("Đã thay đổi trạng thái khách hàng!");
+    toast.success("Đã thay đổi trạng thái khách hàng!", {
+      toastId: `status-${id}`,
+    });
   };
 
   const handleModalSubmit = (data: CustomerFormData) => {
     const { mode, editingRecord } = modalConfig;
 
     if (!data.fullName.trim() || !data.email.trim() || !data.username.trim()) {
-      toast.error("Vui lòng điền đầy đủ các thông tin bắt buộc.");
+      toast.error("Vui lòng điền đầy đủ các thông tin bắt buộc.", {
+        toastId: "err-req",
+      });
       return;
     }
 
@@ -279,13 +298,16 @@ export function useCustomerManagement() {
           username: data.username.trim(),
           customerType: data.customerType,
           status: data.status,
+          reviewAccess: data.reviewAccess,
           lastLogin: "Never",
           phone: data.phone.trim(),
         };
         nextIdCounter.current += 1;
         setRecords((prev) => [newRecord, ...prev]);
         setPagination((p) => ({ ...p, page: 1 }));
-        toast.success("Thêm khách hàng thành công!");
+        toast.success("Thêm khách hàng thành công!", {
+          toastId: "add-success",
+        });
       } else if (mode === "edit" && editingRecord) {
         setRecords((prev) =>
           prev.map((r) =>
@@ -298,15 +320,20 @@ export function useCustomerManagement() {
                   phone: data.phone.trim(),
                   customerType: data.customerType,
                   status: data.status,
+                  reviewAccess: data.reviewAccess,
                 }
               : r,
           ),
         );
-        toast.success("Cập nhật thông tin thành công!");
+        toast.success("Cập nhật thông tin thành công!", {
+          toastId: "edit-success",
+        });
       }
       actions.closeModal();
     } catch {
-      toast.error("Đã xảy ra lỗi trong quá trình lưu dữ liệu.");
+      toast.error("Đã xảy ra lỗi trong quá trình lưu dữ liệu.", {
+        toastId: "err-save",
+      });
       setModalConfig((prev) => ({ ...prev, isSubmitting: false }));
     }
   };
@@ -314,7 +341,6 @@ export function useCustomerManagement() {
   // nút bulk
   const bulkActions = {
     bulkActivate: () => {
-      // bỏ qua các bản ghi đang bị khóa
       const targets = records.filter(
         (r) => selectedIds.has(r.id) && r.status !== "Locked",
       );
@@ -327,7 +353,9 @@ export function useCustomerManagement() {
             : r,
         ),
       );
-      toast.success(`Đã kích hoạt ${targets.length} khách hàng!`);
+      toast.success(`Đã kích hoạt ${targets.length} khách hàng!`, {
+        toastId: "bulk-act",
+      });
       setSelectedIds(new Set());
     },
 
@@ -344,7 +372,9 @@ export function useCustomerManagement() {
             : r,
         ),
       );
-      toast.warning(`Đã vô hiệu hóa ${targets.length} khách hàng!`);
+      toast.warning(`Đã vô hiệu hóa ${targets.length} khách hàng!`, {
+        toastId: "bulk-deact",
+      });
       setSelectedIds(new Set());
     },
 

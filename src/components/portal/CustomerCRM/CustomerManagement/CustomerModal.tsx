@@ -1,10 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import "./CustomerModal.css";
+import { useClickOutside } from "../../../../hooks/common/useClickOutside";
+import { ChevronDownSmallIcon } from "../../../../assets/icons/CustomerManagementIcons";
 
 import type {
   CustomerRecord,
   CustomerFormData,
   CustomerStatus,
+  ReviewAccessStatus,
 } from "../../../../hooks/portal/CustomerCRM/CustomerManagement/useCustomerManagement";
 
 export interface CustomerModalProps {
@@ -38,11 +41,16 @@ function CustomerModalContent({
     customerType: "Standard",
     phone: initialData?.phone || "",
     status: initialData?.status || "Active",
+    reviewAccess: initialData?.reviewAccess || "Allowed",
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-  // đóng mở modal
+  // State và ref cho custom dropdown Customer Type
+  const [isTypeOpen, setIsTypeOpen] = useState(false);
+  const typeRef = useRef<HTMLDivElement>(null);
+  useClickOutside(typeRef, () => setIsTypeOpen(false));
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !isSubmitting) {
@@ -90,6 +98,13 @@ function CustomerModalContent({
     const newStatus: CustomerStatus =
       formData.status === "Active" ? "Inactive" : "Active";
     setFormData((prev) => ({ ...prev, status: newStatus }));
+  };
+
+  const toggleReviewAccess = () => {
+    if (isSubmitting) return;
+    const newAccess: ReviewAccessStatus =
+      formData.reviewAccess === "Allowed" ? "Restricted" : "Allowed";
+    setFormData((prev) => ({ ...prev, reviewAccess: newAccess }));
   };
 
   return (
@@ -188,30 +203,45 @@ function CustomerModalContent({
             </div>
           </div>
 
-          <div className="crm-form-group crm-full-width">
+          <div className="crm-form-group crm-full-width" ref={typeRef}>
             <label>
               Customer Type <span className="crm-required">*</span>
             </label>
-            <select
-              value={formData.customerType}
-              onChange={(e) =>
-                updateField(
-                  "customerType" as keyof CustomerFormData,
-                  e.target.value,
-                )
-              }
-              disabled={isSubmitting}
-              className={errors.customerType ? "crm-input-error" : ""}
-            >
-              <option value="" disabled>
-                Select Type
-              </option>
-              <option value="Standard">Standard</option>
-              <option value="Trade-in Customer">Trade-in Customer</option>
-              <option value="Silver">Silver</option>
-              <option value="Gold">Gold</option>
-              <option value="VIP">VIP</option>
-            </select>
+            <div className="crm-modal-dropdown-wrapper">
+              <div
+                className={`crm-modal-select-trigger ${isSubmitting ? "disabled" : ""} ${errors.customerType ? "error" : ""}`}
+                onClick={() => {
+                  if (!isSubmitting) setIsTypeOpen(!isTypeOpen);
+                }}
+              >
+                <span>{formData.customerType || "Select Type"}</span>
+                <ChevronDownSmallIcon className={isTypeOpen ? "open" : ""} />
+              </div>
+              {isTypeOpen && !isSubmitting && (
+                <div className="crm-modal-dropdown-options">
+                  {(
+                    [
+                      "Standard",
+                      "Trade-in Customer",
+                      "Silver",
+                      "Gold",
+                      "VIP",
+                    ] as const
+                  ).map((opt) => (
+                    <div
+                      key={opt}
+                      className={`crm-modal-dropdown-option ${formData.customerType === opt ? "active" : ""}`}
+                      onClick={() => {
+                        updateField("customerType", opt);
+                        setIsTypeOpen(false);
+                      }}
+                    >
+                      {opt}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             {errors.customerType && (
               <span className="crm-error-text">{errors.customerType}</span>
             )}
@@ -246,6 +276,21 @@ function CustomerModalContent({
                 disabled={isSubmitting || formData.status === "Locked"}
               ></button>
               <span className="crm-status-label">{formData.status}</span>
+            </div>
+          </div>
+
+          <div className="crm-form-group crm-full-width">
+            <label>Review Access</label>
+            <div className="crm-status-toggle-wrapper">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={formData.reviewAccess === "Allowed"}
+                className={`crm-toggle-switch ${formData.reviewAccess === "Allowed" ? "on" : ""}`}
+                onClick={toggleReviewAccess}
+                disabled={isSubmitting}
+              ></button>
+              <span className="crm-status-label">{formData.reviewAccess}</span>
             </div>
           </div>
         </div>

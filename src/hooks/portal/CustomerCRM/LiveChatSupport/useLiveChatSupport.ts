@@ -1,13 +1,13 @@
 import { useState, useMemo } from "react";
 import { toast } from "react-toastify";
 
-// định nghĩa các kiểu dữ liệu cho module chat
+// props
 export type ChatStatus = "Waitlist" | "Ongoing" | "Complete";
 export type MessageType = "text" | "image" | "product";
 
 export interface ChatMessage {
   id: string;
-  senderId: string; // 'system', 'customer', hoặc id của tư vấn viên
+  senderId: string;
   senderType: "customer" | "consultant" | "system";
   type: MessageType;
   content: string;
@@ -31,7 +31,7 @@ export interface ChatSession {
   messages: ChatMessage[];
 }
 
-// dữ liệu mẫu giả lập các phiên chat
+// mock data
 const MOCK_SESSIONS: ChatSession[] = [
   {
     id: "session_1",
@@ -126,7 +126,7 @@ export function useLiveChatSupport() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
-  // lọc danh sách chat theo tab trạng thái và từ khóa tìm kiếm
+  // lọc theo trạng thái và từ khóa tìm kiếm
   const filteredSessions = useMemo(() => {
     return sessions.filter((session) => {
       const matchStatus = session.status === activeTab;
@@ -141,7 +141,6 @@ export function useLiveChatSupport() {
     });
   }, [sessions, activeTab, searchQuery]);
 
-  // lấy chi tiết đoạn chat đang được chọn
   const activeSession = useMemo(() => {
     return sessions.find((s) => s.id === activeSessionId) || null;
   }, [sessions, activeSessionId]);
@@ -150,16 +149,11 @@ export function useLiveChatSupport() {
     // chuyển đổi tab trạng thái
     changeTab: (tab: ChatStatus) => {
       setActiveTab(tab);
-      setActiveSessionId(null); // Reset chat đang chọn khi đổi tab
+      setActiveSessionId(null);
     },
 
-    // cập nhật từ khóa tìm kiếm
     changeSearch: (query: string) => setSearchQuery(query),
-
-    // chọn một đoạn chat để xem chi tiết
     selectSession: (sessionId: string) => setActiveSessionId(sessionId),
-
-    // chuyển trạng thái từ Waitlist sang Ongoing (nhận tư vấn)
     acceptConsultant: (sessionId: string) => {
       setSessions((prev) =>
         prev.map((s) => (s.id === sessionId ? { ...s, status: "Ongoing" } : s)),
@@ -168,7 +162,6 @@ export function useLiveChatSupport() {
       setActiveTab("Ongoing");
     },
 
-    // chuyển trạng thái từ Ongoing sang Complete (hoàn thành)
     completeConsultant: (sessionId: string) => {
       setSessions((prev) =>
         prev.map((s) =>
@@ -179,13 +172,12 @@ export function useLiveChatSupport() {
       setActiveTab("Complete");
     },
 
-    // gửi tin nhắn mới (chỉ demo gửi text)
     sendMessage: (sessionId: string, text: string) => {
       if (!text.trim()) return;
 
       const newMessage: ChatMessage = {
         id: `msg_${Date.now()}`,
-        senderId: "cons_current", // giả định ID của tư vấn viên hiện tại
+        senderId: "cons_current",
         senderType: "consultant",
         type: "text",
         content: text.trim(),

@@ -1,0 +1,568 @@
+.ban-drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  animation: ban-fadeIn 0.2s ease-out;
+}
+
+.ban-drawer-container {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 650px;
+  max-width: 100vw;
+  background-color: #ffffff;
+  box-shadow: -4px 0 15px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  z-index: 1001;
+  font-family: "Lexend Exa", sans-serif;
+  animation: ban-slideInRight 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.ban-drawer-container * {
+  box-sizing: border-box;
+}
+
+.ban-drawer-header {
+  display: flex;
+  align-items: center;
+  padding: 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.ban-drawer-back-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-right: 16px;
+  color: #111827;
+}
+
+.ban-drawer-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0;
+  color: #111827;
+  flex: 1;
+}
+
+.ban-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ban-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ban-form-group label {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #000000;
+}
+
+.ban-required {
+  color: #ef4444;
+}
+
+.ban-form-input,
+.ban-form-textarea {
+  padding: 12px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.2s;
+}
+
+.ban-form-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.ban-form-input:focus,
+.ban-form-textarea:focus {
+  border-color: #000000;
+}
+
+.ban-form-input:disabled,
+.ban-form-textarea:disabled {
+  background-color: #f9fafb;
+  color: #9ca3af;
+}
+
+/* Dropdown Category Drawer */
+.ban-drawer-custom-dropdown {
+  position: relative;
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.95rem;
+  user-select: none;
+}
+
+.ban-drawer-dropdown-trigger {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #fff;
+  color: #374151;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ban-drawer-dropdown-trigger.disabled {
+  background-color: #f9fafb;
+  color: #9ca3af;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.ban-drawer-dropdown-trigger.active,
+.ban-drawer-dropdown-trigger:hover:not(.disabled) {
+  border-color: #000000;
+}
+
+.ban-drawer-dropdown-trigger svg {
+  transition: transform 0.2s ease;
+  margin-left: 8px;
+  width: 16px;
+  height: 16px;
+}
+
+.ban-drawer-dropdown-trigger svg.open {
+  transform: rotate(180deg);
+}
+
+.ban-drawer-dropdown-options {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 1050;
+  overflow: hidden;
+  animation: ban-slideFadeDown 0.2s ease-out forwards;
+  transform-origin: top center;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.ban-drawer-dropdown-option {
+  padding: 10px 16px;
+  cursor: pointer;
+  color: #374151;
+  transition: all 0.2s ease;
+}
+
+.ban-drawer-dropdown-option:hover {
+  background-color: #f3f4f6;
+  color: #111827;
+  padding-left: 20px;
+}
+
+.ban-drawer-dropdown-option.active {
+  background-color: #e9e9e9;
+  color: #000000;
+  font-weight: 600;
+}
+
+/* Upload Image */
+.ban-upload-box {
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  padding: 24px;
+  text-align: center;
+  background-color: #f9fafb;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.ban-upload-box:hover {
+  border-color: #000000;
+}
+
+.ban-upload-box p {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.ban-upload-preview {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.ban-upload-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ban-btn-remove-img {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ef4444;
+}
+
+/* SunEditor Wrapper */
+.ban-suneditor-wrapper {
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #d1d5db;
+}
+
+.ban-suneditor-wrapper.disabled {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.ban-drawer-body
+  .ban-suneditor-wrapper
+  .sun-editor
+  .se-wrapper
+  .sun-editor-editable {
+  min-height: 250px;
+}
+
+.ban-drawer-body .ban-suneditor-wrapper .sun-editor {
+  border: none;
+}
+
+/* SEO Preview */
+.ban-seo-preview {
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 4px;
+  font-family: Arial, sans-serif;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.ban-seo-url {
+  font-size: 14px;
+  color: #202124;
+  margin-bottom: 4px;
+}
+
+.ban-seo-title {
+  font-size: 20px;
+  color: #1a0dab;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ban-seo-title:hover {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ban-seo-desc {
+  font-size: 14px;
+  color: #4d5156;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Toggle Status */
+.ban-toggle-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ban-toggle-switch {
+  position: relative;
+  width: 48px;
+  height: 26px;
+  background-color: #d1d5db;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.ban-toggle-switch.on {
+  background-color: #000000;
+}
+
+.ban-toggle-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+
+.ban-toggle-switch.on::after {
+  transform: translateX(22px);
+}
+
+/* Footer Buttons */
+.ban-drawer-footer {
+  padding: 24px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  border-top: 1px solid #e5e7eb;
+  background-color: #ffffff;
+}
+
+.ban-btn-submit {
+  padding: 10px 24px;
+  background-color: #000000;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.ban-btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ban-btn-cancel {
+  padding: 10px 24px;
+  background-color: #ffffff;
+  color: #000000;
+  border: 1px solid #000000;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* Product Attached Tags */
+.ban-btn-attach-product {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: #ffffff;
+  color: #374151;
+  border: 1px dashed #d1d5db;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  margin-top: 8px;
+  width: max-content;
+}
+
+.ban-btn-attach-product:hover {
+  background-color: #f9fafb;
+  border-color: #000000;
+  color: #000000;
+}
+
+.ban-attached-products-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.ban-product-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background-color: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #374151;
+  font-weight: 500;
+}
+
+.ban-product-tag button {
+  background: none;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* Product Selection Modal */
+.ban-product-modal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1010;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ban-product-modal {
+  background: #ffffff;
+  width: 90%;
+  max-width: 400px;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ban-product-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.ban-product-modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ban-product-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.ban-product-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.ban-product-item:hover {
+  background-color: #f9fafb;
+}
+
+.ban-product-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.ban-product-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.ban-product-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.ban-product-price {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.ban-product-modal-btn {
+  padding: 10px;
+  background-color: #000000;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@keyframes ban-fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ban-slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes ban-slideFadeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

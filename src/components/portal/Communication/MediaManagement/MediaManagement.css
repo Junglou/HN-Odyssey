@@ -1,0 +1,561 @@
+.mm-container {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2vw, 20px);
+  font-family: "Lexend Exa", sans-serif;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.mm-container * {
+  box-sizing: border-box;
+}
+
+.mm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: clamp(12px, 1.5vw, 16px);
+}
+
+.mm-title {
+  font-size: clamp(1.4rem, 2.5vw, 1.8rem);
+  font-weight: 800;
+  margin: 0 0 4px 0;
+  color: #111827;
+}
+
+.mm-breadcrumb {
+  font-size: clamp(0.75rem, 1vw, 0.85rem);
+  color: #666;
+  margin: 0;
+}
+
+.mm-btn-upload {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  padding: clamp(8px, 1.5vw, 10px) clamp(16px, 2.5vw, 20px);
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: clamp(0.85rem, 1vw, 0.95rem);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.mm-btn-upload:hover {
+  background-color: #2563eb;
+}
+
+.mm-filters-card {
+  background-color: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: clamp(16px, 2vw, 20px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2vw, 20px);
+  width: 100%;
+}
+
+.mm-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2vw, 20px);
+  width: 100%;
+}
+
+.mm-filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(10px, 1.5vw, 16px);
+  align-items: stretch;
+  width: 100%;
+}
+
+.mm-search-wrapper {
+  flex: 3 1 200px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0 16px;
+  background-color: #fff;
+  transition: border-color 0.2s;
+  color: #9ca3af;
+}
+
+.mm-search-wrapper:focus-within {
+  border-color: #3b82f6;
+}
+
+.mm-filter-input {
+  border: none;
+  outline: none;
+  width: 100%;
+  padding: clamp(8px, 1.2vw, 10px) 0;
+  font-family: inherit;
+  font-size: clamp(0.85rem, 1vw, 0.95rem);
+  background-color: transparent;
+}
+
+/* Các tùy chỉnh Dropdown sao chép từ CustomerManagement */
+.mm-custom-dropdown {
+  flex: 1 1 130px;
+  position: relative;
+  font-family: inherit;
+  font-size: clamp(0.85rem, 1vw, 0.95rem);
+  user-select: none;
+}
+
+.mm-dropdown-trigger {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: clamp(8px, 1.2vw, 10px) 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #fff;
+  color: #111827;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  height: 100%;
+  white-space: nowrap;
+}
+
+.mm-dropdown-trigger.active,
+.mm-dropdown-trigger:hover {
+  border-color: #000000;
+}
+
+.mm-dropdown-arrow {
+  transition: transform 0.3s ease;
+  margin-left: 8px;
+}
+
+.mm-dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.mm-dropdown-options {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  overflow: hidden;
+  animation: mm-slideFadeIn 0.2s ease-out forwards;
+  transform-origin: top center;
+}
+
+.mm-dropdown-option {
+  padding: 10px 16px;
+  cursor: pointer;
+  color: #374151;
+  transition: background-color 0.2s;
+}
+
+.mm-dropdown-option:hover {
+  background-color: #f3f4f6;
+}
+
+.mm-dropdown-option.active {
+  background-color: #e9e9e9;
+  color: #000000;
+  font-weight: 600;
+}
+
+.mm-btn-clear {
+  flex: 1 1 auto;
+  padding: clamp(8px, 1.2vw, 10px) 20px;
+  background-color: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: clamp(0.85rem, 1vw, 0.95rem);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  font-family: inherit;
+  color: #374151;
+}
+
+.mm-btn-clear:hover {
+  background-color: #f9fafb;
+  border-color: #000000;
+}
+
+.mm-dropzone {
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  padding: 32px;
+  text-align: center;
+  background-color: #f9fafb;
+  transition: all 0.2s ease;
+}
+
+.mm-dropzone.dragging {
+  border-color: #3b82f6;
+  background-color: #eff6ff;
+}
+
+.mm-dropzone p {
+  margin: 0;
+  color: #374151;
+  font-weight: 500;
+}
+
+.mm-browse-text {
+  color: #3b82f6;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.mm-dropzone-sub {
+  font-size: 0.85rem;
+  color: #6b7280 !important;
+  margin-top: 8px !important;
+}
+
+.mm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+/* Các style của thẻ Image Card nhúng trực tiếp */
+.mm-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #ffffff;
+  transition: box-shadow 0.2s;
+}
+
+.mm-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.mm-card-thumbnail {
+  position: relative;
+  height: 160px;
+  background-color: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.mm-card-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mm-card-view-btn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background-color: rgba(255, 255, 255, 0.8);
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #374151;
+  transition: background-color 0.2s;
+}
+
+.mm-card-view-btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.mm-card-view-btn:hover {
+  background-color: #ffffff;
+}
+
+.mm-card-primary-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background-color: #3b82f6;
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mm-card-info {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mm-card-filename {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mm-card-badges {
+  display: flex;
+  gap: 8px;
+}
+
+.mm-card-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.type-badge {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.status-badge.published {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.status-badge.draft {
+  background-color: #f3f4f6;
+  color: #4b5563;
+}
+
+.status-badge.hidden {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.mm-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-top: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+}
+
+.mm-action-btn {
+  background: none;
+  border: none;
+  font-size: 0.75rem;
+  color: #6b7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  transition: color 0.2s;
+}
+
+.mm-action-btn:hover:not(:disabled) {
+  color: #111827;
+}
+
+.mm-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mm-action-btn.delete-btn:hover {
+  color: #ef4444;
+}
+
+.mm-empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* Các style của Pagination sao chép từ CustomerManagement */
+.mm-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 10px;
+  font-size: clamp(0.8rem, 1vw, 0.9rem);
+  font-weight: 500;
+  color: #374151;
+  gap: 16px;
+}
+
+.mm-page-numbers {
+  display: flex;
+  gap: clamp(4px, 1vw, 8px);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.mm-page-num {
+  width: clamp(26px, 2.5vw, 30px);
+  height: clamp(26px, 2.5vw, 30px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  cursor: pointer;
+  background-color: transparent;
+  border: none;
+  font-family: inherit;
+  font-weight: 600;
+  color: #374151;
+}
+
+.mm-page-num.active {
+  background-color: #f3f4f6;
+  font-weight: 700;
+}
+
+.mm-page-num:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.mm-limit-dropdown {
+  position: relative;
+  font-family: inherit;
+  font-size: 0.9rem;
+  user-select: none;
+  margin-left: 8px;
+}
+
+.mm-limit-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #fff;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+  box-sizing: border-box;
+  font-weight: 500;
+}
+
+.mm-limit-trigger:hover,
+.mm-limit-trigger.active {
+  border-color: #111827;
+  background-color: #f9fafb;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  color: #111827;
+}
+
+.mm-limit-icon {
+  display: flex;
+  align-items: center;
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.mm-limit-icon.open {
+  transform: rotate(180deg);
+}
+
+.mm-limit-options {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 100%;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  overflow: hidden;
+  animation: mm-slideFadeDown 0.25s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  transform-origin: top center;
+}
+
+.mm-limit-option {
+  padding: 10px 16px;
+  cursor: pointer;
+  color: #4b5563;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.mm-limit-option:hover {
+  background-color: #f3f4f6;
+  color: #111827;
+  padding-left: 20px;
+}
+
+.mm-limit-option.active {
+  background-color: #e9e9e9;
+  color: #000000;
+  font-weight: 700;
+}
+
+.mm-card-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background-color: #000000;
+}
+
+.mm-action-btn.disabled,
+.mm-action-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  background-color: #f9fafb;
+}
+
+.mm-action-btn.disabled:hover,
+.mm-action-btn:disabled:hover {
+  background-color: #f9fafb;
+  border-color: transparent;
+  color: #6b7280;
+}
+
+@keyframes mm-slideFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes mm-slideFadeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

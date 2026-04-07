@@ -33,6 +33,13 @@ import CustomerManagementPage from "../pages/portal/CustomerCRM/CustomerManageme
 import LiveChatSupportPage from "../pages/portal/CustomerCRM/LiveChatSupport/LiveChatSupportPage";
 
 import PromotionManagementPage from "../pages/portal/MarketingSuite/PromotionManagement/PromotionManagementPage";
+import ReviewAndRatingManagementPage from "../pages/portal/MarketingSuite/ReviewAndRatingManagement/ReviewAndRatingManagementPage";
+import CouponManagementPage from "../pages/portal/MarketingSuite/CouponManagement/CouponManagementPage";
+
+import StaticPageManagementPage from "../pages/portal/Communication/StaticPageManagement/StaticPageManagementPage";
+import MediaManagementPage from "../pages/portal/Communication/MediaManagement/MediaManagementPage";
+import BannerManagementPage from "../pages/portal/Communication/BannerManagement/BannerManagementPage";
+import BlogNewsManagementPage from "../pages/portal/Communication/BlogNewsManagement/BlogNewsManagementPage";
 
 export const router = createBrowserRouter([
   // route auth
@@ -171,6 +178,30 @@ export const router = createBrowserRouter([
       {
         path: "promotion",
         element: <PromotionManagementPage />,
+      },
+      {
+        path: "review-rating",
+        element: <ReviewAndRatingManagementPage />,
+      },
+      {
+        path: "coupon",
+        element: <CouponManagementPage />,
+      },
+      {
+        path: "static-pages",
+        element: <StaticPageManagementPage />,
+      },
+      {
+        path: "media-management",
+        element: <MediaManagementPage />,
+      },
+      {
+        path: "banner-management",
+        element: <BannerManagementPage />,
+      },
+      {
+        path: "blog-news",
+        element: <BlogNewsManagementPage />,
       },
     ],
   },

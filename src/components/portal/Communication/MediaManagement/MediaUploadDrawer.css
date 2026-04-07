@@ -1,0 +1,425 @@
+/* kế thừa phong cách overlay của CustomerModal */
+.mm-drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  animation: mm-fadeIn 0.2s ease-out;
+}
+
+/* đổi thành dạng trượt từ phải sang (Drawer) thay vì Modal giữa màn hình */
+.mm-drawer-container {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 450px;
+  max-width: 100vw;
+  background-color: #ffffff;
+  box-shadow: -4px 0 15px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  z-index: 1001;
+  font-family: "Lexend Exa", sans-serif;
+  animation: mm-slideInRight 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.mm-drawer-container * {
+  box-sizing: border-box;
+}
+
+.mm-drawer-header {
+  display: flex;
+  align-items: center;
+  padding: 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.mm-drawer-back-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-right: 16px;
+  display: flex;
+  align-items: center;
+  color: #111827;
+}
+
+.mm-drawer-back-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mm-drawer-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0;
+  color: #111827;
+  flex: 1;
+  text-align: right;
+}
+
+.mm-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.mm-drawer-preview-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.mm-drawer-preview-box {
+  width: 120px;
+  height: 90px;
+  background-color: #f3f4f6;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mm-drawer-preview-box img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.mm-drawer-filename {
+  flex: 1;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #111827;
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mm-drawer-section {
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.mm-drawer-section:last-child {
+  margin-bottom: 0;
+}
+
+.mm-section-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px dashed #d1d5db;
+}
+
+/* các form input kế thừa chuẩn của CustomerManagement */
+.mm-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mm-form-group label {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #000000;
+}
+
+.mm-required {
+  color: #e1251b;
+  margin-left: 2px;
+}
+
+.mm-form-group textarea,
+.mm-form-group input[type="text"] {
+  padding: 12px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  outline: none;
+  color: #333333;
+  transition: border-color 0.2s ease;
+  background-color: #ffffff;
+  width: 100%;
+}
+
+.mm-form-group textarea {
+  resize: vertical;
+}
+
+.mm-form-group textarea:focus:not(:disabled),
+.mm-form-group input[type="text"]:focus:not(:disabled) {
+  border-color: #000000;
+}
+
+.mm-form-group textarea:disabled,
+.mm-form-group input[type="text"]:disabled {
+  background-color: #f9fafb;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.mm-input-error {
+  border-color: #ef4444 !important;
+}
+
+.mm-error-text {
+  color: #ef4444;
+  font-size: 0.8rem;
+  margin-top: -4px;
+}
+
+/* toggle Switch mượt mà giống CustomerModal */
+.mm-status-toggle-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.mm-toggle-switch {
+  width: 48px;
+  height: 26px;
+  border-radius: 20px;
+  position: relative;
+  cursor: pointer;
+  background-color: #d1d5db;
+  border: 1px solid transparent;
+  transition: background-color 0.3s ease;
+  padding: 0;
+}
+
+.mm-toggle-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: #ffffff;
+  border-radius: 50%;
+  transition: transform 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.mm-toggle-switch.on {
+  background-color: #6b46c1; /* màu tím đặc trưng */
+}
+
+.mm-toggle-switch.on::after {
+  transform: translateX(22px);
+}
+
+.mm-toggle-switch:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.mm-status-label {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #000000;
+}
+
+/* footer chứa nút giống CustomerModal */
+.mm-drawer-footer {
+  padding: 24px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  border-top: 1px solid #e5e7eb;
+  background-color: #ffffff;
+}
+
+.mm-btn-submit {
+  order: 1;
+  padding: 10px 24px;
+  background-color: #cccccc;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #ffffff;
+  cursor: not-allowed;
+  font-family: inherit;
+  transition: all 0.3s ease;
+}
+
+.mm-btn-submit.active {
+  background-color: #000000;
+  cursor: pointer;
+}
+
+.mm-btn-submit.active:hover {
+  background-color: #333333;
+}
+
+.mm-btn-submit:disabled:not(.active) {
+  opacity: 0.7;
+}
+
+.mm-btn-cancel {
+  order: 2;
+  padding: 10px 24px;
+  background-color: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #000000;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.mm-btn-cancel:hover:not(:disabled) {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+.mm-btn-cancel:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  border-color: #cccccc;
+  color: #cccccc;
+}
+
+@keyframes mm-fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes mm-slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* css cho Autocomplete Dropdown với Animation */
+.mm-autocomplete-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.mm-autocomplete-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 100%;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 1002;
+  max-height: 200px;
+  overflow-y: auto;
+  animation: mm-slideDownFade 0.2s ease-out forwards;
+  transform-origin: top center;
+}
+
+.mm-autocomplete-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #374151;
+  border-bottom: 1px solid #f3f4f6;
+  transition: all 0.2s ease;
+}
+
+.mm-autocomplete-item:last-child {
+  border-bottom: none;
+}
+
+.mm-autocomplete-item:hover {
+  background-color: #f9fafb;
+  color: #111827;
+  font-weight: 600;
+}
+
+.mm-autocomplete-empty {
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  color: #6b7280;
+  text-align: center;
+}
+
+/* đánh dấu mục đang được chọn trong danh sách xổ xuống */
+.mm-autocomplete-item.active {
+  background-color: #e9e9e9;
+  color: #000000;
+  font-weight: 600;
+}
+
+@keyframes mm-slideDownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* định dạng thẻ trigger của custom dropdown giống hệt thẻ input */
+.mm-drawer-select-trigger {
+  padding: 12px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  background-color: #ffffff;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  color: #333333;
+  transition: border-color 0.2s ease;
+}
+
+.mm-drawer-select-trigger:hover:not(.disabled) {
+  border-color: #000000;
+}
+
+.mm-drawer-select-trigger.disabled {
+  background-color: #f9fafb;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.mm-drawer-select-trigger svg {
+  transition: transform 0.2s ease;
+}
+
+.mm-drawer-select-trigger svg.open {
+  transform: rotate(180deg);
+}

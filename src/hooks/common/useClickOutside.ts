@@ -1,27 +1,41 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 // Định nghĩa kiểu Ref mở rộng để tương thích với cả RefObject và MutableRefObject, tránh lỗi TypeScript
 export const useClickOutside = <T extends HTMLElement>(
   ref: { current: T | null },
   handler: (event: MouseEvent | TouchEvent) => void,
 ) => {
+  const isStartedInsideRef = useRef(false);
+
   useEffect(() => {
-    const listener = (event: MouseEvent | TouchEvent) => {
-      // Bỏ qua nếu tham chiếu không tồn tại hoặc người dùng nhấp chuột vào bên trong phần tử
-      if (!ref.current || ref.current.contains(event.target as Node)) {
-        return;
-      }
-      handler(event);
+    const handleMouseDown = (event: MouseEvent | TouchEvent) => {
+      if (!ref.current) return;
+      isStartedInsideRef.current = ref.current.contains(event.target as Node);
     };
 
-    // Lắng nghe cả sự kiện nhấp chuột trên máy tính và chạm trên thiết bị di động
-    document.addEventListener("mousedown", listener);
-    document.addEventListener("touchstart", listener);
+    const handleMouseUp = (event: MouseEvent | TouchEvent) => {
+      if (!ref.current) return;
 
-    // Dọn dẹp sự kiện khi component bị hủy để tránh rò rỉ bộ nhớ
+      const isEndedInside = ref.current.contains(event.target as Node);
+
+      if (!isStartedInsideRef.current && !isEndedInside) {
+        handler(event);
+      }
+
+      isStartedInsideRef.current = false;
+    };
+
+    document.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("touchstart", handleMouseDown);
+
+    document.addEventListener("mouseup", handleMouseUp);
+    document.addEventListener("touchend", handleMouseUp);
+
     return () => {
-      document.removeEventListener("mousedown", listener);
-      document.removeEventListener("touchstart", listener);
+      document.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("touchstart", handleMouseDown);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.removeEventListener("touchend", handleMouseUp);
     };
   }, [ref, handler]);
 };

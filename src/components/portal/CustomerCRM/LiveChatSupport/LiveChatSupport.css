@@ -134,7 +134,7 @@
   border-color: #3b82f6;
 }
 
-/* khu vực danh sách các cuộc hội thoại cho phép cuộn độc lập */
+/* danh sách hội thoại */
 .lcs-session-list {
   flex: 1;
   overflow-y: auto;
@@ -157,7 +157,7 @@
   background-color: #eff6ff;
 }
 
-/* avatar giả lập bằng vòng tròn */
+/* avatar giả lập */
 .lcs-avatar-circle {
   width: 40px;
   height: 40px;
@@ -221,7 +221,7 @@
   font-size: 0.9rem;
 }
 
-/* cột phải: khu vực hiển thị chi tiết nội dung tin nhắn */
+/* cột phải: chi tiết nội dung tin nhắn */
 .lcs-chat-area {
   flex: 1;
   display: flex;
@@ -238,7 +238,7 @@
   font-size: 1rem;
 }
 
-/* header trong khung chat hiển thị thông tin người đang nhắn */
+/* header khung chat / thông tin người dùng hiện tại */
 .lcs-chat-header {
   display: flex;
   justify-content: space-between;
@@ -286,7 +286,6 @@
   opacity: 0.9;
 }
 
-/* khu vực cuộn chứa các đoạn hội thoại */
 .lcs-chat-messages {
   flex: 1;
   padding: 24px;
@@ -319,7 +318,7 @@
   margin-left: 12px;
 }
 
-/* định dạng chung cho từng dòng tin nhắn */
+/* định dạng chung cho tin nhắn */
 .lcs-message-row {
   display: flex;
   align-items: flex-end;
@@ -355,7 +354,7 @@
   background-color: #ea580c;
 }
 
-/* định dạng khối bong bóng tin nhắn */
+/* định dạng khối tin nhắn */
 .lcs-message-content {
   padding: 12px 16px;
   border-radius: 20px;
@@ -366,7 +365,6 @@
   margin: 0;
 }
 
-/* phân tách màu nền bong bóng giữa khách hàng và tư vấn viên */
 .customer-bg {
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
@@ -388,7 +386,7 @@
   display: block;
 }
 
-/* định dạng hiển thị thẻ thông tin sản phẩm đính kèm */
+/* định dạng hiển thị thông tin sản phẩm đính kèm */
 .lcs-product-card {
   margin-top: 10px;
   background-color: #ffffff;
@@ -437,7 +435,7 @@
   margin-bottom: 4px;
 }
 
-/* thanh nhập tin nhắn bên dưới */
+/* thanh nhập tin nhắn */
 .lcs-chat-input-area {
   padding: 16px 24px;
   background-color: #ffffff;
@@ -527,7 +525,7 @@
   user-select: none;
 }
 
-/* cấu hình responsive cho màn hình nhỏ và thiết bị di động */
+/* responsive */
 @media (max-width: 900px) {
   .lcs-container {
     flex-direction: column;
@@ -536,13 +534,13 @@
   }
 
   .lcs-sidebar {
-    width: 100%; /* do không bị style inline đè nữa nên nó sẽ nhận 100% một cách tự nhiên */
+    width: 100%;
     border-right: none;
     border-bottom: 1px solid #e5e7eb;
   }
 
   .lcs-resizer {
-    display: none; /* ẩn thanh kéo trên thiết bị nhỏ */
+    display: none;
   }
 
   .lcs-session-list {
