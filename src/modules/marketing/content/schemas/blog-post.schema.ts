@@ -10,6 +10,10 @@ export enum PostStatus {
 
 @Schema({ timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } })
 export class BlogPost extends Document {
+  // AC1: Gán thông tin tác giả
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
+  author_id: Types.ObjectId;
+
   @Prop({ required: true, trim: true })
   title: string;
 

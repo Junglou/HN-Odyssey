@@ -16,6 +16,8 @@ class OrderItem {
   quantity: number;
   @Prop()
   image: string;
+  @Prop()
+  variant_name?: string;
 }
 
 @Schema()

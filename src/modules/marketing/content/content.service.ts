@@ -103,6 +103,15 @@ export class ContentService {
   async createPost(dto: CreatePostDto, userId: string, email: string) {
     await this.checkSlugExist(dto.slug);
 
+    // AC6: Tự động trích xuất meta_description từ content nếu bị trống
+    if (!dto.meta_description && dto.content) {
+      const plainText = dto.content.replace(/<[^>]*>?/gm, '').trim();
+      dto.meta_description =
+        plainText.length > 150
+          ? plainText.substring(0, 150).trim() + '...'
+          : plainText;
+    }
+
     let initialStatus = dto.status || PostStatus.DRAFT;
     if (dto.published_at && new Date(dto.published_at) > new Date()) {
       initialStatus = PostStatus.SCHEDULED;
@@ -110,6 +119,7 @@ export class ContentService {
 
     const newPost = new this.postModel({
       ...dto,
+      author_id: new Types.ObjectId(userId),
       status: initialStatus,
     });
 
@@ -490,6 +500,15 @@ export class ContentService {
       post.status = PostStatus.SCHEDULED;
     }
 
+    // AC6: Tự động trích xuất meta_description từ content nếu bị trống
+    if (!dto.meta_description && dto.content) {
+      const plainText = dto.content.replace(/<[^>]*>?/gm, '').trim();
+      dto.meta_description =
+        plainText.length > 150
+          ? plainText.substring(0, 150).trim() + '...'
+          : plainText;
+    }
+
     const updatedPost = await post.save();
 
     await this.auditLogsService.log({
@@ -616,6 +635,13 @@ export class ContentService {
 
     for (const file of files) {
       const isVideo = file.mimetype.startsWith('video/');
+      const allowedImageMimeTypes = ['image/jpeg', 'image/png', 'image/webp']; // AC3: Chỉ cho phép định dạng ảnh phổ biến
+
+      if (!isVideo && !allowedImageMimeTypes.includes(file.mimetype)) {
+        throw new BadRequestException(
+          `Định dạng file "${file.originalname}" không được hỗ trợ. Chỉ cho phép JPG, PNG, WEBP.`,
+        );
+      }
 
       // Kiểm tra dung lượng
       if (!isVideo && file.size > maxImageSize) {
