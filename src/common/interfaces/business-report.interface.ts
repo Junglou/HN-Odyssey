@@ -1,3 +1,5 @@
+import { Types } from 'mongoose';
+
 // REVENUE & CASH FLOW (US1)
 export interface IRevenueTimelineAgg {
   _id: string; // "2023-10-01" hoặc "14" (giờ)
@@ -174,4 +176,65 @@ export interface IRetentionReport {
   cohortHeatmap: Record<string, Record<string, number>>; // AC7
   loyaltyRetention: ILoyaltyTierRetention[]; // AC8: So sánh hạng thành viên
   retentionTrend: ITimelineTrend[]; // AC9: Xu hướng giữ chân theo thời gian
+}
+
+//  GIAO DIỆN KẾT QUẢ AGGREGATION MONGODB
+
+export interface IRevenueTimeSeries {
+  _id: string; // VD: "2026-03-19" hoặc "2026-03"
+  total_revenue: number;
+  total_orders: number;
+}
+
+export interface IHeatmapData {
+  _id: {
+    day_of_week: number; // 1 (Chủ nhật) -> 7 (Thứ 7)
+    hour: number; // 0 -> 23
+  };
+  order_count: number;
+  revenue: number;
+}
+
+export interface IGeoAnalysisData {
+  _id: string; // city_code hoặc province name
+  total_revenue: number;
+  order_count: number;
+}
+
+export interface IBasketAnalysisResult {
+  _id: {
+    product_a: Types.ObjectId;
+    product_b: Types.ObjectId;
+  };
+  frequency: number; // Số lần xuất hiện cùng nhau
+}
+
+export interface IProductTrend {
+  _id: string; // SKU hoặc Product ID
+  product_name: string;
+  total_sold: number;
+  revenue: number;
+}
+
+export interface IInventorySalesCorrelation {
+  _id: Types.ObjectId;
+  sku: string;
+  productName: string;
+  totalSold: number;
+  currentStock: number;
+  turnoverRate: number; // Tốc độ luân chuyển
+  classification: 'HIGH_DEMAND' | 'SLOW_MOVING' | 'NORMAL';
+}
+
+export interface IYoYComparison {
+  period: string; // VD: "Tháng 1", "Tháng 2"
+  currentRevenue: number;
+  previousRevenue: number;
+  growthRate: number; // %
+}
+
+export interface IForecastData {
+  period: string; // VD: "2026-05"
+  actualRevenue: number | null;
+  forecastedRevenue: number;
 }

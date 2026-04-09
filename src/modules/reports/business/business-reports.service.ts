@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, PipelineStage, Types } from 'mongoose';
+import { Model, PipelineStage, Types, FilterQuery } from 'mongoose';
 import {
   Order,
   OrderDocument,
@@ -23,9 +23,20 @@ import {
   IVipCustomer,
   IConversionReport,
   IBounceAndAbandonmentReport,
+  IRevenueTimeSeries,
+  IHeatmapData,
+  IGeoAnalysisData,
+  IBasketAnalysisResult,
+  IInventorySalesCorrelation,
+  IYoYComparison,
+  IForecastData,
 } from 'src/common/interfaces/business-report.interface';
 import { User } from 'src/modules/users/schemas/user.schema';
 import { PriceHistory } from 'src/modules/products/catalog/schemas/price-history.schema.ts';
+import {
+  ReportFilterDto,
+  TimeInterval,
+} from 'src/common/dtos/report-filter.dto';
 
 interface IRevenueFacetResult {
   timeline: IRevenueTimelineAgg[];
@@ -1207,5 +1218,339 @@ export class BusinessReportsService {
         })),
       },
     };
+  }
+
+  // Helper tạo match condition chung cho các báo cáo doanh thu
+  // Chỉ tính các đơn hàng đã thành công/hoàn tất
+
+  private buildBaseMatchStage(dto: ReportFilterDto): PipelineStage.Match {
+    const matchStage: FilterQuery<Order> = {
+      status: { $in: ['COMPLETED', 'DELIVERED'] },
+      createdAt: {
+        $gte: new Date(dto.startDate),
+        $lte: new Date(dto.endDate),
+      },
+    };
+
+    // 2. DASHBOARD AC8: Lọc số liệu theo chiến dịch (Campaign)
+    if (dto.campaign_id && Types.ObjectId.isValid(dto.campaign_id)) {
+      matchStage['campaign_id'] = new Types.ObjectId(dto.campaign_id);
+    }
+
+    // 3. TIME-SERIES AC4: Phân tích xu hướng bán hàng theo TỪNG SẢN PHẨM
+    if (dto.product_id && Types.ObjectId.isValid(dto.product_id)) {
+      matchStage['items.product_id'] = new Types.ObjectId(dto.product_id);
+    }
+
+    return { $match: matchStage };
+  }
+
+  // BI - AC1 & AC2 (Time Series): Phân tích xu hướng bán hàng
+
+  async getRevenueTimeSeries(
+    dto: ReportFilterDto,
+  ): Promise<IRevenueTimeSeries[]> {
+    let dateFormat = '%Y-%m-%d'; // Mặc định nhóm theo ngày
+    if (dto.interval === TimeInterval.MONTH) dateFormat = '%Y-%m';
+    if (dto.interval === TimeInterval.YEAR) dateFormat = '%Y';
+
+    return this.orderModel.aggregate<IRevenueTimeSeries>([
+      this.buildBaseMatchStage(dto),
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: dateFormat,
+              date: '$createdAt',
+              timezone: 'Asia/Ho_Chi_Minh', // Setup múi giờ VN chuẩn
+            },
+          },
+          total_revenue: { $sum: '$total_amount' },
+          total_orders: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } }, // Sắp xếp theo trục thời gian tiến tới
+    ]);
+  }
+
+  // BI - AC2 (Heatmap): Biểu đồ nhiệt theo Thứ và Giờ
+  async getShoppingHeatmap(dto: ReportFilterDto): Promise<IHeatmapData[]> {
+    return this.orderModel.aggregate<IHeatmapData>([
+      this.buildBaseMatchStage(dto),
+      {
+        $project: {
+          day_of_week: {
+            $dayOfWeek: { date: '$createdAt', timezone: 'Asia/Ho_Chi_Minh' },
+          },
+          hour: { $hour: { date: '$createdAt', timezone: 'Asia/Ho_Chi_Minh' } },
+          total_amount: 1,
+        },
+      },
+      {
+        $group: {
+          _id: { day_of_week: '$day_of_week', hour: '$hour' },
+          order_count: { $sum: 1 },
+          revenue: { $sum: '$total_amount' },
+        },
+      },
+      { $sort: { '_id.day_of_week': 1, '_id.hour': 1 } },
+    ]);
+  }
+
+  // BI - AC8 (Geo Analysis): Phân tích theo khu vực địa lý
+
+  async getRevenueByGeography(
+    dto: ReportFilterDto,
+  ): Promise<IGeoAnalysisData[]> {
+    return this.orderModel.aggregate<IGeoAnalysisData>([
+      this.buildBaseMatchStage(dto),
+      {
+        $group: {
+          _id: '$shipping_info.city_code', // Nhóm theo mã Tỉnh/Thành phố
+          total_revenue: { $sum: '$total_amount' },
+          order_count: { $sum: 1 },
+        },
+      },
+      { $sort: { total_revenue: -1 } }, // Xếp từ cao xuống thấp để vẽ biểu đồ cột/bản đồ
+    ]);
+  }
+
+  // BI - AC7 (Basket Analysis): Phân tích cặp sản phẩm mua kèm
+  // Tìm các sản phẩm thường xuyên được mua cùng nhau trong 1 đơn hàng
+
+  async getBasketAnalysis(
+    dto: ReportFilterDto,
+  ): Promise<IBasketAnalysisResult[]> {
+    return this.orderModel.aggregate<IBasketAnalysisResult>([
+      this.buildBaseMatchStage(dto),
+      // Lọc các đơn có từ 2 sản phẩm trở lên
+      { $match: { 'items.1': { $exists: true } } },
+      // Tạo self-join nhẹ: nhân bản array items để tạo cặp (A, B)
+      {
+        $project: { items1: '$items.product_id', items2: '$items.product_id' },
+      },
+      { $unwind: '$items1' },
+      { $unwind: '$items2' },
+      // Loại bỏ cặp trùng nhau (A-A) và chuẩn hóa (A-B tương đương B-A)
+      { $match: { $expr: { $lt: ['$items1', '$items2'] } } },
+      {
+        $group: {
+          _id: { product_a: '$items1', product_b: '$items2' },
+          frequency: { $sum: 1 },
+        },
+      },
+      { $sort: { frequency: -1 } },
+      { $limit: 20 }, // Lấy Top 20 cặp hay mua chung nhất
+    ]);
+  }
+
+  // BI - AC3: Phân tích tương quan Tồn kho và Doanh số (Scatter Plot)
+  // Giúp nhận diện hàng Bán chậm (Slow moving) và Cháy hàng (High demand)
+
+  async getInventorySalesCorrelation(
+    dto: ReportFilterDto,
+  ): Promise<IInventorySalesCorrelation[]> {
+    interface IRawCorrelation {
+      _id: Types.ObjectId;
+      totalSold: number;
+      productInfo: { sku: string; name: string; stock: number }[];
+    }
+
+    const rawData = await this.orderModel.aggregate<IRawCorrelation>([
+      {
+        $match: {
+          status: { $in: ['COMPLETED', 'DELIVERED'] },
+          createdAt: {
+            $gte: new Date(dto.startDate),
+            $lte: new Date(dto.endDate),
+          },
+        },
+      },
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: '$items.product_id',
+          totalSold: { $sum: '$items.quantity' },
+        },
+      },
+      {
+        $lookup: {
+          from: 'products',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'productInfo',
+        },
+      },
+      { $match: { 'productInfo.0': { $exists: true } } },
+    ]);
+
+    return rawData.map((item) => {
+      const p = item.productInfo[0];
+      // Dùng công thức đơn giản hóa vì ta không track tồn kho trung bình kỳ trong hàm này
+      const turnoverRate =
+        p.stock + item.totalSold > 0
+          ? item.totalSold / (p.stock + item.totalSold)
+          : 0;
+
+      let classification: 'HIGH_DEMAND' | 'SLOW_MOVING' | 'NORMAL' = 'NORMAL';
+      if (turnoverRate > 0.8 && p.stock < 10) classification = 'HIGH_DEMAND';
+      if (turnoverRate < 0.1 && p.stock > 50) classification = 'SLOW_MOVING';
+
+      return {
+        _id: item._id,
+        sku: p.sku,
+        productName: p.name,
+        totalSold: item.totalSold,
+        currentStock: p.stock,
+        turnoverRate: Number((turnoverRate * 100).toFixed(2)),
+        classification,
+      };
+    });
+  }
+
+  // BI - AC4 & Time-series AC2: So sánh cùng kỳ (YoY Analysis)
+
+  async getYoYComparison(currentYearStr: string): Promise<IYoYComparison[]> {
+    const currentYear = parseInt(currentYearStr, 10);
+    const previousYear = currentYear - 1;
+
+    interface IMonthlyRevenue {
+      _id: number; // Tháng (1-12)
+      revenue: number;
+    }
+
+    const getYearlyData = async (year: number) => {
+      return this.orderModel.aggregate<IMonthlyRevenue>([
+        {
+          $match: {
+            status: { $in: ['COMPLETED', 'DELIVERED'] },
+            createdAt: {
+              $gte: new Date(`${year}-01-01T00:00:00.000Z`),
+              $lte: new Date(`${year}-12-31T23:59:59.999Z`),
+            },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              $month: { date: '$createdAt', timezone: 'Asia/Ho_Chi_Minh' },
+            },
+            revenue: { $sum: '$total_amount' },
+          },
+        },
+      ]);
+    };
+
+    const [currentData, previousData] = await Promise.all([
+      getYearlyData(currentYear),
+      getYearlyData(previousYear),
+    ]);
+
+    const result: IYoYComparison[] = [];
+    for (let month = 1; month <= 12; month++) {
+      const curr = currentData.find((d) => d._id === month)?.revenue || 0;
+      const prev = previousData.find((d) => d._id === month)?.revenue || 0;
+      const growthRate =
+        prev > 0 ? ((curr - prev) / prev) * 100 : curr > 0 ? 100 : 0;
+
+      result.push({
+        period: `Tháng ${month}`,
+        currentRevenue: curr,
+        previousRevenue: prev,
+        growthRate: Number(growthRate.toFixed(2)),
+      });
+    }
+
+    return result;
+  }
+
+  // BI - AC6 & Time-series AC7: Dự báo xu hướng (Forecasting bằng Linear Regression)
+
+  async getRevenueForecast(): Promise<IForecastData[]> {
+    // Lấy 6 tháng gần nhất làm mốc train
+    const now = new Date();
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
+    interface IMonthly {
+      _id: string;
+      revenue: number;
+    }
+
+    const historical = await this.orderModel.aggregate<IMonthly>([
+      {
+        $match: {
+          status: { $in: ['COMPLETED', 'DELIVERED'] },
+          createdAt: { $gte: sixMonthsAgo },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: '%Y-%m',
+              date: '$createdAt',
+              timezone: 'Asia/Ho_Chi_Minh',
+            },
+          },
+          revenue: { $sum: '$total_amount' },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    if (historical.length < 2) return []; // Không đủ data để dự báo
+
+    // Áp dụng Simple Linear Regression (y = mx + b)
+    let sumX = 0,
+      sumY = 0,
+      sumXY = 0,
+      sumX2 = 0;
+    const n = historical.length;
+
+    historical.forEach((data, index) => {
+      const x = index; // Trục X là index (0, 1, 2...)
+      const y = data.revenue;
+      sumX += x;
+      sumY += y;
+      sumXY += x * y;
+      sumX2 += x * x;
+    });
+
+    const m = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    const b = (sumY - m * sumX) / n;
+
+    const results: IForecastData[] = [];
+
+    // Push historical data
+    historical.forEach((data, index) => {
+      results.push({
+        period: data._id,
+        actualRevenue: data.revenue,
+        forecastedRevenue: Number((m * index + b).toFixed(0)), // Đường trendline
+      });
+    });
+
+    // Dự báo 3 tháng tiếp theo
+    const lastDateStr = historical[historical.length - 1]._id;
+    let [year, month] = lastDateStr.split('-').map(Number);
+
+    for (let i = 1; i <= 3; i++) {
+      month++;
+      if (month > 12) {
+        month = 1;
+        year++;
+      }
+      const periodStr = `${year}-${String(month).padStart(2, '0')}`;
+      const forecastX = n - 1 + i;
+      const predictedY = Math.max(0, m * forecastX + b); // Doanh thu không thể âm
+
+      results.push({
+        period: periodStr,
+        actualRevenue: null,
+        forecastedRevenue: Number(predictedY.toFixed(0)),
+      });
+    }
+
+    return results;
   }
 }

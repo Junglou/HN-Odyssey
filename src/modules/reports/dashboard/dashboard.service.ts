@@ -710,4 +710,22 @@ export class DashboardService {
       };
     });
   }
+
+  // Thêm hàm lấy danh sách đơn hàng gần nhất (AC5 - US1)
+  async getRecentOrders(limit: number = 10) {
+    const recentOrders = await this.orderModel
+      .find({ status: { $nin: ['CANCELLED', 'REFUNDED'] } })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .select('order_code shipping_info.name total_amount status createdAt')
+      .lean();
+
+    return recentOrders.map((order) => ({
+      order_code: order.order_code,
+      customer_name: order.shipping_info?.name || 'Khách vãng lai',
+      total_amount: order.total_amount,
+      status: order.status,
+      created_at: order.createdAt,
+    }));
+  }
 }

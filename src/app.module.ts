@@ -29,6 +29,7 @@ import { SecurityMonitorInterceptor } from './common/interceptors/security-monit
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { UebaMonitorInterceptor } from './common/interceptors/ueba-monitor.interceptor';
 import { ReportsModule } from './modules/reports/reports.module';
+import { CacheModule } from '@nestjs/cache-manager';
 
 @Module({
   imports: [
@@ -58,6 +59,10 @@ import { ReportsModule } from './modules/reports/reports.module';
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'uploads'), // Trỏ ra thư mục uploads ở root
       serveRoot: '/uploads', // Prefix URL: http://localhost:3000/uploads/...
+    }),
+
+    CacheModule.register({
+      isGlobal: true, // Thêm dòng này để dùng Cache ở mọi nơi mà không cần import lại
     }),
 
     AuthModule,

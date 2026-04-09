@@ -13,6 +13,7 @@ import { Role } from 'src/common/enums/role.enum';
 import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
+import { ReportFilterDto } from 'src/common/dtos/report-filter.dto';
 
 @Controller('admin/reports/business')
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
@@ -76,6 +77,45 @@ export class BusinessReportsController {
     return new BaseResponse(
       true,
       'Lấy báo cáo tỷ lệ thoát và bỏ dở thanh toán thành công',
+      data,
+    );
+  }
+
+  //  CÁC ROUTE NÂNG CAO (BI ADVANCED)
+
+  @Get('inventory-correlation')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @RequirePermissions(Resource.REPORTS, Action.READ)
+  async getInventoryCorrelation(@Query() filter: ReportFilterDto) {
+    const data = await this.reportsService.getInventorySalesCorrelation(filter);
+    return new BaseResponse(
+      true,
+      'Lấy báo cáo tương quan tồn kho - doanh số thành công',
+      data,
+    );
+  }
+
+  @Get('yoy-comparison')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @RequirePermissions(Resource.REPORTS, Action.READ)
+  async getYoYComparison(@Query('year') year: string) {
+    const targetYear = year || new Date().getFullYear().toString();
+    const data = await this.reportsService.getYoYComparison(targetYear);
+    return new BaseResponse(
+      true,
+      'Lấy báo cáo so sánh cùng kỳ (YoY) thành công',
+      data,
+    );
+  }
+
+  @Get('forecast')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @RequirePermissions(Resource.REPORTS, Action.READ)
+  async getRevenueForecast() {
+    const data = await this.reportsService.getRevenueForecast();
+    return new BaseResponse(
+      true,
+      'Lấy dự báo doanh thu tương lai thành công',
       data,
     );
   }

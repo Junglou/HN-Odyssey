@@ -61,4 +61,16 @@ export class DashboardController {
       data,
     );
   }
+
+  // Thêm API endpoint
+  @Get('recent-orders')
+  @RequirePermissions(Resource.DASHBOARD, Action.READ)
+  async getRecentOrders() {
+    const data = await this.dashboardService.getRecentOrders(10);
+    return new BaseResponse(
+      true,
+      'Lấy danh sách đơn hàng vừa đặt thành công',
+      data,
+    );
+  }
 }
