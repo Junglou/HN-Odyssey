@@ -30,6 +30,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { UebaMonitorInterceptor } from './common/interceptors/ueba-monitor.interceptor';
 import { ReportsModule } from './modules/reports/reports.module';
 import { CacheModule } from '@nestjs/cache-manager';
+import { RecommendationModule } from './modules/recommendations/recommendations.module';
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { CacheModule } from '@nestjs/cache-manager';
     NotificationsModule,
     ReportsModule,
     EventEmitterModule.forRoot(),
+    RecommendationModule,
   ],
   controllers: [AppController],
   providers: [

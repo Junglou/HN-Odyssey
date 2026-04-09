@@ -37,6 +37,7 @@ import {
   ReportFilterDto,
   TimeInterval,
 } from 'src/common/dtos/report-filter.dto';
+import { ConfigService } from '@nestjs/config';
 
 interface IRevenueFacetResult {
   timeline: IRevenueTimelineAgg[];
@@ -61,6 +62,11 @@ export interface ISourceConversionAgg {
   rate: number;
 }
 
+interface ITimeToPurchaseAgg {
+  _id: string; // Tương ứng với session_id
+  time_taken_minutes: number;
+}
+
 @Injectable()
 export class BusinessReportsService {
   private readonly EXCLUDED_STATUSES = [
@@ -78,6 +84,7 @@ export class BusinessReportsService {
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(PriceHistory.name)
     private priceHistoryModel: Model<PriceHistory>,
+    private readonly configService: ConfigService,
   ) {}
 
   private getDateRange(filter: DashboardFilterDto): {
@@ -659,7 +666,9 @@ export class BusinessReportsService {
     filter: DashboardFilterDto,
   ): Promise<IConversionReport> {
     const dates = this.getDateRange(filter);
-    const targetKpi = filter.target_kpi || 2.5;
+    const targetKpi =
+      filter.target_kpi ||
+      this.configService.get<number>('TARGET_CONVERSION_RATE', 2.5);
     const isToday = filter.time_filter === TimeFilter.TODAY;
 
     interface IConvAgg {
@@ -1552,5 +1561,52 @@ export class BusinessReportsService {
     }
 
     return results;
+  }
+
+  async getTimeToPurchaseStats(filter: DashboardFilterDto) {
+    const dates = this.getDateRange(filter);
+
+    // Tiêm Type ITimeToPurchaseAgg vào hàm aggregate
+    const agg = await this.behaviorModel.aggregate<ITimeToPurchaseAgg>([
+      { $match: { createdAt: { $gte: dates.start, $lte: dates.end } } },
+      {
+        $group: {
+          _id: '$session_id',
+          actions: { $push: '$action' },
+          first_event: { $min: '$createdAt' },
+          purchase_event: {
+            $max: {
+              $cond: [
+                { $eq: ['$action', BehaviorAction.PURCHASE] },
+                '$createdAt',
+                null,
+              ],
+            },
+          },
+        },
+      },
+      // Chỉ lấy các session có Purchase
+      { $match: { purchase_event: { $ne: null } } },
+      {
+        $project: {
+          time_taken_minutes: {
+            $divide: [
+              { $subtract: ['$purchase_event', '$first_event'] },
+              60000,
+            ],
+          },
+        },
+      },
+    ]);
+
+    // Lúc này TypeScript đã hiểu 'item' có kiểu ITimeToPurchaseAgg nên sẽ không còn báo lỗi Unsafe Member Access
+    const result = agg.map((item) => ({
+      session_id: item._id,
+      time_taken_minutes: item.time_taken_minutes,
+      classification:
+        item.time_taken_minutes <= 15 ? 'FAST_BUYER' : 'SLOW_BUYER',
+    }));
+
+    return result;
   }
 }

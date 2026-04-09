@@ -122,6 +122,10 @@ export class Product {
   @Prop()
   brand: string;
 
+  // Thêm vào trong class Product ở file product.schema.ts
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Warehouse', index: true })
+  warehouse_id: Types.ObjectId;
+
   //MEDIA
   @Prop({ type: [ProductMedia], default: [] })
   gallery: ProductMedia[];

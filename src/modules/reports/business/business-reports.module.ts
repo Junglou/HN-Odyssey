@@ -19,6 +19,7 @@ import { User, UserSchema } from 'src/modules/users/schemas/user.schema';
 import { ScheduleModule } from '@nestjs/schedule';
 import { NotificationsModule } from 'src/modules/notifications/notifications.module';
 import { BusinessMonitoringCronService } from './business-monitoring.cron';
+import { ProductSchema } from 'src/modules/products/catalog/schemas/product.schema';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { BusinessMonitoringCronService } from './business-monitoring.cron';
       { name: UserBehavior.name, schema: UserBehaviorSchema },
       { name: User.name, schema: UserSchema },
       { name: PriceHistory.name, schema: PriceHistorySchema },
+      { name: 'Product', schema: ProductSchema },
     ]),
     ScheduleModule.forRoot(),
     NotificationsModule,
