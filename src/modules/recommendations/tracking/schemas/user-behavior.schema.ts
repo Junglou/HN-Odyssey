@@ -39,7 +39,7 @@ export interface TrackingMetadata {
   guest_email?: string; // Phục vụ lưu email khách vãng lai
 }
 
-@Schema({ timestamps: true })
+@Schema({ collection: 'user_behaviors', timestamps: true })
 export class UserBehavior extends Document {
   @Prop({ required: true, index: true })
   session_id: string;
