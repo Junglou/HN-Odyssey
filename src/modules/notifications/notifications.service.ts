@@ -169,7 +169,7 @@ export class NotificationsService {
         });
       }
 
-      // 2. Xác định các Room cần gửi Socket (Payload giữ nguyên như bạn đã viết)
+      // 2. Xác định các Room cần gửi Socket
       const warehouseId = data.warehouse_id ? String(data.warehouse_id) : '';
       const payload = {
         id: logData._id.toString(),
@@ -183,7 +183,7 @@ export class NotificationsService {
           : new Date().toISOString(),
       };
 
-      // Gửi Socket (Logic Rooms giữ nguyên là rất tốt)
+      // Gửi Socket
       if (warehouseId) {
         this.gateway.sendToRoom(
           `role_${data.recipient_role}_area_${warehouseId}`,
@@ -468,7 +468,7 @@ export class NotificationsService {
 
   async createAndSendToMultipleRoles(data: {
     roles: string[];
-    warehouse_id: string | Types.ObjectId;
+    warehouse_id?: string | Types.ObjectId;
     title: string;
     message: string;
     type: NotificationType;

@@ -21,7 +21,7 @@ export class Verification extends Document {
   @Prop({ type: Date, required: false, default: null })
   lock_until: Date | null;
 
-  @Prop({ required: true })
+  @Prop({ type: Date, required: true, expires: 0 })
   expired_at: Date;
 
   @Prop({ type: Object })

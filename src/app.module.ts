@@ -31,6 +31,7 @@ import { UebaMonitorInterceptor } from './common/interceptors/ueba-monitor.inter
 import { ReportsModule } from './modules/reports/reports.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import { RecommendationModule } from './modules/recommendations/recommendations.module';
+import { SystemModule } from './modules/system/system.module';
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { RecommendationModule } from './modules/recommendations/recommendations.
     ReportsModule,
     EventEmitterModule.forRoot(),
     RecommendationModule,
+    SystemModule,
   ],
   controllers: [AppController],
   providers: [

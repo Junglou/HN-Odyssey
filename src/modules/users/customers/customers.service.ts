@@ -227,13 +227,15 @@ export class CustomersService {
       );
     }
 
-    const verificationCode = Math.floor(
-      100000 + Math.random() * 900000,
-    ).toString();
+    const isEmail = dto.type === ContactType.EMAIL;
+    // Nếu là Phone thì Twilio tự sinh mã, ta chỉ gán giá trị giữ chỗ vào DB
+    const verificationCode = isEmail
+      ? Math.floor(100000 + Math.random() * 900000).toString()
+      : 'TWILIO_VERIFY_CODE';
     const expiresAt = new Date(now.getTime() + 5 * 60000);
 
     await this.userModel.findByIdAndUpdate(userId, {
-      ...(dto.type === ContactType.EMAIL
+      ...(isEmail
         ? { pending_email: dto.newValue }
         : { pending_phone: dto.newValue }),
       verification_code: await this.hashPassword(verificationCode),
@@ -242,10 +244,10 @@ export class CustomersService {
       failed_otp_attempts: 0,
     });
 
-    if (dto.type === ContactType.EMAIL) {
+    if (isEmail) {
       await this.emailService.sendOtp(dto.newValue, verificationCode);
     } else if (dto.type === ContactType.PHONE) {
-      await this.smsService.sendOtp(dto.newValue, verificationCode);
+      await this.smsService.sendOtp(dto.newValue); // Đã fix lỗi 2 tham số
     }
 
     return {
@@ -279,15 +281,27 @@ export class CustomersService {
       );
     }
 
-    if (
-      user.verification_code_expires_at &&
-      user.verification_code_expires_at < new Date()
-    ) {
-      throw new BadRequestException('Mã xác thực đã hết hạn');
+    let isCodeValid = false;
+
+    // Phân luồng kiểm tra OTP
+    if (user.pending_phone) {
+      // 1. Nếu là đổi SĐT -> Gọi sang Twilio Verify
+      isCodeValid = await this.smsService.verifyOtp(
+        user.pending_phone,
+        dto.code,
+      );
+    } else if (user.pending_email) {
+      // 2. Nếu là đổi Email -> Check DB nội bộ
+      if (
+        user.verification_code_expires_at &&
+        user.verification_code_expires_at < new Date()
+      ) {
+        throw new BadRequestException('Mã xác thực đã hết hạn');
+      }
+      isCodeValid = await bcrypt.compare(dto.code, user.verification_code);
     }
 
-    const isCodeValid = await bcrypt.compare(dto.code, user.verification_code);
-
+    // Logic xử lý khi sai OTP (Giữ nguyên của bạn)
     if (!isCodeValid) {
       const updatedUser = await this.userModel.findByIdAndUpdate(
         userId,
@@ -311,6 +325,7 @@ export class CustomersService {
       );
     }
 
+    // Logic khi thành công
     if (user.pending_email) {
       user.email = user.pending_email;
     }

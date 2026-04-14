@@ -128,15 +128,27 @@ export class AuthService {
         password: hashedPassword,
         dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
         gender: dto.gender || Gender.OTHER,
-        is_subscribed: dto.isSubscribed ?? false, // Xử lý trường hợp "thích thì tích"
+        is_subscribed: dto.isSubscribed ?? false,
         roles: ['CUSTOMER'],
         is_active: false,
         status: UserStatus.INACTIVE,
       });
       await newCustomer.save({ session });
 
+      // Dọn dẹp OTP cũ của user + Dọn tất cả OTP hết hạn trong hệ thống
+      await this.verificationModel
+        .deleteMany({
+          $or: [
+            { account: accountKey, type: 'REGISTER' }, // Rác của session này
+            { expired_at: { $lt: new Date() } }, // Rác đã hết hạn của toàn hệ thống
+          ],
+        })
+        .session(session);
+
       // AC10: Tạo và Lưu OTP
-      const otpCode = this.generateOtpCode();
+      // Phân tách mã thật (Email) và mã giữ chỗ (SMS) cho đồng bộ
+      const otpCode = email ? this.generateOtpCode() : 'TWILIO_VERIFY_CODE';
+
       const verification = new this.verificationModel({
         account: accountKey,
         code: otpCode,
@@ -145,14 +157,14 @@ export class AuthService {
       });
       await verification.save({ session });
 
-      // Gửi OTP (Cân nhắc: Nếu gửi mail thất bại có nên hủy đăng ký không?)
+      // Gửi OTP
       if (email) {
         await this.emailService
           .sendOtp(email, otpCode)
           .catch((e) => this.logger.error('Lỗi gửi mail:', e));
       } else if (phoneNumber) {
         await this.smsService
-          .sendOtp(phoneNumber, otpCode)
+          .sendOtp(phoneNumber)
           .catch((e) => this.logger.error('Lỗi gửi SMS:', e));
       }
 
@@ -202,65 +214,89 @@ export class AuthService {
     return cleaned;
   }
 
-  //2. XÁC THỰC OTP (AC13)
+  // 2. XÁC THỰC OTP (AC13)
   async verifyOtp(dto: VerifyOtpDto, ip: string, userAgent: string) {
-    if (!dto.account.includes('@')) {
+    const isEmail = dto.account.includes('@');
+
+    if (!isEmail) {
       dto.account = this.normalizePhoneNumber(dto.account);
     }
 
-    // Tìm bản ghi OTP
-    const record = await this.verificationModel.findOne({
-      account: dto.account,
-      type: dto.type,
-    });
+    if (isEmail) {
+      // LUỒNG 1: XÁC THỰC EMAIL QUA DATABASE NỘI BỘ
+      const record = await this.verificationModel
+        .findOne({
+          account: dto.account,
+          type: dto.type,
+        })
+        .sort({ _id: -1 }); // Lấy bản ghi mới nhất nếu có nhiều bản ghi cùng account và type
 
-    // AC5: Báo lỗi nếu không tìm thấy
-    if (!record) {
-      throw new BadRequestException(
-        'Mã xác thực không tồn tại hoặc đã hết hạn.',
-      );
-    }
-
-    if (record.failed_attempts >= 5) {
-      // Nếu đang trong thời gian khóa
-      if (
-        record.lock_until &&
-        new Date(record.lock_until).getTime() > Date.now()
-      ) {
+      // AC5: Báo lỗi nếu không tìm thấy
+      if (!record) {
         throw new BadRequestException(
-          'Bạn nhập sai quá nhiều lần. Vui lòng thử lại sau 15 phút.',
+          'Mã xác thực không tồn tại hoặc đã hết hạn.',
         );
       }
-      // Nếu đã HẾT thời gian khóa -> Reset lại để cho phép thử
-      else {
-        record.failed_attempts = 0;
-        record.lock_until = null;
-        await record.save(); // Đã có await (Tốt)
-      }
-    }
 
-    // AC10: Check hết hạn OTP
-    if (new Date() > new Date(record.expired_at)) {
-      throw new BadRequestException('Mã xác thực đã hết hạn.');
-    }
-
-    if (record.code !== dto.code) {
-      // Tăng biến đếm sai
-      record.failed_attempts = (record.failed_attempts || 0) + 1;
-
-      // Nếu sai đủ 5 lần -> Set thời gian khóa
       if (record.failed_attempts >= 5) {
-        record.lock_until = new Date(Date.now() + 15 * 60 * 1000); // Khóa 15p
+        // Nếu đang trong thời gian khóa
+        if (
+          record.lock_until &&
+          new Date(record.lock_until).getTime() > Date.now()
+        ) {
+          throw new BadRequestException(
+            'Bạn nhập sai quá nhiều lần. Vui lòng thử lại sau 15 phút.',
+          );
+        }
+        // Nếu đã HẾT thời gian khóa -> Reset lại để cho phép thử
+        else {
+          record.failed_attempts = 0;
+          record.lock_until = null;
+          await record.save(); // Đã có await
+        }
       }
 
-      await record.save(); // Đã có await
+      // AC10: Check hết hạn OTP
+      if (new Date() > new Date(record.expired_at)) {
+        throw new BadRequestException('Mã xác thực đã hết hạn.');
+      }
 
-      throw new BadRequestException(
-        `Mã không đúng. Bạn còn ${5 - record.failed_attempts} lần thử.`,
-      );
+      if (record.code !== dto.code) {
+        // Tăng biến đếm sai
+        record.failed_attempts = (record.failed_attempts || 0) + 1;
+
+        // Nếu sai đủ 5 lần -> Set thời gian khóa
+        if (record.failed_attempts >= 5) {
+          record.lock_until = new Date(Date.now() + 15 * 60 * 1000); // Khóa 15p
+        }
+
+        await record.save();
+
+        throw new BadRequestException(
+          `Mã không đúng. Bạn còn ${5 - record.failed_attempts} lần thử.`,
+        );
+      }
+
+      // Xóa OTP sau khi dùng xong
+      await record.deleteOne();
+    } else {
+      // LUỒNG 2: XÁC THỰC SMS QUA TWILIO VERIFY API
+      const isValid = await this.smsService.verifyOtp(dto.account, dto.code);
+
+      if (!isValid) {
+        throw new BadRequestException(
+          'Mã xác thực không đúng hoặc đã hết hạn.',
+        );
+      }
+
+      // Xóa bản ghi OTP "giữ chỗ" trong database (được tạo ở hàm register để rate-limit)
+      await this.verificationModel.deleteMany({
+        account: dto.account,
+        type: dto.type,
+      });
     }
 
-    // NẾU CODE ĐÚNG -> XỬ LÝ TIẾP
+    // NẾU CODE ĐÚNG -> XỬ LÝ TIẾP NGHIỆP VỤ
     if (dto.type === 'REGISTER') {
       const user = (await this.userModel.findOneAndUpdate(
         {
@@ -276,9 +312,6 @@ export class AuthService {
       if (!user)
         throw new NotFoundException('Không tìm thấy tài khoản tương ứng.');
 
-      // Xóa OTP sau khi dùng xong
-      await record.deleteOne(); // Đã có await
-
       // AC14: Tự động đăng nhập
       const accessToken = await this.generateAccessToken(user);
       const refreshToken = await this.generateRefreshToken(user, false);
@@ -290,7 +323,7 @@ export class AuthService {
         { refresh_token: hashedRt },
       );
 
-      // Ghi Audit Log
+      // Ghi Audit Log (Bổ sung thêm field tracking method: SMS hay EMAIL)
       await this.auditLogsService.log({
         action: 'VERIFY_OTP_SUCCESS',
         collection_name: 'users',
@@ -298,7 +331,11 @@ export class AuthService {
         actor_email: user.email,
         target_id: user._id,
         department: Department.SUPPORT,
-        detail: { account: dto.account, type: dto.type },
+        detail: {
+          account: dto.account,
+          type: dto.type,
+          method: isEmail ? 'EMAIL' : 'SMS',
+        },
         ip: ip,
         user_agent: userAgent,
       });
@@ -310,7 +347,6 @@ export class AuthService {
         user: {
           _id: user._id,
           email: user.email,
-          // Kiểm tra lại tên field trong Schema của bạn (last_Name hay lastName)
           full_name: user.last_Name + ' ' + user.first_Name,
           roles: user.roles,
         },
@@ -318,15 +354,21 @@ export class AuthService {
     }
   }
 
-  //3. GỬI LẠI OTP (AC12)
+  // 3. GỬI LẠI OTP (AC12)
   async resendOtp(dto: ResendOtpDto) {
-    if (!dto.account.includes('@')) {
+    const isEmail = dto.account.includes('@');
+
+    if (!isEmail) {
       dto.account = this.normalizePhoneNumber(dto.account);
     }
-    const user = await this.userModel.findOne({ email: dto.account });
+
+    const user = await this.userModel.findOne({
+      $or: [{ email: dto.account }, { phone: dto.account }],
+    });
+
     if (!user) throw new NotFoundException('Tài khoản không tồn tại.');
 
-    // Rate Limit
+    // 1. Kiểm tra Rate Limit (60s)
     const lastOtp = await this.verificationModel.findOne({
       account: dto.account,
       type: dto.type,
@@ -339,34 +381,37 @@ export class AuthService {
       );
     }
 
-    // Xóa mã cũ
+    // 2. Xóa mã cũ + Dọn dẹp DB
     await this.verificationModel.deleteMany({
-      account: dto.account,
-      type: dto.type,
+      $or: [
+        { account: dto.account, type: dto.type },
+        { expired_at: { $lt: new Date() } },
+      ],
     });
 
-    // Tạo mã mới
-    const otpCode = this.generateOtpCode();
-    const expiredAt = new Date(Date.now() + 5 * 60 * 1000);
+    // 3. TẠO VÀ GỬI MÃ MỚI TÙY THEO KÊNH
+    let otpCode = '';
 
+    if (isEmail) {
+      otpCode = this.generateOtpCode(); // Email: Tự tạo mã
+      this.emailService
+        .sendOtp(dto.account, otpCode)
+        .catch((e) => this.logger.error('Lỗi gửi lại mail:', e));
+    } else {
+      otpCode = 'TWILIO_VERIFY_CODE'; // SMS: Gán mã giữ chỗ, mã thật Twilio tự quản lý
+      this.smsService
+        .sendOtp(dto.account)
+        .catch((e) => this.logger.error('Lỗi gửi lại SMS:', e));
+    }
+
+    // 4. Lưu bản ghi mới vào DB (Phục vụ rate-limit và verify Email)
+    const expiredAt = new Date(Date.now() + 5 * 60 * 1000);
     await this.verificationModel.create({
       account: dto.account,
       code: otpCode,
       type: dto.type,
       expired_at: expiredAt,
     });
-
-    // GỬI LẠI MÃ THẬT
-    const isEmail = dto.account.includes('@');
-    if (isEmail) {
-      this.emailService
-        .sendOtp(dto.account, otpCode)
-        .catch((e) => this.logger.error(e));
-    } else {
-      this.smsService
-        .sendOtp(dto.account, otpCode)
-        .catch((e) => this.logger.error(e));
-    }
 
     return { message: 'Mã xác thực mới đã được gửi.' };
   }
@@ -504,6 +549,13 @@ export class AuthService {
       const staffUser = user as unknown as Staff;
       employeeCode = staffUser.employee_code;
     }
+
+    this.eventEmitter.emit('user.logged_in', {
+      userId: user._id.toString(),
+      email: user.email,
+      ip: ip,
+      userAgent: userAgent,
+    });
 
     await this.auditLogsService.log({
       action: 'LOGIN',
@@ -1006,15 +1058,19 @@ export class AuthService {
     if (!user) {
       await new Promise((r) => setTimeout(r, 1000));
       return {
-        message: 'Nếu tài khoản tồn tại, chúng tôi đã gửi hướng dẫn khôi phục.',
+        message:
+          'Nếu tài khoản tồn tại, chúng tôi đã gửi OTP đến số điện thoại của bạn.',
       };
     }
 
     const expiredAt = new Date(Date.now() + 10 * 60 * 1000);
 
+    // Dọn mã quên mật khẩu cũ của user + Dọn luôn các mã OTP đã hết hạn khác
     await this.verificationModel.deleteMany({
-      account: account,
-      type: 'RESET_PASSWORD',
+      $or: [
+        { account: account, type: 'RESET_PASSWORD' },
+        { expired_at: { $lt: new Date() } },
+      ],
     });
 
     const isEmail = account.includes('@');
@@ -1027,8 +1083,8 @@ export class AuthService {
         .sendResetPasswordLink(account, link)
         .catch((e) => this.logger.error(e));
     } else {
-      code = Math.floor(100000 + Math.random() * 900000).toString();
-      this.smsService.sendOtp(account, code).catch((e) => this.logger.error(e));
+      code = 'TWILIO_VERIFY_CODE'; // Gán giá trị giữ chỗ vì mã thật do Twilio tự sinh và quản lý
+      this.smsService.sendOtp(account).catch((e) => this.logger.error(e));
     }
 
     await this.verificationModel.create({
@@ -1053,30 +1109,65 @@ export class AuthService {
       throw new BadRequestException('Mật khẩu xác nhận không khớp.');
     }
 
-    const verifyRecord = await this.verificationModel.findOne({
-      account: dto.account,
-      code: dto.code,
-      type: 'RESET_PASSWORD',
-    });
+    const isEmail = dto.account.includes('@');
+    let finalAccount = dto.account;
 
-    if (!verifyRecord || verifyRecord.expired_at < new Date()) {
-      throw new BadRequestException(
-        'Mã xác thực hoặc Link không hợp lệ/hết hạn.',
-      );
+    // Chuẩn hóa số điện thoại nếu đầu vào không phải email
+    if (!isEmail) {
+      finalAccount = this.normalizePhoneNumber(dto.account);
     }
 
+    if (isEmail) {
+      // LUỒNG 1: XÁC THỰC EMAIL QUA DATABASE
+
+      const verifyRecord = await this.verificationModel.findOne({
+        account: finalAccount,
+        code: dto.code,
+        type: 'RESET_PASSWORD',
+      });
+
+      if (!verifyRecord || verifyRecord.expired_at < new Date()) {
+        throw new BadRequestException(
+          'Mã xác thực hoặc Link không hợp lệ/hết hạn.',
+        );
+      }
+
+      await verifyRecord.deleteOne();
+    } else {
+      // LUỒNG 2: XÁC THỰC SMS QUA TWILIO
+
+      const isValid = await this.smsService.verifyOtp(finalAccount, dto.code);
+
+      if (!isValid) {
+        throw new BadRequestException(
+          'Mã xác thực không đúng hoặc đã hết hạn.',
+        );
+      }
+
+      // Xóa bản ghi giữ chỗ rate-limit
+      await this.verificationModel.deleteMany({
+        account: finalAccount,
+        type: 'RESET_PASSWORD',
+      });
+    }
+
+    // CẬP NHẬT MẬT KHẨU MỚI
+
     const user = await this.userModel.findOne({
-      $or: [{ email: dto.account }, { phone: dto.account }],
+      $or: [{ email: finalAccount }, { phone: finalAccount }],
     });
 
     if (!user) throw new NotFoundException('User không tồn tại.');
 
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(dto.newPassword, salt);
+
+    // Tự động mở khóa tài khoản và reset số lần nhập sai nếu họ đã tự đổi mật khẩu thành công
     user.status = UserStatus.ACTIVE;
+    user.lock_until = null;
+    user.login_attempts = 0;
 
     await user.save();
-    await verifyRecord.deleteOne();
 
     this.eventEmitter.emit('notification.security.resolve', {
       user_id: String(user._id),
@@ -1085,14 +1176,15 @@ export class AuthService {
     await this.auditLogsService.log({
       action: 'RESET_PASSWORD_SUCCESS',
       collection_name: 'users',
-      actor_id: user._id,
+      actor_id: user._id.toString(),
       actor_email: user.email,
-      target_id: user._id,
+      target_id: user._id.toString(),
       department: Department.SUPPORT,
-      detail: { account: dto.account },
+      detail: { account: finalAccount, method: isEmail ? 'EMAIL' : 'SMS' },
       ip: ip,
       user_agent: userAgent,
     });
+
     return { message: 'Đặt lại mật khẩu thành công.' };
   }
 

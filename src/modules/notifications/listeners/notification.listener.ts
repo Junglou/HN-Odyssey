@@ -3,7 +3,6 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from '../notifications.service';
 import { EmailService } from '../channels/email.service';
-import { SmsService } from '../channels/sms.service';
 import {
   NotificationType,
   NotificationPriority,
@@ -34,7 +33,6 @@ export class NotificationListener {
   constructor(
     private readonly notificationsService: NotificationsService,
     private readonly emailService: EmailService,
-    private readonly smsService: SmsService,
     private readonly configService: ConfigService,
     private readonly webhookService: WebhookService,
     @Inject(forwardRef(() => UsersService))
@@ -103,28 +101,15 @@ export class NotificationListener {
       `Chi tiết: ${data.message}\n- IP: ${data.ip || 'N/A'}\n- User ID: ${data.user_id || 'N/A'}`,
     );
 
-    // 2. Xử lý logic khóa tài khoản và SMS cho mức CRITICAL
+    // 2. Xử lý logic khóa tài khoản cho mức CRITICAL (Đã gỡ SMS)
     if (data.severity === 'CRITICAL' && data.user_id) {
-      const adminPhone =
-        this.configService.get<string>('ADMIN_PHONE_NUMBER') || '0987654321';
-
-      // Thực hiện các tác vụ chặn song song để tối ưu tốc độ phản ứng
-      await Promise.all([
-        this.usersService.updateStatus(data.user_id, {
-          is_active: false,
-          lock_reason: `Security Alert: ${data.message}`,
-        }),
-        this.smsService
-          .sendOtp(
-            adminPhone,
-            `[CRITICAL] Phat hien rui ro bao mat cho User: ${data.user_id}. Kiem tra ngay!`,
-          )
-          .catch(() => {}),
-      ]);
+      await this.usersService.updateStatus(data.user_id, {
+        is_active: false,
+        lock_reason: `Security Alert: ${data.message}`,
+      });
     }
 
     // 3. Gửi Duy Nhất một thông báo hệ thống (Socket + DB)
-    // Title và Priority được quyết định dựa trên Severity
     await this.notificationsService.createAndSend({
       recipient_role: 'SUPER_ADMIN',
       warehouse_id: undefined, // Admin nhận diện rộng, không phân kho
@@ -202,15 +187,6 @@ export class NotificationListener {
         `Mã lỗi: ${data.error_code} - ${data.message}`,
         data.severity,
       );
-
-      const adminPhone =
-        this.configService.get<string>('ADMIN_PHONE_NUMBER') || '0987654321';
-      await this.smsService
-        .sendOtp(
-          adminPhone,
-          `[CRITICAL] He thong xay ra loi nghiem trong: ${data.error_code}. Kiem tra ngay!`,
-        )
-        .catch((e) => this.logger.error('Lỗi gửi SMS CRITICAL', e));
     }
 
     await this.notificationsService.createAndSend({
