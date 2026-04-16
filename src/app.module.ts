@@ -32,6 +32,8 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import { RecommendationModule } from './modules/recommendations/recommendations.module';
 import { SystemModule } from './modules/system/system.module';
+import { TradeInModule } from './modules/trade-in/trade-in.module';
+import { SupportModule } from './modules/support/support.module';
 
 @Module({
   imports: [
@@ -84,6 +86,8 @@ import { SystemModule } from './modules/system/system.module';
     EventEmitterModule.forRoot(),
     RecommendationModule,
     SystemModule,
+    TradeInModule,
+    SupportModule,
   ],
   controllers: [AppController],
   providers: [

@@ -26,6 +26,41 @@ interface SecurityAlertPayload {
   ip?: string;
 }
 
+interface TradeInAcceptedPayload {
+  request_id: string;
+  customer_id: string;
+  product_name: string;
+  final_value: number;
+  rma_order_code: string;
+}
+
+interface TradeInCompletedPayload {
+  request_id: string;
+  customer_id: string;
+  payout_method: string;
+  final_value: number;
+  voucher_code?: string;
+}
+
+interface TradeInCreatedPayload {
+  request_id: string;
+  customer_id: string;
+  product_name: string;
+  estimated_value: number;
+}
+
+interface TradeInRenegotiatePayload {
+  request_id: string;
+  customer_id: string;
+  proposed_price: number;
+}
+
+interface TradeInInspectedPayload {
+  request_id: string;
+  customer_id: string;
+  final_value: number;
+}
+
 @Injectable()
 export class NotificationListener {
   private readonly logger = new Logger(NotificationListener.name);
@@ -212,7 +247,7 @@ export class NotificationListener {
     await this.notificationsService.createAndSend({
       recipient_role: 'CUSTOMER', // Bắn đích danh cho role Khách Hàng
       recipient_id: data.userId,
-      title: 'Nhận điểm thưởng thành công! 🎉',
+      title: 'Nhận điểm thưởng thành công!',
       message: `Bạn vừa được cộng thêm ${data.pointsAmount} điểm từ đơn hàng ${data.orderId}.`,
       type: NotificationType.LOYALTY, // Dùng đúng Type chuẩn xác
       priority: NotificationPriority.LOW, // Sự kiện bình thường
@@ -278,6 +313,76 @@ export class NotificationListener {
       type: NotificationType.LOYALTY,
       priority: NotificationPriority.HIGH,
       metadata: { target_url: '/wallet/vouchers', event: 'birthday' },
+    });
+  }
+
+  @OnEvent('notify.trade_in.accepted')
+  async handleTradeInAccepted(data: TradeInAcceptedPayload) {
+    await this.notificationsService.createAndSend({
+      recipient_role: 'CUSTOMER',
+      recipient_id: data.customer_id,
+      title: 'Yêu cầu thu cũ đã được chấp thuận!',
+      message: `Sản phẩm ${data.product_name} đã được định giá ${data.final_value}đ. Mã vận đơn ngược: ${data.rma_order_code}. Shipper sẽ sớm liên hệ bạn!`,
+      type: NotificationType.ORDER,
+      priority: NotificationPriority.HIGH,
+      metadata: { target_url: `/trade-in/history/${data.request_id}` },
+    });
+  }
+
+  @OnEvent('notify.trade_in.completed')
+  async handleTradeInCompleted(data: TradeInCompletedPayload) {
+    const isVoucher = data.payout_method === 'VOUCHER';
+    const msg = isVoucher
+      ? `Đã gửi Voucher trị giá ${data.final_value}đ (Mã: ${data.voucher_code}) vào ví của bạn.`
+      : `Đã chuyển khoản thành công ${data.final_value}đ vào tài khoản ngân hàng của bạn.`;
+
+    await this.notificationsService.createAndSend({
+      recipient_role: 'CUSTOMER',
+      recipient_id: data.customer_id,
+      title: 'Hoàn tất thanh toán Thu cũ!',
+      message: msg,
+      type: NotificationType.ORDER,
+      priority: NotificationPriority.HIGH,
+      metadata: { target_url: `/trade-in/history/${data.request_id}` },
+    });
+  }
+
+  @OnEvent('notify.trade_in.created')
+  async handleTradeInCreated(data: TradeInCreatedPayload) {
+    await this.notificationsService.createAndSend({
+      recipient_role: 'CUSTOMER',
+      recipient_id: data.customer_id,
+      title: 'Yêu cầu thu cũ đã gửi thành công',
+      message: `Hệ thống đã tiếp nhận yêu cầu thu mua sản phẩm ${data.product_name}. Định giá sơ bộ: ${data.estimated_value.toLocaleString()}đ.`,
+      type: NotificationType.ORDER,
+      priority: NotificationPriority.MEDIUM,
+      metadata: { target_url: `/trade-in/history/${data.request_id}` },
+    });
+  }
+
+  @OnEvent('notify.trade_in.renegotiate')
+  async handleTradeInRenegotiate(data: TradeInRenegotiatePayload) {
+    await this.notificationsService.createAndSend({
+      recipient_role: 'CUSTOMER',
+      recipient_id: data.customer_id,
+      title: 'Có thay đổi về định giá Thu cũ (Cần xác nhận)',
+      message: `Sản phẩm của bạn có sai lệch tình trạng sau khi kiểm định tại kho. Đề xuất giá mới: ${data.proposed_price.toLocaleString()}đ. Vui lòng kiểm tra và xác nhận!`,
+      type: NotificationType.ORDER,
+      priority: NotificationPriority.HIGH,
+      metadata: { target_url: `/trade-in/history/${data.request_id}` },
+    });
+  }
+
+  @OnEvent('notify.trade_in.inspected')
+  async handleTradeInInspected(data: TradeInInspectedPayload) {
+    await this.notificationsService.createAndSend({
+      recipient_role: 'CUSTOMER',
+      recipient_id: data.customer_id,
+      title: 'Sản phẩm đã qua kiểm định!',
+      message: `Tuyệt vời! Sản phẩm của bạn khớp hoàn toàn với mô tả. Đã chốt giá thu mua: ${data.final_value.toLocaleString()}đ.`,
+      type: NotificationType.ORDER,
+      priority: NotificationPriority.HIGH,
+      metadata: { target_url: `/trade-in/history/${data.request_id}` },
     });
   }
 }
