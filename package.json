@@ -17,6 +17,7 @@
     "react-easy-crop": "^5.5.7",
     "react-router-dom": "^7.12.0",
     "react-toastify": "^11.0.5",
+    "recharts": "^3.8.1",
     "suneditor": "^2.47.8",
     "suneditor-react": "^3.6.1"
   },

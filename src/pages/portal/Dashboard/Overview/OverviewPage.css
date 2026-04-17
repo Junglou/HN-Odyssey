@@ -1,0 +1,9 @@
+.op-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  background-color: #f3f4f6;
+  padding: clamp(16px, 3vw, 32px);
+}

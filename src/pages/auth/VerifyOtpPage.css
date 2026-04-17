@@ -230,9 +230,9 @@
 .verify-page-container.collapsed .otp-timer,
 .verify-page-container.collapsed .verify-send-btn,
 .verify-page-container.collapsed .verify-form-input::placeholder {
-  opacity: 0 !important;
-  visibility: hidden !important;
-  transition: opacity 0.2s ease !important;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease;
 }
 
 /* Responsive */

@@ -1,0 +1,138 @@
+/* khung bọc ngoài */
+.bsp-wrapper {
+  background-color: #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bsp-section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.bsp-table-wrapper {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.bsp-table {
+  width: 100%;
+  min-width: 600px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.bsp-table th,
+.bsp-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.bsp-table th {
+  background-color: #e6d5c3;
+  color: #1e293b;
+  font-weight: 700;
+}
+
+.bsp-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.bsp-table td {
+  color: #475569;
+  font-weight: 500;
+}
+
+.bsp-revenue-cell {
+  font-weight: 700;
+  color: #1e293b;
+}
+
+/* trạng thái trống */
+.bsp-empty-state {
+  padding: 40px;
+  text-align: center;
+  color: #64748b;
+  font-weight: 500;
+  background-color: #f8fafc;
+}
+
+/* tiêu đề cột click được */
+.bsp-sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.bsp-sortable:hover {
+  background-color: #d6c3b0;
+}
+
+/* biểu tượng sort */
+.bsp-sort-icon {
+  margin-left: 6px;
+  font-size: 0.8rem;
+  display: inline-block;
+}
+
+.bsp-sort-icon.bsp-inactive {
+  opacity: 0.3;
+}
+
+.bsp-sort-icon.bsp-active {
+  opacity: 1;
+  color: #b45309;
+}
+
+/* phân trang */
+.bsp-pagination-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px;
+  background-color: #ffffff;
+  border-top: 1px solid #e2e8f0;
+}
+
+.bsp-page-numbers {
+  display: flex;
+  gap: 8px;
+}
+
+.bsp-page-nav-btn,
+.bsp-page-num-btn {
+  padding: 6px 12px;
+  border: 1px solid #cbd5e1;
+  background-color: #ffffff;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.bsp-page-num-btn.bsp-active {
+  background-color: #1e293b;
+  color: #ffffff;
+  border-color: #1e293b;
+}
+
+.bsp-page-nav-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bsp-page-nav-btn:not(:disabled):hover,
+.bsp-page-num-btn:not(.bsp-active):hover {
+  background-color: #f1f5f9;
+}

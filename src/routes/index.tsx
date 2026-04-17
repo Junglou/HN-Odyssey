@@ -5,7 +5,6 @@ import PortalLayout from "../layouts/PortalLayout";
 
 import LoginPage from "../pages/auth/LoginPage";
 import RegisterPage from "../pages/auth/RegisterPage";
-import DashboardPage from "../pages/dashboard/DashboardPage";
 import ProductListPage from "../pages/products/ProductListPage";
 import VerifyOtpPage from "../pages/auth/VerifyOtpPage";
 import ResetPasswordPage from "../pages/auth/ResetPasswordPage";
@@ -40,6 +39,13 @@ import StaticPageManagementPage from "../pages/portal/Communication/StaticPageMa
 import MediaManagementPage from "../pages/portal/Communication/MediaManagement/MediaManagementPage";
 import BannerManagementPage from "../pages/portal/Communication/BannerManagement/BannerManagementPage";
 import BlogNewsManagementPage from "../pages/portal/Communication/BlogNewsManagement/BlogNewsManagementPage";
+import SystemPage from "../pages/portal/System/SystemPage";
+
+import OverviewPage from "../pages/portal/Dashboard/Overview/OverviewPage";
+import RevenueReportPage from "../pages/portal/Dashboard/RevenueReport/RevenueReportPage";
+import MarketingAndPromotionPage from "../pages/portal/Dashboard/MarketingAndPromotion/MarketingAndPromotionPage";
+import BusinessIntelligencePage from "../pages/portal/Dashboard/BusinessIntelligence/BusinessIntelligencePage";
+import InventoryManagementPage from "../pages/portal/Dashboard/InventoryManagement/InventoryManagementPage";
 
 export const router = createBrowserRouter([
   // route auth
@@ -100,10 +106,6 @@ export const router = createBrowserRouter([
       {
         index: true, // Route mặc định của path: "/"
         element: <Navigate to="/login" replace />, // Redirect về login
-      },
-      {
-        path: "dashboard",
-        element: <DashboardPage />,
       },
       {
         path: "products",
@@ -202,6 +204,30 @@ export const router = createBrowserRouter([
       {
         path: "blog-news",
         element: <BlogNewsManagementPage />,
+      },
+      {
+        path: "system",
+        element: <SystemPage />,
+      },
+      {
+        path: "overview",
+        element: <OverviewPage />,
+      },
+      {
+        path: "revenue-report",
+        element: <RevenueReportPage />,
+      },
+      {
+        path: "marketing-promotion",
+        element: <MarketingAndPromotionPage />,
+      },
+      {
+        path: "bi",
+        element: <BusinessIntelligencePage />,
+      },
+      {
+        path: "inventory",
+        element: <InventoryManagementPage />,
       },
     ],
   },

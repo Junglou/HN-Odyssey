@@ -1,0 +1,102 @@
+.sys-payment-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  animation: sys-fadeIn 0.3s ease-in-out;
+}
+
+/* thay thế inline style bằng class grid đáp ứng */
+.sys-payment-kpi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(16px, 2vw, 24px);
+}
+
+.sys-payment-table-wrapper {
+  overflow-x: auto;
+  margin-top: 16px;
+}
+
+.sys-payment-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-family: inherit;
+}
+
+.sys-payment-table th {
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #4b5563;
+  background-color: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+.sys-payment-table td {
+  padding: 16px;
+  font-size: 0.85rem;
+  color: #111827;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+
+.sys-payment-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.sys-payment-badge.critical {
+  background-color: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+}
+
+.sys-payment-badge.warning {
+  background-color: #fffbeb;
+  color: #d97706;
+  border: 1px solid #fcd34d;
+}
+
+.sys-payment-badge.stable {
+  background-color: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.sys-payment-badge.neutral {
+  background-color: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid #d1d5db;
+}
+
+/* responsive */
+@media screen and (max-width: 768px) {
+  .sys-payment-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sys-payment-table th,
+  .sys-payment-table td {
+    padding: 10px;
+  }
+}
+
+/* animation */
+@keyframes sys-fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

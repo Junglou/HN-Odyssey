@@ -1,0 +1,162 @@
+/* Wrapper */
+.retention-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background-color: #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.retention-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+/* Card */
+.retention-card {
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 24px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+/* Layout */
+.retention-content {
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+}
+
+.retention-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 24px;
+  justify-content: center;
+}
+
+.retention-divider {
+  width: 1px;
+  background-color: #d1d5db;
+  margin: 0 24px;
+  flex-shrink: 0;
+}
+
+.retention-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 24px;
+}
+
+/* Info */
+.retention-info {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.95rem;
+  color: #475569;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-weight: 500;
+}
+
+/* Donut container */
+.retention-donut-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  flex-wrap: wrap;
+}
+
+/* Kích thước biểu đồ */
+.retention-donut-wrapper {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  flex-shrink: 0;
+}
+
+.retention-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Center text */
+.retention-center-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.retention-center-val {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.retention-center-lbl {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+/* Stats */
+.retention-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-size: 0.95rem;
+  color: #475569;
+  font-weight: 600;
+}
+
+.retention-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.retention-stat-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* Responsive */
+@media screen and (max-width: 768px) {
+  .retention-content {
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .retention-column {
+    padding: 0;
+  }
+
+  .retention-divider {
+    width: 100%;
+    height: 1px;
+    margin: 0;
+  }
+
+  .retention-donut-container {
+    justify-content: flex-start;
+  }
+}

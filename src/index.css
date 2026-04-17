@@ -86,7 +86,7 @@ body {
   padding: 0;
   width: 100%; /* Đổi min-width thành width 100% cho chắc chắn */
   min-height: 100vh;
-  background-color: #f9f9f9 !important; /* Dùng !important để đè mọi setting Dark Mode mặc định */
+  background-color: #f9f9f9; /* Dùng  để đè mọi setting Dark Mode mặc định */
   display: block; /* Quan trọng */
 }
 
@@ -104,50 +104,50 @@ body {
 
 /* Khung chung của thông báo */
 .Toastify__toast {
-  border-radius: 12px !important; /* Bo góc mềm mại */
-  padding: 16px !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1) !important; /* Đổ bóng xịn */
+  border-radius: 12px; /* Bo góc mềm mại */
+  padding: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); /* Đổ bóng xịn */
   font-family: inherit; /* Dùng font chữ của web */
   font-size: 14px;
   font-weight: 500;
-  min-height: auto !important; /* Bỏ chiều cao cứng */
-  margin-bottom: 1rem !important; /* Khoảng cách giữa các thông báo */
+  min-height: auto; /* Bỏ chiều cao cứng */
+  margin-bottom: 1rem; /* Khoảng cách giữa các thông báo */
 }
 
 /* Màu sắc cho từng loại thông báo (Success - Error - Warning) */
 .Toastify__toast--success {
-  background-color: #ffffff !important;
-  border-left: 6px solid #10b981 !important;
-  color: #064e3b !important;
+  background-color: #ffffff;
+  border-left: 6px solid #10b981;
+  color: #064e3b;
 }
 .Toastify__toast--success .Toastify__progress-bar {
-  background: #10b981 !important;
+  background: #10b981;
 }
 .Toastify__toast--success svg {
-  fill: #10b981 !important; /* Đổi màu icon mặc định */
+  fill: #10b981; /* Đổi màu icon mặc định */
 }
 
 /* ERROR */
 .Toastify__toast--error {
-  background-color: #ffffff !important;
-  border-left: 6px solid #ef4444 !important;
-  color: #7f1d1d !important;
+  background-color: #ffffff;
+  border-left: 6px solid #ef4444;
+  color: #7f1d1d;
 }
 .Toastify__toast--error .Toastify__progress-bar {
-  background: #ef4444 !important;
+  background: #ef4444;
 }
 .Toastify__toast--error svg {
-  fill: #ef4444 !important;
+  fill: #ef4444;
 }
 
 /* WARNING */
 .Toastify__toast--warning {
-  background-color: #ffffff !important;
-  border-left: 6px solid #f59e0b !important;
-  color: #78350f !important;
+  background-color: #ffffff;
+  border-left: 6px solid #f59e0b;
+  color: #78350f;
 }
 .Toastify__toast--warning .Toastify__progress-bar {
-  background: #f59e0b !important;
+  background: #f59e0b;
 }
 
 /* Tùy chỉnh nút tắt (Close button) */
@@ -162,14 +162,14 @@ body {
 /* Responsive cho mobile */
 @media only screen and (max-width: 480px) {
   .Toastify__toast-container {
-    width: 90% !important;
-    left: 50% !important;
+    width: 90%;
+    left: 50%;
     transform: translateX(-50%);
     top: 1rem;
   }
   .Toastify__toast {
     margin-bottom: 10px;
-    border-radius: 8px !important;
+    border-radius: 8px;
   }
 }
 
