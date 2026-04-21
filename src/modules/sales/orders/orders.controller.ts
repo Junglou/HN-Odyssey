@@ -148,4 +148,60 @@ export class OrdersController {
   async sendInvoice(@Param('id') id: string) {
     return this.ordersService.sendInvoiceEmail(id);
   }
+
+  // INTERNAL API CHO AI AGENT (n8n) SỬ DỤNG
+  @Get('internal/chatbot/tracking')
+  @Public()
+  @ApiOperation({ summary: 'API nội bộ cho Chatbot tra cứu đơn hàng' })
+  async chatbotTrackOrder(
+    @Query('order_code') orderCode?: string,
+    @Query('phone') phone?: string,
+  ) {
+    // 1. DỌN DẸP DỮ LIỆU TỪ AI (Xóa ngoặc kép, ngoặc đơn, khoảng trắng thừa)
+    const cleanOrderCode = orderCode
+      ? orderCode.replace(/['"]/g, '').trim()
+      : undefined;
+    const cleanPhone = phone ? phone.replace(/['"]/g, '').trim() : undefined;
+
+    // 2. LOG ĐỂ KIỂM CHỨNG
+    console.log('\n--- N8N CHATBOT GỌI API TRA CỨU ---');
+    console.log('Mã gốc n8n gửi:', orderCode);
+    console.log('Mã đã làm sạch:', cleanOrderCode);
+
+    if (!cleanOrderCode && !cleanPhone) {
+      throw new BadRequestException('Vui lòng cung cấp order_code hoặc phone');
+    }
+
+    // 3. GỌI HÀM TÌM KIẾM
+    const orders = await this.ordersService.findForChatbot(
+      cleanOrderCode,
+      cleanPhone,
+    );
+
+    if (!orders || orders.length === 0) {
+      return {
+        found: false,
+        message: 'Không tìm thấy đơn hàng nào khớp với thông tin cung cấp.',
+      };
+    }
+
+    // Format lại dữ liệu cho AI dễ đọc
+    const ordersData = orders.map((order) => ({
+      order_code: order.order_code,
+      status: order.status,
+      created_at: order.createdAt,
+      total_amount: order.total_amount,
+      items: order.items
+        .map((i) => `${i.quantity}x ${i.product_name}`)
+        .join(', '),
+      shipping_info: {
+        address: order.shipping_info?.address || 'Nhận tại cửa hàng',
+        tracking_code: order.shipping_info?.tracking_code || 'Chưa có',
+      },
+      payment_method: order.payment?.method || 'COD',
+      payment_status: order.payment?.status || 'PENDING',
+    }));
+
+    return { found: true, orders: ordersData };
+  }
 }

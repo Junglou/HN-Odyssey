@@ -117,7 +117,7 @@ export class ProductsService {
         const inputValues = inputAttributes.get(dbAttr.code);
         const validValues = dbAttr.values.map((v) => v.value);
 
-        // [FIX LỖI 2]: Kiểm tra tồn tại trước khi loop (Optional Chaining hoặc If)
+        // Kiểm tra tồn tại trước khi loop (Optional Chaining hoặc If)
         if (inputValues) {
           inputValues.forEach((iv) => {
             if (!validValues.includes(iv)) {
@@ -1294,5 +1294,33 @@ export class ProductsService {
     } catch (error) {
       console.error('[CRON] Lỗi khi xử lý giá khuyến mãi hết hạn:', error);
     }
+  }
+
+  // HÀM DÀNH RIÊNG CHO CHATBOT TÌM KIẾM
+  async searchForChatbot(keyword: string) {
+    console.log('\n--- N8N CHATBOT TÌM KIẾM SẢN PHẨM ---');
+    console.log('1. Keyword gốc n8n gửi sang:', keyword);
+
+    // Xử lý khoảng trắng: Biến "iPhone 15" thành "iPhone.*15" để tìm kiểu gì cũng dính
+    const safeKeyword = keyword.trim().replace(/\s+/g, '.*');
+    const searchRegex = new RegExp(safeKeyword, 'i');
+    console.log('2. Regex query trong DB:', searchRegex);
+
+    const results = await this.productModel
+      .find({
+        $or: [
+          { name: { $regex: searchRegex } },
+          { tags: { $regex: searchRegex } },
+        ],
+        status: ProductStatus.ACTIVE,
+        is_deleted: false,
+      })
+      .select('name slug price sale_price stock has_variants specs')
+      .limit(5)
+      .lean()
+      .exec();
+
+    console.log('3. Số sản phẩm DB trả về:', results.length);
+    return results;
   }
 }

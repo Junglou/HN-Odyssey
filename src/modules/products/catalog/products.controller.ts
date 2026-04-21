@@ -14,6 +14,7 @@ import {
   Res,
   HttpStatus,
   HttpException,
+  BadRequestException,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { ProductsService } from './products.service';
@@ -35,6 +36,7 @@ import { FilterProductDto } from './dto/filter-product.dto';
 import { FilterOutput, ProductFilterService } from '../products-filter.service';
 import type { ProductQueryParam } from 'src/common/interfaces/product.interface';
 import { ContentService } from 'src/modules/marketing/content/content.service';
+import { ApiOperation } from '@nestjs/swagger';
 
 @Controller('products')
 export class ProductsController {
@@ -47,7 +49,6 @@ export class ProductsController {
   // PUBLIC API (STOREFRONT)
 
   @Get('filters')
-  // Khai báo kiểu trả về rõ ràng: Promise<FilterOutput[]>
   async getFilters(@Query() query: FilterProductDto): Promise<FilterOutput[]> {
     return this.productFilterService.getSmartFiltersForCategory(query);
   }
@@ -230,96 +231,6 @@ export class ProductsController {
       limits: { fileSize: 200 * 1024 * 1024 },
     }),
   )
-
-  // async uploadFiles(
-  //   @UploadedFiles()
-  //   files: Array<Express.Multer.File>,
-  // ) {
-  //   if (!files || files.length === 0)
-  //     throw new BadRequestException('Không có file nào được tải lên');
-
-  //   const processedFiles: any[] = [];
-  //   const uploadDir = path.join(process.cwd(), 'uploads/products');
-
-  //   if (!fs.existsSync(uploadDir)) {
-  //     fs.mkdirSync(uploadDir, { recursive: true });
-  //   }
-
-  //   for (const file of files) {
-  //     // Xác định file này là Ảnh hay Video
-  //     const isVideo = file.mimetype.startsWith('video/');
-
-  //     // 1. KIỂM TRA DUNG LƯỢNG RIÊNG BIỆT (Ảnh 50MB, Video 200MB)
-  //     const maxImageSize = 50 * 1024 * 1024; // 50MB
-  //     const maxVideoSize = 200 * 1024 * 1024; // 200MB
-
-  //     if (!isVideo && file.size > maxImageSize) {
-  //       throw new BadRequestException(
-  //         `Ảnh "${file.originalname}" vượt quá 50MB`,
-  //       );
-  //     }
-  //     if (isVideo && file.size > maxVideoSize) {
-  //       throw new BadRequestException(
-  //         `Video "${file.originalname}" vượt quá 200MB`,
-  //       );
-  //     }
-
-  //     // Tạo tên file ngẫu nhiên
-  //     const filename = `prod-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-  //     const ext = path.extname(file.originalname).toLowerCase();
-  //     const originalPath = path.join(uploadDir, `${filename}${ext}`);
-
-  //     // 2. PHÂN NHÁNH XỬ LÝ (ẢNH vs VIDEO)
-  //     if (isVideo) {
-  //       // --- XỬ LÝ VIDEO ---
-  //       // Video không thể dùng Sharp để cắt. Chỉ lưu file vật lý thẳng vào ổ cứng.
-  //       fs.writeFileSync(originalPath, file.buffer);
-
-  //       processedFiles.push({
-  //         originalName: file.originalname,
-  //         filename: `${filename}${ext}`,
-  //         path: `/uploads/products/${filename}${ext}`,
-  //         thumbnail: `/uploads/products/${filename}${ext}`, // Video không cắt được thumb, dùng luôn link gốc
-  //         medium: `/uploads/products/${filename}${ext}`,
-  //         mimetype: file.mimetype,
-  //         size: file.size,
-  //         type: 'VIDEO', // Đánh dấu là VIDEO
-  //       });
-  //     } else {
-  //       // --- XỬ LÝ ẢNH ---
-  //       // 1. Lưu ảnh gốc
-  //       await sharp(file.buffer).toFile(originalPath);
-
-  //       // 2. Tạo ảnh Thumbnail (200x200)
-  //       const thumbPath = path.join(uploadDir, `${filename}-thumb${ext}`);
-  //       await sharp(file.buffer)
-  //         .resize(200, 200, { fit: 'cover' })
-  //         .toFile(thumbPath);
-
-  //       // 3. Tạo ảnh Medium (800px width)
-  //       const mediumPath = path.join(uploadDir, `${filename}-medium${ext}`);
-  //       await sharp(file.buffer)
-  //         .resize(800, null, { withoutEnlargement: true })
-  //         .toFile(mediumPath);
-
-  //       processedFiles.push({
-  //         originalName: file.originalname,
-  //         filename: `${filename}${ext}`,
-  //         path: `/uploads/products/${filename}${ext}`,
-  //         thumbnail: `/uploads/products/${filename}-thumb${ext}`,
-  //         medium: `/uploads/products/${filename}-medium${ext}`,
-  //         mimetype: file.mimetype,
-  //         size: file.size,
-  //         type: 'IMAGE', // Đánh dấu là IMAGE
-  //       });
-  //     }
-  //   }
-
-  //   return {
-  //     message: 'Tải lên và xử lý file thành công',
-  //     data: processedFiles,
-  //   };
-  // }
   @Patch(':id/tags')
   @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
   async updateTags(
@@ -421,5 +332,48 @@ export class ProductsController {
       generateThumbnail: true, // Product thì cần thumbnail
       generateMedium: true, // Product thì cần size vừa
     });
+  }
+
+  // INTERNAL API CHO AI AGENT (n8n) SỬ DỤNG
+  @Get('internal/chatbot/search')
+  @Public()
+  @ApiOperation({ summary: 'API nội bộ cho Chatbot tìm kiếm sản phẩm' })
+  async chatbotSearchProduct(@Query('keyword') keyword: string) {
+    const cleanKeyword = keyword
+      ? keyword.replace(/['"]/g, '').trim()
+      : undefined;
+
+    if (!cleanKeyword) {
+      throw new BadRequestException('Vui lòng cung cấp keyword tìm kiếm');
+    }
+
+    const products = await this.productsService.searchForChatbot(cleanKeyword);
+
+    if (!products || products.length === 0) {
+      return { found: false, message: 'Không tìm thấy sản phẩm nào.' };
+    }
+
+    // Format lại dữ liệu, gom Specs (Thuộc tính) thành chuỗi cho AI dễ đọc
+    const productsData = products.map((p) => {
+      let options = 'Sản phẩm đơn (Không phân loại)';
+
+      // Nếu có biến thể, map cấu trúc specs: "Màu: Đỏ, Xanh | Size: M, L"
+      if (p.has_variants && p.specs && p.specs.length > 0) {
+        options = p.specs
+          .map((spec) => `${spec.name}: ${spec.values.join(', ')}`)
+          .join(' | ');
+      }
+
+      return {
+        name: p.name,
+        price: p.price,
+        sale_price: p.sale_price,
+        stock: p.stock,
+        available_options: options, // Cung cấp cho AI biết để tư vấn
+        url: `https://your-domain.com/products/${p.slug}`,
+      };
+    });
+
+    return { found: true, products: productsData };
   }
 }

@@ -8,7 +8,7 @@ import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Connection, Types, FilterQuery } from 'mongoose';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
-import { Order } from './schemas/order.schema';
+import { Order, OrderDocument } from './schemas/order.schema';
 import { Cart } from '../cart/schemas/cart.schema';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { Product } from 'src/modules/products/catalog/schemas/product.schema';
@@ -2017,5 +2017,33 @@ export class OrdersService {
         await session.endSession();
       }
     }
+  }
+
+  // HÀM DÀNH RIÊNG CHO CHATBOT TRA CỨU
+  async findForChatbot(orderCode?: string, phone?: string) {
+    const query: FilterQuery<OrderDocument> = { status: { $ne: 'TEMPORARY' } };
+
+    if (orderCode) {
+      // Tìm bằng Regex cực kỳ chính xác và không quan tâm hoa thường
+      query.order_code = { $regex: new RegExp(`^${orderCode}$`, 'i') };
+    } else if (phone) {
+      query.$or = [
+        { 'shipping_info.phone': phone },
+        { 'guest_info.phone': phone },
+      ];
+    }
+
+    return this.orderModel
+      .find(query)
+      .sort({ createdAt: -1 })
+      .limit(3)
+      .lean()
+      .exec();
+  }
+
+  async findOneByCodeAndPhone(order_code: string, phone: string) {
+    return this.orderModel
+      .findOne({ order_code, 'shipping_info.phone': phone })
+      .exec();
   }
 }

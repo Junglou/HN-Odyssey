@@ -244,6 +244,56 @@ export class EmailService {
     });
   }
 
+  // THÊM MỚI: Gửi xác nhận tạo Ticket hỗ trợ (AC5)
+  async sendTicketConfirmation(email: string, messageContent: string) {
+    const currentYear = new Date().getFullYear();
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; background-color: #ffffff;">
+        
+        <div style="background-color: #000000; color: #ffffff; padding: 25px 20px; text-align: center;">
+           <h2 style="margin: 0; letter-spacing: 2px; font-size: 24px;">H&N ODYSSEY</h2>
+        </div>
+        
+        <div style="padding: 30px 25px;">
+          <h3 style="color: #333333; margin-top: 0; font-size: 20px;">Yêu Cầu Hỗ Trợ Đã Được Ghi Nhận</h3>
+          <p style="color: #555555; line-height: 1.6; font-size: 15px;">Xin chào,</p>
+          <p style="color: #555555; line-height: 1.6; font-size: 15px;">
+            Cảm ơn bạn đã liên hệ với bộ phận CSKH của <strong>H&N Odyssey</strong>. Chúng tôi đã nhận được yêu cầu hỗ trợ của bạn với nội dung chi tiết như sau:
+          </p>
+          
+          <div style="background-color: #f8f9fa; border-left: 4px solid #000000; padding: 15px 20px; margin: 25px 0; color: #444444; font-style: italic; border-radius: 0 4px 4px 0;">
+            "${messageContent}"
+          </div>
+          
+          <p style="color: #555555; line-height: 1.6; font-size: 15px;">
+            Đội ngũ hỗ trợ đang tiến hành kiểm tra và sẽ phản hồi lại cho bạn qua email này trong vòng <strong>24 giờ làm việc</strong>.
+          </p>
+          <p style="color: #555555; line-height: 1.6; font-size: 15px;">
+            Nếu có thêm bất kỳ thông tin nào cần bổ sung (hình ảnh, video báo lỗi...), bạn vui lòng trả lời <em>(Reply)</em> trực tiếp email này.
+          </p>
+          
+          <p style="color: #555555; line-height: 1.6; font-size: 15px; margin-bottom: 0; margin-top: 30px;">
+            Trân trọng,<br>
+            <strong style="color: #000000;">Đội ngũ H&N Odyssey</strong>
+          </p>
+        </div>
+        
+        <div style="background-color: #f1f1f1; padding: 20px; text-align: center; font-size: 12px; color: #888888; border-top: 1px solid #eeeeee;">
+           &copy; ${currentYear} H&N Odyssey. All rights reserved.<br><br>
+           Hotline: 1900 xxxx | Email: support@hnodyssey.com
+        </div>
+        
+      </div>
+    `;
+
+    await this.mailerService.sendMail({
+      to: email,
+      subject: '[H&N Odyssey] Xác nhận tiếp nhận yêu cầu hỗ trợ',
+      html: htmlContent,
+    });
+  }
+
   // Hàm chung gửi mail bất kỳ
   async sendRaw(to: string, subject: string, content: string) {
     await this.mailerService.sendMail({

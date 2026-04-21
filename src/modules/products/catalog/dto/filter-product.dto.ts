@@ -30,5 +30,9 @@ export class FilterProductDto {
   limit?: number = 20;
 
   @IsOptional()
+  @IsString()
+  keyword?: string;
+
+  @IsOptional()
   attributes?: Record<string, string>;
 }
