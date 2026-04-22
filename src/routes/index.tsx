@@ -47,6 +47,8 @@ import MarketingAndPromotionPage from "../pages/portal/Dashboard/MarketingAndPro
 import BusinessIntelligencePage from "../pages/portal/Dashboard/BusinessIntelligence/BusinessIntelligencePage";
 import InventoryManagementPage from "../pages/portal/Dashboard/InventoryManagement/InventoryManagementPage";
 
+import StockManagementPage from "../pages/portal/Warehouse/StockManagementPage";
+
 export const router = createBrowserRouter([
   // route auth
   {
@@ -228,6 +230,10 @@ export const router = createBrowserRouter([
       {
         path: "inventory",
         element: <InventoryManagementPage />,
+      },
+      {
+        path: "warehouse",
+        element: <StockManagementPage />,
       },
     ],
   },

@@ -1,4 +1,5 @@
-.pm-page-container {
+/* container trang vận hành kho */
+.sm-page-container {
   display: flex;
   flex-direction: column;
   gap: clamp(12px, 2vw, 20px);

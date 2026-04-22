@@ -1,0 +1,289 @@
+import React, { useState, useEffect, useRef } from "react";
+import "./QuickAdjustModal.css";
+import { CloseIcon } from "../../../../assets/icons/RoleManagementIcons";
+import { ChevronDownIcon } from "../../../../assets/icons/HeaderIcons";
+
+interface QuickAdjustModalProps {
+  isOpen: boolean;
+  sku: string;
+  productName: string;
+  currentStock?: number;
+  minStock?: number;
+  maxStock?: number;
+  onClose: () => void;
+  onSubmit: (payload: {
+    type: string;
+    quantity: number;
+    reason: string;
+  }) => void;
+}
+
+// custom select bên trong modal
+function ModalSelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (val: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // xử lý click ra ngoài để đóng dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const currentLabel =
+    options.find((opt) => opt.value === value)?.label || options[0].label;
+
+  return (
+    <div className="qam-custom-select" ref={dropdownRef}>
+      <div
+        className={`qam-select-trigger ${isOpen ? "active" : ""}`}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span>{currentLabel}</span>
+        <ChevronDownIcon
+          className={`qam-select-arrow ${isOpen ? "open" : ""}`}
+        />
+      </div>
+      {isOpen && (
+        <div className="qam-select-options">
+          {options.map((opt) => (
+            <div
+              key={opt.value}
+              className={`qam-select-option ${value === opt.value ? "selected" : ""}`}
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function QuickAdjustModal({
+  isOpen,
+  sku,
+  productName,
+  currentStock,
+  minStock,
+  maxStock,
+  onClose,
+  onSubmit,
+}: QuickAdjustModalProps) {
+  // state lưu trữ dữ liệu form
+  const [type, setType] = useState("add");
+  const [quantity, setQuantity] = useState<number | "">("");
+  const [reason, setReason] = useState("");
+
+  if (!isOpen) return null;
+
+  const quantityNum = Number(quantity);
+  const stockToUse = currentStock !== undefined ? currentStock : 0;
+  const newStock =
+    type === "add" ? stockToUse + quantityNum : stockToUse - quantityNum;
+
+  const isOverRemove =
+    type === "remove" &&
+    currentStock !== undefined &&
+    quantityNum > currentStock;
+  const isOverMax =
+    type === "add" &&
+    maxStock !== undefined &&
+    newStock > maxStock &&
+    quantityNum > 0;
+  const isUnderMin =
+    type === "remove" &&
+    minStock !== undefined &&
+    newStock < minStock &&
+    quantityNum > 0 &&
+    !isOverRemove;
+
+  const adjustOptions = [
+    { value: "add", label: "Add Stock" },
+    ...(currentStock === undefined || currentStock > 0
+      ? [{ value: "remove", label: "Remove Stock" }]
+      : []),
+  ];
+
+  // submit handler
+  const handleCloseModal = () => {
+    setType("add");
+    setQuantity("");
+    setReason("");
+    onClose();
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quantity || Number(quantity) <= 0 || !reason.trim() || isOverRemove)
+      return;
+
+    onSubmit({
+      type,
+      quantity: Number(quantity),
+      reason,
+    });
+
+    handleCloseModal();
+  };
+
+  return (
+    <div className="qam-modal-overlay">
+      <div className="qam-modal-box">
+        {/* header section */}
+        <div className="qam-modal-header">
+          <div className="qam-header-content">
+            <h2 className="qam-modal-title">Quick Adjust Stock</h2>
+            <p className="qam-modal-subtitle">
+              Adjusting: <strong>{sku}</strong> - {productName}
+            </p>
+            {currentStock !== undefined && (
+              <p className="qam-modal-subtitle" style={{ marginTop: 4 }}>
+                Current Stock: <strong>{currentStock}</strong>
+              </p>
+            )}
+          </div>
+          <button
+            className="qam-modal-close"
+            onClick={handleCloseModal}
+            type="button"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        {/* main form section */}
+        <form onSubmit={handleFormSubmit} className="qam-modal-form">
+          <div className="qam-form-group">
+            <label>
+              Adjustment Type <span className="qam-req">*</span>
+            </label>
+            <ModalSelect
+              value={type}
+              options={adjustOptions}
+              onChange={(val) => {
+                setType(val);
+                setQuantity("");
+                setReason("");
+              }}
+            />
+          </div>
+
+          <div className="qam-form-group">
+            <label>
+              Quantity <span className="qam-req">*</span>
+            </label>
+            <input
+              type="number"
+              min="1"
+              max={
+                type === "remove" && currentStock !== undefined
+                  ? currentStock
+                  : undefined
+              }
+              className="qam-input"
+              value={quantity}
+              onChange={(e) =>
+                setQuantity(e.target.value === "" ? "" : Number(e.target.value))
+              }
+              placeholder="Enter quantity"
+              required
+            />
+            {isOverRemove && (
+              <span
+                style={{
+                  fontSize: "0.85rem",
+                  color: "#e1251b",
+                  marginTop: 4,
+                  fontWeight: 500,
+                }}
+              >
+                Cannot remove more than current stock ({currentStock}).
+              </span>
+            )}
+            {isOverMax && (
+              <span
+                style={{
+                  fontSize: "0.85rem",
+                  color: "#d97706",
+                  marginTop: 4,
+                  fontWeight: 500,
+                }}
+              >
+                Warning: Exceeds max limit (Max: {maxStock}).
+              </span>
+            )}
+            {isUnderMin && (
+              <span
+                style={{
+                  fontSize: "0.85rem",
+                  color: "#d97706",
+                  marginTop: 4,
+                  fontWeight: 500,
+                }}
+              >
+                Warning: Drops below safe limit (Min: {minStock}).
+              </span>
+            )}
+          </div>
+
+          <div className="qam-form-group">
+            <label>
+              Reason <span className="qam-req">*</span>
+            </label>
+            <textarea
+              className="qam-textarea"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Enter details for this adjustment"
+              rows={3}
+              required
+            />
+          </div>
+
+          {/* actions layout */}
+          <div className="qam-modal-actions">
+            <button
+              type="submit"
+              className="qam-btn-submit"
+              disabled={
+                !quantity ||
+                Number(quantity) <= 0 ||
+                !reason.trim() ||
+                isOverRemove
+              }
+            >
+              Confirm Adjustment
+            </button>
+            <button
+              type="button"
+              className="qam-btn-cancel"
+              onClick={handleCloseModal}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

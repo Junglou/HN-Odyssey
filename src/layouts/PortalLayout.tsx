@@ -30,6 +30,7 @@ const PortalLayout = () => {
   const [isMarketingSuiteOpen, setIsMarketingSuiteOpen] = useState(false);
   const [isCommunicationOpen, setIsCommunicationOpen] = useState(false);
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+  const [isWarehouseOpen, setIsWarehouseOpen] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
   const isParentActive = (basePath: string) =>
@@ -184,11 +185,36 @@ const PortalLayout = () => {
             <ChevronIcon open={false} />
           </div>
 
-          <div className="menu-item">
-            <div className="menu-item-left">
-              <WarehouseIcon /> Warehouse (WMS)
+          {/* Warehouse (WMS) */}
+          <div className="menu-group">
+            <div
+              className={`menu-item ${isParentActive("/portal/warehouse") ? "active-parent" : ""}`}
+              onClick={() => setIsWarehouseOpen(!isWarehouseOpen)}
+            >
+              <div className="menu-item-left">
+                <WarehouseIcon /> Warehouse (WMS)
+              </div>
+              <ChevronIcon open={isWarehouseOpen} />
             </div>
-            <ChevronIcon open={false} />
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateRows: isWarehouseOpen ? "1fr" : "0fr",
+                transition:
+                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+                overflow: "hidden",
+              }}
+            >
+              <div className="submenu" style={{ minHeight: 0 }}>
+                <div
+                  className={`submenu-item ${isActive("/portal/warehouse") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/warehouse")}
+                >
+                  Stock Management
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Customer CRM */}
