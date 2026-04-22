@@ -15,8 +15,9 @@ import {
   HttpStatus,
   HttpException,
   BadRequestException,
+  Request,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request as ExpressRequest, Response } from 'express';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import {
@@ -37,6 +38,14 @@ import { FilterOutput, ProductFilterService } from '../products-filter.service';
 import type { ProductQueryParam } from 'src/common/interfaces/product.interface';
 import { ContentService } from 'src/modules/marketing/content/content.service';
 import { ApiOperation } from '@nestjs/swagger';
+import { AlgoliaService } from 'src/modules/search/algolia.service';
+
+interface RequestWithOptionalUser extends ExpressRequest {
+  user?: {
+    _id?: string;
+    id?: string;
+  };
+}
 
 @Controller('products')
 export class ProductsController {
@@ -44,13 +53,25 @@ export class ProductsController {
     private readonly productsService: ProductsService,
     private readonly productFilterService: ProductFilterService,
     private readonly contentService: ContentService,
+    private readonly algoliaService: AlgoliaService,
   ) {}
+
+  // API chạy tạm để đồng bộ Algolia
+  @Get('trigger-algolia-sync')
+  async triggerAlgoliaSync() {
+    return this.productsService.bulkSyncToAlgolia();
+  }
 
   // PUBLIC API (STOREFRONT)
 
+  @Public() // Vẫn là Public vì Guest được gọi
   @Get('filters')
-  async getFilters(@Query() query: FilterProductDto): Promise<FilterOutput[]> {
-    return this.productFilterService.getSmartFiltersForCategory(query);
+  async getFilters(
+    @Query() query: FilterProductDto,
+    @Request() req: RequestWithOptionalUser,
+  ): Promise<FilterOutput[]> {
+    const userId = req.user?._id || req.user?.id;
+    return this.productFilterService.getSmartFiltersForCategory(query, userId);
   }
 
   @Public()
@@ -375,5 +396,12 @@ export class ProductsController {
     });
 
     return { found: true, products: productsData };
+  }
+
+  // Trong products.controller.ts
+  @Get('trigger-algolia-setup')
+  @Roles(Role.SUPER_ADMIN)
+  async triggerAlgoliaSetup() {
+    return this.algoliaService.setupAlgoliaIndicesAndReplicas();
   }
 }

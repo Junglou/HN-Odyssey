@@ -71,6 +71,35 @@ export class ContentService {
     private readonly auditLogsService: AuditLogsService,
   ) {}
 
+  async findAllPages(query: QueryPageDto) {
+    const page = Number(query.page || 1);
+    const limit = Number(query.limit || 10);
+    const skip = (page - 1) * limit;
+
+    const filter: FilterQuery<StaticPage> = { is_deleted: false };
+    if (query.status) filter.status = query.status;
+
+    const [data, total] = await Promise.all([
+      this.pageModel
+        .find(filter)
+        .sort({ created_at: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      this.pageModel.countDocuments(filter),
+    ]);
+
+    return {
+      data,
+      meta: {
+        totalItems: total,
+        itemsPerPage: limit,
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
   // XỬ LÝ BLOG POSTS (US.125)
 
   private async checkSlugExist(

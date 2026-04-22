@@ -53,6 +53,15 @@ export class AttributesService {
       throw new ConflictException(`Mã thuộc tính '${code}' đã tồn tại.`);
     }
 
+    const existsName = await this.attributeModel.findOne({
+      name: createDto.name,
+    });
+    if (existsName) {
+      throw new ConflictException(
+        `Tên thuộc tính '${createDto.name}' đã tồn tại.`,
+      );
+    }
+
     //AC4: Logic cho Màu sắc (Bắt buộc có mã Hex hợp lệ)
     if (display_type === AttributeType.COLOR_SWATCH) {
       if (!values || values.length === 0) {
@@ -156,6 +165,16 @@ export class AttributesService {
       const isUsed = await this.productModel.exists({
         'attributes.code': attr.code,
       });
+
+      if (updateDto.name && updateDto.name !== attr.name) {
+        const existsName = await this.attributeModel.findOne({
+          name: updateDto.name,
+          _id: { $ne: id }, // Bỏ qua chính nó
+        });
+        if (existsName) {
+          throw new ConflictException('Tên thuộc tính mới đã tồn tại');
+        }
+      }
 
       if (isUsed) {
         throw new BadRequestException(

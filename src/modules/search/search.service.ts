@@ -10,6 +10,31 @@ import {
   ProductDocument,
 } from '../products/catalog/schemas/product.schema';
 import { ProductStatus } from 'src/common/enums/product-status.enum';
+import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
+import { Department } from 'src/common/enums/department.enum';
+import {
+  Attribute,
+  AttributeDocument,
+} from '../products/attributes/schemas/attribute.schema';
+import { AlgoliaService } from './algolia.service';
+
+interface AtlasSearchConfig {
+  index: string;
+  text?: {
+    query: string;
+    path: string | string[];
+    fuzzy?: {
+      maxEdits?: number;
+      prefixLength?: number;
+    };
+  };
+  score?: {
+    boost?: {
+      path: string;
+      undefined?: number;
+    };
+  };
+}
 
 @Injectable()
 export class SearchService {
@@ -17,85 +42,147 @@ export class SearchService {
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
     @InjectModel(SearchHistory.name)
     private searchHistoryModel: Model<SearchHistoryDocument>,
+    private readonly auditLogsService: AuditLogsService,
+    @InjectModel(Attribute.name)
+    private attributeModel: Model<AttributeDocument>,
+    private algoliaService: AlgoliaService,
   ) {}
 
-  private blackList = ['thô tục', 'sex', 'cấm', 'sensitive']; // AC12
+  private blackList = ['thô tục', 'sex', 'cấm', 'sensitive'];
 
+  // 4. CẬP NHẬT LẠI HÀM NÀY (Thay thế mock rỗng)
   async reindexAttributes(): Promise<void> {
-    // Sau này logic kết nối ElasticSearch/Algolia sẽ viết ở đây
-    console.log(
-      '[SEARCH ENGINE] Đang đánh chỉ mục lại (Re-indexing) Attribute...',
-    );
-    console.log('[SEARCH ENGINE] Đã cập nhật Index thành công!');
+    try {
+      // B1: Lấy danh sách các code thuộc tính đang cho phép lọc trên hệ thống
+      const filterableAttributes = await this.attributeModel
+        .find({
+          is_active: true,
+          is_filterable: true,
+        })
+        .select('code')
+        .lean()
+        .exec();
 
-    // Giả lập độ trễ mạng
-    await new Promise((resolve) => setTimeout(resolve, 500));
+      const filterableCodes = filterableAttributes.map((attr) => attr.code);
+
+      // B2: Gọi Algolia để khai báo lại các Facets này
+      if (filterableCodes.length > 0) {
+        await this.algoliaService.updateFacetsConfig(filterableCodes);
+        console.log(
+          `[SearchService] Đã kích hoạt Re-index cấu hình bộ lọc cho ${filterableCodes.length} thuộc tính.`,
+        );
+      }
+    } catch (error) {
+      console.error(
+        '[SearchService] Lỗi hệ thống khi Re-index thuộc tính Algolia:',
+        error,
+      );
+    }
   }
 
-  async getSuggestions(keyword: string, userId?: string, deviceId?: string) {
-    // AC1: Chưa nhập gì -> Trả về History & Trending
+  async getSuggestions(
+    keyword: string,
+    userId?: string,
+    deviceId?: string,
+    ip?: string,
+    userAgent?: string,
+  ) {
     if (!keyword || keyword.trim() === '') {
       return this.getHistoryAndTrending(userId, deviceId);
     }
 
     const cleanKeyword = keyword.trim();
 
-    // AC12: Blacklist
     if (
       this.blackList.some((bad) => cleanKeyword.toLowerCase().includes(bad))
     ) {
       return { keywords: [], products: [] };
     }
 
-    // AC15: Log (Fire & Forget)
     void this.logSearchTerm(cleanKeyword, userId, deviceId);
 
-    //TÌM SẢN PHẨM BẰNG ATLAS SEARCH (FUZZY AI)
+    let searchConfig: AtlasSearchConfig = {
+      index: 'default',
+      text: {
+        query: cleanKeyword,
+        path: ['name', 'tags'],
+        fuzzy: {
+          maxEdits: 2,
+          prefixLength: 1,
+        },
+      },
+    };
 
-    //Pipeline này thay thế cho cả Text Search và Regex cũ
-    const productResults = await this.productModel.aggregate([
-      {
-        $search: {
-          index: 'default',
-          text: {
-            query: cleanKeyword,
-            path: ['name', 'tags'], // Tìm trong tên và tags
-            fuzzy: {
-              maxEdits: 2, // Cho phép sai lỗi chính tả (ipone -> iphone)
-              prefixLength: 1, // Ký tự đầu phải đúng
-            },
+    if (userId) {
+      searchConfig = {
+        ...searchConfig,
+        score: {
+          boost: {
+            path: 'rating_average',
+            undefined: 1,
           },
         },
-      },
-      {
-        $match: {
+      };
+    } else {
+      searchConfig = {
+        ...searchConfig,
+        score: {
+          boost: {
+            path: 'sold_count',
+            undefined: 1,
+          },
+        },
+      };
+    }
+
+    let productResults: any[] = [];
+
+    try {
+      productResults = await this.productModel.aggregate([
+        {
+          $search: searchConfig as unknown as Record<string, unknown>,
+        },
+        {
+          $match: {
+            status: ProductStatus.ACTIVE,
+            is_deleted: false,
+          },
+        },
+        { $limit: 5 },
+        {
+          $project: {
+            _id: 1,
+            name: 1,
+            slug: 1,
+            price: 1,
+            sale_price: 1,
+            thumbnail: 1,
+            rating_average: 1,
+            sold_count: 1,
+            score: { $meta: 'searchScore' },
+          },
+        },
+      ]);
+    } catch {
+      const regex = new RegExp(this.escapeRegex(cleanKeyword), 'i');
+      productResults = await this.productModel
+        .find({
           status: ProductStatus.ACTIVE,
           is_deleted: false,
-        },
-      },
-      { $limit: 5 }, // AC11: Giới hạn 5 sản phẩm
-      {
-        $project: {
-          _id: 1,
-          name: 1,
-          slug: 1,
-          price: 1,
-          sale_price: 1,
-          thumbnail: 1,
-          rating_average: 1,
-          sold_count: 1,
-          score: { $meta: 'searchScore' }, // Lấy điểm phù hợp để debug nếu cần
-        },
-      },
-    ]);
+          $or: [{ name: { $regex: regex } }, { tags: { $regex: regex } }],
+        })
+        .sort({ sold_count: -1 })
+        .limit(5)
+        .select(
+          '_id name slug price sale_price thumbnail rating_average sold_count',
+        )
+        .lean()
+        .exec();
+    }
 
-    //TÌM TỪ KHÓA GỢI Ý (HISTORY + TAGS)
-
-    // Regex vẫn dùng cho việc highlight và tìm tags đơn giản
     const regex = new RegExp(this.escapeRegex(cleanKeyword), 'i');
 
     const [personalHistory, distinctTags] = await Promise.all([
-      // 2.1. Lịch sử cá nhân
       (async () => {
         if (!userId && !deviceId) return [];
         const historyQuery = {
@@ -109,8 +196,6 @@ export class SearchService {
           .select('keyword');
         return historyDocs.map((h) => h.keyword);
       })(),
-
-      // 2.2. Tags hệ thống
       this.productModel.distinct('tags', {
         tags: { $regex: regex },
         status: ProductStatus.ACTIVE,
@@ -121,15 +206,25 @@ export class SearchService {
       new Set([...personalHistory, ...distinctTags]),
     );
 
+    if (userId) {
+      void this.auditLogsService.log({
+        action: 'SEARCH_SUGGESTION',
+        collection_name: 'products',
+        actor_id: userId,
+        department: Department.MARKETING,
+        detail: { keyword: cleanKeyword, results_count: productResults.length },
+        ip: ip || '',
+        user_agent: userAgent || '',
+      });
+    }
+
     return {
       keywords: uniqueKeywords.slice(0, 10),
       products: productResults,
     };
   }
 
-  // AC1: Logic lấy Lịch sử & Xu hướng
   private async getHistoryAndTrending(userId?: string, deviceId?: string) {
-    // 1. Lịch sử cá nhân
     let history: string[] = [];
     if (userId || deviceId) {
       const query = userId ? { user_id: userId } : { device_id: deviceId };
@@ -141,10 +236,9 @@ export class SearchService {
       history = logs.map((l) => l.keyword);
     }
 
-    // 2. Xu hướng (Trending) - Lấy các từ khóa được tìm nhiều nhất toàn sàn
     const trendingLogs = await this.searchHistoryModel
       .find()
-      .sort({ count: -1 }) // Sắp xếp theo số lần tìm
+      .sort({ count: -1 })
       .limit(5)
       .select('keyword');
     const trending = trendingLogs.map((l) => l.keyword);
@@ -152,7 +246,6 @@ export class SearchService {
     return { history, trending };
   }
 
-  // AC15: Ghi Log thông minh (Update count nếu đã tồn tại)
   private async logSearchTerm(
     keyword: string,
     userId?: string,
@@ -160,10 +253,9 @@ export class SearchService {
   ) {
     try {
       const filter: Record<string, any> = { keyword: keyword.toLowerCase() };
-      // Nếu user đã login, log theo user, ngược lại log theo device
       if (userId) filter.user_id = userId;
       else if (deviceId) filter.device_id = deviceId;
-      else return; // Không xác định được người dùng
+      else return;
 
       await this.searchHistoryModel.findOneAndUpdate(
         filter,

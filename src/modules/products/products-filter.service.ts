@@ -19,6 +19,15 @@ import { FilterProductDto } from './catalog/dto/filter-product.dto';
 import { ProductStatus } from 'src/common/enums/product-status.enum';
 import { AttributeType } from 'src/common/enums/attribute-type.enum';
 
+import {
+  Customer,
+  CustomerDocument,
+} from 'src/modules/users/customers/schemas/customer.schema';
+import {
+  MemberTier,
+  MemberTierDocument,
+} from 'src/modules/marketing/loyalty/schemas/member-tier.schema';
+
 // 1. ĐỊNH NGHĨA INTERFACE CHO KẾT QUẢ AGGREGATION
 export interface CountResult {
   _id: { code: string; value: string };
@@ -55,10 +64,12 @@ export class ProductFilterService {
     private attributeModel: Model<AttributeDocument>,
     @InjectModel(Category.name) private categoryModel: Model<CategoryDocument>,
     private readonly categoriesService: CategoriesService,
+    @InjectModel(Customer.name) private customerModel: Model<CustomerDocument>,
+    @InjectModel(MemberTier.name) private tierModel: Model<MemberTierDocument>,
   ) {}
 
   // API chính phục vụ Frontend (US.2)
-  async getSmartFiltersForCategory(dto: FilterProductDto) {
+  async getSmartFiltersForCategory(dto: FilterProductDto, userId?: string) {
     const { categorySlug, attributes } = dto;
 
     //Bắt buộc phải có định danh danh mục
@@ -110,6 +121,38 @@ export class ProductFilterService {
       is_deleted: false,
       stock: { $gt: 0 },
     };
+
+    // XÁC ĐỊNH RANK CỦA USER
+    let userRank = 0;
+    if (userId) {
+      const customer = await this.customerModel
+        .findById(userId)
+        .select('loyalty')
+        .lean();
+      const userTierCode = customer?.loyalty?.tier || 'SILVER';
+
+      const tierConfig = await this.tierModel
+        .findOne({ code: userTierCode })
+        .lean();
+
+      interface ExtendedTierData {
+        rank_level?: number;
+      }
+
+      const tierData = tierConfig as unknown as ExtendedTierData;
+
+      userRank = tierData?.rank_level ?? 0;
+    }
+
+    // BẢO MẬT HIỂN THỊ (AC14)
+    // Chặn đếm số lượng các sản phẩm yêu cầu Rank cao hơn Rank hiện tại
+    matchStage.$or = [
+      { is_member_only: { $ne: true } }, // 1. Mở cho mọi người (Không phải hàng Member)
+      {
+        is_member_only: true,
+        rank_required: { $lte: userRank }, // 2. Hàng Member NHƯNG user đủ Rank
+      },
+    ];
 
     // Apply filters đang chọn
     if (attributes) {

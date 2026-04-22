@@ -28,6 +28,7 @@ import {
 } from 'src/modules/marketing/loyalty/schemas/member-tier.schema';
 import { MarketingModule } from 'src/modules/marketing/marketing.module';
 import { PriceHistorySchema } from './schemas/price-history.schema.ts';
+import { AlgoliaService } from 'src/modules/search/algolia.service';
 
 @Module({
   imports: [
@@ -51,7 +52,7 @@ import { PriceHistorySchema } from './schemas/price-history.schema.ts';
     MarketingModule,
   ],
   controllers: [ProductsController],
-  providers: [ProductsService, ProductFilterService],
-  exports: [ProductsService],
+  providers: [ProductsService, ProductFilterService, AlgoliaService],
+  exports: [ProductsService, AlgoliaService],
 })
 export class ProductsCatalogModule {}

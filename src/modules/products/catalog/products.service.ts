@@ -58,6 +58,13 @@ import {
 } from 'src/modules/marketing/loyalty/schemas/member-tier.schema';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ContentService } from 'src/modules/marketing/content/content.service';
+import { AlgoliaService } from 'src/modules/search/algolia.service';
+
+interface PopulatedCategory {
+  _id: Types.ObjectId;
+  name: string;
+  slug: string;
+}
 
 @Injectable()
 export class ProductsService {
@@ -74,7 +81,29 @@ export class ProductsService {
     @InjectModel(Customer.name) private customerModel: Model<CustomerDocument>,
     @InjectModel(MemberTier.name) private tierModel: Model<MemberTierDocument>,
     private readonly contentService: ContentService,
+    private readonly algoliaService: AlgoliaService,
   ) {}
+
+  async syncToSearchEngine(product: ProductDocument) {
+    const populatedProduct = await this.productModel
+      .findById(product._id)
+      .populate('categories', 'name') // Chỉ lấy field name
+      .lean()
+      .exec();
+
+    if (!populatedProduct) return;
+
+    // Ép kiểu an toàn để lấy danh sách tên danh mục
+    const categories = (populatedProduct.categories ||
+      []) as unknown as PopulatedCategory[];
+    const categoryHierarchy = categories.map((c) => c.name);
+
+    // Truyền dữ liệu đã qua xử lý an toàn vào Algolia
+    await this.algoliaService.syncProduct(
+      product, // Dùng bản gốc ProductDocument để đúng kiểu dữ liệu yêu cầu
+      categoryHierarchy,
+    );
+  }
 
   // HELPER METHODS
   private async validateAttributesExist(variants: CreateProductVariantDto[]) {
@@ -762,6 +791,22 @@ export class ProductsService {
     product.status = status;
     await product.save();
 
+    // THÊM ĐOẠN NÀY: Đồng bộ lên Algolia nếu sản phẩm được ACTIVE
+    if (status === ProductStatus.ACTIVE) {
+      // Không dùng await ở đây để tránh làm chậm request của User
+      this.syncToSearchEngine(product).catch((err) => {
+        console.error('Lỗi đồng bộ Algolia:', err);
+      });
+    } else if (
+      status === ProductStatus.DRAFT ||
+      status === ProductStatus.INACTIVE
+    ) {
+      // Nếu chuyển về nháp hoặc ngưng bán -> xóa khỏi Algolia
+      this.algoliaService.removeProduct(product._id.toString()).catch((err) => {
+        console.error('Lỗi xóa Algolia:', err);
+      });
+    }
+
     // 4. Ghi Audit Log
     await this.auditLogsService.log({
       action: 'UPDATE_PRODUCT_STATUS',
@@ -1322,5 +1367,28 @@ export class ProductsService {
 
     console.log('3. Số sản phẩm DB trả về:', results.length);
     return results;
+  }
+
+  async bulkSyncToAlgolia() {
+    console.log('Bắt đầu đồng bộ dữ liệu lên Algolia...');
+
+    // Chỉ lấy các sản phẩm đang bán và chưa bị xóa
+    const products = await this.productModel
+      .find({ status: ProductStatus.ACTIVE, is_deleted: false })
+      .exec();
+
+    let count = 0;
+    for (const product of products) {
+      try {
+        await this.syncToSearchEngine(product);
+        count++;
+        console.log(`Đã đồng bộ SKU: ${product.sku}`);
+      } catch (error) {
+        console.error(`Lỗi đồng bộ SKU ${product.sku}:`, error);
+      }
+    }
+
+    console.log(`Hoàn tất! Đã đẩy ${count} sản phẩm lên Algolia.`);
+    return { message: `Đã đồng bộ thành công ${count} sản phẩm lên Algolia` };
   }
 }

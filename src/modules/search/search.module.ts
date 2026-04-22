@@ -11,12 +11,18 @@ import {
   SearchHistorySchema,
 } from './schemas/search-history.schema';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { AlgoliaService } from './algolia.service';
+import {
+  Attribute,
+  AttributeSchema,
+} from '../products/attributes/schemas/attribute.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Product.name, schema: ProductSchema },
       { name: SearchHistory.name, schema: SearchHistorySchema },
+      { name: Attribute.name, schema: AttributeSchema },
     ]),
 
     ThrottlerModule.forRoot([
@@ -27,7 +33,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
     ]),
   ],
   controllers: [SearchController],
-  providers: [SearchService],
-  exports: [SearchService],
+  providers: [SearchService, AlgoliaService],
+  exports: [SearchService, AlgoliaService],
 })
 export class SearchModule {}
