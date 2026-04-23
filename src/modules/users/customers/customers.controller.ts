@@ -12,6 +12,7 @@ import {
   FileTypeValidator,
   Query,
   Param,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -34,13 +35,22 @@ import { GetMyOrdersDto } from './dto/get-my-orders.dto';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { Role } from 'src/common/enums/role.enum';
+import { ContentService } from 'src/modules/marketing/content/content.service';
+
+// Interface hỗ trợ ép kiểu an toàn cho kết quả upload
+interface IUploadResult {
+  url: string;
+}
 
 @ApiTags('Customers (Khách hàng)')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.CUSTOMER)
 @Controller('users/customers')
 export class CustomersController {
-  constructor(private readonly customersService: CustomersService) {}
+  constructor(
+    private readonly customersService: CustomersService,
+    private readonly contentService: ContentService,
+  ) {}
 
   // TRANG CÁ NHÂN
   @Get('profile')
@@ -93,10 +103,22 @@ export class CustomersController {
     )
     file: Express.Multer.File,
   ) {
-    // Note: Thực tế tại đây sẽ truyền file buffer cho Cloudinary/S3 lấy URL.
-    // Ở bước này ta mock 1 URL trả về để test flow.
-    const mockAvatarUrl = `https://your-storage.com/${file.originalname}`;
-    return this.customersService.updateAvatar(userId, mockAvatarUrl);
+    const result = await this.contentService.processAndSaveFiles([file], {
+      subFolder: 'avatars',
+      generateThumbnail: false,
+    });
+
+    // Ép kiểu an toàn (Safe Cast) qua unknown để vượt qua ESLint Strict Mode
+    const typedResult = result as unknown as IUploadResult[];
+    const avatarUrl = typedResult[0]?.url;
+
+    if (!avatarUrl) {
+      throw new BadRequestException(
+        'Lỗi hệ thống: Không thể trích xuất đường dẫn ảnh sau khi tải lên.',
+      );
+    }
+
+    return this.customersService.updateAvatar(userId, avatarUrl);
   }
 
   @Patch('change-password')
@@ -156,5 +178,22 @@ export class CustomersController {
     @Param('orderId') orderId: string,
   ) {
     return this.customersService.getMyOrderDetail(userId, orderId);
+  }
+
+  // THÊM MỚI: Route để Frontend lưu trạng thái tìm kiếm (Gọi ẩn dưới background)
+  @Patch('search-preferences')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'AC15: Lưu trạng thái bộ lọc và sắp xếp của phiên làm việc',
+  })
+  async saveSearchPreferences(
+    @CurrentUser('_id') userId: string,
+    @Body() body: { filters?: Record<string, unknown>; sort?: string },
+  ) {
+    return this.customersService.saveSearchPreferences(
+      userId,
+      body.filters,
+      body.sort,
+    );
   }
 }

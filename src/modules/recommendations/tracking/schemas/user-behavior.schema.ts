@@ -15,6 +15,8 @@ export enum BehaviorAction {
   ADD_PAYMENT_INFO = 'ADD_PAYMENT_INFO',
   PURCHASE = 'PURCHASE',
   EXIT_PAGE = 'EXIT_PAGE',
+  CLICK_SEARCH_SUGGESTION = 'CLICK_SEARCH_SUGGESTION', // User click vào gợi ý (Keyword hoặc Product)
+  APPLY_FILTER = 'APPLY_FILTER', // User áp dụng bộ lọc / sắp xếp
 }
 
 export enum DeviceType {
@@ -37,6 +39,10 @@ export interface TrackingMetadata {
   exit_page?: string;
   cart_snapshot?: Record<string, unknown>[];
   guest_email?: string; // Phục vụ lưu email khách vãng lai
+  search_keyword?: string; // Từ khóa user đã nhập
+  suggestion_type?: 'KEYWORD' | 'PRODUCT'; // Loại gợi ý user đã click
+  filters_applied?: Record<string, any>; // Lưu object bộ lọc user đang dùng (vd: { color: 'red', size: 'M' })
+  sort_applied?: string; // Lưu tiêu chí sắp xếp (vd: 'price_asc')
 }
 
 @Schema({ collection: 'user_behaviors', timestamps: true })

@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -85,22 +87,31 @@ export class ProductsService {
   ) {}
 
   async syncToSearchEngine(product: ProductDocument) {
+    // Sửa lỗi bằng cách truyền Generic vào hàm populate để định nghĩa kiểu dữ liệu sau khi populate
     const populatedProduct = await this.productModel
       .findById(product._id)
-      .populate('categories', 'name') // Chỉ lấy field name
+      .populate<{ categories: PopulatedCategory[] }>('categories', 'name slug')
       .lean()
       .exec();
 
-    if (!populatedProduct) return;
+    // Kiểm tra an toàn
+    if (!populatedProduct || !populatedProduct.categories) {
+      console.warn(
+        `[Algolia] Sản phẩm ${product.sku} không có danh mục hợp lệ.`,
+      );
+      return;
+    }
 
-    // Ép kiểu an toàn để lấy danh sách tên danh mục
-    const categories = (populatedProduct.categories ||
-      []) as unknown as PopulatedCategory[];
-    const categoryHierarchy = categories.map((c) => c.name);
+    // Khai báo kiểu string[] rõ ràng cho categoryHierarchy
+    const categoryHierarchy: string[] = populatedProduct.categories.map(
+      (c) => c.name,
+    );
 
-    // Truyền dữ liệu đã qua xử lý an toàn vào Algolia
-    await this.algoliaService.syncProduct(
-      product, // Dùng bản gốc ProductDocument để đúng kiểu dữ liệu yêu cầu
+    // Truyền categoryHierarchy (kiểu string[]) vào hàm syncProduct một cách an toàn
+    await this.algoliaService.syncProduct(product, categoryHierarchy);
+
+    console.log(
+      `[Algolia] Đã đồng bộ SKU: ${product.sku} với categories:`,
       categoryHierarchy,
     );
   }
@@ -541,7 +552,16 @@ export class ProductsService {
       .exec();
 
     if (!product) {
-      // Logic tìm old_slugs
+      const oldProduct = await this.productModel
+        .findOne({ old_slugs: slug })
+        .select('slug')
+        .lean();
+      if (oldProduct) {
+        throw new HttpException(
+          { message: 'Sản phẩm đã đổi đường dẫn', new_slug: oldProduct.slug },
+          HttpStatus.MOVED_PERMANENTLY,
+        );
+      }
       throw new NotFoundException('Sản phẩm không tìm thấy');
     }
 
@@ -1069,15 +1089,23 @@ export class ProductsService {
     }
 
     // 3. Xóa vĩnh viễn (AC4)
-    await this.productModel.findByIdAndDelete(id);
-    // // 3. THỰC HIỆN SOFT DELETE (Thay vì hard delete như cũ)
-    // product.is_deleted = true;
-    // product.status = ProductStatus.DRAFT; // Reset về Draft hoặc Archived
-    // await product.save();
+    // await this.productModel.findByIdAndDelete(id);
+    // 3. THỰC HIỆN SOFT DELETE (Thay vì hard delete như cũ)
+    product.is_deleted = true;
+    product.status = ProductStatus.DRAFT; // Reset về Draft hoặc Archived
+    await product.save();
+
+    try {
+      await this.algoliaService.removeProduct(id);
+      console.log(`[Algolia] Đã gỡ sản phẩm ${id} do bị xóa.`);
+    } catch (err) {
+      console.error('Lỗi xóa Algolia khi Soft Delete:', err);
+    }
 
     // 4. Log (AC5)
     await this.auditLogsService.log({
-      action: 'HARD_DELETE_PRODUCT',
+      // action: 'HARD_DELETE_PRODUCT',
+      action: 'SOFT_DELETE_PRODUCT',
       collection_name: 'products',
       actor_id: userId,
       target_id: id,
@@ -1272,6 +1300,7 @@ export class ProductsService {
       meta: {
         total,
         page,
+        limit,
         lastPage: Math.ceil(total / limit),
         sub_categories: subCategories,
         category: {
@@ -1372,7 +1401,10 @@ export class ProductsService {
   async bulkSyncToAlgolia() {
     console.log('Bắt đầu đồng bộ dữ liệu lên Algolia...');
 
-    // Chỉ lấy các sản phẩm đang bán và chưa bị xóa
+    // BƯỚC 1: Xóa sạch dữ liệu cũ trên Algolia trước khi đồng bộ lại
+    await this.algoliaService.clearAllProducts();
+
+    // BƯỚC 2: Chỉ lấy các sản phẩm đang bán và chưa bị xóa
     const products = await this.productModel
       .find({ status: ProductStatus.ACTIVE, is_deleted: false })
       .exec();
@@ -1382,7 +1414,6 @@ export class ProductsService {
       try {
         await this.syncToSearchEngine(product);
         count++;
-        console.log(`Đã đồng bộ SKU: ${product.sku}`);
       } catch (error) {
         console.error(`Lỗi đồng bộ SKU ${product.sku}:`, error);
       }

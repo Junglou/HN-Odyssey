@@ -57,6 +57,13 @@ export class Customer extends User {
 
   @Prop({ default: '' })
   status_reason: string; // AC4: Lý do thay đổi trạng thái (Bắt buộc)
+
+  // THÊM MỚI: Lưu cấu hình bộ lọc/sắp xếp gần nhất của User (US.5 - AC15)
+  @Prop({ type: Object, default: {} })
+  search_preferences: {
+    last_filters?: Record<string, any>;
+    last_sort?: string;
+  };
 }
 
 export type CustomerDocument = Customer & Document;

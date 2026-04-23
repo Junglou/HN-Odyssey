@@ -476,4 +476,30 @@ export class CustomersService {
       data: order,
     };
   }
+
+  // THÊM MỚI: Lưu cấu hình tìm kiếm/lọc của user (US.5 TB - AC15)
+  async saveSearchPreferences(
+    userId: string,
+    filters?: Record<string, any>,
+    sort?: string,
+  ) {
+    // FIX ESLINT: Khai báo Record cụ thể thay vì dùng kiểu 'any' lỏng lẻo
+    const updateData: Record<string, unknown> = {};
+
+    if (filters !== undefined) {
+      updateData['search_preferences.last_filters'] = filters;
+    }
+
+    if (sort !== undefined) {
+      updateData['search_preferences.last_sort'] = sort;
+    }
+
+    await this.userModel.findByIdAndUpdate(
+      userId,
+      { $set: updateData }, // Bây giờ $set đã nhận được 1 Object an toàn, hết báo lỗi unsafe-assignment
+      { new: true },
+    );
+
+    return { success: true, message: 'Đã lưu trạng thái tìm kiếm/lọc' };
+  }
 }

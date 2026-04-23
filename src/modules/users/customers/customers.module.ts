@@ -19,6 +19,7 @@ import {
   AuditLog,
   AuditLogSchema,
 } from 'src/modules/system/audit-logs/schemas/audit-log.schema';
+import { ContentModule } from 'src/modules/marketing/content/content.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import {
     ]),
     NotificationsModule,
     AuditLogsModule,
+    ContentModule,
   ],
   controllers: [CustomersController, CustomersAdminController],
   providers: [CustomersService, CustomersAdminService],

@@ -16,6 +16,10 @@ import {
   Attribute,
   AttributeSchema,
 } from '../products/attributes/schemas/attribute.schema';
+import {
+  UserBehavior,
+  UserBehaviorSchema,
+} from '../recommendations/tracking/schemas/user-behavior.schema';
 
 @Module({
   imports: [
@@ -23,6 +27,7 @@ import {
       { name: Product.name, schema: ProductSchema },
       { name: SearchHistory.name, schema: SearchHistorySchema },
       { name: Attribute.name, schema: AttributeSchema },
+      { name: UserBehavior.name, schema: UserBehaviorSchema },
     ]),
 
     ThrottlerModule.forRoot([

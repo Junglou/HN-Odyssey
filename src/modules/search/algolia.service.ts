@@ -15,6 +15,7 @@ interface IAlgoliaIndex {
   saveObject(object: Record<string, unknown>): Promise<unknown>;
   deleteObject(objectID: string): Promise<unknown>;
   setSettings(settings: Record<string, unknown>): Promise<unknown>;
+  clearObjects(): Promise<unknown>;
 }
 
 interface IAlgoliaClient {
@@ -215,5 +216,16 @@ export class AlgoliaService {
       '[Algolia] Đã đồng bộ cấu hình Facets thành công:',
       dynamicFacets,
     );
+  }
+
+  async clearAllProducts() {
+    try {
+      await this.index.clearObjects();
+      console.log('[Algolia] Đã xóa sạch dữ liệu trên Index.');
+      return { message: 'Dữ liệu đã được làm sạch.' };
+    } catch (error) {
+      console.error('[Algolia] Lỗi khi xóa Index:', error);
+      throw error;
+    }
   }
 }

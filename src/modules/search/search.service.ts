@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import {
   SearchHistory,
   SearchHistoryDocument,
@@ -17,9 +17,16 @@ import {
   AttributeDocument,
 } from '../products/attributes/schemas/attribute.schema';
 import { AlgoliaService } from './algolia.service';
+import { ConfigService } from '@nestjs/config';
+import { UserBehavior } from '../recommendations/tracking/schemas/user-behavior.schema';
 
+// 1. Cập nhật Interface để loại bỏ lỗi "unsafe assignment" của ESLint
 interface AtlasSearchConfig {
   index: string;
+  compound?: {
+    must?: Record<string, unknown>[];
+    should?: Record<string, unknown>[];
+  };
   text?: {
     query: string;
     path: string | string[];
@@ -36,8 +43,23 @@ interface AtlasSearchConfig {
   };
 }
 
+// Định nghĩa kiểu trả về cho Product để tránh lỗi any
+export interface ProductSearchResult {
+  _id: Types.ObjectId | string;
+  name: string;
+  slug: string;
+  price: number;
+  sale_price: number;
+  thumbnail?: string;
+  rating_average?: number;
+  sold_count?: number;
+  score?: number;
+}
+
 @Injectable()
 export class SearchService {
+  private blackList: string[];
+
   constructor(
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
     @InjectModel(SearchHistory.name)
@@ -46,14 +68,37 @@ export class SearchService {
     @InjectModel(Attribute.name)
     private attributeModel: Model<AttributeDocument>,
     private algoliaService: AlgoliaService,
-  ) {}
+    private configService: ConfigService,
+    @InjectModel(UserBehavior.name) private behaviorModel: Model<UserBehavior>,
+  ) {
+    const envBlacklist = this.configService.get<string>('SEARCH_BLACKLIST');
+    this.blackList = envBlacklist
+      ? envBlacklist.split(',').map((word) => word.trim().toLowerCase())
+      : ['thô tục', 'sex', 'cấm', 'sensitive'];
+  }
 
-  private blackList = ['thô tục', 'sex', 'cấm', 'sensitive'];
+  // Lấy sở thích của User
+  private async getUserPreferences(userId: string): Promise<string[]> {
+    const behaviors = await this.behaviorModel.aggregate<{
+      _id: string;
+      count: number;
+    }>([
+      {
+        $match: {
+          user_id: new Types.ObjectId(userId),
+          action: 'VIEW_PRODUCT',
+        },
+      },
+      { $group: { _id: '$metadata.search_keyword', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 3 },
+    ]);
 
-  // 4. CẬP NHẬT LẠI HÀM NÀY (Thay thế mock rỗng)
+    return behaviors.map((b) => b._id).filter(Boolean);
+  }
+
   async reindexAttributes(): Promise<void> {
     try {
-      // B1: Lấy danh sách các code thuộc tính đang cho phép lọc trên hệ thống
       const filterableAttributes = await this.attributeModel
         .find({
           is_active: true,
@@ -65,7 +110,6 @@ export class SearchService {
 
       const filterableCodes = filterableAttributes.map((attr) => attr.code);
 
-      // B2: Gọi Algolia để khai báo lại các Facets này
       if (filterableCodes.length > 0) {
         await this.algoliaService.updateFacetsConfig(filterableCodes);
         console.log(
@@ -101,53 +145,64 @@ export class SearchService {
 
     void this.logSearchTerm(cleanKeyword, userId, deviceId);
 
-    let searchConfig: AtlasSearchConfig = {
+    // Khai báo kiểu AtlasSearchConfig đã thiết lập
+    const searchConfig: AtlasSearchConfig = {
       index: 'default',
-      text: {
-        query: cleanKeyword,
-        path: ['name', 'tags'],
-        fuzzy: {
-          maxEdits: 2,
-          prefixLength: 1,
-        },
+      compound: {
+        must: [
+          {
+            text: {
+              query: cleanKeyword,
+              path: ['name', 'tags'],
+              fuzzy: { maxEdits: 2, prefixLength: 1 },
+            },
+          },
+        ],
+        should: [],
       },
     };
 
     if (userId) {
-      searchConfig = {
-        ...searchConfig,
-        score: {
-          boost: {
-            path: 'rating_average',
-            undefined: 1,
-          },
+      const favoriteKeywords = await this.getUserPreferences(userId);
+
+      if (favoriteKeywords && favoriteKeywords.length > 0) {
+        favoriteKeywords.forEach((favWord) => {
+          searchConfig.compound?.should?.push({
+            text: {
+              query: favWord,
+              path: ['name', 'tags', 'categories.name'],
+              score: { boost: { value: 3 } },
+            },
+          });
+        });
+      }
+
+      searchConfig.compound?.should?.push({
+        near: {
+          path: 'rating_average',
+          origin: 5,
+          pivot: 2,
+          score: { boost: { value: 1.5 } },
         },
-      };
+      });
     } else {
-      searchConfig = {
-        ...searchConfig,
-        score: {
-          boost: {
-            path: 'sold_count',
-            undefined: 1,
-          },
+      searchConfig.compound?.should?.push({
+        near: {
+          path: 'sold_count',
+          origin: 1000,
+          pivot: 100,
+          score: { boost: { value: 2 } },
         },
-      };
+      });
     }
 
-    let productResults: any[] = [];
+    // Khai báo mảng kết quả có định dạng rõ ràng
+    let productResults: ProductSearchResult[] = [];
 
     try {
-      productResults = await this.productModel.aggregate([
-        {
-          $search: searchConfig as unknown as Record<string, unknown>,
-        },
-        {
-          $match: {
-            status: ProductStatus.ACTIVE,
-            is_deleted: false,
-          },
-        },
+      productResults = await this.productModel.aggregate<ProductSearchResult>([
+        { $search: searchConfig as unknown as Record<string, unknown> },
+        { $match: { status: ProductStatus.ACTIVE, is_deleted: false } },
         { $limit: 5 },
         {
           $project: {
@@ -164,8 +219,9 @@ export class SearchService {
         },
       ]);
     } catch {
+      // Fix lỗi unused variable 'error'
       const regex = new RegExp(this.escapeRegex(cleanKeyword), 'i');
-      productResults = await this.productModel
+      const fallbackResults = await this.productModel
         .find({
           status: ProductStatus.ACTIVE,
           is_deleted: false,
@@ -178,6 +234,9 @@ export class SearchService {
         )
         .lean()
         .exec();
+
+      // Ép kiểu an toàn kết quả trả về của find()
+      productResults = fallbackResults as unknown as ProductSearchResult[];
     }
 
     const regex = new RegExp(this.escapeRegex(cleanKeyword), 'i');
@@ -185,7 +244,7 @@ export class SearchService {
     const [personalHistory, distinctTags] = await Promise.all([
       (async () => {
         if (!userId && !deviceId) return [];
-        const historyQuery = {
+        const historyQuery: Record<string, unknown> = {
           ...(userId ? { user_id: userId } : { device_id: deviceId }),
           keyword: { $regex: regex },
         };
@@ -252,7 +311,9 @@ export class SearchService {
     deviceId?: string,
   ) {
     try {
-      const filter: Record<string, any> = { keyword: keyword.toLowerCase() };
+      const filter: Record<string, unknown> = {
+        keyword: keyword.toLowerCase(),
+      };
       if (userId) filter.user_id = userId;
       else if (deviceId) filter.device_id = deviceId;
       else return;
