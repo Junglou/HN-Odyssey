@@ -29,6 +29,9 @@ import {
 import { MarketingModule } from 'src/modules/marketing/marketing.module';
 import { PriceHistorySchema } from './schemas/price-history.schema.ts';
 import { AlgoliaService } from 'src/modules/search/algolia.service';
+import { ProductSeederCommand } from './seedProduct/product-seeder.command';
+import { ProductSeederService } from './seedProduct/product-seeder.service';
+import { CommandModule } from 'nestjs-command';
 
 @Module({
   imports: [
@@ -50,9 +53,16 @@ import { AlgoliaService } from 'src/modules/search/algolia.service';
     LoyaltyModule,
     UsersModule,
     MarketingModule,
+    CommandModule,
   ],
   controllers: [ProductsController],
-  providers: [ProductsService, ProductFilterService, AlgoliaService],
+  providers: [
+    ProductsService,
+    ProductFilterService,
+    AlgoliaService,
+    ProductSeederService,
+    ProductSeederCommand,
+  ],
   exports: [ProductsService, AlgoliaService],
 })
 export class ProductsCatalogModule {}

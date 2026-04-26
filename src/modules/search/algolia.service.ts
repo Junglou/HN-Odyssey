@@ -142,21 +142,32 @@ export class AlgoliaService {
     // Ép kiểu an toàn để trích xuất created_at
     const productData = product as unknown as {
       created_at?: Date | string | number;
+      is_flash_sale?: boolean;
+      margin_tier?: number;
+      allow_backorder?: boolean;
+      has_variants?: boolean;
+      review_count?: number;
     };
+
     const createdAtTime = productData.created_at
       ? new Date(productData.created_at).getTime()
       : Date.now();
 
-    // Định nghĩa Type chuẩn cho Record để pass qua IAlgoliaIndex.saveObject
+    // ĐÃ BỔ SUNG TOÀN BỘ CÁC TRƯỜNG CÒN THIẾU VÀO ĐÂY
     const record: Record<string, unknown> = {
       objectID: product._id.toString(),
       name: product.name,
       sku: product.sku,
       slug: product.slug,
+      brand: product.brand,
+      image_url: product.thumbnail,
+      description: product.description,
+      short_description: product.short_description,
       price: product.price,
       sale_price: product.sale_price > 0 ? product.sale_price : product.price,
       stock: product.stock,
       sold_count: product.sold_count,
+      view_count: product.view_count,
       rating_average: product.rating_average,
       categories: categoryHierarchy,
       attributes: attrs,
@@ -165,6 +176,13 @@ export class AlgoliaService {
       is_deleted: product.is_deleted,
       created_at: createdAtTime,
       thumbnail: product.thumbnail,
+
+      //  BỔ SUNG CÁC TRƯỜNG MỚI ĐỂ FRONTEND & AI XỬ LÝ
+      is_flash_sale: productData.is_flash_sale ?? false,
+      margin_tier: productData.margin_tier ?? 1,
+      allow_backorder: productData.allow_backorder ?? false,
+      has_variants: productData.has_variants ?? false,
+      review_count: productData.review_count ?? 0,
     };
 
     await this.index.saveObject(record);
@@ -195,6 +213,8 @@ export class AlgoliaService {
     // Các bộ lọc core bắt buộc phải có
     const baseFacets = [
       'searchable(categories)',
+      'searchable(brand)',
+      'searchable(tags)',
       'filterOnly(status)',
       'filterOnly(is_deleted)',
     ];

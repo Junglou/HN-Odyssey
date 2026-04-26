@@ -1,6 +1,6 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 
 interface IShippingItem {
   name: string;
@@ -97,10 +97,23 @@ export class GhnService {
         waybillCode: result.order_code,
         actualFee: result.total_fee,
       };
-    } catch (error) {
-      const axiosError = error as AxiosError<GhnErrorResponse>;
+    } catch (err: unknown) {
+      let errorMsg = 'Lỗi kết nối GHN';
 
-      const errorMsg = axiosError.response?.data?.message || 'Lỗi kết nối GHN';
+      // Kiểm tra thủ công thay vì dùng isAxiosError để tránh lỗi "Unsafe call"
+      const isAxiosErr =
+        typeof err === 'object' && err !== null && 'isAxiosError' in err;
+
+      if (isAxiosErr) {
+        // Ép kiểu qua unknown rồi mới sang ISafeAxiosError (Duck-typing)
+        const axiosErr = err as unknown as {
+          message: string;
+          response?: { data?: GhnErrorResponse };
+        };
+        errorMsg = axiosErr.response?.data?.message || axiosErr.message;
+      } else if (err instanceof Error) {
+        errorMsg = err.message;
+      }
 
       this.logger.error(`GHN Create Error: ${errorMsg}`);
       throw new HttpException(
@@ -119,11 +132,16 @@ export class GhnService {
         { headers: { Token: this.apiToken } },
       );
       return `https://dev-online-gateway.ghn.vn/a5/public-api/print/${response.data.data.token}`;
-    } catch (error) {
-      const axiosError = error as AxiosError;
-      this.logger.error(`GHN Print Error: ${axiosError.message}`);
+    } catch (err: unknown) {
+      const isAxiosErr =
+        typeof err === 'object' && err !== null && 'isAxiosError' in err;
+      const errMsg = isAxiosErr
+        ? (err as unknown as { message: string }).message
+        : 'Unknown error';
+
+      this.logger.error(`GHN Error: ${errMsg}`);
       throw new HttpException(
-        'Không thể lấy link in đơn',
+        'Không thể thực hiện thao tác với GHN',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -146,9 +164,16 @@ export class GhnService {
         { headers: { Token: this.apiToken } },
       );
       return response.data.data;
-    } catch (error) {
-      const axiosError = error as AxiosError;
-      this.logger.error(`GHN GetInfo Error: ${axiosError.message}`);
+    } catch (err: unknown) {
+      const isAxiosErr =
+        typeof err === 'object' && err !== null && 'isAxiosError' in err;
+      const errMsg = isAxiosErr
+        ? (err as unknown as { message: string }).message
+        : err instanceof Error
+          ? err.message
+          : 'Unknown error';
+
+      this.logger.error(`GHN GetInfo Error: ${errMsg}`);
       throw new HttpException(
         'Không thể lấy thông tin từ GHN',
         HttpStatus.BAD_REQUEST,

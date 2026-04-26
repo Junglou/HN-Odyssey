@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import axios, { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import axios from 'axios';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import {
@@ -9,8 +9,21 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
 
-interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
+// 1. Khai báo Interface độc lập, không phụ thuộc vào version của Axios để tránh lỗi Generic
+interface ITrackerConfig {
+  url?: string;
+  data?: unknown;
   metadata?: { startTime: number };
+}
+
+// 2. Duck-typing cho Axios Error thay vì import AxiosError từ thư viện
+interface ISafeAxiosError extends Error {
+  isAxiosError: boolean;
+  config?: ITrackerConfig;
+  response?: {
+    status?: number;
+    data?: unknown;
+  };
 }
 
 @Injectable()
@@ -24,44 +37,45 @@ export class AxiosMonitorSetup implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    // 1. Chặn chiều gửi đi (Bắt đầu đếm giờ)
-    axios.interceptors.request.use((config: CustomAxiosRequestConfig) => {
-      config.metadata = { startTime: Date.now() };
+    // Để TypeScript tự suy luận (infer) kiểu của config dựa vào đúng version Axios bạn đang dùng
+    axios.interceptors.request.use((config) => {
+      // Ép kiểu qua unknown rồi mới sang Interface tự chế để ESLint không báo lỗi Unsafe
+      const tracker = config as unknown as ITrackerConfig;
+      tracker.metadata = { startTime: Date.now() };
       return config;
     });
 
-    // 2. Chặn chiều nhận về (Success)
     axios.interceptors.response.use(
-      (response: AxiosResponse) => {
-        this.saveLog(
-          response.config as CustomAxiosRequestConfig,
-          response.status,
-          response.data,
-          false,
-        );
+      (response) => {
+        const tracker = response.config as unknown as ITrackerConfig;
+        const status = response.status;
+        const data = response.data;
+
+        this.saveLog(tracker, status, data, false);
         return response;
       },
-      (error: unknown) => {
-        // 3. Chặn chiều nhận về (Fail)
-        let config: CustomAxiosRequestConfig | undefined = undefined;
+      (err: unknown) => {
+        let tracker: ITrackerConfig | undefined = undefined;
         let status = 500;
         let data: unknown = { message: 'Unknown error' };
         let rejectError: Error;
 
-        // Dùng Type Guard để TypeScript hiểu đây là AxiosError, không còn lỗi Unsafe
-        if (axios.isAxiosError(error)) {
-          config = error.config as CustomAxiosRequestConfig | undefined;
-          status = error.response?.status ?? 500;
-          data = error.response?.data ?? { message: error.message };
-          rejectError = error; // AxiosError kế thừa từ Error
+        // Tự kiểm tra đối tượng an toàn thay vì gọi axios.isAxiosError(err) để né lỗi Type
+        const isAxiosErr =
+          typeof err === 'object' && err !== null && 'isAxiosError' in err;
+
+        if (isAxiosErr) {
+          const safeErr = err as ISafeAxiosError;
+          tracker = safeErr.config;
+          status = safeErr.response?.status ?? 500;
+          data = safeErr.response?.data ?? { message: safeErr.message };
+          rejectError = safeErr;
         } else {
-          // Fix lỗi prefer-promise-reject-errors
-          rejectError =
-            error instanceof Error ? error : new Error(String(error));
+          rejectError = err instanceof Error ? err : new Error(String(err));
         }
 
-        if (config) {
-          this.saveLog(config, status, data, true);
+        if (tracker) {
+          this.saveLog(tracker, status, data, true);
         }
 
         return Promise.reject(rejectError);
@@ -73,7 +87,7 @@ export class AxiosMonitorSetup implements OnModuleInit {
   }
 
   private saveLog(
-    config: CustomAxiosRequestConfig,
+    config: ITrackerConfig,
     status: number,
     responseData: unknown,
     isError: boolean,
@@ -83,21 +97,17 @@ export class AxiosMonitorSetup implements OnModuleInit {
     const duration = Date.now() - config.metadata.startTime;
     const url = config.url || '';
 
-    // AC1: Phân loại provider dựa trên URL
     let provider = 'UNKNOWN';
     if (url.includes('ghn.vn')) provider = 'GHN';
     else if (url.includes('ghtklab')) provider = 'GHTK';
     else if (url.includes('momo.vn')) provider = 'MOMO';
     else if (url.includes('vnpay.vn')) provider = 'VNPAY';
 
-    // Parse Object an toàn (Fix lỗi Unsafe assignment của JSON.parse)
     let requestData: Record<string, unknown> = {};
     if (typeof config.data === 'string') {
       try {
-        requestData = JSON.parse(config.data || '{}') as Record<
-          string,
-          unknown
-        >;
+        const parsed = JSON.parse(config.data || '{}') as unknown;
+        requestData = parsed as Record<string, unknown>;
       } catch {
         requestData = { raw_data: config.data } as Record<string, unknown>;
       }
@@ -105,11 +115,9 @@ export class AxiosMonitorSetup implements OnModuleInit {
       requestData = config.data as Record<string, unknown>;
     }
 
-    // [BỔ SUNG 4]: CHỦ ĐỘNG CẢNH BÁO LỖI ĐỐI TÁC (US5)
-    // Nếu API đối tác trả về lỗi 5xx hoặc Timeout, gửi cảnh báo ngay
     if (isError && status >= 500) {
       this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
-        severity: 'HIGH', // Lỗi đối tác để mức HIGH, không phải CRITICAL để tránh spam sms
+        severity: 'HIGH',
         error_code: `3RD_PARTY_FAIL_${provider}`,
         message: `Mất kết nối hoặc đối tác ${provider} đang bị lỗi (HTTP ${status}). Độ trễ: ${duration}ms. URL: ${url}`,
       });
@@ -129,6 +137,11 @@ export class AxiosMonitorSetup implements OnModuleInit {
         request_data: requestData,
         response_data: responseData as Record<string, unknown>,
       })
-      .catch(() => {});
+      .catch((err: unknown) => {
+        this.logger.error(
+          'Không thể lưu log tích hợp',
+          err instanceof Error ? err.message : String(err),
+        );
+      });
   }
 }

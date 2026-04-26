@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsDateString,
@@ -101,7 +102,25 @@ export class CreateProductDto {
   @IsMongoId({ each: true, message: 'ID danh mục không hợp lệ' })
   category_ids: string[];
 
-  @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
+  // [FIX 1]: BẮT BUỘC PHẢI CÓ TAGS CHO AI
+  @IsArray({ message: 'Tags phải là một mảng' })
+  @ArrayMinSize(1, {
+    message:
+      'Sản phẩm phải có ít nhất 1 Tag (VD: Outdoor, Lều) để AI phân tích',
+  })
+  @IsString({ each: true })
+  tags: string[];
+
+  // [FIX 2]: BỔ SUNG TRƯỜNG DÀNH CHO AI & THUẬT TOÁN GỢI Ý
+  @IsOptional()
+  @IsBoolean()
+  is_flash_sale?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(5) // Thang điểm lợi nhuận từ 1 đến 5
+  margin_tier?: number;
 
   // US.73: Media
   @IsOptional() @IsArray() @IsString({ each: true }) images?: string[];

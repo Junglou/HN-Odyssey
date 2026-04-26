@@ -30,7 +30,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { UebaMonitorInterceptor } from './common/interceptors/ueba-monitor.interceptor';
 import { ReportsModule } from './modules/reports/reports.module';
 import { CacheModule } from '@nestjs/cache-manager';
-import { RecommendationModule } from './modules/recommendations/recommendations.module';
+import { RecommendationsModule } from './modules/recommendations/recommendations.module';
 import { SystemModule } from './modules/system/system.module';
 import { TradeInModule } from './modules/trade-in/trade-in.module';
 import { SupportModule } from './modules/support/support.module';
@@ -84,7 +84,7 @@ import { SupportModule } from './modules/support/support.module';
     NotificationsModule,
     ReportsModule,
     EventEmitterModule.forRoot(),
-    RecommendationModule,
+    RecommendationsModule,
     SystemModule,
     TradeInModule,
     SupportModule,

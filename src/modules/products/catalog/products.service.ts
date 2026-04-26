@@ -805,6 +805,25 @@ export class ProductsService {
           'Sản phẩm chưa có hình ảnh. Không thể kích hoạt bán.',
         );
       }
+
+      // THÊM MỚI RULE 5: Validate Data cho thuật toán AI
+      if (!product.categories || product.categories.length === 0) {
+        throw new BadRequestException(
+          'Sản phẩm chưa có Danh mục. Không thể kích hoạt.',
+        );
+      }
+
+      if (!product.tags || product.tags.length === 0) {
+        throw new BadRequestException(
+          'Sản phẩm chưa có Tags từ khóa. Thuật toán AI cần ít nhất 1 Tag để hoạt động.',
+        );
+      }
+
+      if (!product.brand || product.brand.trim() === '') {
+        throw new BadRequestException(
+          'Sản phẩm High-end bắt buộc phải có Thương hiệu (Brand) để hiển thị bộ lọc.',
+        );
+      }
     }
 
     // 3. Cập nhật & Lưu

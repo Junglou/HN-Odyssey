@@ -168,13 +168,19 @@ export class Product {
   })
   categories: Category[];
 
-  @Prop({ type: [String], index: true })
+  @Prop({
+    type: [String],
+    index: true,
+    // Tự động lowercase và xóa khoảng trắng thừa ở 2 đầu
+    set: (tags: string[]) =>
+      tags ? tags.map((tag) => tag.toLowerCase().trim()) : [],
+  })
   tags: string[];
 
   @Prop({ type: [ProductAttributeParams], default: [] })
   specs: ProductAttributeParams[];
 
-  @Prop({ type: [Object], index: true, default: [] }) // Object ở đây là VariantAttribute
+  @Prop({ type: [Object], default: [] }) // Object ở đây là VariantAttribute
   attributes: VariantAttribute[];
 
   //GIÁ & KHUYẾN MÃI (US.75)
@@ -189,6 +195,13 @@ export class Product {
 
   @Prop()
   sale_end_date: Date;
+
+  // THÊM 2 TRƯỜNG NÀY PHỤC VỤ THUẬT TOÁN GỢI Ý (ContextualCartService)
+  @Prop({ default: false, index: true })
+  is_flash_sale: boolean;
+
+  @Prop({ default: 1 }) // Thang điểm 1-5, mặc định là 1 (lời ít)
+  margin_tier: number;
 
   //BIẾN THỂ (US.74)
   @Prop({ type: [ProductVariantSchema], default: [] })
@@ -314,9 +327,10 @@ ProductSchema.index({ categories: 1, status: 1 });
 ProductSchema.index({ tags: 1, status: 1 });
 ProductSchema.index({ rating_average: -1 });
 ProductSchema.index({ name: 'text', tags: 'text' });
+// ProductSchema.index({
+//   categories: 1,
+//   'attributes.code': 1,
+//   'attributes.value': 1,
+// });
+ProductSchema.index({ categories: 1 });
 ProductSchema.index({ 'attributes.code': 1, 'attributes.value': 1 });
-ProductSchema.index({
-  categories: 1,
-  'attributes.code': 1,
-  'attributes.value': 1,
-});

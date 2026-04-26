@@ -43,6 +43,10 @@ import {
   ILoyaltyHealthReport,
 } from 'src/common/interfaces/marketing-tracking.interface';
 import * as ExcelJS from 'exceljs';
+import {
+  IAlgoliaInsightEvent,
+  IAlgoliaInsightPayload,
+} from 'src/common/interfaces/algolia.interface';
 
 export interface UserExportInfo {
   fullName?: string;
@@ -55,6 +59,9 @@ export interface UserExportInfo {
 export class TrackingService {
   private readonly logger = new Logger(TrackingService.name);
   private readonly EXCLUDED_STATUSES = ['CANCELLED', 'RETURNED', 'REFUNDED'];
+  private readonly insightsApiUrl = 'https://insights.algolia.io/1/events';
+  private readonly indexName: string;
+  private readonly headers: Record<string, string>;
 
   constructor(
     @InjectModel(Cart.name) private readonly cartModel: Model<Cart>,
@@ -68,7 +75,18 @@ export class TrackingService {
     private loyaltyModel: Model<LoyaltyHistoryDocument>,
     private readonly eventEmitter: EventEmitter2,
     private readonly configService: ConfigService,
-  ) {}
+  ) {
+    this.indexName =
+      this.configService.get<string>('ALGOLIA_INDEX_NAME') || 'products';
+
+    this.headers = {
+      'X-Algolia-Application-Id':
+        this.configService.get<string>('ALGOLIA_APP_ID') || '',
+      'X-Algolia-API-Key':
+        this.configService.get<string>('ALGOLIA_ADMIN_KEY') || '',
+      'Content-Type': 'application/json',
+    };
+  }
 
   // US2 - AC5: Thu thập Email khách vãng lai
   async captureGuestEmail(session_id: string, email: string): Promise<void> {
@@ -869,5 +887,58 @@ export class TrackingService {
     });
 
     return workbook;
+  }
+
+  // [MỚI]: Bắn Tracking cho Algolia Insights để Model tự học
+  async sendAlgoliaInsight(
+    action: 'CLICK' | 'VIEW' | 'ADD_TO_CART',
+    userToken: string,
+    objectID: string,
+    widgetType: string,
+  ): Promise<void> {
+    let eventType: 'click' | 'conversion' | 'view';
+    let eventName: string;
+
+    switch (action) {
+      case 'CLICK':
+        eventType = 'click';
+        eventName = `Clicked ${widgetType} Recommendation`;
+        break;
+      case 'ADD_TO_CART':
+        eventType = 'conversion';
+        eventName = `Added ${widgetType} Item To Cart`;
+        break;
+      case 'VIEW':
+      default:
+        eventType = 'view';
+        eventName = `Viewed ${widgetType} Widget`;
+        break;
+    }
+
+    const eventPayload: IAlgoliaInsightEvent = {
+      eventType,
+      eventName,
+      index: this.indexName,
+      userToken: userToken || 'anonymous_user', // Algolia yêu cầu bắt buộc có userToken
+      objectIDs: [objectID],
+    };
+
+    const data: IAlgoliaInsightPayload = {
+      events: [eventPayload],
+    };
+
+    try {
+      await axios.post(this.insightsApiUrl, data, {
+        headers: this.headers,
+        timeout: 1000,
+      });
+      this.logger.log(
+        `[Algolia Insights] Đã đẩy event ${eventName} cho sản phẩm ${objectID}`,
+      );
+    } catch (error: unknown) {
+      // Bọc try-catch không throw để không làm đứt mạch API chính của User
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`[Algolia Insights] Thất bại: ${msg}`);
+    }
   }
 }

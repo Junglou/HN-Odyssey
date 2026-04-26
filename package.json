@@ -18,9 +18,11 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "seed": "ts-node -r tsconfig-paths/register src/cli.ts"
   },
   "dependencies": {
+    "@algolia/recommend": "^4.24.0",
     "@nestjs-modules/ioredis": "^2.0.2",
     "@nestjs-modules/mailer": "^2.0.2",
     "@nestjs/axios": "^4.0.1",
@@ -43,7 +45,7 @@
     "@nestjs/typeorm": "^11.0.0",
     "@nestjs/websockets": "^11.1.9",
     "algoliasearch": "^4.24.0",
-    "axios": "^1.15.0",
+    "axios": "^1.15.2",
     "bcryptjs": "^3.0.3",
     "bull": "^4.16.5",
     "bwip-js": "^4.8.0",
@@ -58,6 +60,7 @@
     "moment-timezone": "^0.6.0",
     "mongoose": "^8.20.2",
     "ms": "^2.1.3",
+    "nestjs-command": "^3.1.5",
     "nodemailer": "^7.0.11",
     "passport": "^0.7.0",
     "passport-facebook": "^3.0.0",
@@ -76,14 +79,17 @@
     "socket.io": "^4.8.1",
     "swagger-ui-express": "^5.0.1",
     "twilio": "^4.23.0",
-    "typeorm": "^0.3.28"
+    "typeorm": "^0.3.28",
+    "yargs": "^17.7.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
+    "@faker-js/faker": "^10.4.0",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
+    "@types/axios": "^0.9.36",
     "@types/bcryptjs": "^2.4.6",
     "@types/cron": "^2.0.1",
     "@types/express": "^5.0.0",
@@ -103,6 +109,7 @@
     "@types/sanitize-html": "^2.16.0",
     "@types/sharp": "^0.31.1",
     "@types/supertest": "^6.0.2",
+    "@types/yargs": "^17.0.35",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",

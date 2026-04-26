@@ -1,6 +1,6 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import axios, { AxiosError } from 'axios';
+import axios from 'axios'; // Bỏ AxiosError nếu không dùng đến type của nó
 import { ShippingService } from '../shipping.service';
 
 // 1. Định nghĩa Interface cho dữ liệu đầu vào
@@ -58,7 +58,7 @@ export class GhtkService {
 
   async createShippingOrder(orderData: IGhtkOrderInput) {
     try {
-      const token = await this.getActiveToken(); // 2. Lấy token động
+      const token = await this.getActiveToken();
 
       const response = await axios.post<IGhtkResponse>(
         `${this.apiUrl}/order`,
@@ -72,8 +72,8 @@ export class GhtkService {
             id: orderData.orderCode,
             pick_name: 'H&N Odyssey Store',
             pick_address: '217 Đ. Đặng Thuỳ Trâm',
-            pick_province: 'Thành phố Hồ Chí Minh', // Phải khớp với mapping GHTK
-            pick_district: 'Quận Bình Thạnh', // Phải khớp với mapping GHTK
+            pick_province: 'Thành phố Hồ Chí Minh',
+            pick_district: 'Quận Bình Thạnh',
             pick_tel: '098919964',
             tel: orderData.phone,
             name: orderData.customerName,
@@ -91,7 +91,7 @@ export class GhtkService {
         {
           headers: {
             Token: token,
-            'X-Client-Source': 'S308157', // Thêm cái này để GHTK Staging nhận diện partner
+            'X-Client-Source': 'S308157',
           },
         },
       );
@@ -105,16 +105,22 @@ export class GhtkService {
         waybillCode: result.order?.label || '',
         actualFee: result.order?.fee || 0,
       };
-    } catch (error) {
-      // Xử lý lỗi an toàn cho biến 'error'
+    } catch (err: unknown) {
+      // FIX: Xử lý lỗi an toàn tuyệt đối cho ESLint
       let errorMessage = 'Lỗi kết nối GHTK';
 
-      if (error instanceof AxiosError) {
-        // Lấy message từ response của GHTK nếu có
-        const ghtkData = error.response?.data as IGhtkResponse | undefined;
-        errorMessage = ghtkData?.message || error.message;
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
+      const isAxiosErr =
+        typeof err === 'object' && err !== null && 'isAxiosError' in err;
+
+      if (isAxiosErr) {
+        // Ép kiểu qua unknown để "tẩy trắng" rồi mới gán cấu trúc mong muốn
+        const axiosErr = err as unknown as {
+          message: string;
+          response?: { data?: IGhtkResponse };
+        };
+        errorMessage = axiosErr.response?.data?.message || axiosErr.message;
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
       }
 
       this.logger.error(`GHTK Create Error: ${errorMessage}`);
@@ -125,16 +131,22 @@ export class GhtkService {
     }
   }
 
-  // AC4: Lấy thông tin trạng thái mới nhất từ GHTK
   async getOrderInfo(label: string): Promise<any> {
     try {
       const response = await axios.get(`${this.apiUrl}/v2/tracking/${label}`, {
         headers: { Token: this.apiToken },
       });
       return response.data;
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+    } catch (err: unknown) {
+      // FIX: Tránh dùng trực tiếp biến catch để né lỗi unsafe member access
+      const isAxiosErr =
+        typeof err === 'object' && err !== null && 'isAxiosError' in err;
+      const errorMessage = isAxiosErr
+        ? (err as unknown as { message: string }).message
+        : err instanceof Error
+          ? err.message
+          : 'Unknown error';
+
       this.logger.error(`GHTK GetInfo Error: ${errorMessage}`);
       throw new HttpException(
         'Không thể lấy thông tin từ GHTK',
@@ -143,9 +155,7 @@ export class GhtkService {
     }
   }
 
-  // AC5: Lấy link in phiếu gửi GHTK
   async getPrintLabel(label: string): Promise<string> {
-    // GHTK hỗ trợ in trực tiếp trên nền tảng web của họ thông qua alias code
     return `https://khachhang-staging.ghtklab.com/khachhang?code=${label}`;
   }
 

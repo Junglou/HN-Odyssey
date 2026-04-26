@@ -28,6 +28,9 @@ import {
   FlashSaleSchema,
 } from 'src/modules/marketing/promotions/schemas/flash-sale.schema';
 import { LoyaltyModule } from 'src/modules/marketing/loyalty/loyalty.module';
+import { CommandModule } from 'nestjs-command';
+import { OrderSeederCommand } from './SeedOrder/order-seeder.command';
+import { OrderSeederService } from './SeedOrder/order-seeder.service';
 
 @Module({
   imports: [
@@ -46,6 +49,7 @@ import { LoyaltyModule } from 'src/modules/marketing/loyalty/loyalty.module';
     ShippingModule,
     JwtModule.register({}),
     LoyaltyModule,
+    CommandModule,
   ],
   controllers: [OrdersController],
   providers: [
@@ -54,6 +58,8 @@ import { LoyaltyModule } from 'src/modules/marketing/loyalty/loyalty.module';
     OrdersCronService,
     OrderStateMachine,
     OrderShippingListener,
+    OrderSeederService,
+    OrderSeederCommand,
   ],
   exports: [OrdersService],
 })
