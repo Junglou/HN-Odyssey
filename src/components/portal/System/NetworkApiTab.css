@@ -1,0 +1,114 @@
+/* src/components/portal/System/NetworkApiTab.css */
+.na-tab-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  animation: na-fadeIn 0.3s ease-in-out;
+}
+
+.na-section-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 24px 0;
+}
+
+.na-section-title.mb-0 {
+  margin-bottom: 0;
+}
+
+/* chuyển từ grid sang flex-wrap để responsive */
+.na-bottom-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+/* thêm min-width: 0 và làm đậm viền/bóng */
+.na-chart-card,
+.na-table-card {
+  flex: 1 1 400px;
+  min-width: 0;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db; /* đậm hơn */
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.05),
+    0 2px 4px -1px rgba(0, 0, 0, 0.03); /* bóng rõ hơn */
+}
+
+/* các class chia layout cho 2 biểu đồ nằm ngang */
+.na-chart-flex {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.na-chart-col {
+  flex: 1 1 250px;
+  min-width: 0;
+}
+
+.na-chart-container {
+  width: 100%;
+  height: 240px;
+  margin-top: 20px;
+  padding-right: 20px;
+}
+
+/* ép chiều cao chuyên biệt cho biểu đồ mini */
+.na-chart-container.small {
+  height: 180px;
+}
+
+/* bảng hiển thị trạng thái api */
+.na-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+
+.na-table th {
+  text-align: left;
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #4b5563;
+  background-color: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.na-table td {
+  padding: 16px;
+  font-size: 0.85rem;
+  color: #111827;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.na-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.na-badge.warning {
+  background-color: #fef08a;
+  color: #854d0e;
+}
+.na-badge.stable {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+@keyframes na-fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

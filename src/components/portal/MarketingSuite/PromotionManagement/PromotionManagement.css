@@ -348,7 +348,7 @@
   color: #1e40af;
 }
 
-/* hành động trên dòng */
+/* nút action */
 .promo-row-actions {
   display: flex;
   gap: clamp(4px, 0.8vw, 8px);

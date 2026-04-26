@@ -38,11 +38,10 @@ export default function LiveChatSupport({
 }: LiveChatSupportProps) {
   const [messageText, setMessageText] = useState("");
 
-  // state quản lý kích thước và trạng thái kéo thả của sidebar
+  // state quản lý kích thước và trạng thái kéo thả sidebar
   const [sidebarWidth, setSidebarWidth] = useState(350);
   const [isResizing, setIsResizing] = useState(false);
 
-  // dùng ref để tham chiếu đến thẻ sidebar, giúp đo đạc khoảng cách
   const sidebarRef = useRef<HTMLDivElement>(null);
   const startResizing = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -91,7 +90,6 @@ export default function LiveChatSupport({
 
   return (
     <div className="lcs-page-wrapper">
-      {/* phần tiêu đề trang được đưa ra ngoài cùng */}
       <div className="lcs-page-header">
         <h1 className="lcs-page-title">Live Chat Support</h1>
         <p className="lcs-page-breadcrumb">Customer CRM / Live Chat Support</p>
@@ -155,7 +153,7 @@ export default function LiveChatSupport({
                   </div>
 
                   <div className="lcs-session-info">
-                    {/* bọc tên và thời gian vào cùng một hàng để flexbox tự động căn chỉnh */}
+                    {/* bọc tên và thời gian */}
                     <div className="lcs-session-name-row">
                       <h4 className="lcs-session-name">
                         {session.customerName}
@@ -177,7 +175,7 @@ export default function LiveChatSupport({
           </div>
         </div>
 
-        {/* thanh kéo thả để thay đổi kích thước */}
+        {/* thanh kéo thả thay đổi kích thước */}
         <div
           className={`lcs-resizer ${isResizing ? "active" : ""}`}
           onMouseDown={startResizing}

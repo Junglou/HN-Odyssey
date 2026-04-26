@@ -1,4 +1,3 @@
-// src/layouts/MainLayout.tsx
 import { Outlet } from "react-router-dom";
 import Header from "../components/common/Header";
 import PromotionBar from "../components/common/PromotionBar";
@@ -9,18 +8,18 @@ const MainLayout = () => {
     <div
       style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}
     >
-      {/* 1. Promotion Bar phải nằm ở đây */}
+      {/* Promotion Bar phải nằm ở đây */}
       <PromotionBar />
 
-      {/* 2. Header nằm ngay dưới */}
+      {/* Header nằm ngay dưới */}
       <Header />
 
-      {/* 3. Nội dung các trang */}
+      {/* Nội dung các trang */}
       <main style={{ flex: 1 }}>
         <Outlet />
       </main>
 
-      {/* 4. Footer ở cuối cùng */}
+      {/* Footer ở cuối cùng */}
       <Footer />
     </div>
   );

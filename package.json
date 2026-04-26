@@ -11,11 +11,16 @@
   },
   "dependencies": {
     "axios": "^1.13.3",
+    "exceljs": "^4.4.0",
     "lucide-react": "^0.577.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-easy-crop": "^5.5.7",
     "react-router-dom": "^7.12.0",
-    "react-toastify": "^11.0.5"
+    "react-toastify": "^11.0.5",
+    "recharts": "^3.8.1",
+    "suneditor": "^2.47.8",
+    "suneditor-react": "^3.6.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

@@ -1,0 +1,110 @@
+/* layout chia cột bên trong card */
+.if-card {
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 24px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.if-card-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 24px;
+}
+
+.if-content {
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+}
+
+.if-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 24px;
+}
+
+.if-divider {
+  width: 1px;
+  background-color: #d1d5db;
+  margin: 0 24px;
+  flex-shrink: 0;
+}
+
+/* tiêu đề mục nhỏ */
+.if-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 16px;
+}
+
+/* danh sách kho */
+.if-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.95rem;
+  color: #475569;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-weight: 500;
+}
+
+/* biểu đồ donut và thống kê */
+.if-donut-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 36px;
+  flex-wrap: wrap;
+}
+
+.if-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.if-stat-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.if-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-size: 0.95rem;
+  color: #475569;
+  font-weight: 600;
+}
+
+/* responsive */
+@media screen and (max-width: 850px) {
+  .if-content {
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .if-divider {
+    width: 100%;
+    height: 1px;
+    margin: 0;
+  }
+
+  .if-donut-container {
+    justify-content: flex-start;
+  }
+}

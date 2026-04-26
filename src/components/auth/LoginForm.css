@@ -106,27 +106,21 @@
 }
 
 .login-text-link {
-  /* ÉP MÀU ĐEN TUYỆT ĐỐI */
-  color: #000 !important;
-
+  color: #000;
   text-decoration: underline;
   text-underline-offset: 4px;
   font-size: 0.9rem;
   cursor: pointer;
   width: fit-content;
-
-  /* Đảm bảo độ đậm mặc định */
   opacity: 1;
   transition: opacity 0.2s ease;
 }
 
-/* Fix lỗi màu xám nếu trình duyệt cố tình đổi màu thẻ a */
 .login-text-link:visited,
 .login-text-link:active {
-  color: #000 !important;
+  color: #000;
 }
 
-/* Hiệu ứng khi di chuột giống bên Register */
 .login-text-link:hover {
   opacity: 0.7;
 }

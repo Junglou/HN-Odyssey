@@ -1,0 +1,13 @@
+.sys-page-container {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 2vw, 20px);
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: clamp(12px, 3vw, 32px);
+  background-color: #f9fafb;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}

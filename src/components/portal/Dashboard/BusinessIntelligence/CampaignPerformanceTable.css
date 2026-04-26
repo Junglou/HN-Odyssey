@@ -1,0 +1,127 @@
+/* khung bọc ngoài */
+.cpt-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background-color: #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.cpt-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+/* thẻ chứa bảng */
+.cpt-card {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* khung cuộn ngang */
+.cpt-table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.cpt-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+/* tiêu đề bảng màu kem */
+.cpt-th {
+  background-color: #e6d5c3;
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #1e293b;
+  border-bottom: 1px solid #cbd5e1;
+  white-space: nowrap;
+}
+
+/* ô dữ liệu */
+.cpt-td {
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  color: #475569;
+  font-weight: 500;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.cpt-tr:last-child .cpt-td {
+  border-bottom: none;
+}
+
+/* badge roi */
+.cpt-roi-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.cpt-roi-positive {
+  background-color: #6ee7b7;
+  color: #065f46;
+}
+
+.cpt-roi-negative {
+  background-color: #fca5a5;
+  color: #7f1d1d;
+}
+
+/* phân trang */
+.cpt-pagination-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px;
+  background-color: #ffffff;
+  border-top: 1px solid #e2e8f0;
+}
+
+.cpt-page-numbers {
+  display: flex;
+  gap: 8px;
+}
+
+.cpt-page-nav-btn,
+.cpt-page-num-btn {
+  padding: 6px 12px;
+  border: 1px solid #cbd5e1;
+  background-color: #ffffff;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cpt-page-num-btn.cpt-active {
+  background-color: #1e293b;
+  color: #ffffff;
+  border-color: #1e293b;
+}
+
+.cpt-page-nav-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cpt-page-nav-btn:not(:disabled):hover,
+.cpt-page-num-btn:not(.cpt-active):hover {
+  background-color: #f1f5f9;
+}

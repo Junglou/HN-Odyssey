@@ -1,0 +1,111 @@
+/* container */
+.sm-container {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2vw, 20px);
+  font-family: "Lexend Exa", sans-serif;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.sm-container * {
+  box-sizing: border-box;
+}
+
+/* header */
+.sm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: clamp(12px, 1.5vw, 16px);
+}
+
+.sm-title {
+  font-size: clamp(1.4rem, 2.5vw, 1.8rem);
+  font-weight: 800;
+  margin: 0 0 4px 0;
+  color: #111827;
+}
+
+.sm-breadcrumb {
+  font-size: clamp(0.75rem, 1vw, 0.85rem);
+  color: #6b7280;
+  margin: 0;
+}
+
+.sm-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sm-btn-primary {
+  padding: clamp(8px, 1.2vw, 10px) 20px;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.sm-btn-primary:hover {
+  background: #2563eb;
+}
+
+.sm-btn-primary:focus {
+  outline: none;
+}
+
+/* tabs */
+.sm-tabs-nav {
+  display: flex;
+  gap: 32px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 4px;
+}
+
+.sm-tab-btn {
+  background: none;
+  border: none;
+  padding: 12px 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  position: relative;
+  font-family: inherit;
+  transition: color 0.2s;
+}
+
+.sm-tab-btn:hover {
+  color: #111827;
+}
+
+.sm-tab-active {
+  color: #111827;
+}
+
+.sm-tab-active::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: #111827;
+}
+.sm-tab-btn:focus {
+  outline: none;
+}
+
+/* body */
+.sm-body {
+  width: 100%;
+}

@@ -1,0 +1,135 @@
+/* wrapper */
+.smtab-wrapper {
+  background-color: #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+/* header */
+.smtab-header {
+  padding: 0;
+  background-color: transparent;
+}
+.smtab-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0;
+}
+
+/* card */
+.smtab-card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* table container */
+.smtab-container {
+  width: 100%;
+  overflow-x: auto;
+  margin-bottom: 0;
+}
+.smtab-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+/* cells */
+.smtab-th {
+  background-color: #e6d3bd;
+  padding: 16px 24px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #111827;
+  white-space: nowrap;
+}
+.smtab-td {
+  padding: 16px 24px;
+  font-size: 0.9rem;
+  color: #1f2937;
+  border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* rows */
+.smtab-table tbody tr {
+  background-color: #ffffff;
+}
+
+/* status badge */
+.smtab-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+.smtab-badge.safe {
+  background-color: #a7f3d0;
+  color: #064e3b;
+}
+.smtab-badge.low {
+  background-color: #fef08a;
+  color: #713f12;
+}
+.smtab-badge.critical {
+  background-color: #fecaca;
+  color: #7f1d1d;
+}
+.smtab-badge.over {
+  background-color: #dbeafe;
+  color: #1e3a8a;
+}
+
+/* pagination */
+.smtab-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 24px;
+  background-color: #ffffff;
+  border-top: 1px solid #e5e7eb;
+  margin: 0;
+}
+.smtab-btn,
+.smtab-num {
+  padding: 6px 12px;
+  border: 1px solid #e5e7eb;
+  background-color: #ffffff;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: #9ca3af;
+  transition: all 0.2s ease;
+}
+.smtab-btn:hover:not(:disabled),
+.smtab-num:hover:not(.active) {
+  background-color: #1e293b;
+  color: #ffffff;
+  border-color: #1e293b;
+}
+.smtab-num.active {
+  background-color: #1e293b;
+  color: #ffffff;
+  border-color: #1e293b;
+}
+.smtab-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}

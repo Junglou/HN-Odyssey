@@ -238,6 +238,13 @@ function PromotionModalContent({
     };
   });
 
+  const todayStr = new Date().toISOString().split("T")[0];
+  const minStartDate =
+    mode === "add" ? todayStr : initialData?.startDate || todayStr;
+  const isPublishedIntent = ["Active", "Scheduled", "Expired"].includes(
+    formData.status,
+  );
+
   const getTitle = () => {
     if (mode === "add") return "Create Promotion";
     if (mode === "edit") return "Edit Promotion";
@@ -391,6 +398,7 @@ function PromotionModalContent({
                 type="date"
                 className="promo-form-input"
                 value={formData.startDate}
+                min={minStartDate}
                 onChange={(e) => handleChange("startDate", e.target.value)}
                 disabled={isViewMode}
               />
@@ -404,6 +412,7 @@ function PromotionModalContent({
                 type="date"
                 className="promo-form-input"
                 value={formData.endDate}
+                min={formData.startDate || todayStr}
                 onChange={(e) => handleChange("endDate", e.target.value)}
                 disabled={isViewMode}
               />
@@ -427,7 +436,7 @@ function PromotionModalContent({
                 <input
                   type="radio"
                   name="status"
-                  checked={formData.status === "Active"}
+                  checked={isPublishedIntent}
                   onChange={() => handleChange("status", "Active")}
                   disabled={isViewMode}
                 />

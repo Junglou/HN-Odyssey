@@ -1,0 +1,548 @@
+/* container chính của trang system */
+.sys-container {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2vw, 24px);
+  font-family: "Lexend Exa", sans-serif;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.sys-container * {
+  box-sizing: border-box;
+}
+
+/* khối header chứa title và cụm controls */
+.sys-header {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.sys-title {
+  font-size: clamp(1.4rem, 2.5vw, 1.8rem);
+  font-weight: 900;
+  text-transform: none;
+  letter-spacing: normal;
+  margin: 0;
+  color: #111827;
+}
+
+/*  toolbar */
+.sys-top-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex: 1 1 auto;
+}
+
+/* nhóm chữ label và dropdown */
+.sys-control-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4b5563;
+  white-space: nowrap;
+  position: relative;
+}
+
+/* nút kích hoạt dropdown */
+.sys-dropdown {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+  min-width: 140px;
+  height: 44px;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #111827;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.sys-dropdown:hover {
+  border-color: #9ca3af;
+  background-color: #f9fafb;
+}
+
+/* cố định kích thước icon và thêm hiệu ứng xoay */
+.sys-dropdown svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sys-dropdown.active svg {
+  transform: rotate(180deg);
+}
+
+/* khung menu thả xuống với hiệu ứng trượt */
+.sys-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 100%;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.1),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform-origin: top center;
+  animation: sys-dropdown-slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.sys-dropdown-item {
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+  white-space: nowrap;
+}
+
+.sys-dropdown-item:hover {
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+@keyframes sys-dropdown-slideDown {
+  from {
+    opacity: 0;
+    transform: scaleY(0.95) translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1) translateY(0);
+  }
+}
+
+.sys-btn-health {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #3b82f6;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 0 16px;
+  font-weight: 600;
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  height: 44px;
+  white-space: nowrap;
+}
+
+.sys-btn-health:hover {
+  background-color: #2563eb;
+}
+
+.sys-btn-health svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* hàng 3 thẻ kpi trên cùng */
+.sys-top-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(16px, 2vw, 24px);
+}
+
+.sys-info-card {
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.sys-info-icon {
+  width: 36px;
+  height: 36px;
+  color: #4b5563;
+  flex-shrink: 0;
+}
+
+/* thẻ status xanh lá */
+.sys-info-card.success {
+  border-color: #86efac;
+  background-color: #f0fdf4;
+}
+
+.sys-info-card.success .sys-info-icon,
+.sys-info-card.success .sys-info-value {
+  color: #16a34a;
+}
+
+/* thẻ incident đỏ */
+.sys-info-card.warning {
+  border-color: #fca5a5;
+  background-color: #fef2f2;
+}
+
+.sys-info-card.warning .sys-info-icon,
+.sys-info-card.warning .sys-info-value,
+.sys-info-card.warning .sys-info-label {
+  color: #dc2626;
+}
+
+.sys-info-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sys-info-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #4b5563;
+}
+
+.sys-info-value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+/* lưới chia 2 cột chính */
+.sys-main-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: clamp(16px, 2vw, 24px);
+  align-items: start;
+}
+
+/* khối sidebar bên trái */
+.sys-left-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sys-card {
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.sys-status-box {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  padding: 20px;
+}
+
+.sys-status-icon {
+  width: 36px;
+  height: 36px;
+  color: #16a34a;
+}
+
+.sys-status-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sys-status-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #166534;
+}
+
+.sys-status-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #15803d;
+}
+
+.sys-card-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 16px 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* các nút công tắc bật tắt module */
+.sys-tab-btn {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 16px;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.2s;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sys-tab-btn:last-child {
+  margin-bottom: 0;
+}
+
+/* triệt tiêu viền focus mặc định của trình duyệt */
+.sys-tab-btn:focus,
+.sys-tab-btn:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border-color: #d1d5db;
+}
+
+.sys-tab-btn:hover {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+}
+
+/* trạng thái đang bật */
+.sys-tab-btn.active {
+  background-color: #e5e7eb;
+  border-color: #111827;
+  color: #111827;
+}
+
+/* giữ nguyên viền đen khi click lại vào nút đang bật */
+.sys-tab-btn.active:focus,
+.sys-tab-btn.active:focus-visible {
+  border-color: #111827;
+}
+
+/* xử lý phần chữ để tự do xuống dòng mà không lệch icon */
+.sys-tab-btn span {
+  flex: 1;
+  text-align: left;
+  line-height: 1.3;
+}
+
+/* cấu trúc hạt công tắc */
+.sys-tab-switch {
+  width: 44px;
+  height: 24px;
+  background-color: #e5e7eb;
+  border: 1px solid #d1d5db;
+  border-radius: 20px;
+  position: relative;
+  transition: 0.3s;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.sys-tab-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background-color: #9ca3af;
+  border-radius: 50%;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sys-tab-btn.active .sys-tab-switch {
+  background-color: #111827;
+  border-color: #111827;
+}
+
+.sys-tab-btn.active .sys-tab-switch::after {
+  background-color: #ffffff;
+  transform: translateX(20px);
+}
+
+.sys-threshold-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 0.9rem;
+  color: #4b5563;
+  font-weight: 600;
+}
+
+.sys-mini-chart-box {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 20px;
+}
+
+.sys-mini-chart-header {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #4b5563;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.sys-latency-avg {
+  font-weight: 500;
+}
+
+.sys-mini-svg-container {
+  width: 100%;
+  height: 40px;
+}
+
+.sys-content-area {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2vw, 24px);
+  min-width: 0;
+}
+
+/* header của threshold card có chứa nút edit */
+.sys-card-header-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.sys-card-title.sys-mb-0 {
+  margin: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.sys-edit-btn {
+  background: none;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sys-edit-btn:hover {
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+/* danh sách ngưỡng cảnh báo */
+.sys-threshold-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sys-threshold-input {
+  width: 60px;
+  padding: 4px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #111827;
+  text-align: right;
+  outline: none;
+}
+
+.sys-threshold-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.sys-threshold-input::-webkit-outer-spin-button,
+.sys-threshold-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* toast thông báo */
+.sys-toast {
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  background-color: #111827;
+  color: #ffffff;
+  padding: 16px 24px;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  z-index: 9999;
+  animation: sys-slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.sys-toast-icon {
+  color: #22c55e;
+  width: 24px;
+  height: 24px;
+}
+
+/* animation */
+@keyframes sys-slideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(50px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media screen and (max-width: 1024px) {
+  .sys-top-controls {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+}

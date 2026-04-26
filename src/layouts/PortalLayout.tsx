@@ -24,10 +24,13 @@ const PortalLayout = () => {
 
   // state quản lý đóng mở các menu cha
   const [isUsersRolesOpen, setIsUsersRolesOpen] = useState(false);
-  const [isProductCatalogOpen, setIsProductCatalogOpen] = useState(true);
+  const [isProductCatalogOpen, setIsProductCatalogOpen] = useState(false);
   const [isCustomerCRMOpen, setIsCustomerCRMOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isMarketingSuiteOpen, setIsMarketingSuiteOpen] = useState(false);
+  const [isCommunicationOpen, setIsCommunicationOpen] = useState(false);
+  const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+  const [isWarehouseOpen, setIsWarehouseOpen] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
   const isParentActive = (basePath: string) =>
@@ -56,16 +59,69 @@ const PortalLayout = () => {
         <div className="portal-brand">H&N-Portal</div>
 
         <nav className="sidebar-menu">
-          <div
-            className="menu-item"
-            onClick={() => handleNavigate("/portal/dashboard")}
-          >
-            <div className="menu-item-left">
-              <DashboardIcon /> Dashboard
+          {/* Dashboard */}
+          <div className="menu-group">
+            <div
+              className={`menu-item ${
+                isParentActive("/portal/overview") ||
+                isParentActive("/portal/revenue-report") ||
+                isParentActive("/portal/marketing-promotion") ||
+                isParentActive("/portal/bi") ||
+                isParentActive("/portal/inventory")
+                  ? "active-parent"
+                  : ""
+              }`}
+              onClick={() => setIsDashboardOpen(!isDashboardOpen)}
+            >
+              <div className="menu-item-left">
+                <DashboardIcon /> Dashboard
+              </div>
+              <ChevronIcon open={isDashboardOpen} />
             </div>
-            <ChevronIcon open={false} />
-          </div>
 
+            <div
+              style={{
+                display: "grid",
+                gridTemplateRows: isDashboardOpen ? "1fr" : "0fr",
+                transition:
+                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+                overflow: "hidden",
+              }}
+            >
+              <div className="submenu" style={{ minHeight: 0 }}>
+                <div
+                  className={`submenu-item ${isActive("/portal/overview") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/overview")}
+                >
+                  Overview
+                </div>
+                <div
+                  className={`submenu-item ${isActive("/portal/revenue-report") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/revenue-report")}
+                >
+                  Revenue Report
+                </div>
+                <div
+                  className={`submenu-item ${isActive("/portal/marketing-promotion") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/marketing-promotion")}
+                >
+                  Marketing & Promotion
+                </div>
+                <div
+                  className={`submenu-item ${isActive("/portal/bi") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/bi")}
+                >
+                  Business Intelligence (BI)
+                </div>
+                <div
+                  className={`submenu-item ${isActive("/portal/inventory") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/inventory")}
+                >
+                  Inventory Management
+                </div>
+              </div>
+            </div>
+          </div>
           {/* Product Catalog */}
           <div className="menu-group">
             <div
@@ -129,11 +185,36 @@ const PortalLayout = () => {
             <ChevronIcon open={false} />
           </div>
 
-          <div className="menu-item">
-            <div className="menu-item-left">
-              <WarehouseIcon /> Warehouse (WMS)
+          {/* Warehouse (WMS) */}
+          <div className="menu-group">
+            <div
+              className={`menu-item ${isParentActive("/portal/warehouse") ? "active-parent" : ""}`}
+              onClick={() => setIsWarehouseOpen(!isWarehouseOpen)}
+            >
+              <div className="menu-item-left">
+                <WarehouseIcon /> Warehouse (WMS)
+              </div>
+              <ChevronIcon open={isWarehouseOpen} />
             </div>
-            <ChevronIcon open={false} />
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateRows: isWarehouseOpen ? "1fr" : "0fr",
+                transition:
+                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+                overflow: "hidden",
+              }}
+            >
+              <div className="submenu" style={{ minHeight: 0 }}>
+                <div
+                  className={`submenu-item ${isActive("/portal/warehouse") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/warehouse")}
+                >
+                  Stock Management
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Customer CRM */}
@@ -203,10 +284,10 @@ const PortalLayout = () => {
                   Promotion Management
                 </div>
                 <div
-                  className={`submenu-item ${isActive("/portal/ReviewAndRating") ? "active" : ""}`}
-                  onClick={() => handleNavigate("/portal/ReviewAndRating")}
+                  className={`submenu-item ${isActive("/portal/review-rating") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/review-rating")}
                 >
-                  Review & Rating Moderation
+                  Review & Rating Management
                 </div>
                 <div
                   className={`submenu-item ${isActive("/portal/coupon") ? "active" : ""}`}
@@ -264,14 +345,67 @@ const PortalLayout = () => {
             </div>
           </div>
 
-          <div className="menu-item">
-            <div className="menu-item-left">
-              <CommunicationIcon /> Communication
+          {/* Communication */}
+          <div className="menu-group">
+            <div
+              className={`menu-item ${
+                isParentActive("/portal/static-pages") ||
+                isParentActive("/portal/image-management") ||
+                isParentActive("/portal/banner-management") ||
+                isParentActive("/portal/blog-news")
+                  ? "active-parent"
+                  : ""
+              }`}
+              onClick={() => setIsCommunicationOpen(!isCommunicationOpen)}
+            >
+              <div className="menu-item-left">
+                <CommunicationIcon /> Communication
+              </div>
+              <ChevronIcon open={isCommunicationOpen} />
             </div>
-            <ChevronIcon open={false} />
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateRows: isCommunicationOpen ? "1fr" : "0fr",
+                transition:
+                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+                overflow: "hidden",
+              }}
+            >
+              <div className="submenu" style={{ minHeight: 0 }}>
+                <div
+                  className={`submenu-item ${isActive("/portal/static-pages") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/static-pages")}
+                >
+                  Static Page Management
+                </div>
+                <div
+                  className={`submenu-item ${isActive("/portal/media-management") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/media-management")}
+                >
+                  Media Management
+                </div>
+                <div
+                  className={`submenu-item ${isActive("/portal/banner-management") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/banner-management")}
+                >
+                  Banner Management
+                </div>
+                <div
+                  className={`submenu-item ${isActive("/portal/blog-news") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/blog-news")}
+                >
+                  Blog&News Management
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="menu-item">
+          <div
+            className={`menu-item ${isActive("/portal/system") ? "active-parent" : ""}`}
+            onClick={() => handleNavigate("/portal/system")}
+          >
             <div className="menu-item-left">
               <SystemIcon /> System
             </div>

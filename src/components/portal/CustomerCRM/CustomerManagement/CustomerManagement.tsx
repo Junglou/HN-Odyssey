@@ -214,7 +214,6 @@ export default function CustomerManagement({
           </div>
 
           <div className="crm-bulk-actions">
-            {/* đã bỏ thuộc tính outline để phục hồi nguyên trạng giao diện */}
             <button
               type="button"
               className="crm-btn-bulk"
@@ -363,7 +362,6 @@ export default function CustomerManagement({
                               Delete User
                             </button>
 
-                            {/* hiển thị nút thao tác khóa hoặc mở khóa tùy thuộc vào trạng thái tài khoản */}
                             {record.status === "Locked" ? (
                               <button
                                 type="button"
