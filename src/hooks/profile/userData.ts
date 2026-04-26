@@ -1,6 +1,7 @@
 import type { UserProfile, UserOrder, UserAddress } from "../../types/user";
 import type { Product } from "../../types/product";
 import { productList } from "./productData";
+import { couponList } from "./couponData";
 
 const addresses: UserAddress[] = [
   {
@@ -125,4 +126,5 @@ export const INITIAL_MOCK_USERS: UserProfile = {
   userOrders: order,
   userFinishedOrders: finishedOrder,
   userWishlist: getRandomProducts(5),
+  userCoupons: couponList,
 };

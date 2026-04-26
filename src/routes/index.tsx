@@ -34,6 +34,8 @@ import LiveChatSupportPage from "../pages/portal/CustomerCRM/LiveChatSupport/Liv
 
 import PromotionManagementPage from "../pages/portal/MarketingSuite/PromotionManagement/PromotionManagementPage";
 import RecentViewPage from "../pages/profile/RecentViewPage";
+import MyCouponPage from "../pages/profile/MyCouponPage";
+import LoyaltyPage from "../pages/profile/LoyaltyPage";
 
 export const router = createBrowserRouter([
   // route auth
@@ -94,6 +96,14 @@ export const router = createBrowserRouter([
       {
         path: "/profile/recent",
         element: <RecentViewPage />
+      },
+      {
+        path: "/profile/coupon",
+        element: <MyCouponPage />
+      },
+      {
+        path: "/profile/loyalty",
+        element: <LoyaltyPage />
       },
       {
         index: true, // Route mặc định của path: "/"

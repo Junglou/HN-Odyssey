@@ -1,4 +1,5 @@
 import type { Product } from "./product";
+import type { Coupon } from "./coupon";
 
 // UserProfile
 export interface UserProfile {
@@ -18,6 +19,7 @@ export interface UserProfile {
   userOrders: UserOrder[];
   userFinishedOrders: UserOrder[];
   userWishlist: Product[];
+  userCoupons: Coupon[];
 }
 
 export interface ProductRecommendation {
