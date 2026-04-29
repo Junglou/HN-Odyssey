@@ -1,5 +1,14 @@
-import { Controller, Get, Post, Query, Body, Req } from '@nestjs/common';
-import type { Request } from 'express'; // Import type Request từ express
+import {
+  Controller,
+  Get,
+  Post,
+  Query,
+  Body,
+  Req,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
+import type { Request } from 'express';
 import { AssociationRuleService } from './engine/association-rule.service';
 import { ContextualCartService } from './engine/contextual-cart.service';
 import { PersonalizedService } from './engine/personalized.service';
@@ -12,7 +21,6 @@ import {
 import { AddBundleToCartDto } from './dto/bundle-cart.dto';
 import { TrackingService } from './tracking/tracking.service';
 
-// Import các Interface chuẩn để ESLint không báo lỗi no-unsafe-return
 import type {
   IFBTRecommendation,
   IRecommendationFeedback,
@@ -26,6 +34,17 @@ import {
 } from './tracking/schemas/user-behavior.schema';
 import { Public } from 'src/common/decorators/public.decorator';
 import { Throttle } from '@nestjs/throttler';
+import { CollaborativeFilteringService } from './engine/collaborative-filtering.service';
+import { ViewBasedService } from './engine/view-based.service';
+import { PurchaseBasedService } from './engine/purchase-based.service';
+import { Action, Resource } from 'src/common/enums/resource.enum';
+import { AuditLogsService } from '../system/audit-logs/audit-logs.service';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { Role } from 'src/common/enums/role.enum';
+import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 
 export class SubmitFeedbackDto implements IRecommendationFeedback {
   session_id: string;
@@ -35,14 +54,15 @@ export class SubmitFeedbackDto implements IRecommendationFeedback {
   action: 'CLICK' | 'VIEW' | 'IGNORE' | 'ADD_TO_CART';
 }
 
-// Định nghĩa interface mở rộng an toàn cho Request để Typescript không báo lỗi "any"
+// Đồng nhất interface với JWT Payload thực tế
 interface RequestWithUser extends Request {
-  user?: {
-    id?: string;
+  user: {
+    _id: string;
+    email: string;
+    roles: string[];
   };
 }
 
-@Public()
 @Controller('recommendations')
 export class RecommendationsController {
   constructor(
@@ -51,9 +71,14 @@ export class RecommendationsController {
     private readonly personalizedService: PersonalizedService,
     private readonly bundleService: BundleDiscountService,
     private readonly trackingService: TrackingService,
+    private readonly viewBasedService: ViewBasedService,
+    private readonly purchaseBasedService: PurchaseBasedService,
+    private readonly cfService: CollaborativeFilteringService,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
-  @Throttle({ default: { limit: 20, ttl: 60 } }) // Tối đa 20 requests / 60 giây cho mỗi IP
+  @Public()
+  @Throttle({ default: { limit: 20, ttl: 60 } })
   @Get('fbt')
   async getFBT(@Query() dto: GetFBTDto): Promise<IFBTRecommendation[]> {
     return this.fbtService.getFrequentlyBoughtTogether(
@@ -62,6 +87,7 @@ export class RecommendationsController {
     );
   }
 
+  @Public()
   @Get('cart')
   async getCartRecs(
     @Query() dto: GetCartRecommendationsDto,
@@ -73,6 +99,7 @@ export class RecommendationsController {
     );
   }
 
+  @Public()
   @Get('personalized')
   async getPersonalized(
     @Query() dto: GetPersonalizedDto,
@@ -92,6 +119,7 @@ export class RecommendationsController {
     );
   }
 
+  @Public()
   @Get('personalized/related')
   async getRelatedProducts(
     @Query('product_id') productId: string,
@@ -99,6 +127,7 @@ export class RecommendationsController {
     return this.personalizedService.getRelatedProducts(productId, 10);
   }
 
+  @Public()
   @Get('personalized/similar')
   async getLookingSimilar(
     @Query('product_id') productId: string,
@@ -106,16 +135,17 @@ export class RecommendationsController {
     return this.personalizedService.getLookingSimilar(productId, 10);
   }
 
+  @Public()
   @Post('bundle/add-to-cart')
   async addBundleToCart(
-    @Req() req: RequestWithUser, // Inject đối tượng Request có chứa kiểu user an toàn
+    @Req() req: RequestWithUser,
     @Body() dto: AddBundleToCartDto,
   ): Promise<{ message: string; total_discount: number; items_added: number }> {
-    // Lấy userId an toàn, đã bỏ `dto.user_id` để tránh lỗi TS
-    const userId = req.user?.id || undefined;
+    const userId = req.user?._id;
     return this.bundleService.applyComboDiscountAndAddToCart(dto, userId);
   }
 
+  @Public()
   @Post('feedback')
   async submitFeedback(
     @Body() dto: SubmitFeedbackDto,
@@ -125,7 +155,7 @@ export class RecommendationsController {
       user_id: dto.user_id,
       action:
         dto.action === 'CLICK'
-          ? BehaviorAction.CLICK_SEARCH_SUGGESTION
+          ? BehaviorAction.VIEW_PRODUCT
           : BehaviorAction.VIEW_PAGE,
       path: `/widget/${dto.widget_type}`,
       device: DeviceType.DESKTOP,
@@ -148,5 +178,143 @@ export class RecommendationsController {
       success: true,
       message: 'Đã ghi nhận tương tác để huấn luyện Model',
     };
+  }
+
+  @Public()
+  @Get('recently-viewed')
+  async getRecentlyViewed(
+    @Query('session_id') sessionId: string,
+    @Query('current_product_id') currentProductId: string,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.viewBasedService.getRecentlyViewed(
+      sessionId,
+      req.user?._id,
+      12,
+      currentProductId,
+    );
+  }
+
+  // Bắt buộc đăng nhập để xem lịch sử mua lại
+  @UseGuards(JwtAuthGuard)
+  @Get('reorder')
+  async getReorder(@Req() req: RequestWithUser) {
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return [];
+    }
+    return this.purchaseBasedService.getReorderAndAccessories(userId);
+  }
+
+  @Public()
+  @Get('discover')
+  async getDiscoverCF(
+    @Req() req: RequestWithUser,
+    @Query('user_id') queryUserId?: string,
+  ) {
+    const userId = req.user?._id || queryUserId;
+
+    if (!userId) {
+      const fallback = await this.personalizedService.getTrendingItems(10);
+      return {
+        test_group: 'ALGO_TRENDING',
+        data: fallback.products as unknown as ProductDocument[],
+      };
+    }
+
+    const userIdStr = String(userId);
+    const lastChar = userIdStr.slice(-1);
+    const isGroupA = parseInt(lastChar, 16) % 2 === 0;
+
+    let products: ProductDocument[];
+    let testGroup: 'ALGO_SVD' | 'ALGO_TRENDING';
+
+    if (isGroupA) {
+      products =
+        await this.cfService.getCollaborativeRecommendations(userIdStr);
+      testGroup = 'ALGO_SVD';
+    } else {
+      const fallback = await this.personalizedService.getTrendingItems(10);
+      products = fallback.products as unknown as ProductDocument[];
+      testGroup = 'ALGO_TRENDING';
+    }
+
+    return {
+      test_group: testGroup,
+      data: products,
+    };
+  }
+
+  @Public()
+  @Delete('recently-viewed')
+  async clearRecentlyViewed(
+    @Query('session_id') sessionId: string,
+    @Req() req: RequestWithUser,
+  ) {
+    const success = await this.viewBasedService.clearViewHistory(
+      sessionId,
+      req.user?._id,
+    );
+    return { success, message: 'Đã xóa lịch sử xem sản phẩm' };
+  }
+
+  @Public()
+  @Post('impression')
+  async recordImpression(
+    @Body()
+    dto: {
+      session_id: string;
+      user_id?: string;
+      product_ids: string[];
+    },
+  ) {
+    await this.trackingService.logImpressions(
+      dto.user_id || dto.session_id,
+      dto.product_ids,
+    );
+    return { success: true };
+  }
+
+  // API dành riêng cho Admin báo cáo
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  @RequirePermissions(Resource.REPORTS, Action.READ)
+  @Get('admin/replenishment-list')
+  async getAdminReplenishment(@Req() req: RequestWithUser) {
+    try {
+      const data = await this.purchaseBasedService.getReplenishmentCandidates();
+
+      await this.auditLogsService.log({
+        action: 'EXPORT_REPLENISHMENT_LIST',
+        collection_name: Resource.REPORTS,
+        actor_id: req.user?._id,
+        actor_email: req.user?.email,
+        department: 'ACCOUNTING',
+        detail: {
+          total_candidates: data.length,
+          purpose:
+            'Lấy danh sách khách hàng tiềm năng để gửi Email nhắc mua lại',
+        },
+        is_success: true,
+        ip: req.ip,
+        user_agent: req.headers['user-agent'] as string,
+      });
+
+      return data;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+
+      await this.auditLogsService.log({
+        action: 'EXPORT_REPLENISHMENT_LIST',
+        collection_name: Resource.REPORTS,
+        actor_id: req.user?._id,
+        is_success: false,
+        error_reason: errorMessage,
+        department: 'ACCOUNTING',
+      });
+      throw error;
+    }
   }
 }

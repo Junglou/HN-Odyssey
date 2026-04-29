@@ -1,4 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager'; // [FIX 1]: Import CACHE_MANAGER từ đúng package
+import type { Cache } from 'cache-manager'; // [FIX 2]: Thêm 'type' vào import
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
@@ -75,6 +77,7 @@ export class TrackingService {
     private loyaltyModel: Model<LoyaltyHistoryDocument>,
     private readonly eventEmitter: EventEmitter2,
     private readonly configService: ConfigService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
     this.indexName =
       this.configService.get<string>('ALGOLIA_INDEX_NAME') || 'products';
@@ -538,7 +541,6 @@ export class TrackingService {
   }
 
   // BỔ SUNG: US4 - AC1 (Cập nhật chi phí quảng cáo thủ công)
-
   async updateAdSpend(campaignId: string, adSpend: number): Promise<void> {
     await this.campaignModel.findByIdAndUpdate(campaignId, {
       $set: { ad_spend: adSpend },
@@ -546,7 +548,6 @@ export class TrackingService {
   }
 
   // BỔ SUNG: US1 - AC8 & US4 - AC5 (Biểu đồ xu hướng theo thời gian)
-
   async getCampaignTrend(
     campaignId: string,
     filter: TrackingFilterDto,
@@ -650,7 +651,6 @@ export class TrackingService {
   }
 
   // BỔ SUNG: US2 - AC2 (Tra cứu chi tiết đơn hàng dùng mã)
-
   async getOrdersByCoupon(
     couponCode: string,
     filter: CouponFilterDto,
@@ -687,7 +687,6 @@ export class TrackingService {
   }
 
   // XUẤT EXCEL BÁO CÁO CHIẾN DỊCH
-
   async generateCampaignsExcel(
     filter: TrackingFilterDto,
     user: UserExportInfo,
@@ -889,7 +888,7 @@ export class TrackingService {
     return workbook;
   }
 
-  // [MỚI]: Bắn Tracking cho Algolia Insights để Model tự học
+  // Bắn Tracking cho Algolia Insights để Model tự học
   async sendAlgoliaInsight(
     action: 'CLICK' | 'VIEW' | 'ADD_TO_CART',
     userToken: string,
@@ -939,6 +938,23 @@ export class TrackingService {
       // Bọc try-catch không throw để không làm đứt mạch API chính của User
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(`[Algolia Insights] Thất bại: ${msg}`);
+    }
+  }
+
+  // Hàm xử lý Frequency Capping
+  async logImpressions(userToken: string, productIds: string[]) {
+    try {
+      for (const pId of productIds) {
+        const key = `impression:${userToken}:${pId}`;
+        const currentCount = (await this.cacheManager.get<number>(key)) || 0;
+        // Tăng đếm và set TTL 24 giờ (86400000 ms)
+        await this.cacheManager.set(key, currentCount + 1, 86400000);
+      }
+    } catch (error: unknown) {
+      // Ép kiểu error: unknown để sửa lỗi unsafe call/member access
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(`Lỗi log impression: ${errorMessage}`);
     }
   }
 }

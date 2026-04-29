@@ -97,8 +97,7 @@ export class AuditLogsService {
     const accountingResources = [Resource.REPORTS, Resource.PAYMENT].map((x) =>
       x.toString(),
     );
-
-    if (accountingResources.includes(r)) {
+    if (accountingResources.includes(resource.toUpperCase())) {
       return Department.ACCOUNTING;
     }
 

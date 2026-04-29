@@ -21,6 +21,9 @@ import {
   UserBehavior,
   UserBehaviorSchema,
 } from 'src/modules/recommendations/tracking/schemas/user-behavior.schema';
+import { CollaborativeFilteringService } from './engine/collaborative-filtering.service';
+import { PurchaseBasedService } from './engine/purchase-based.service';
+import { ViewBasedService } from './engine/view-based.service';
 
 @Module({
   imports: [
@@ -40,7 +43,17 @@ import {
     PersonalizedService,
     BundleDiscountService,
     MlIntegrationService,
+    ViewBasedService,
+    PurchaseBasedService,
+    CollaborativeFilteringService,
   ],
-  exports: [AssociationRuleService, ContextualCartService, PersonalizedService],
+  exports: [
+    AssociationRuleService,
+    ContextualCartService,
+    PersonalizedService,
+    ViewBasedService,
+    PurchaseBasedService,
+    CollaborativeFilteringService,
+  ],
 })
 export class RecommendationsModule {}

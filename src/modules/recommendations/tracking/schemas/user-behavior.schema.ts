@@ -17,6 +17,7 @@ export enum BehaviorAction {
   EXIT_PAGE = 'EXIT_PAGE',
   CLICK_SEARCH_SUGGESTION = 'CLICK_SEARCH_SUGGESTION', // User click vào gợi ý (Keyword hoặc Product)
   APPLY_FILTER = 'APPLY_FILTER', // User áp dụng bộ lọc / sắp xếp
+  REVIEW_PRODUCT = 'REVIEW_PRODUCT', //Thêm hành động Đánh giá sản phẩm để Tracking có thể lưu lại
 }
 
 export enum DeviceType {
