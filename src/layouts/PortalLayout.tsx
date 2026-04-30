@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import "./PortalLayout.css";
 
@@ -16,7 +16,33 @@ import {
   LogoutIcon,
   HamburgerIcon,
   ChevronIcon,
+  BellIcon,
 } from "../assets/icons/PortalIcons";
+
+// mock data thông báo
+const MOCK_NOTIFICATIONS = [
+  {
+    title: "New RMA Request",
+    time: "(20m ago)",
+    unread: true,
+    icon: <CatalogIcon />,
+    link: "/portal/trade-in",
+  },
+  {
+    title: "Order #1198 Received",
+    time: "(15m ago)",
+    unread: true,
+    icon: <WarehouseIcon />,
+    link: "/portal/orders",
+  },
+  {
+    title: "System Update Complete",
+    time: "(1d ago)",
+    unread: false,
+    icon: <SystemIcon />,
+    link: "/portal/system",
+  },
+];
 
 const PortalLayout = () => {
   const navigate = useNavigate();
@@ -31,6 +57,58 @@ const PortalLayout = () => {
   const [isCommunicationOpen, setIsCommunicationOpen] = useState(false);
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [isWarehouseOpen, setIsWarehouseOpen] = useState(false);
+  const [isOrderManagementOpen, setIsOrderManagementOpen] = useState(false);
+
+  // Component hiệu ứng nền sidebar
+  const RippleSidebarBackground = () => {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const lastPos = useRef({ x: 0, y: 0 });
+
+    useEffect(() => {
+      const parent = containerRef.current?.closest(
+        ".portal-sidebar",
+      ) as HTMLElement;
+      if (!parent) return;
+
+      const handleMouseMove = (e: MouseEvent) => {
+        const rect = parent.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top + parent.scrollTop;
+        const dx = x - lastPos.current.x;
+        const dy = y - lastPos.current.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < 15) return;
+        lastPos.current = { x, y };
+
+        const ripple = document.createElement("div");
+        ripple.className = "water-ripple-particle";
+
+        const size = 60 + Math.random() * 20;
+
+        ripple.style.width = `${size}px`;
+        ripple.style.height = `${size}px`;
+        ripple.style.left = `${x}px`;
+        ripple.style.top = `${y}px`;
+
+        containerRef.current?.appendChild(ripple);
+
+        setTimeout(() => {
+          if (ripple && ripple.parentNode) {
+            ripple.parentNode.removeChild(ripple);
+          }
+        }, 2000);
+      };
+
+      parent.addEventListener("mousemove", handleMouseMove);
+      return () => parent.removeEventListener("mousemove", handleMouseMove);
+    }, []);
+
+    return <div className="ripple-surface-wrapper" ref={containerRef}></div>;
+  };
+
+  // state thông báo
+  const [isNotiOpen, setIsNotiOpen] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
   const isParentActive = (basePath: string) =>
@@ -56,6 +134,7 @@ const PortalLayout = () => {
       ></div>
 
       <aside className={`portal-sidebar ${isMobileSidebarOpen ? "open" : ""}`}>
+        <RippleSidebarBackground />
         <div className="portal-brand">H&N-Portal</div>
 
         <nav className="sidebar-menu">
@@ -84,7 +163,7 @@ const PortalLayout = () => {
                 display: "grid",
                 gridTemplateRows: isDashboardOpen ? "1fr" : "0fr",
                 transition:
-                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+                  "grid-template-rows 0.5s cubic-bezier(0.25, 1, 0.5, 1)",
                 overflow: "hidden",
               }}
             >
@@ -139,7 +218,7 @@ const PortalLayout = () => {
                 display: "grid",
                 gridTemplateRows: isProductCatalogOpen ? "1fr" : "0fr",
                 transition:
-                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+                  "grid-template-rows 0.5s cubic-bezier(0.25, 1, 0.5, 1)",
                 overflow: "hidden",
               }}
             >
@@ -178,11 +257,41 @@ const PortalLayout = () => {
             </div>
           </div>
 
-          <div className="menu-item">
-            <div className="menu-item-left">
-              <OrderIcon /> Order Management
+          <div className="menu-group">
+            <div
+              className={`menu-item ${isParentActive("/portal/orders") || isParentActive("/portal/trade-in") ? "active-parent" : ""}`}
+              onClick={() => setIsOrderManagementOpen(!isOrderManagementOpen)}
+            >
+              <div className="menu-item-left">
+                <OrderIcon /> Order Management
+              </div>
+              <ChevronIcon open={isOrderManagementOpen} />
             </div>
-            <ChevronIcon open={false} />
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateRows: isOrderManagementOpen ? "1fr" : "0fr",
+                transition:
+                  "grid-template-rows 0.5s cubic-bezier(0.25, 1, 0.5, 1)",
+                overflow: "hidden",
+              }}
+            >
+              <div className="submenu" style={{ minHeight: 0 }}>
+                <div
+                  className={`submenu-item ${isActive("/portal/orders") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/orders")}
+                >
+                  Order Management
+                </div>
+                <div
+                  className={`submenu-item ${isActive("/portal/trade-in") ? "active" : ""}`}
+                  onClick={() => handleNavigate("/portal/trade-in")}
+                >
+                  Trade-in Management
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Warehouse (WMS) */}
@@ -202,7 +311,7 @@ const PortalLayout = () => {
                 display: "grid",
                 gridTemplateRows: isWarehouseOpen ? "1fr" : "0fr",
                 transition:
-                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+                  "grid-template-rows 0.5s cubic-bezier(0.25, 1, 0.5, 1)",
                 overflow: "hidden",
               }}
             >
@@ -234,7 +343,7 @@ const PortalLayout = () => {
                 display: "grid",
                 gridTemplateRows: isCustomerCRMOpen ? "1fr" : "0fr",
                 transition:
-                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+                  "grid-template-rows 0.5s cubic-bezier(0.25, 1, 0.5, 1)",
                 overflow: "hidden",
               }}
             >
@@ -258,7 +367,13 @@ const PortalLayout = () => {
           {/* Marketing Suite */}
           <div className="menu-group">
             <div
-              className={`menu-item ${isParentActive("/portal/promotion") ? "active-parent" : ""}`}
+              className={`menu-item ${
+                isParentActive("/portal/promotion") ||
+                isParentActive("/portal/review-rating") ||
+                isParentActive("/portal/coupon")
+                  ? "active-parent"
+                  : ""
+              }`}
               onClick={() => setIsMarketingSuiteOpen(!isMarketingSuiteOpen)}
             >
               <div className="menu-item-left">
@@ -272,7 +387,7 @@ const PortalLayout = () => {
                 display: "grid",
                 gridTemplateRows: isMarketingSuiteOpen ? "1fr" : "0fr",
                 transition:
-                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+                  "grid-template-rows 0.5s cubic-bezier(0.25, 1, 0.5, 1)",
                 overflow: "hidden",
               }}
             >
@@ -316,7 +431,7 @@ const PortalLayout = () => {
                 display: "grid",
                 gridTemplateRows: isUsersRolesOpen ? "1fr" : "0fr",
                 transition:
-                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+                  "grid-template-rows 0.5s cubic-bezier(0.25, 1, 0.5, 1)",
                 overflow: "hidden",
               }}
             >
@@ -350,7 +465,7 @@ const PortalLayout = () => {
             <div
               className={`menu-item ${
                 isParentActive("/portal/static-pages") ||
-                isParentActive("/portal/image-management") ||
+                isParentActive("/portal/media-management") ||
                 isParentActive("/portal/banner-management") ||
                 isParentActive("/portal/blog-news")
                   ? "active-parent"
@@ -369,7 +484,7 @@ const PortalLayout = () => {
                 display: "grid",
                 gridTemplateRows: isCommunicationOpen ? "1fr" : "0fr",
                 transition:
-                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+                  "grid-template-rows 0.5s cubic-bezier(0.25, 1, 0.5, 1)",
                 overflow: "hidden",
               }}
             >
@@ -413,14 +528,61 @@ const PortalLayout = () => {
         </nav>
 
         <div className="sidebar-bottom">
+          {/* nút thông báo */}
+          <div className="notification-btn" onClick={() => setIsNotiOpen(true)}>
+            <div className="menu-item-left">
+              <BellIcon /> Notifications
+            </div>
+            <span className="notification-badge">
+              {MOCK_NOTIFICATIONS.filter((n) => n.unread).length}
+            </span>
+          </div>
+
+          <div className="sidebar-divider"></div>
+
           <div className="logout-btn" onClick={() => navigate("/profile")}>
             <LogoutIcon /> Exit Portal
           </div>
         </div>
       </aside>
 
+      {/* drawer thông báo */}
+      <div
+        className={`p-noti-overlay ${isNotiOpen ? "open" : ""}`}
+        onClick={() => setIsNotiOpen(false)}
+      ></div>
+      <div className={`p-noti-drawer ${isNotiOpen ? "open" : ""}`}>
+        <div className="p-noti-header">
+          <h3 className="p-noti-title">Notifications Center</h3>
+          <button className="p-noti-close" onClick={() => setIsNotiOpen(false)}>
+            ✕
+          </button>
+        </div>
+        <div className="p-noti-body">
+          {MOCK_NOTIFICATIONS.map((noti, idx) => (
+            <div
+              key={idx}
+              className={`p-noti-item ${noti.unread ? "unread" : ""}`}
+              onClick={() => {
+                if (noti.link) navigate(noti.link);
+                setIsNotiOpen(false);
+              }}
+            >
+              <div className="p-noti-icon-wrapper">{noti.icon}</div>
+              <div className="p-noti-content">
+                <p className="p-noti-item-title">{noti.title}</p>
+                <p className="p-noti-item-time">{noti.time}</p>
+              </div>
+              <div className="p-noti-dot"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <main className="portal-main-content">
-        <Outlet />
+        <div key={location.pathname} className="page-transition-wrapper">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

@@ -1,0 +1,231 @@
+.usm-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1050;
+  padding: 16px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.usm-modal {
+  background-color: #fff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  font-family: "Lexend Exa", sans-serif;
+  overflow: visible;
+  animation: slideUp 0.3s ease-out;
+}
+
+.usm-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.usm-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.usm-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.usm-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+  display: block;
+}
+
+/* Custom Dropdown Styles */
+.usm-custom-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.usm-dropdown-trigger {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #111827;
+  background-color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.usm-dropdown-trigger:hover {
+  border-color: #9ca3af;
+}
+
+.usm-dropdown-trigger.active {
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.1);
+}
+
+.usm-dropdown-arrow {
+  display: flex;
+  color: #6b7280;
+  transition: transform 0.2s ease;
+}
+
+.usm-dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.usm-dropdown-options {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background-color: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  z-index: 10;
+  overflow: hidden;
+  animation: dropdownFadeIn 0.2s ease-out forwards;
+  transform-origin: top;
+}
+
+.usm-dropdown-option {
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  color: #374151;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.usm-dropdown-option:hover {
+  background-color: #f3f4f6;
+}
+
+.usm-dropdown-option.selected {
+  background-color: #f3f4f6;
+  color: #111827;
+  font-weight: 600;
+}
+
+.usm-textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: #111827;
+  outline: none;
+  resize: vertical;
+  margin-top: 16px;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.usm-textarea:focus {
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.1);
+}
+
+.usm-footer {
+  padding: 16px 20px;
+  background-color: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+.usm-btn-cancel {
+  padding: 8px 16px;
+  background-color: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  color: #374151;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.usm-btn-cancel:hover {
+  background-color: #f3f4f6;
+  border-color: #6b7280;
+}
+
+.usm-btn-cancel:focus {
+  outline: none;
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.1);
+}
+
+.usm-btn-confirm {
+  padding: 8px 16px;
+  background-color: #111827;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.usm-btn-confirm:hover:not(:disabled) {
+  background-color: #374151;
+}
+
+.usm-btn-confirm:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: scaleY(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}

@@ -1,0 +1,494 @@
+/* container & header */
+.tim-container {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2vw, 20px);
+  font-family: "Lexend Exa", sans-serif;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.tim-container * {
+  box-sizing: border-box;
+}
+
+.tim-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: clamp(12px, 1.5vw, 16px);
+}
+
+.tim-title {
+  font-size: clamp(1.4rem, 2.5vw, 1.8rem);
+  font-weight: 800;
+  margin: 0 0 4px 0;
+  color: #111827;
+}
+
+.tim-breadcrumb {
+  font-size: clamp(0.75rem, 1vw, 0.85rem);
+  color: #6b7280;
+  margin: 0;
+}
+
+/* export button */
+.tim-btn-export {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  padding: clamp(8px, 1.5vw, 12px) clamp(16px, 2vw, 24px);
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: clamp(0.8rem, 1vw, 0.9rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tim-btn-export:hover {
+  background-color: #2563eb;
+}
+
+/* card */
+.tim-card {
+  background-color: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: clamp(16px, 2vw, 20px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2vw, 20px);
+  width: 100%;
+  min-width: 0;
+}
+
+/* filters & toolbar */
+.tim-filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(10px, 1.5vw, 16px);
+  align-items: stretch;
+  width: 100%;
+}
+
+.tim-filter-input {
+  flex: 3 1 200px;
+  padding: clamp(8px, 1.2vw, 10px) 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  outline: none;
+  font-family: inherit;
+  font-size: clamp(0.85rem, 1vw, 0.95rem);
+  background-color: #fff;
+  transition: border-color 0.2s;
+  color: #111827;
+}
+
+.tim-filter-input[type="date"] {
+  flex: 2 1 150px;
+}
+
+.tim-filter-input:focus {
+  border-color: #111827;
+}
+
+/* action buttons */
+.tim-btn-clear,
+.tim-btn-action-top {
+  flex: 1 1 auto;
+  padding: clamp(8px, 1.2vw, 10px) 20px;
+  background-color: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #374151;
+  font-size: clamp(0.85rem, 1vw, 0.95rem);
+  white-space: nowrap;
+}
+
+.tim-btn-clear:hover,
+.tim-btn-action-top:hover,
+.tim-btn-clear:focus,
+.tim-btn-action-top:focus {
+  background-color: #f3f4f6;
+  border-color: #111827;
+  outline: none;
+}
+
+/* custom dropdown */
+.tim-custom-dropdown {
+  position: relative;
+  flex: 2 1 150px;
+}
+
+.tim-dropdown-trigger {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(8px, 1.2vw, 10px) 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: clamp(0.85rem, 1vw, 0.95rem);
+  color: #111827;
+  transition: border-color 0.2s;
+}
+.tim-dropdown-trigger.active {
+  border-color: #111827;
+}
+
+.tim-dropdown-arrow {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.2s;
+}
+
+.tim-dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.tim-dropdown-options {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  overflow: hidden;
+  animation: tim-slideFadeIn 0.2s ease-out forwards;
+  transform-origin: top center;
+}
+
+.tim-dropdown-option {
+  padding: 10px 16px;
+  font-size: clamp(0.85rem, 1vw, 0.95rem);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.tim-dropdown-option:hover {
+  background: #f3f4f6;
+}
+
+.tim-dropdown-option.selected {
+  background: #f3f4f6;
+  font-weight: 500;
+  color: #111827;
+}
+
+/* table */
+.tim-table-container {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.tim-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1000px;
+  text-align: left;
+}
+
+.tim-table th {
+  background-color: #f9fafb;
+  padding: 14px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4b5563;
+  border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+.tim-table td {
+  padding: 16px;
+  font-size: 0.9rem;
+  color: #111827;
+  border-bottom: 1px solid #e5e7eb;
+  vertical-align: middle;
+}
+
+.tim-table tr:last-child td {
+  border-bottom: none;
+}
+
+.tim-table tr:hover {
+  background-color: #f9fafb;
+}
+
+.tim-row-selected {
+  background-color: #f9fafb;
+}
+
+/* utilities */
+.tim-text-center {
+  text-align: center;
+}
+.tim-text-right {
+  text-align: right;
+}
+.tim-font-semibold {
+  font-weight: 600;
+}
+.tim-text-blue-bold {
+  font-weight: 600;
+  color: #2563eb;
+}
+.tim-empty-state {
+  text-align: center;
+  padding: 32px;
+  color: #6b7280;
+}
+
+/* badges */
+.tim-badge {
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: capitalize;
+  display: inline-block;
+  text-align: center;
+}
+
+.tim-badge-status-Pending {
+  background-color: #fef08a;
+  color: #ca8a04;
+}
+.tim-badge-status-Approved {
+  background-color: #dbeafe;
+  color: #3b82f6;
+}
+.tim-badge-status-Received {
+  background-color: #f3e8ff;
+  color: #9333ea;
+}
+.tim-badge-status-Completed {
+  background-color: #dcfce7;
+  color: #16a34a;
+}
+.tim-badge-status-Rejected {
+  background-color: #fee2e2;
+  color: #ef4444;
+}
+.tim-badge-status-Cancelled {
+  background-color: #f3f4f6;
+  color: #4b5563;
+}
+.tim-badge-status-Shipping {
+  background-color: #ffedd5;
+  color: #ea580c;
+}
+
+/* row actions */
+.tim-row-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.tim-btn-outline-primary {
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid #d1d5db;
+  color: #111827;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.tim-btn-outline-primary:hover,
+.tim-btn-outline-primary:focus {
+  background-color: #f3f4f6;
+  border-color: #111827;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  outline: none;
+}
+
+.tim-btn-outline-danger {
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid #d1d5db;
+  color: #ef4444;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.tim-btn-outline-danger:hover,
+.tim-btn-outline-danger:focus {
+  background-color: #fef2f2;
+  border-color: #ef4444;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  outline: none;
+}
+
+/* pagination */
+.tim-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-top: 8px;
+  font-size: clamp(0.8rem, 1vw, 0.9rem);
+  color: #4b5563;
+}
+
+.tim-page-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tim-btn-page {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  color: #374151;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.tim-btn-page:focus {
+  outline: none;
+}
+.tim-btn-page:hover:not(:disabled),
+.tim-btn-page.active {
+  background-color: #f3f4f6;
+  font-weight: 700;
+  color: #111827;
+}
+
+.tim-btn-page:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: #f9fafb;
+}
+
+/* custom dropdown limit */
+.tim-limit-dropdown {
+  position: relative;
+  width: 120px;
+}
+
+.tim-limit-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 12px;
+  background-color: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tim-limit-trigger:hover,
+.tim-limit-trigger.active {
+  border-color: #111827;
+  background-color: #f9fafb;
+}
+
+.tim-limit-icon {
+  display: flex;
+  align-items: center;
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.tim-limit-icon.open {
+  transform: rotate(180deg);
+}
+
+.tim-limit-options {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 100%;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  overflow: hidden;
+  animation: tim-slideFadeIn 0.2s ease-out forwards;
+  transform-origin: top center;
+}
+
+.tim-limit-option {
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  color: #374151;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.tim-limit-option:hover {
+  background-color: #f3f4f6;
+}
+.tim-limit-option.active {
+  background-color: #f9fafb;
+  font-weight: 600;
+  color: #111827;
+}
+
+/* animations */
+@keyframes tim-slideFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes tim-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tim-spin-anim {
+  animation: tim-spin 0.5s linear infinite;
+  display: flex;
+}

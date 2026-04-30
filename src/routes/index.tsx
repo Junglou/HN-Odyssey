@@ -32,6 +32,25 @@ import CustomerManagementPage from "../pages/portal/CustomerCRM/CustomerManageme
 import LiveChatSupportPage from "../pages/portal/CustomerCRM/LiveChatSupport/LiveChatSupportPage";
 
 import PromotionManagementPage from "../pages/portal/MarketingSuite/PromotionManagement/PromotionManagementPage";
+import ReviewAndRatingManagementPage from "../pages/portal/MarketingSuite/ReviewAndRatingManagement/ReviewAndRatingManagementPage";
+import CouponManagementPage from "../pages/portal/MarketingSuite/CouponManagement/CouponManagementPage";
+
+import StaticPageManagementPage from "../pages/portal/Communication/StaticPageManagement/StaticPageManagementPage";
+import MediaManagementPage from "../pages/portal/Communication/MediaManagement/MediaManagementPage";
+import BannerManagementPage from "../pages/portal/Communication/BannerManagement/BannerManagementPage";
+import BlogNewsManagementPage from "../pages/portal/Communication/BlogNewsManagement/BlogNewsManagementPage";
+import SystemPage from "../pages/portal/System/SystemPage";
+
+import OverviewPage from "../pages/portal/Dashboard/Overview/OverviewPage";
+import RevenueReportPage from "../pages/portal/Dashboard/RevenueReport/RevenueReportPage";
+import MarketingAndPromotionPage from "../pages/portal/Dashboard/MarketingAndPromotion/MarketingAndPromotionPage";
+import BusinessIntelligencePage from "../pages/portal/Dashboard/BusinessIntelligence/BusinessIntelligencePage";
+import InventoryManagementPage from "../pages/portal/Dashboard/InventoryManagement/InventoryManagementPage";
+
+import StockManagementPage from "../pages/portal/Warehouse/StockManagementPage";
+
+import OrderManagementPage from "../pages/portal/OrderManagement/OrderManagement/OrderManagementPage";
+import TradeInManagementPage from "../pages/portal/OrderManagement/TradeInManagement/TradeInManagementPage";
 
 export const router = createBrowserRouter([
   // route auth
@@ -91,15 +110,15 @@ export const router = createBrowserRouter([
       },
       {
         path: "/profile/recent",
-        element: <RecentViewPage />
+        element: <RecentViewPage />,
       },
       {
         path: "/profile/coupon",
-        element: <MyCouponPage />
+        element: <MyCouponPage />,
       },
       {
         path: "/profile/loyalty",
-        element: <LoyaltyPage />
+        element: <LoyaltyPage />,
       },
       {
         index: true, // Route mặc định của path: "/"
@@ -230,6 +249,14 @@ export const router = createBrowserRouter([
       {
         path: "warehouse",
         element: <StockManagementPage />,
+      },
+      {
+        path: "orders",
+        element: <OrderManagementPage />,
+      },
+      {
+        path: "trade-in",
+        element: <TradeInManagementPage />,
       },
     ],
   },
