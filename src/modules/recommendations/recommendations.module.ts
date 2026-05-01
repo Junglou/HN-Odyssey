@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { ScheduleModule } from '@nestjs/schedule';
 import { RecommendationsController } from './recommendations.controller';
 import { AssociationRuleService } from './engine/association-rule.service';
 import { ContextualCartService } from './engine/contextual-cart.service';
@@ -24,10 +23,12 @@ import {
 import { CollaborativeFilteringService } from './engine/collaborative-filtering.service';
 import { PurchaseBasedService } from './engine/purchase-based.service';
 import { ViewBasedService } from './engine/view-based.service';
+import { NewArrivalsService } from './engine/new-arrivals.service';
+import { UsersModule } from 'src/modules/users/users.module';
+import { NotificationsModule } from 'src/modules/notifications/notifications.module';
 
 @Module({
   imports: [
-    ScheduleModule.forRoot(), // Kích hoạt Cronjob
     MongooseModule.forFeature([
       { name: Product.name, schema: ProductSchema },
       { name: Order.name, schema: OrderSchema },
@@ -35,6 +36,8 @@ import { ViewBasedService } from './engine/view-based.service';
       { name: UserBehavior.name, schema: UserBehaviorSchema },
     ]),
     TrackingModule,
+    UsersModule,
+    NotificationsModule,
   ],
   controllers: [RecommendationsController],
   providers: [
@@ -46,6 +49,7 @@ import { ViewBasedService } from './engine/view-based.service';
     ViewBasedService,
     PurchaseBasedService,
     CollaborativeFilteringService,
+    NewArrivalsService,
   ],
   exports: [
     AssociationRuleService,
@@ -54,6 +58,7 @@ import { ViewBasedService } from './engine/view-based.service';
     ViewBasedService,
     PurchaseBasedService,
     CollaborativeFilteringService,
+    NewArrivalsService,
   ],
 })
 export class RecommendationsModule {}

@@ -9,7 +9,6 @@ import { FlashSale, FlashSaleSchema } from './schemas/flash-sale.schema';
 import { PromotionsController } from './promotions.controller';
 import { RolesModule } from 'src/modules/users/roles/roles.module';
 import { AuditLogsModule } from 'src/modules/system/audit-logs/audit-logs.module';
-import { ScheduleModule } from '@nestjs/schedule';
 import {
   Product,
   ProductSchema,
@@ -18,6 +17,8 @@ import {
   Order,
   OrderSchema,
 } from 'src/modules/sales/orders/schemas/order.schema';
+import { VoucherRecommendationService } from './voucher-recommendation.service';
+import { UsersModule } from 'src/modules/users/users.module';
 
 @Module({
   imports: [
@@ -28,12 +29,22 @@ import {
       { name: Product.name, schema: ProductSchema },
       { name: Order.name, schema: OrderSchema },
     ]),
-    ScheduleModule.forRoot(),
     RolesModule,
     AuditLogsModule,
+    UsersModule,
   ],
   controllers: [PromotionsController],
-  providers: [PromotionEngineService, CouponsService, FlashSalesService],
-  exports: [PromotionEngineService],
+  providers: [
+    PromotionEngineService,
+    CouponsService,
+    FlashSalesService,
+    VoucherRecommendationService,
+  ],
+  exports: [
+    PromotionEngineService,
+    CouponsService,
+    FlashSalesService,
+    VoucherRecommendationService,
+  ],
 })
 export class PromotionsModule {}

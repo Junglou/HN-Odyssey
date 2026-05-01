@@ -36,6 +36,6 @@ import { ContentModule } from 'src/modules/marketing/content/content.module';
   ],
   controllers: [CustomersController, CustomersAdminController],
   providers: [CustomersService, CustomersAdminService],
-  exports: [CustomersService, CustomersAdminService],
+  exports: [CustomersService, CustomersAdminService, MongooseModule],
 })
 export class CustomersModule {}

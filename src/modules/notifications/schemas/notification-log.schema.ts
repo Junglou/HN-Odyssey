@@ -7,6 +7,7 @@ export enum NotificationType {
   SYSTEM = 'SYSTEM',
   SECURITY = 'SECURITY',
   LOYALTY = 'LOYALTY',
+  PROMOTION = 'PROMOTION',
 }
 
 export enum NotificationPriority {
