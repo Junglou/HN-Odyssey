@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ant-design/icons": "^6.2.2",
+    "antd": "^6.3.7",
     "axios": "^1.13.3",
     "exceljs": "^4.4.0",
     "framer-motion": "^12.38.0",
@@ -17,8 +19,11 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-easy-crop": "^5.5.7",
+    "react-moveable": "^0.56.0",
+    "react-rnd": "^10.5.3",
     "react-router-dom": "^7.12.0",
     "react-toastify": "^11.0.5",
+    "react-zoom-pan-pinch": "^4.0.3",
     "recharts": "^3.8.1",
     "suneditor": "^2.47.8",
     "suneditor-react": "^3.6.1"

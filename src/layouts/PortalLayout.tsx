@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import "./PortalLayout.css";
 
-// Icon
+// Icons
 import {
   DashboardIcon,
   CatalogIcon,
@@ -48,7 +48,7 @@ const PortalLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // state quản lý đóng mở các menu cha
+  // Menu States
   const [isUsersRolesOpen, setIsUsersRolesOpen] = useState(false);
   const [isProductCatalogOpen, setIsProductCatalogOpen] = useState(false);
   const [isCustomerCRMOpen, setIsCustomerCRMOpen] = useState(false);
@@ -58,8 +58,9 @@ const PortalLayout = () => {
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [isWarehouseOpen, setIsWarehouseOpen] = useState(false);
   const [isOrderManagementOpen, setIsOrderManagementOpen] = useState(false);
+  const [isNotiOpen, setIsNotiOpen] = useState(false);
 
-  // Component hiệu ứng nền sidebar
+  // Ripple Effect Component
   const RippleSidebarBackground = () => {
     const containerRef = useRef<HTMLDivElement>(null);
     const lastPos = useRef({ x: 0, y: 0 });
@@ -107,9 +108,7 @@ const PortalLayout = () => {
     return <div className="ripple-surface-wrapper" ref={containerRef}></div>;
   };
 
-  // state thông báo
-  const [isNotiOpen, setIsNotiOpen] = useState(false);
-
+  // Active Route Helpers
   const isActive = (path: string) => location.pathname === path;
   const isParentActive = (basePath: string) =>
     location.pathname.includes(basePath);
@@ -121,6 +120,7 @@ const PortalLayout = () => {
 
   return (
     <div className="portal-container">
+      {/* Mobile Toggle */}
       <button
         className="mobile-menu-toggle"
         onClick={() => setIsMobileSidebarOpen(true)}
@@ -128,11 +128,13 @@ const PortalLayout = () => {
         <HamburgerIcon />
       </button>
 
+      {/* Mobile Backdrop */}
       <div
         className={`portal-backdrop ${isMobileSidebarOpen ? "open" : ""}`}
         onClick={() => setIsMobileSidebarOpen(false)}
       ></div>
 
+      {/* Sidebar */}
       <aside className={`portal-sidebar ${isMobileSidebarOpen ? "open" : ""}`}>
         <RippleSidebarBackground />
         <div className="portal-brand">H&N-Portal</div>
@@ -163,7 +165,7 @@ const PortalLayout = () => {
                 display: "grid",
                 gridTemplateRows: isDashboardOpen ? "1fr" : "0fr",
                 transition:
-                  "grid-template-rows 0.5s cubic-bezier(0.25, 1, 0.5, 1)",
+                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
                 overflow: "hidden",
               }}
             >
@@ -201,6 +203,7 @@ const PortalLayout = () => {
               </div>
             </div>
           </div>
+
           {/* Product Catalog */}
           <div className="menu-group">
             <div
@@ -218,7 +221,7 @@ const PortalLayout = () => {
                 display: "grid",
                 gridTemplateRows: isProductCatalogOpen ? "1fr" : "0fr",
                 transition:
-                  "grid-template-rows 0.5s cubic-bezier(0.25, 1, 0.5, 1)",
+                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
                 overflow: "hidden",
               }}
             >
@@ -257,6 +260,7 @@ const PortalLayout = () => {
             </div>
           </div>
 
+          {/* Order Management */}
           <div className="menu-group">
             <div
               className={`menu-item ${isParentActive("/portal/orders") || isParentActive("/portal/trade-in") ? "active-parent" : ""}`}
@@ -273,7 +277,7 @@ const PortalLayout = () => {
                 display: "grid",
                 gridTemplateRows: isOrderManagementOpen ? "1fr" : "0fr",
                 transition:
-                  "grid-template-rows 0.5s cubic-bezier(0.25, 1, 0.5, 1)",
+                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
                 overflow: "hidden",
               }}
             >
@@ -311,7 +315,7 @@ const PortalLayout = () => {
                 display: "grid",
                 gridTemplateRows: isWarehouseOpen ? "1fr" : "0fr",
                 transition:
-                  "grid-template-rows 0.5s cubic-bezier(0.25, 1, 0.5, 1)",
+                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
                 overflow: "hidden",
               }}
             >
@@ -343,7 +347,7 @@ const PortalLayout = () => {
                 display: "grid",
                 gridTemplateRows: isCustomerCRMOpen ? "1fr" : "0fr",
                 transition:
-                  "grid-template-rows 0.5s cubic-bezier(0.25, 1, 0.5, 1)",
+                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
                 overflow: "hidden",
               }}
             >
@@ -367,13 +371,7 @@ const PortalLayout = () => {
           {/* Marketing Suite */}
           <div className="menu-group">
             <div
-              className={`menu-item ${
-                isParentActive("/portal/promotion") ||
-                isParentActive("/portal/review-rating") ||
-                isParentActive("/portal/coupon")
-                  ? "active-parent"
-                  : ""
-              }`}
+              className={`menu-item ${isParentActive("/portal/promotion") || isParentActive("/portal/review-rating") || isParentActive("/portal/coupon") ? "active-parent" : ""}`}
               onClick={() => setIsMarketingSuiteOpen(!isMarketingSuiteOpen)}
             >
               <div className="menu-item-left">
@@ -387,7 +385,7 @@ const PortalLayout = () => {
                 display: "grid",
                 gridTemplateRows: isMarketingSuiteOpen ? "1fr" : "0fr",
                 transition:
-                  "grid-template-rows 0.5s cubic-bezier(0.25, 1, 0.5, 1)",
+                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
                 overflow: "hidden",
               }}
             >
@@ -431,7 +429,7 @@ const PortalLayout = () => {
                 display: "grid",
                 gridTemplateRows: isUsersRolesOpen ? "1fr" : "0fr",
                 transition:
-                  "grid-template-rows 0.5s cubic-bezier(0.25, 1, 0.5, 1)",
+                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
                 overflow: "hidden",
               }}
             >
@@ -467,7 +465,8 @@ const PortalLayout = () => {
                 isParentActive("/portal/static-pages") ||
                 isParentActive("/portal/media-management") ||
                 isParentActive("/portal/banner-management") ||
-                isParentActive("/portal/blog-news")
+                isParentActive("/portal/blog-news") ||
+                isParentActive("/portal/content-config")
                   ? "active-parent"
                   : ""
               }`}
@@ -484,7 +483,7 @@ const PortalLayout = () => {
                 display: "grid",
                 gridTemplateRows: isCommunicationOpen ? "1fr" : "0fr",
                 transition:
-                  "grid-template-rows 0.5s cubic-bezier(0.25, 1, 0.5, 1)",
+                  "grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
                 overflow: "hidden",
               }}
             >
@@ -513,10 +512,17 @@ const PortalLayout = () => {
                 >
                   Blog&News Management
                 </div>
+                <div
+                  className={`submenu-item ${isActive("/portal/content-config") ? "active" : ""}`} // Mới
+                  onClick={() => handleNavigate("/portal/content-config")} // Mới
+                >
+                  Content Config
+                </div>
               </div>
             </div>
           </div>
 
+          {/* System */}
           <div
             className={`menu-item ${isActive("/portal/system") ? "active-parent" : ""}`}
             onClick={() => handleNavigate("/portal/system")}

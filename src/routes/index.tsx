@@ -16,6 +16,9 @@ import OrderMangementPage from "../pages/profile/OrderManagementPage";
 import OrderDetailPage from "../pages/profile/OrderDetailPage";
 import PurchaseHistoryPage from "../pages/profile/PurchaseHistoryPage";
 import MyWishlistPage from "../pages/profile/MyWishlistPage";
+import LoyaltyPage from "../pages/profile/LoyaltyPage";
+import MyCouponPage from "../pages/profile/MyCouponPage";
+import RecentViewPage from "../pages/profile/RecentViewPage";
 
 import UserManagementPage from "../pages/portal/UsersAndRoles/UserManagement/UserManagementPage";
 import RoleManagementPage from "../pages/portal/UsersAndRoles/RoleManagement/RoleManagementPage";
@@ -39,6 +42,8 @@ import StaticPageManagementPage from "../pages/portal/Communication/StaticPageMa
 import MediaManagementPage from "../pages/portal/Communication/MediaManagement/MediaManagementPage";
 import BannerManagementPage from "../pages/portal/Communication/BannerManagement/BannerManagementPage";
 import BlogNewsManagementPage from "../pages/portal/Communication/BlogNewsManagement/BlogNewsManagementPage";
+import ContentConfigPage from "../pages/portal/Communication/ContentConfig/ContentConfigPage";
+
 import SystemPage from "../pages/portal/System/SystemPage";
 
 import OverviewPage from "../pages/portal/Dashboard/Overview/OverviewPage";
@@ -221,6 +226,10 @@ export const router = createBrowserRouter([
       {
         path: "blog-news",
         element: <BlogNewsManagementPage />,
+      },
+      {
+        path: "content-config",
+        element: <ContentConfigPage />,
       },
       {
         path: "system",
