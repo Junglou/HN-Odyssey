@@ -1,6 +1,6 @@
 // imports
 import { useState, useRef, useEffect } from "react";
-import { Rnd } from "react-rnd";
+import Moveable from "react-moveable";
 import SunEditor from "suneditor-react";
 import "suneditor/dist/css/suneditor.min.css";
 import "./ContentConfig.css";
@@ -29,6 +29,7 @@ function EditorDropdown({
   onChange: (val: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [hasOpened, setHasOpened] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -36,8 +37,9 @@ function EditorDropdown({
       if (
         dropdownRef.current &&
         !dropdownRef.current.contains(e.target as Node)
-      )
+      ) {
         setIsOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -45,6 +47,10 @@ function EditorDropdown({
 
   const selectedOption =
     options.find((opt) => opt.value === value) || options[0];
+
+  if (isOpen && !hasOpened) {
+    setHasOpened(true);
+  }
 
   return (
     <div className="cc-custom-dropdown" ref={dropdownRef}>
@@ -57,22 +63,23 @@ function EditorDropdown({
           <DropdownIcon />
         </div>
       </div>
-      {isOpen && (
-        <div className="cc-dropdown-options">
-          {options.map((opt) => (
-            <div
-              key={opt.value}
-              className={`cc-dropdown-option ${value === opt.value ? "selected" : ""}`}
-              onClick={() => {
-                onChange(opt.value);
-                setIsOpen(false);
-              }}
-            >
-              {opt.label}
-            </div>
-          ))}
-        </div>
-      )}
+
+      <div
+        className={`cc-dropdown-options ${isOpen ? "open" : hasOpened ? "closed" : ""}`}
+      >
+        {options.map((opt) => (
+          <div
+            key={opt.value}
+            className={`cc-dropdown-option ${value === opt.value ? "selected" : ""}`}
+            onClick={() => {
+              onChange(opt.value);
+              setIsOpen(false);
+            }}
+          >
+            {opt.label}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -137,7 +144,33 @@ export default function ContentConfig({
 
   const [scale, setScale] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
+  const [moveableTarget, setMoveableTarget] = useState<HTMLElement | null>(
+    null,
+  );
 
+  // Auto-fit Zoom
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+
+    if (wrapperRef.current && selectedSectionId) {
+      const { clientWidth, clientHeight } = wrapperRef.current;
+      const availableWidth = clientWidth - 80;
+      const availableHeight = clientHeight - 80;
+
+      const scaleX = availableWidth / 1200;
+      const scaleY = availableHeight / 600;
+
+      const minScale = Math.min(scaleX, scaleY);
+
+      timer = setTimeout(() => {
+        setScale(minScale < 1 ? Number(minScale.toFixed(2)) : 1);
+      }, 0);
+    }
+
+    return () => clearTimeout(timer);
+  }, [selectedSectionId, isPreviewMode]);
+
+  // effects
   useEffect(() => {
     const handleClickOutsideEditor = (e: MouseEvent) => {
       if (editingElementId) {
@@ -161,9 +194,12 @@ export default function ContentConfig({
     const handleWheel = (e: WheelEvent) => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        const zoomDelta = e.deltaY > 0 ? -0.1 : 0.1;
         setScale((s) =>
-          Number(Math.min(Math.max(0.2, s + zoomDelta), 3).toFixed(2)),
+          Number(
+            Math.min(Math.max(0.2, s + (e.deltaY > 0 ? -0.1 : 0.1)), 3).toFixed(
+              2,
+            ),
+          ),
         );
       }
     };
@@ -175,10 +211,10 @@ export default function ContentConfig({
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isPanning && wrapperRef.current) {
-        const dx = e.clientX - panStartRef.current.x;
-        const dy = e.clientY - panStartRef.current.y;
-        wrapperRef.current.scrollLeft = panStartRef.current.scrollLeft - dx;
-        wrapperRef.current.scrollTop = panStartRef.current.scrollTop - dy;
+        wrapperRef.current.scrollLeft =
+          panStartRef.current.scrollLeft - (e.clientX - panStartRef.current.x);
+        wrapperRef.current.scrollTop =
+          panStartRef.current.scrollTop - (e.clientY - panStartRef.current.y);
       }
     };
     const handleMouseUp = () => setIsPanning(false);
@@ -213,6 +249,7 @@ export default function ContentConfig({
           actions.duplicateElement(selectedElementId);
       }
       if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
         if (selectedElementId && !isPreviewMode)
           actions.removeElement(selectedElementId);
       }
@@ -221,22 +258,41 @@ export default function ContentConfig({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [actions, selectedElementId, isPreviewMode, editingElementId]);
 
+  // Target DOM tracking
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    if (selectedElementId && !isPreviewMode) {
+      timer = setTimeout(() => {
+        const el = document.getElementById(`el-${selectedElementId}`);
+        setMoveableTarget(el);
+      }, 10);
+    } else {
+      timer = setTimeout(() => {
+        setMoveableTarget(null);
+      }, 0);
+    }
+    return () => clearTimeout(timer);
+  }, [selectedElementId, isPreviewMode, currentSection?.elements]);
+
   // handlers
   const handleWrapperMouseDown = (e: React.MouseEvent) => {
     if (e.button === 2 || e.button === 1) {
       e.preventDefault();
       setIsPanning(true);
-      if (wrapperRef.current) {
+      if (wrapperRef.current)
         panStartRef.current = {
           x: e.clientX,
           y: e.clientY,
           scrollLeft: wrapperRef.current.scrollLeft,
           scrollTop: wrapperRef.current.scrollTop,
         };
-      }
     } else if (e.button === 0) {
       const target = e.target as Element;
-      if (!target.closest(".cc-element") && !target.closest(".se-wrapper")) {
+      if (
+        !target.closest(".cc-element") &&
+        !target.closest(".se-wrapper") &&
+        !target.closest(".moveable-control-box")
+      ) {
         if (!isPreviewMode) {
           actions.selectElement(null);
           setEditingElementId(null);
@@ -249,19 +305,22 @@ export default function ContentConfig({
     e.preventDefault();
     setIsDragOver(false);
     if (!canvasRef.current) return;
-
     const canvasRect = canvasRef.current.getBoundingClientRect();
-    const rawX = (e.clientX - canvasRect.left) / scale;
-    const rawY = (e.clientY - canvasRect.top) / scale;
-
-    const dropX = Math.round(rawX / 10) * 10;
-    const dropY = Math.round(rawY / 10) * 10;
-
+    const dropX = Math.round((e.clientX - canvasRect.left) / scale / 10) * 10;
+    const dropY = Math.round((e.clientY - canvasRect.top) / scale / 10) * 10;
     const newType = e.dataTransfer.getData(
       "application/new-element",
     ) as ElementType;
     if (newType) actions.addElement(newType, dropX, dropY);
   };
+
+  // PHÂN TÁCH CHẾ ĐỘ UX
+  const isEditingShape =
+    editingElementId === selectedElementId &&
+    ["rectangle", "ellipse"].includes(activeElementData?.type || "");
+  const isEditingText =
+    editingElementId === selectedElementId &&
+    !["rectangle", "ellipse"].includes(activeElementData?.type || "");
 
   // render
   return (
@@ -301,7 +360,7 @@ export default function ContentConfig({
             onClick={actions.saveConfig}
             disabled={isPreviewMode}
           >
-            <SaveIcon /> Save Config
+            <SaveIcon /> Save
           </button>
         </div>
       </div>
@@ -322,7 +381,10 @@ export default function ContentConfig({
         />
       </div>
 
-      <div className="cc-workspace" onContextMenu={(e) => e.preventDefault()}>
+      <div
+        className={`cc-workspace ${isPreviewMode ? "preview-layout" : ""}`}
+        onContextMenu={(e) => e.preventDefault()}
+      >
         {!isPreviewMode && <SidebarModules actions={actions} />}
 
         <div
@@ -355,6 +417,7 @@ export default function ContentConfig({
                       width: 1200,
                       height: 600,
                       transform: `scale(${scale})`,
+                      transformOrigin: "top left",
                       backgroundImage: `url(${currentSection.backgroundUrl})`,
                     }}
                   >
@@ -363,57 +426,40 @@ export default function ContentConfig({
                         className="cc-empty-state"
                         style={{ paddingTop: "20%" }}
                       >
-                        Kéo thả module từ bên trái vào đây để bắt đầu.
+                        Kéo thả module vào đây để bắt đầu.
                       </div>
                     )}
 
                     {currentSection.elements.map((el) => (
-                      <Rnd
+                      <div
                         key={el.id}
-                        scale={scale}
-                        bounds="parent"
-                        dragGrid={[10, 10]}
-                        resizeGrid={[10, 10]}
-                        position={{ x: el.x, y: el.y }}
-                        size={{ width: el.width, height: el.height }}
-                        onDragStart={(e) => {
-                          e.stopPropagation();
-                          actions.selectElement(el.id);
-                        }}
-                        onDragStop={(_e, d) =>
-                          actions.updateElementPosition(el.id, d.x, d.y)
-                        }
-                        onResizeStop={(
-                          _e,
-                          _direction,
-                          ref,
-                          _delta,
-                          position,
-                        ) => {
-                          actions.updateElementProperties(el.id, {
-                            width: parseInt(ref.style.width),
-                            height: parseInt(ref.style.height),
-                            x: position.x,
-                            y: position.y,
-                          });
-                        }}
-                        disableDragging={
-                          isPreviewMode ||
-                          selectedElementId !== el.id ||
-                          editingElementId === el.id
-                        }
-                        enableResizing={
-                          !isPreviewMode &&
-                          selectedElementId === el.id &&
-                          editingElementId !== el.id
-                        }
+                        id={`el-${el.id}`}
                         className={`cc-element ${selectedElementId === el.id ? "selected" : ""} ${el.type === "dropcap" ? "cc-element-dropcap" : ""} ${el.type === "animated" ? "cc-element-animated" : ""} ${isPreviewMode ? "is-preview" : ""}`}
-                        style={{ ...el.style }}
-                        onClick={(e: React.MouseEvent) => {
-                          e.stopPropagation();
-                          if (!isPreviewMode) actions.selectElement(el.id);
+                        style={{
+                          left: `${el.x}px`,
+                          top: `${el.y}px`,
+                          width: `${el.width}px`,
+                          height: `${el.height}px`,
+                          zIndex:
+                            editingElementId === el.id
+                              ? 9999
+                              : selectedElementId === el.id
+                                ? 50
+                                : 1,
+                          transform: `rotate(${el.rotate || 0}deg) ${el.style?.transform || ""}`,
+                          transformOrigin: "center center",
+                          ...el.style,
                         }}
-                        onDoubleClick={(e: React.MouseEvent) => {
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!isPreviewMode) {
+                            actions.selectElement(el.id);
+                            // Clear trạng thái Edit nếu click sang hình khác
+                            if (editingElementId !== el.id)
+                              setEditingElementId(null);
+                          }
+                        }}
+                        onDoubleClick={(e) => {
                           e.stopPropagation();
                           if (
                             !isPreviewMode &&
@@ -421,28 +467,34 @@ export default function ContentConfig({
                               "text",
                               "button",
                               "heading",
-                              "badge",
                               "blockquote",
-                              "dropcap",
-                              "animated",
+                              "textlink",
+                              "rectangle", // Hỗ trợ Double Click cho Shape
+                              "ellipse", // Hỗ trợ Double Click cho Shape
                             ].includes(el.type)
                           )
                             setEditingElementId(el.id);
                         }}
                       >
-                        {!isPreviewMode && (
-                          <div className="cc-element-handle">
-                            <button
-                              className="cc-element-action-btn"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                actions.removeElement(el.id);
-                              }}
+                        {/* ẨN NÚT XÓA KHI ĐANG TRONG CHẾ ĐỘ EDIT CLIP-PATH HOẶC SUN-EDITOR */}
+                        {!isPreviewMode &&
+                          selectedElementId === el.id &&
+                          editingElementId !== el.id && (
+                            <div
+                              className="cc-element-handle"
+                              onMouseDown={(e) => e.stopPropagation()}
                             >
-                              <TrashIcon />
-                            </button>
-                          </div>
-                        )}
+                              <button
+                                className="cc-element-action-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  actions.removeElement(el.id);
+                                }}
+                              >
+                                <TrashIcon />
+                              </button>
+                            </div>
+                          )}
 
                         {el.type === "image" ? (
                           <img
@@ -453,6 +505,41 @@ export default function ContentConfig({
                               height: "100%",
                               objectFit: "cover",
                               pointerEvents: "none",
+                              borderRadius: "inherit",
+                            }}
+                          />
+                        ) : el.type === "video-link" ? (
+                          <iframe
+                            src={el.content}
+                            title="Video Link"
+                            width="100%"
+                            height="100%"
+                            style={{
+                              border: "none",
+                              pointerEvents: isPreviewMode ? "auto" : "none",
+                              borderRadius: "inherit",
+                            }}
+                            allowFullScreen
+                          />
+                        ) : el.type === "video-upload" ? (
+                          <video
+                            src={el.content}
+                            width="100%"
+                            height="100%"
+                            controls
+                            style={{
+                              pointerEvents: isPreviewMode ? "auto" : "none",
+                              objectFit: "cover",
+                              borderRadius: "inherit",
+                            }}
+                          />
+                        ) : el.type === "rectangle" || el.type === "ellipse" ? (
+                          <div
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              backgroundColor: el.style?.backgroundColor,
+                              borderRadius: "inherit",
                             }}
                           />
                         ) : editingElementId === el.id ? (
@@ -494,15 +581,103 @@ export default function ContentConfig({
                               height: "100%",
                               display: "flex",
                               alignItems: "center",
-                              justifyContent:
-                                el.type === "button" ? "center" : "flex-start",
+                              justifyContent: ["button", "textlink"].includes(
+                                el.type,
+                              )
+                                ? "center"
+                                : "flex-start",
                               pointerEvents: "none",
                             }}
                             dangerouslySetInnerHTML={{ __html: el.content }}
                           />
                         )}
-                      </Rnd>
+                      </div>
                     ))}
+
+                    {!isPreviewMode && moveableTarget && (
+                      <Moveable
+                        target={moveableTarget}
+                        // Tắt khung Xanh Dương (Kéo/Giãn/Xoay) nếu đang trong chế độ Edit
+                        draggable={!isEditingText && !isEditingShape}
+                        resizable={!isEditingText && !isEditingShape}
+                        rotatable={!isEditingText && !isEditingShape}
+                        // Bật khung Xanh Lá (Clip-path) NẾU đang Double Click vào Shape
+                        clippable={isEditingShape}
+                        defaultClipPath={
+                          activeElementData?.style?.clipPath ||
+                          "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)"
+                        }
+                        clipType="polygon"
+                        clipRelative={true}
+                        clipArea={true}
+                        dragWithClip={true}
+                        onClip={(e) => {
+                          e.target.style.clipPath = e.clipStyle;
+                        }}
+                        onClipEnd={(e) => {
+                          actions.updateElementProperties(
+                            selectedElementId as string,
+                            {
+                              style: {
+                                clipPath: (e.target as HTMLElement).style
+                                  .clipPath,
+                              },
+                            },
+                          );
+                        }}
+                        snappable={true}
+                        snapRotationThreshold={15}
+                        rotationPosition="top"
+                        origin={false}
+                        onDrag={(e) => {
+                          e.target.style.left = `${e.left}px`;
+                          e.target.style.top = `${e.top}px`;
+                        }}
+                        onDragEnd={(e) => {
+                          const target = e.target as HTMLElement;
+                          actions.updateElementPosition(
+                            selectedElementId as string,
+                            parseFloat(target.style.left),
+                            parseFloat(target.style.top),
+                          );
+                        }}
+                        onResize={(e) => {
+                          e.target.style.width = `${e.width}px`;
+                          e.target.style.height = `${e.height}px`;
+                          e.target.style.left = `${e.drag.left}px`;
+                          e.target.style.top = `${e.drag.top}px`;
+                        }}
+                        onResizeEnd={(e) => {
+                          const target = e.target as HTMLElement;
+                          actions.updateElementProperties(
+                            selectedElementId as string,
+                            {
+                              width: parseFloat(target.style.width),
+                              height: parseFloat(target.style.height),
+                            },
+                          );
+                          actions.updateElementPosition(
+                            selectedElementId as string,
+                            parseFloat(target.style.left),
+                            parseFloat(target.style.top),
+                          );
+                        }}
+                        onRotate={(e) => {
+                          e.target.style.transform = `rotate(${e.absoluteRotation}deg)`;
+                        }}
+                        onRotateEnd={(e) => {
+                          const target = e.target as HTMLElement;
+                          const match = target.style.transform.match(
+                            /rotate\(([\d.-]+)deg\)/,
+                          );
+                          if (match)
+                            actions.updateElementProperties(
+                              selectedElementId as string,
+                              { rotate: parseFloat(match[1]) },
+                            );
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
               </div>

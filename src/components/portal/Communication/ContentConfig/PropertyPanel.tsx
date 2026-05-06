@@ -135,24 +135,81 @@ export default function PropertyPanel({
             />
           )}
 
-          {/* Alignment */}
-          <CustomSelect
-            label="Block Alignment"
-            value={activeElementData.style?.textAlign || "left"}
-            options={[
-              { value: "left", label: "Left Align" },
-              { value: "center", label: "Center Align" },
-              { value: "right", label: "Right Align" },
-              { value: "justify", label: "Justify" },
-            ]}
-            onChange={(val) =>
-              actions.updateElementProperties(activeElementData.id, {
-                style: { textAlign: val as TextAlignType },
-              })
-            }
-          />
+          {/* mirror */}
+          {["image", "rectangle", "ellipse"].includes(
+            activeElementData.type,
+          ) && (
+            <div className="pp-form-group">
+              <label className="pp-label">Mirror</label>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  className="pp-input"
+                  style={{
+                    flex: 1,
+                    cursor: "pointer",
+                    backgroundColor:
+                      activeElementData.style?.transform?.includes("scaleX(-1)")
+                        ? "#e5e7eb"
+                        : "#fff",
+                  }}
+                  onClick={() => {
+                    const currentT = activeElementData.style?.transform || "";
+                    const newT = currentT.includes("scaleX(-1)")
+                      ? currentT.replace("scaleX(-1)", "")
+                      : currentT + " scaleX(-1)";
+                    actions.updateElementProperties(activeElementData.id, {
+                      style: { transform: newT.trim() },
+                    });
+                  }}
+                >
+                  horizontal flip
+                </button>
+                <button
+                  className="pp-input"
+                  style={{
+                    flex: 1,
+                    cursor: "pointer",
+                    backgroundColor:
+                      activeElementData.style?.transform?.includes("scaleY(-1)")
+                        ? "#e5e7eb"
+                        : "#fff",
+                  }}
+                  onClick={() => {
+                    const currentT = activeElementData.style?.transform || "";
+                    const newT = currentT.includes("scaleY(-1)")
+                      ? currentT.replace("scaleY(-1)", "")
+                      : currentT + " scaleY(-1)";
+                    actions.updateElementProperties(activeElementData.id, {
+                      style: { transform: newT.trim() },
+                    });
+                  }}
+                >
+                  vertical flip
+                </button>
+              </div>
+            </div>
+          )}
 
-          {/* Sizing */}
+          {/* Alignment */}
+          {!["image", "divider"].includes(activeElementData.type) && (
+            <CustomSelect
+              label="Block Alignment"
+              value={activeElementData.style?.textAlign || "left"}
+              options={[
+                { value: "left", label: "Left Align" },
+                { value: "center", label: "Center Align" },
+                { value: "right", label: "Right Align" },
+                { value: "justify", label: "Justify" },
+              ]}
+              onChange={(val) =>
+                actions.updateElementProperties(activeElementData.id, {
+                  style: { textAlign: val as TextAlignType },
+                })
+              }
+            />
+          )}
+
+          {/* Sizing (Width / Height) */}
           <div className="pp-form-group">
             <label className="pp-label">Width (px)</label>
             <input
@@ -167,58 +224,155 @@ export default function PropertyPanel({
             />
           </div>
 
-          {/* Background & Radius */}
-          {["badge", "button"].includes(activeElementData.type) && (
-            <>
-              <div className="pp-form-group">
-                <label className="pp-label">Background Color</label>
-                <div
-                  style={{ display: "flex", gap: "8px", alignItems: "center" }}
-                >
-                  <input
-                    type="color"
-                    className="pp-input pp-color-input"
-                    style={{ width: "50px", padding: "2px", height: "38px" }}
-                    value={
-                      activeElementData.style?.backgroundColor || "#111827"
-                    }
-                    onChange={(e) =>
-                      actions.updateElementProperties(activeElementData.id, {
-                        style: { backgroundColor: e.target.value },
-                      })
-                    }
-                  />
-                  <span
-                    style={{
-                      fontSize: "0.8rem",
-                      color: "#6b7280",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {activeElementData.style?.backgroundColor || "#111827"}
-                  </span>
-                </div>
-              </div>
+          {["image", "divider"].includes(activeElementData.type) && (
+            <div className="pp-form-group">
+              <label className="pp-label">
+                Height (px){" "}
+                {activeElementData.type === "divider" ? "(Thickness)" : ""}
+              </label>
+              <input
+                type="number"
+                className="pp-input"
+                value={Math.round(activeElementData.height)}
+                onChange={(e) =>
+                  actions.updateElementProperties(activeElementData.id, {
+                    height: Number(e.target.value),
+                  })
+                }
+              />
+            </div>
+          )}
 
-              <div className="pp-form-group">
-                <label className="pp-label">Corner Radius (px)</label>
+          {/* Rotation */}
+          <div className="pp-form-group">
+            <label className="pp-label">Rotation (deg)</label>
+            <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+              <input
+                type="range"
+                min="0"
+                max="360"
+                value={activeElementData.rotate || 0}
+                onChange={(e) =>
+                  actions.updateElementProperties(activeElementData.id, {
+                    rotate: Number(e.target.value),
+                  })
+                }
+                style={{ flex: 1, cursor: "pointer" }}
+              />
+              <input
+                type="number"
+                className="pp-input"
+                style={{
+                  width: "70px",
+                  padding: "4px 8px",
+                  textAlign: "center",
+                }}
+                value={activeElementData.rotate || 0}
+                onChange={(e) =>
+                  actions.updateElementProperties(activeElementData.id, {
+                    rotate: Number(e.target.value),
+                  })
+                }
+              />
+            </div>
+          </div>
+
+          {/* Background Color */}
+          {["badge", "button", "divider"].includes(activeElementData.type) && (
+            <div className="pp-form-group">
+              <label className="pp-label">
+                {activeElementData.type === "divider"
+                  ? "Line Color"
+                  : "Background Color"}
+              </label>
+              <div
+                style={{ display: "flex", gap: "8px", alignItems: "center" }}
+              >
                 <input
-                  type="number"
-                  className="pp-input"
-                  placeholder="e.g. 8"
-                  value={parseInt(activeElementData.style?.borderRadius || "0")}
+                  type="color"
+                  className="pp-input pp-color-input"
+                  style={{ width: "50px", padding: "2px", height: "38px" }}
+                  value={
+                    activeElementData.style?.backgroundColor ||
+                    (activeElementData.type === "divider"
+                      ? "#d1d5db"
+                      : "#111827")
+                  }
                   onChange={(e) =>
                     actions.updateElementProperties(activeElementData.id, {
-                      style: { borderRadius: `${e.target.value}px` },
+                      style: { backgroundColor: e.target.value },
                     })
                   }
                 />
+                <span
+                  style={{
+                    fontSize: "0.8rem",
+                    color: "#6b7280",
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {activeElementData.style?.backgroundColor ||
+                    (activeElementData.type === "divider"
+                      ? "#d1d5db"
+                      : "#111827")}
+                </span>
               </div>
-            </>
+            </div>
+          )}
+
+          {/* Text Color (Cho Text Link) */}
+          {activeElementData.type === "textlink" && (
+            <div className="pp-form-group">
+              <label className="pp-label">Color</label>
+              <div
+                style={{ display: "flex", gap: "8px", alignItems: "center" }}
+              >
+                <input
+                  type="color"
+                  className="pp-input pp-color-input"
+                  style={{ width: "50px", padding: "2px", height: "38px" }}
+                  value={activeElementData.style?.color || "#111827"}
+                  onChange={(e) =>
+                    actions.updateElementProperties(activeElementData.id, {
+                      style: { color: e.target.value },
+                    })
+                  }
+                />
+                <span
+                  style={{
+                    fontSize: "0.8rem",
+                    color: "#6b7280",
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {activeElementData.style?.color || "#111827"}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Corner Radius */}
+          {["badge", "button", "image", "rectangle", "ellipse"].includes(
+            activeElementData.type,
+          ) && (
+            <div className="pp-form-group">
+              <label className="pp-label">Corner Radius (px)</label>
+              <input
+                type="number"
+                className="pp-input"
+                placeholder="e.g. 8"
+                value={parseInt(activeElementData.style?.borderRadius || "0")}
+                onChange={(e) =>
+                  actions.updateElementProperties(activeElementData.id, {
+                    style: { borderRadius: `${e.target.value}px` },
+                  })
+                }
+              />
+            </div>
           )}
 
           {/* Target Link */}
-          {activeElementData.type === "button" && (
+          {["button", "textlink"].includes(activeElementData.type) && (
             <div className="pp-form-group">
               <label className="pp-label">Click Action (URL)</label>
               <input
@@ -242,6 +396,23 @@ export default function PropertyPanel({
               <input
                 type="text"
                 className="pp-input"
+                value={activeElementData.content || ""}
+                onChange={(e) =>
+                  actions.updateElementProperties(activeElementData.id, {
+                    content: e.target.value,
+                  })
+                }
+              />
+            </div>
+          )}
+          {/* Input Video Link */}
+          {activeElementData.type === "video-link" && (
+            <div className="pp-form-group">
+              <label className="pp-label">Youtube/Vimeo Embed URL</label>
+              <input
+                type="text"
+                className="pp-input"
+                placeholder="https://www.youtube.com/embed/..."
                 value={activeElementData.content || ""}
                 onChange={(e) =>
                   actions.updateElementProperties(activeElementData.id, {

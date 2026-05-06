@@ -14,6 +14,12 @@ import {
   BlockquoteIcon,
   DropcapIcon,
   AnimatedIcon,
+  TextLinkIcon,
+  DividerIcon,
+  VideoLinkIcon,
+  VideoUploadIcon,
+  RectangleIcon,
+  EllipseIcon,
 } from "../../../../assets/icons/ContentConfigIcons";
 import type { ElementType } from "../../../../hooks/portal/Communication/ContentConfig/useContentConfig";
 
@@ -41,6 +47,7 @@ export default function SidebarModules({ actions }: SidebarModulesProps) {
   } = useSidebarModule();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   // helpers
   const renderIcon = (iconId: string) => {
@@ -63,6 +70,18 @@ export default function SidebarModules({ actions }: SidebarModulesProps) {
         return <ImageIcon />;
       case "upload":
         return <UploadIcon />;
+      case "textlink":
+        return <TextLinkIcon />;
+      case "divider":
+        return <DividerIcon />;
+      case "video-link":
+        return <VideoLinkIcon />;
+      case "video-upload":
+        return <VideoUploadIcon />;
+      case "rectangle":
+        return <RectangleIcon />;
+      case "ellipse":
+        return <EllipseIcon />;
       default:
         return null;
     }
@@ -79,6 +98,13 @@ export default function SidebarModules({ actions }: SidebarModulesProps) {
       const url = URL.createObjectURL(file);
       actions.addElement("image", 0, 0, url);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+  const handleUploadVideo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      actions.addElement("video-upload", 0, 0, URL.createObjectURL(file));
+      if (videoInputRef.current) videoInputRef.current.value = "";
     }
   };
 
@@ -140,9 +166,13 @@ export default function SidebarModules({ actions }: SidebarModulesProps) {
                               : undefined
                           }
                           onClick={
-                            mod.actionType === "click" &&
-                            mod.id === "mod-upload"
-                              ? () => fileInputRef.current?.click()
+                            mod.actionType === "click"
+                              ? () => {
+                                  if (mod.id === "mod-upload")
+                                    fileInputRef.current?.click();
+                                  if (mod.id === "mod-video-upload")
+                                    videoInputRef.current?.click();
+                                }
                               : undefined
                           }
                         >
@@ -165,6 +195,13 @@ export default function SidebarModules({ actions }: SidebarModulesProps) {
         hidden
         accept="image/*"
         onChange={handleUploadImage}
+      />
+      <input
+        type="file"
+        ref={videoInputRef}
+        hidden
+        accept="video/*"
+        onChange={handleUploadVideo}
       />
 
       {/* shortcuts */}

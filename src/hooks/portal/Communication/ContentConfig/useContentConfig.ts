@@ -9,7 +9,6 @@ export type PageType =
   | "product_page"
   | "global";
 
-// Cập nhật đủ 6 loại Typography mới
 export type ElementType =
   | "text"
   | "button"
@@ -18,7 +17,13 @@ export type ElementType =
   | "badge"
   | "blockquote"
   | "dropcap"
-  | "animated";
+  | "animated"
+  | "textlink"
+  | "divider"
+  | "video-link"
+  | "video-upload"
+  | "rectangle"
+  | "ellipse";
 
 export interface EditorElement {
   id: string;
@@ -30,6 +35,7 @@ export interface EditorElement {
   content: string;
   link?: string;
   tag?: string;
+  rotate?: number;
   style?: {
     backgroundColor?: string;
     color?: string;
@@ -41,6 +47,10 @@ export interface EditorElement {
     fontStyle?: string;
     borderLeft?: string;
     paddingLeft?: string;
+    textDecoration?: string;
+    textUnderlineOffset?: string;
+    clipPath?: string;
+    transform?: string;
   };
 }
 
@@ -69,6 +79,7 @@ const MOCK_SECTIONS: SectionConfig[] = [
         height: 80,
         content: "Giải pháp chuyển đổi số toàn diện",
         tag: "h1",
+        rotate: 0,
         style: {
           color: "#111827",
           fontSize: "48px",
@@ -87,6 +98,7 @@ const MOCK_SECTIONS: SectionConfig[] = [
         content:
           "Tối ưu hóa quy trình làm việc và tăng trưởng doanh thu với nền tảng của chúng tôi.",
         tag: "p",
+        rotate: 0,
         style: {
           color: "#374151",
           fontSize: "18px",
@@ -103,10 +115,12 @@ const MOCK_SECTIONS: SectionConfig[] = [
         height: 45,
         content: "Khám phá ngay",
         link: "/services",
+        rotate: 0,
         style: {
           backgroundColor: "#2563eb",
           color: "#ffffff",
           borderRadius: "8px",
+          textAlign: "center",
         },
       },
     ],
@@ -188,7 +202,7 @@ export function useContentConfig() {
         defaultHeight = 45;
         defaultContent = defaultContent || "Click Here";
         defaultStyle = {
-          backgroundColor: "#3b82f6",
+          backgroundColor: "#111827",
           color: "#fff",
           borderRadius: "6px",
           textAlign: "center",
@@ -197,6 +211,34 @@ export function useContentConfig() {
         defaultWidth = 200;
         defaultHeight = 200;
         defaultContent = defaultContent || "https://via.placeholder.com/200";
+        defaultStyle = { borderRadius: "0px" };
+      } else if (type === "video-link") {
+        defaultWidth = 400;
+        defaultHeight = 225;
+        defaultContent =
+          defaultContent || "https://www.youtube.com/embed/dQw4w9WgXcQ";
+      } else if (type === "video-upload") {
+        defaultWidth = 400;
+        defaultHeight = 225;
+        defaultContent = defaultContent || "";
+      } else if (type === "rectangle") {
+        defaultWidth = 150;
+        defaultHeight = 150;
+        defaultContent = "";
+        defaultStyle = {
+          backgroundColor: "#d1d5db",
+          borderRadius: "0px",
+          clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)",
+        };
+      } else if (type === "ellipse") {
+        defaultWidth = 150;
+        defaultHeight = 150;
+        defaultContent = "";
+        defaultStyle = {
+          backgroundColor: "#d1d5db",
+          borderRadius: "50%",
+          clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)",
+        };
       } else if (type === "text") {
         defaultWidth = 300;
         defaultHeight = 80;
@@ -269,6 +311,26 @@ export function useContentConfig() {
           fontWeight: "bold",
           textAlign: "center",
         };
+      } else if (type === "textlink") {
+        defaultWidth = 120;
+        defaultHeight = 40;
+        defaultContent = defaultContent || "DISCOVER";
+        defaultTag = "span";
+        defaultStyle = {
+          color: "#111827",
+          fontSize: "16px",
+          fontWeight: "bold",
+          textAlign: "center",
+          textDecoration: "underline",
+          textUnderlineOffset: "4px",
+        };
+      } else if (type === "divider") {
+        defaultWidth = 300;
+        defaultHeight = 2;
+        defaultContent = "";
+        defaultStyle = {
+          backgroundColor: "#d1d5db",
+        };
       }
 
       const newElement: EditorElement = {
@@ -279,9 +341,10 @@ export function useContentConfig() {
         width: defaultWidth,
         height: defaultHeight,
         content: defaultContent,
-        link: type === "button" ? "/" : undefined,
+        link: type === "button" || type === "textlink" ? "/" : undefined,
         tag: defaultTag,
         style: defaultStyle,
+        rotate: 0,
       };
 
       const newSections = sections.map((sec) =>
