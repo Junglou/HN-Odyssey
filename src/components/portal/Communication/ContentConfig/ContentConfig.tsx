@@ -318,7 +318,6 @@ export default function ContentConfig({
     if (newType) actions.addElement(newType, dropX, dropY);
   };
 
-  // PHÂN TÁCH CHẾ ĐỘ UX
   const isEditingShape =
     editingElementId === selectedElementId &&
     ["rectangle", "ellipse"].includes(activeElementData?.type || "");
@@ -453,7 +452,6 @@ export default function ContentConfig({
                           e.stopPropagation();
                           if (!isPreviewMode) {
                             actions.selectElement(el.id);
-                            // Clear trạng thái Edit nếu click sang hình khác
                             if (editingElementId !== el.id)
                               setEditingElementId(null);
                           }
@@ -468,14 +466,13 @@ export default function ContentConfig({
                               "heading",
                               "blockquote",
                               "textlink",
-                              "rectangle", // Hỗ trợ Double Click cho Shape
-                              "ellipse", // Hỗ trợ Double Click cho Shape
+                              "rectangle",
+                              "ellipse",
                             ].includes(el.type)
                           )
                             setEditingElementId(el.id);
                         }}
                       >
-                        {/* ẨN NÚT XÓA KHI ĐANG TRONG CHẾ ĐỘ EDIT CLIP-PATH HOẶC SUN-EDITOR */}
                         {!isPreviewMode &&
                           selectedElementId === el.id &&
                           editingElementId !== el.id && (
