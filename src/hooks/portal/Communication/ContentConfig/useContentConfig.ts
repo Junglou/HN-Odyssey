@@ -356,6 +356,40 @@ export function useContentConfig() {
       setSelectedElementId(newElement.id);
     },
 
+    updateSectionBackground: (url: string) => {
+      if (!currentSection) return;
+      const newSections = sections.map((sec) =>
+        sec.id === currentSection.id ? { ...sec, backgroundUrl: url } : sec,
+      );
+      saveHistory(newSections);
+    },
+
+    reorderElement: (
+      elementId: string,
+      direction: "front" | "back" | "up" | "down",
+    ) => {
+      if (!currentSection) return;
+      const elIndex = currentSection.elements.findIndex(
+        (el) => el.id === elementId,
+      );
+      if (elIndex === -1) return;
+
+      const newElements = [...currentSection.elements];
+      const [el] = newElements.splice(elIndex, 1);
+
+      if (direction === "front") newElements.push(el);
+      else if (direction === "back") newElements.unshift(el);
+      else if (direction === "up")
+        newElements.splice(Math.min(newElements.length, elIndex + 1), 0, el);
+      else if (direction === "down")
+        newElements.splice(Math.max(0, elIndex - 1), 0, el);
+
+      const newSections = sections.map((sec) =>
+        sec.id === currentSection.id ? { ...sec, elements: newElements } : sec,
+      );
+      saveHistory(newSections);
+    },
+
     updateElementPosition: (elementId: string, newX: number, newY: number) => {
       if (!currentSection) return;
       const newSections = sections.map((sec) =>

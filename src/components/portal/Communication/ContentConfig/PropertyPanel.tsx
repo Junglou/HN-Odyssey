@@ -1,7 +1,17 @@
 // imports
 import { useState, useRef, useEffect } from "react";
 import "./PropertyPanel.css";
-import type { EditorElement } from "../../../../hooks/portal/Communication/ContentConfig/useContentConfig";
+import type {
+  EditorElement,
+  SectionConfig,
+} from "../../../../hooks/portal/Communication/ContentConfig/useContentConfig";
+import {
+  SelectArrowIcon,
+  BringToFrontIcon,
+  BringForwardIcon,
+  SendBackwardIcon,
+  SendToBackIcon,
+} from "../../../../assets/icons/ContentConfigIcons";
 
 // helpers
 function CustomSelect({
@@ -16,6 +26,7 @@ function CustomSelect({
   onChange: (val: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -37,37 +48,33 @@ function CustomSelect({
       <div className="pp-custom-select-wrapper" ref={ref}>
         <div
           className={`pp-custom-select-trigger ${isOpen ? "active" : ""}`}
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => {
+            setIsOpen(!isOpen);
+            if (!hasMounted) setHasMounted(true);
+          }}
         >
           <span>{selectedLabel}</span>
-          <svg
+          <SelectArrowIcon
             className={`pp-select-arrow ${isOpen ? "open" : ""}`}
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <polyline points="6 9 12 15 18 9"></polyline>
-          </svg>
+          />
         </div>
-        {isOpen && (
-          <div className="pp-custom-select-options">
-            {options.map((opt) => (
-              <div
-                key={opt.value}
-                className={`pp-custom-select-option ${value === opt.value ? "selected" : ""}`}
-                onClick={() => {
-                  onChange(opt.value);
-                  setIsOpen(false);
-                }}
-              >
-                {opt.label}
-              </div>
-            ))}
-          </div>
-        )}
+
+        <div
+          className={`pp-custom-select-options ${isOpen ? "open" : hasMounted ? "closed" : ""}`}
+        >
+          {options.map((opt) => (
+            <div
+              key={opt.value}
+              className={`pp-custom-select-option ${value === opt.value ? "selected" : ""}`}
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -75,34 +82,137 @@ function CustomSelect({
 
 // props
 interface PropertyPanelProps {
+  currentSection: SectionConfig | null;
   activeElementData: EditorElement | null;
   actions: {
     updateElementProperties: (
       id: string,
       updates: Partial<EditorElement>,
     ) => void;
+    updateSectionBackground: (url: string) => void;
+    reorderElement: (
+      elementId: string,
+      direction: "front" | "back" | "up" | "down",
+    ) => void;
   };
 }
 
 // component
 export default function PropertyPanel({
+  currentSection,
   activeElementData,
   actions,
 }: PropertyPanelProps) {
   type TextAlignType = NonNullable<EditorElement["style"]>["textAlign"];
+  const bgInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadBackground = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      actions.updateSectionBackground(url);
+      if (bgInputRef.current) bgInputRef.current.value = "";
+    }
+  };
 
   // render
   return (
     <div className="pp-property-panel">
-      <h3 className="pp-panel-title">Properties</h3>
+      <h3 className="pp-panel-title">
+        {activeElementData ? "Element Properties" : "Section Properties"}
+      </h3>
 
       {!activeElementData ? (
-        <div className="pp-empty-state">Select an element to edit</div>
+        <div
+          className="pp-property-body"
+          style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+        >
+          <div className="pp-form-group">
+            <label className="pp-label">Background Image URL</label>
+            <input
+              type="text"
+              className="pp-input"
+              placeholder="https://..."
+              value={currentSection?.backgroundUrl || ""}
+              onChange={(e) => actions.updateSectionBackground(e.target.value)}
+            />
+          </div>
+
+          <div className="pp-form-group">
+            <button
+              className="pp-input"
+              style={{
+                cursor: "pointer",
+                backgroundColor: "#111827",
+                color: "#fff",
+                fontWeight: 600,
+                textAlign: "center",
+                border: "none",
+              }}
+              onClick={() => bgInputRef.current?.click()}
+            >
+              Upload Local Image
+            </button>
+            <input
+              type="file"
+              ref={bgInputRef}
+              hidden
+              accept="image/*"
+              onChange={handleUploadBackground}
+            />
+          </div>
+
+          <div className="pp-empty-state" style={{ marginTop: "10px" }}>
+            Click an element on the canvas to edit its properties.
+          </div>
+        </div>
       ) : (
         <div
           className="pp-property-body"
           style={{ display: "flex", flexDirection: "column", gap: "16px" }}
         >
+          <div className="pp-form-group">
+            <label className="pp-label">Layer Arrange</label>
+            <div style={{ display: "flex", gap: "6px" }}>
+              <button
+                className="pp-input pp-layer-btn"
+                onClick={() =>
+                  actions.reorderElement(activeElementData.id, "back")
+                }
+                title="Send to Back (Xuống dưới cùng)"
+              >
+                <SendToBackIcon />
+              </button>
+              <button
+                className="pp-input pp-layer-btn"
+                onClick={() =>
+                  actions.reorderElement(activeElementData.id, "down")
+                }
+                title="Send Backward (Xuống một lớp)"
+              >
+                <SendBackwardIcon />
+              </button>
+              <button
+                className="pp-input pp-layer-btn"
+                onClick={() =>
+                  actions.reorderElement(activeElementData.id, "up")
+                }
+                title="Bring Forward (Lên một lớp)"
+              >
+                <BringForwardIcon />
+              </button>
+              <button
+                className="pp-input pp-layer-btn"
+                onClick={() =>
+                  actions.reorderElement(activeElementData.id, "front")
+                }
+                title="Bring to Front (Lên trên cùng)"
+              >
+                <BringToFrontIcon />
+              </button>
+            </div>
+          </div>
+
           {/* SEO & Tag Configuration */}
           {["heading", "text", "dropcap", "animated", "blockquote"].includes(
             activeElementData.type,
@@ -162,7 +272,7 @@ export default function PropertyPanel({
                     });
                   }}
                 >
-                  horizontal flip
+                  Horizontal
                 </button>
                 <button
                   className="pp-input"
@@ -184,7 +294,7 @@ export default function PropertyPanel({
                     });
                   }}
                 >
-                  vertical flip
+                  Vertical
                 </button>
               </div>
             </div>
@@ -278,7 +388,9 @@ export default function PropertyPanel({
           </div>
 
           {/* Background Color */}
-          {["badge", "button", "divider"].includes(activeElementData.type) && (
+          {["badge", "button", "divider", "rectangle", "ellipse"].includes(
+            activeElementData.type,
+          ) && (
             <div className="pp-form-group">
               <label className="pp-label">
                 {activeElementData.type === "divider"
@@ -405,6 +517,7 @@ export default function PropertyPanel({
               />
             </div>
           )}
+
           {/* Input Video Link */}
           {activeElementData.type === "video-link" && (
             <div className="pp-form-group">

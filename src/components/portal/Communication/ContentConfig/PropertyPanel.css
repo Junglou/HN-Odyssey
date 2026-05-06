@@ -66,7 +66,26 @@
   margin-top: 20px;
 }
 
-/* --- CUSTOM SELECT STYLES --- */
+/* Nút Layer Arrange */
+.pp-layer-btn {
+  flex: 1;
+  cursor: pointer;
+  padding: 6px 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background-color: #ffffff;
+  color: #374151;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.pp-layer-btn:hover {
+  background-color: #f3f4f6;
+  border-color: #111827;
+  color: #111827;
+}
+
+/* select */
 .pp-custom-select-wrapper {
   position: relative;
   width: 100%;
@@ -112,10 +131,23 @@
   z-index: 100;
   max-height: 200px;
   overflow-y: auto;
-  animation: slideDownFade 0.2s ease-out;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-5px);
+}
+.pp-custom-select-options.open {
+  pointer-events: auto;
+  animation: pp-slideFadeDown 0.2s ease-out forwards;
+  transform-origin: top center;
 }
 
-@keyframes slideDownFade {
+.pp-custom-select-options.closed {
+  pointer-events: none;
+  animation: pp-slideFadeUp 0.2s ease-out forwards;
+  transform-origin: top center;
+}
+
+@keyframes pp-slideFadeDown {
   from {
     opacity: 0;
     transform: translateY(-5px);
@@ -123,6 +155,17 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes pp-slideFadeUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-5px);
   }
 }
 

@@ -29,7 +29,7 @@ function EditorDropdown({
   onChange: (val: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [hasOpened, setHasOpened] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -48,15 +48,14 @@ function EditorDropdown({
   const selectedOption =
     options.find((opt) => opt.value === value) || options[0];
 
-  if (isOpen && !hasOpened) {
-    setHasOpened(true);
-  }
-
   return (
     <div className="cc-custom-dropdown" ref={dropdownRef}>
       <div
         className={`cc-dropdown-trigger ${isOpen ? "active" : ""}`}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          setIsOpen(!isOpen);
+          if (!hasMounted) setHasMounted(true);
+        }}
       >
         <span>{selectedOption?.label || "Select..."}</span>
         <div className={`cc-dropdown-arrow ${isOpen ? "open" : ""}`}>
@@ -65,7 +64,7 @@ function EditorDropdown({
       </div>
 
       <div
-        className={`cc-dropdown-options ${isOpen ? "open" : hasOpened ? "closed" : ""}`}
+        className={`cc-dropdown-options ${isOpen ? "open" : hasMounted ? "closed" : ""}`}
       >
         {options.map((opt) => (
           <div
@@ -111,6 +110,11 @@ interface ContentConfigProps {
     duplicateElement: (id: string) => void;
     undo: () => void;
     saveConfig: () => void;
+    updateSectionBackground: (url: string) => void;
+    reorderElement: (
+      elementId: string,
+      direction: "front" | "back" | "up" | "down",
+    ) => void;
   };
 }
 
@@ -430,7 +434,7 @@ export default function ContentConfig({
                       </div>
                     )}
 
-                    {currentSection.elements.map((el) => (
+                    {currentSection.elements.map((el, index) => (
                       <div
                         key={el.id}
                         id={`el-${el.id}`}
@@ -440,12 +444,7 @@ export default function ContentConfig({
                           top: `${el.y}px`,
                           width: `${el.width}px`,
                           height: `${el.height}px`,
-                          zIndex:
-                            editingElementId === el.id
-                              ? 9999
-                              : selectedElementId === el.id
-                                ? 50
-                                : 1,
+                          zIndex: editingElementId === el.id ? 9999 : index + 1,
                           transform: `rotate(${el.rotate || 0}deg) ${el.style?.transform || ""}`,
                           transformOrigin: "center center",
                           ...el.style,
@@ -597,11 +596,10 @@ export default function ContentConfig({
                     {!isPreviewMode && moveableTarget && (
                       <Moveable
                         target={moveableTarget}
-                        // Tắt khung Xanh Dương (Kéo/Giãn/Xoay) nếu đang trong chế độ Edit
+                        zIndex={9999}
                         draggable={!isEditingText && !isEditingShape}
                         resizable={!isEditingText && !isEditingShape}
                         rotatable={!isEditingText && !isEditingShape}
-                        // Bật khung Xanh Lá (Clip-path) NẾU đang Double Click vào Shape
                         clippable={isEditingShape}
                         defaultClipPath={
                           activeElementData?.style?.clipPath ||
@@ -715,6 +713,7 @@ export default function ContentConfig({
 
         {!isPreviewMode && (
           <PropertyPanel
+            currentSection={currentSection}
             activeElementData={activeElementData}
             actions={actions}
           />
