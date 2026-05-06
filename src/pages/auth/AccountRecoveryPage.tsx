@@ -29,26 +29,31 @@ const AccountRecoveryPage = () => {
   const isLoading = submitLoading || otpLoading;
   const handleSendOtp = async (email: string) => {
     try {
-      // Kiểm tra định dạng (Email hay SĐT)
-      const isEmail = /\S+@\S+\.\S+/.test(email);
+      // 1. Chuẩn bị payload đúng cấu trúc ResendOtpDto của Backend
+      // Backend yêu cầu: { account: string, type: string }
+      const payload = {
+        account: email,
+        type: "RECOVERY",
+      };
 
-      // Gọi API Resend OTP
-      await resend(isEmail ? { email } : { phoneNumber: email });
+      // 2. Gọi hàm resend từ hook với payload đã chuẩn hóa
+      await resend(payload);
 
       toast.success("Mã xác thực đã được gửi! Vui lòng kiểm tra.");
     } catch (error) {
       console.error("Send OTP Error:", error);
-      // Lỗi đã được xử lý hiển thị trong hook useVerifyOtp
     }
   };
 
   // Handler: form yêu cầu hỗ trợ
+  // AccountRecoveryPage.tsx
+
   const handleSubmit = async (data: AccountRecoveryPayload) => {
     try {
-      // Gọi API Gửi yêu cầu hỗ trợ
+      // CHỈ TRUYỀN data thô vào thôi, đừng as any, đừng tạo FormData ở đây
       await submitRequest(data);
+
       toast.success("Yêu cầu hỗ trợ đã được gửi thành công!");
-      // Thành công -> Quay về trang Login
       navigate("/login");
     } catch (error) {
       console.error("Recovery Request Error:", error);

@@ -1,23 +1,36 @@
-const ACCESS_TOKEN_KEY = "access_token";
-const USER_KEY = "user_info";
+const TOKEN_KEY = "accessToken";
+const REFRESH_TOKEN_KEY = "refreshToken"; // Bổ sung key cho Refresh Token
+const USER_KEY = "user";
 
 const tokenStorage = {
-  // 1. Token (Chuỗi JWT)
-  setToken: (JWT_SECRET: string) => {
-    localStorage.setItem(ACCESS_TOKEN_KEY, JWT_SECRET);
+  // --- ACCESS TOKEN ---
+  setToken: (token: string) => {
+    localStorage.setItem(TOKEN_KEY, token);
   },
-  getToken: (): string | null => {
-    return localStorage.getItem(ACCESS_TOKEN_KEY);
+  getToken: () => {
+    return localStorage.getItem(TOKEN_KEY);
   },
   removeToken: () => {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(TOKEN_KEY);
   },
 
-  // 2. User Info (Lưu thông tin user name, email... để hiển thị nhanh)
+  // --- REFRESH TOKEN (BỔ SUNG) ---
+  setRefreshToken: (token: string) => {
+    localStorage.setItem(REFRESH_TOKEN_KEY, token);
+  },
+  getRefreshToken: () => {
+    return localStorage.getItem(REFRESH_TOKEN_KEY);
+  },
+  removeRefreshToken: () => {
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+  },
+
+  // --- USER INFO ---
   setUser: (user: unknown) => {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
   },
-  getUser: () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getUser: (): any => {
     const user = localStorage.getItem(USER_KEY);
     return user ? JSON.parse(user) : null;
   },
@@ -25,9 +38,10 @@ const tokenStorage = {
     localStorage.removeItem(USER_KEY);
   },
 
-  // 3. Xóa sạch (Dùng khi Logout)
+  // --- CLEAR ALL ---
   clearAuth: () => {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY); // Xóa luôn Refresh Token khi logout
     localStorage.removeItem(USER_KEY);
   },
 };

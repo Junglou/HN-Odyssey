@@ -10,24 +10,27 @@ import type {
   ForgotPasswordPayload,
   ResetPasswordPayload,
   AuthResponse,
-  AccountRecoveryResponse,
   ConfirmRecoveryPayload,
   ConfirmRecoveryResponse,
 } from "../types/auth";
 
 const authService = {
-  // Login
+  // Login (US.02)
   async login(payload: LoginPayload): Promise<LoginResponse> {
     const data = await axiosClient.post<unknown, LoginResponse>(
       "/auth/login",
       payload,
     );
 
-    // QUAN TRỌNG: Sửa accessToken -> access_token
+    // Lưu Token, Refresh Token và User info
     if (data.access_token) {
       tokenStorage.setToken(data.access_token);
 
-      // Lưu user info nếu có
+      // BỔ SUNG: Lưu refresh_token vào storage
+      if (data.refresh_token) {
+        tokenStorage.setRefreshToken(data.refresh_token);
+      }
+
       if (data.user) {
         tokenStorage.setUser(data.user);
       }
@@ -36,7 +39,7 @@ const authService = {
     return data;
   },
 
-  // Register
+  // Register (US.01)
   async register(payload: RegisterPayload): Promise<RegisterResponse> {
     return await axiosClient.post<unknown, RegisterResponse>(
       "/auth/register",
@@ -45,8 +48,23 @@ const authService = {
   },
 
   // Logout
-  logout() {
-    tokenStorage.clearAuth();
+  async logout(): Promise<void> {
+    try {
+      await axiosClient.post("/auth/logout");
+    } catch (error) {
+      console.error("Lỗi khi gọi API logout:", error);
+    } finally {
+      tokenStorage.clearAuth();
+    }
+  },
+
+  // Refresh Token (BỔ SUNG)
+  async refreshToken(
+    refreshToken: string,
+  ): Promise<{ access_token: string; refresh_token: string }> {
+    return await axiosClient.post("/auth/refresh", {
+      refresh_token: refreshToken,
+    });
   },
 
   // Verify OTP
@@ -65,10 +83,9 @@ const authService = {
     );
   },
 
-  // Forgot Password
+  // Forgot Password (ĐÃ FIX MAP DỮ LIỆU)
   async forgotPassword(email: string): Promise<AuthResponse> {
-    // API yêu cầu body { email: "..." }
-    const payload: ForgotPasswordPayload = { email };
+    const payload: ForgotPasswordPayload = { account: email };
     return await axiosClient.post<unknown, AuthResponse>(
       "/auth/forgot-password",
       payload,
@@ -84,20 +101,12 @@ const authService = {
   },
 
   // Request Account Recovery
-  async requestAccountRecovery(
-    formData: FormData,
-  ): Promise<AccountRecoveryResponse> {
-    // Lưu ý: Khi gửi File, trình duyệt sẽ tự động set Content-Type là multipart/form-data
-    // Khai báo rõ ràng trong header để chắc chắn. (gợi ý từ AI)
-    return await axiosClient.post<unknown, AccountRecoveryResponse>(
-      "/auth/account-recovery",
-      formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+  requestAccountRecovery: async (formData: FormData) => {
+    return await axiosClient.post("/auth/recovery-request", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
       },
-    );
+    });
   },
 
   // Confirm Account Recovery
@@ -105,7 +114,7 @@ const authService = {
     payload: ConfirmRecoveryPayload,
   ): Promise<ConfirmRecoveryResponse> {
     return await axiosClient.post<unknown, ConfirmRecoveryResponse>(
-      "/auth/confirm-recovery",
+      "/auth/recover-account",
       payload,
     );
   },
