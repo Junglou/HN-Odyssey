@@ -56,6 +56,18 @@ const RegisterForm = ({
     onSubmit(formData);
   };
 
+  // THÊM LOGIC XỬ LÝ ĐĂNG NHẬP MẠNG XÃ HỘI
+  const backendUrl =
+    import.meta.env.VITE_API_URL || "http://localhost:8080/api";
+
+  const handleGoogleLogin = () => {
+    window.location.href = `${backendUrl}/auth/google`;
+  };
+
+  const handleFacebookLogin = () => {
+    window.location.href = `${backendUrl}/auth/facebook`;
+  };
+
   return (
     <div className="register-form-wrapper">
       <h1 className="register-title">Join us today.</h1>
@@ -181,19 +193,23 @@ const RegisterForm = ({
 
       <div className="register-social-login">
         <button
-          type="button"
-          className="register-social-icon-btn"
+          type="button" // Nhớ thêm type="button" để tránh nó submit form
+          className="social-icon-btn"
           disabled={loading}
+          onClick={handleGoogleLogin}
         >
           <GoogleIcon />
         </button>
+
         <button
           type="button"
-          className="register-social-icon-btn"
+          className="social-icon-btn"
           disabled={loading}
+          onClick={handleFacebookLogin}
         >
           <FacebookIcon />
         </button>
+
         <button
           type="button"
           className="register-social-icon-btn"

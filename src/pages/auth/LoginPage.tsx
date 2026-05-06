@@ -12,11 +12,17 @@ import {
   CartIcon,
   HeadsetIcon,
 } from "../../assets/icons/AuthIcons";
+import { useOAuthLogin } from "../../hooks/auth/useOAuthLogin";
 
 const LoginPage = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const navigate = useNavigate();
   const { login, loading, error } = useLogin();
+
+  // GỌI HOOK OAUTH Ở ĐÂY
+  // Nó sẽ tự động chạy ngầm khi trang Login được render.
+  // Nếu trên URL có accessToken, nó sẽ tự động xử lý và chuyển hướng.
+  useOAuthLogin();
 
   const handleLogin = async (data: LoginPayload) => {
     try {

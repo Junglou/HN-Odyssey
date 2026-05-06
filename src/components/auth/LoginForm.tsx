@@ -28,6 +28,23 @@ const LoginForm = ({
     onSubmit({ account, password });
   };
 
+  // THÊM LOGIC XỬ LÝ ĐĂNG NHẬP MẠNG XÃ HỘI
+  const backendUrl =
+    import.meta.env.VITE_API_URL || "http://localhost:8080/api";
+
+  const handleGoogleLogin = () => {
+    window.location.href = `${backendUrl}/auth/google`;
+  };
+
+  const handleFacebookLogin = () => {
+    window.location.href = `${backendUrl}/auth/facebook`;
+  };
+
+  // Nút Zalo bạn chưa có API BE, tạm thời có thể hiển thị thông báo
+  // const handleZaloLogin = () => {
+  //   alert("Chức năng đăng nhập Zalo đang được phát triển.");
+  // };
+
   return (
     <div className="login-form-wrapper">
       <h1 className="login-title">Welcome back!</h1>
@@ -95,10 +112,20 @@ const LoginForm = ({
       </div>
 
       <div className="social-login">
-        <button className="social-icon-btn" disabled={loading}>
+        <button
+          type="button" // Nhớ thêm type="button" để tránh nó submit form
+          className="social-icon-btn"
+          disabled={loading}
+          onClick={handleGoogleLogin}
+        >
           <GoogleIcon />
         </button>
-        <button className="social-icon-btn" disabled={loading}>
+        <button
+          type="button"
+          className="social-icon-btn"
+          disabled={loading}
+          onClick={handleFacebookLogin}
+        >
           <FacebookIcon />
         </button>
         <button className="social-icon-btn" disabled={loading}>

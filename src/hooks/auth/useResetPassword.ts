@@ -20,14 +20,16 @@ export const useResetPassword = () => {
     setError(null);
 
     try {
+      // Truyền thẳng payload do type đã khớp 100% với BE
       await authService.resetPassword(payload);
+      return true;
     } catch (err: unknown) {
       const apiError = err as ApiError;
-      const errorMessage =
-        apiError.response?.data?.message ||
-        apiError.message ||
-        "Đặt lại mật khẩu thất bại.";
+      const message = Array.isArray(apiError.response?.data?.message)
+        ? apiError.response?.data?.message[0]
+        : apiError.response?.data?.message || apiError.message;
 
+      const errorMessage = message || "Đặt lại mật khẩu thất bại.";
       setError(errorMessage);
       throw apiError;
     } finally {

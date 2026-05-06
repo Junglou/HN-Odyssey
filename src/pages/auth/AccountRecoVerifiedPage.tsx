@@ -15,6 +15,7 @@ import {
   CartIcon,
   HeadsetIcon,
 } from "../../assets/icons/AuthIcons";
+import type { ConfirmRecoveryPayload } from "../../types/auth";
 
 interface ApiError {
   response?: {
@@ -29,16 +30,11 @@ const AccountRecoVerifiedPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Lấy ticketId thực tế từ trang trước gửi sang
   const ticketId = location.state?.ticketId;
-
-  // Sử dụng Hook để gọi API
   const { confirmRecovery, loading: submitLoading } = useAccountRecoVerified();
   const { resend, loading: otpLoading, timer } = useVerifyOtp();
   const isLoading = otpLoading || submitLoading;
 
-  // Tắt/bật để test giao diện
-  // Bảo mật: Nếu không có Ticket ID (truy cập chui) thì đá về Login
   useEffect(() => {
     if (!ticketId) {
       toast.error("Yêu cầu không hợp lệ hoặc phiên làm việc đã hết hạn.");
@@ -48,7 +44,7 @@ const AccountRecoVerifiedPage = () => {
 
   const handleSendOtp = async (email: string) => {
     try {
-      await resend({ email });
+      await resend({ account: email, type: "account-recovery" });
       toast.success(`Mã OTP đã được gửi đến: ${email}`);
     } catch (error) {
       console.error("Send OTP Error", error);
@@ -57,20 +53,20 @@ const AccountRecoVerifiedPage = () => {
 
   const handleSubmit = async (formData: RecoVerifiedPayload) => {
     try {
-      const payload = {
-        ...formData,
-        ticketId: ticketId,
+      const payload: ConfirmRecoveryPayload = {
+        account: location.state?.email || "", // Lấy trực tiếp từ location state
+        code: ticketId,
+        newPassword: formData.newPassword,
+        confirmNewPassword: formData.confirmNewPassword,
+        newEmail: formData.newEmail,
       };
 
       console.log("Submitting Real Payload:", payload);
-
-      // Gọi API xác nhận khôi phục từ Hook
       await confirmRecovery(payload);
 
       toast.success("Khôi phục tài khoản thành công! Vui lòng đăng nhập.");
       navigate("/login");
     } catch (error: unknown) {
-      // Log lỗi để debug
       console.error("Submit Error", error);
       const err = error as ApiError;
       const msg =

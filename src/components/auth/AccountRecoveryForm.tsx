@@ -71,7 +71,7 @@ const AccountRecoveryForm = ({
       email,
       otpCode: otp,
       description,
-      evidence: file, // Có thể null nếu người dùng không chọn
+      images: file, // Có thể null nếu người dùng không chọn
     });
   };
 

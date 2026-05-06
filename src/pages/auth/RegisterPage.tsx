@@ -13,11 +13,14 @@ import {
   CartIcon,
   HeadsetIcon,
 } from "../../assets/icons/AuthIcons";
+import { useOAuthLogin } from "../../hooks/auth/useOAuthLogin";
 
 const RegisterPage = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const navigate = useNavigate();
   const { register, loading, error } = useRegister();
+
+  useOAuthLogin();
 
   const handleRegister = async (formData: RegisterPayload) => {
     try {

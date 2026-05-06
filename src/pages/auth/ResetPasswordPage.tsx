@@ -36,20 +36,21 @@ const ResetPasswordPage = () => {
 
   const handleReset = async (newPassword: string) => {
     try {
-      // Gọi API Reset Password từ Hook
       await resetPassword({
-        email: identifier, // Map identifier sang email theo yêu cầu của Backend
-        otpCode: otpCode,
+        account: identifier,
+        code: otpCode,
         newPassword: newPassword,
-        confirmPassword: newPassword, // Gửi kèm confirmPassword (Backend yêu cầu)
+        confirmNewPassword: newPassword,
       });
 
       toast.success("Đổi mật khẩu thành công! Vui lòng đăng nhập.");
       navigate("/login");
     } catch (error) {
-      // Log lỗi để debug
       console.error("Reset Password Error:", error);
-      // Toast lỗi đã được handle trong hook hoặc hiển thị lại tại đây nếu cần
+      const errorMsg =
+        (error as Error)?.message ||
+        "Mã xác thực không hợp lệ hoặc đã hết hạn.";
+      toast.error(errorMsg);
     }
   };
 
