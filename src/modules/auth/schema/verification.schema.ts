@@ -11,7 +11,7 @@ export class Verification extends Document {
 
   @Prop({
     required: true,
-    enum: ['REGISTER', 'RESET_PASSWORD', 'ADMIN_RESET_PASSWORD'],
+    enum: ['REGISTER', 'RESET_PASSWORD', 'ADMIN_RESET_PASSWORD', 'RECOVERY'],
   })
   type: string;
 

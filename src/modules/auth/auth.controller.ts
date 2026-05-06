@@ -142,11 +142,19 @@ export class AuthController {
         userAgent,
       );
 
-      return res.json({
-        message: 'Login Google thành công!',
-        user: req.user,
-        accessToken: result.access_token,
-      });
+      // return res.json({
+      //   message: 'Login Google thành công!',
+      //   user: req.user,
+      //   accessToken: result.access_token,
+      // });
+
+      // Lấy URL của React Frontend (Nhớ sửa port nếu React của bạn chạy port khác)
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+      // Dùng lệnh REDIRECT để đẩy trình duyệt bay ngược về React, kẹp thêm token
+      return res.redirect(
+        `${frontendUrl}/login?accessToken=${result.access_token}`,
+      );
     } catch (error) {
       const err = error as Error;
       const message = encodeURIComponent(err.message);
@@ -182,11 +190,19 @@ export class AuthController {
         userAgent,
       );
 
-      return res.json({
-        message: 'Login Facebook thành công!',
-        user: req.user,
-        accessToken: result.access_token,
-      });
+      // return res.json({
+      //   message: 'Login Facebook thành công!',
+      //   user: req.user,
+      //   accessToken: result.access_token,
+      // });
+
+      // Lấy URL của React Frontend (Nhớ sửa port nếu React của bạn chạy port khác)
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+      // Dùng lệnh REDIRECT để đẩy trình duyệt bay ngược về React, kẹp thêm token
+      return res.redirect(
+        `${frontendUrl}/login?accessToken=${result.access_token}`,
+      );
     } catch (error) {
       const err = error as Error;
       const message = encodeURIComponent(err.message);
@@ -204,10 +220,11 @@ export class AuthController {
     @UploadedFiles(
       new ParseFilePipeBuilder()
         .addFileTypeValidator({
-          fileType: /(jpg|jpeg|png)$/,
+          // Sửa regex ở đây để bắt đúng cấu trúc mimetype của file ảnh
+          fileType: 'image',
         })
         .addMaxSizeValidator({
-          maxSize: 1024 * 1024 * 5,
+          maxSize: 1024 * 1024 * 5, // 5MB
         })
         .build({
           errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,

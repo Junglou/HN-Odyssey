@@ -10,7 +10,7 @@ export class ResendOtpDto {
   @IsString()
   account: string;
 
-  @ApiProperty({ example: 'REGISTER', enum: ['REGISTER', 'RESET_PASSWORD'] })
   @IsNotEmpty()
+  @IsString()
   type: string;
 }

@@ -278,7 +278,9 @@ export class AuthService {
       }
 
       // Xóa OTP sau khi dùng xong
-      await record.deleteOne();
+      if (dto.type !== 'RESET_PASSWORD') {
+        await record.deleteOne();
+      }
     } else {
       // LUỒNG 2: XÁC THỰC SMS QUA TWILIO VERIFY API
       const isValid = await this.smsService.verifyOtp(dto.account, dto.code);
@@ -289,11 +291,13 @@ export class AuthService {
         );
       }
 
-      // Xóa bản ghi OTP "giữ chỗ" trong database (được tạo ở hàm register để rate-limit)
-      await this.verificationModel.deleteMany({
-        account: dto.account,
-        type: dto.type,
-      });
+      // CHỈNH SỬA TẠI ĐÂY: Chỉ xóa OTP giữ chỗ nếu không phải luồng đặt lại mật khẩu
+      if (dto.type !== 'RESET_PASSWORD') {
+        await this.verificationModel.deleteMany({
+          account: dto.account,
+          type: dto.type,
+        });
+      }
     }
 
     // NẾU CODE ĐÚNG -> XỬ LÝ TIẾP NGHIỆP VỤ
