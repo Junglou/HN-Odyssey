@@ -1,10 +1,11 @@
 // imports
 import { useState } from "react";
 import "./RoleManagement.css";
+
+// Icon
 import type {
   Role,
   ModulePermission,
-  Permission,
 } from "../../../../hooks/portal/UserAndRoles/RoleManagement/useRoleManagement";
 import {
   EditIcon,
@@ -25,28 +26,22 @@ interface RoleManagementProps {
     permissions: ModulePermission[];
   };
   uiState: {
-    selectedRoleId: number | null;
+    selectedRoleId: string | null;
     hasUnsavedChanges: boolean;
     searchTerm: string;
   };
   actions: {
     changeSearch: (val: string) => void;
-    selectRole: (id: number) => void;
-    togglePermission: (
-      moduleId: string,
-      subId: string,
-      action: keyof Permission,
-    ) => void;
+    selectRole: (id: string) => void;
+    togglePermission: (moduleId: string, subId: string, action: string) => void;
     saveChanges: () => void;
     cancelChanges: () => void;
     openModal: (mode: "add" | "edit", role?: Role) => void;
-    deleteRole: (id: number) => void;
+    deleteRole: (id: string) => void;
   };
 }
 
 // constants
-const PERMISSION_ACTIONS = ["view", "create", "edit", "delete"] as const;
-
 // component
 export default function RoleManagement({
   data,
@@ -199,8 +194,9 @@ export default function RoleManagement({
 
                 return (
                   <div key={module.moduleId} className="rm-module-card">
+                    {/* Header của Module không còn các thẻ span chia cột nữa */}
                     <div
-                      className="rm-module-header"
+                      className="rm-module-header-dynamic"
                       onClick={() => toggleModule(module.moduleId)}
                     >
                       <div className="rm-module-name-col">
@@ -215,12 +211,6 @@ export default function RoleManagement({
                           {module.moduleName}
                         </span>
                       </div>
-                      <div className="rm-perm-headers">
-                        <span>View</span>
-                        <span>Create</span>
-                        <span>Edit</span>
-                        <span>Delete</span>
-                      </div>
                     </div>
 
                     <div
@@ -228,20 +218,27 @@ export default function RoleManagement({
                     >
                       <div className="rm-submodules-list">
                         {module.subModules.map((sub) => (
-                          <div key={sub.subId} className="rm-submodule-row">
+                          <div
+                            key={sub.subId}
+                            className="rm-submodule-row-dynamic"
+                          >
                             <div className="rm-submodule-name">
                               {sub.subName}
                             </div>
-                            <div className="rm-perm-checkboxes">
-                              {PERMISSION_ACTIONS.map((action) => (
+
+                            {/* Danh sách các quyền được hiển thị tự do bằng Flexbox */}
+                            <div className="rm-perm-actions-dynamic">
+                              {sub.availableActions.map((action) => (
                                 <label
                                   key={action}
-                                  className="rm-checkbox-label"
+                                  className="rm-checkbox-label-dynamic"
                                 >
                                   <input
                                     type="checkbox"
                                     className="rm-checkbox"
-                                    checked={sub.permissions[action]}
+                                    checked={sub.grantedActions.includes(
+                                      action,
+                                    )}
                                     onChange={() =>
                                       actions.togglePermission(
                                         module.moduleId,
@@ -254,6 +251,7 @@ export default function RoleManagement({
                                     <CheckIcon />
                                   </span>
                                   <span className="rm-checkbox-text">
+                                    {/* Viết hoa chữ cái đầu */}
                                     {action.charAt(0).toUpperCase() +
                                       action.slice(1)}
                                   </span>

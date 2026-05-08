@@ -114,3 +114,18 @@ export const ClockIcon = () => (
     <polyline points="12 6 12 12 16 14"></polyline>
   </svg>
 );
+
+export const ChevronDownIcon = () => (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="6 9 12 15 18 9"></polyline>
+  </svg>
+);

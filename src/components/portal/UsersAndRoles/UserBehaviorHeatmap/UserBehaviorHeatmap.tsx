@@ -9,6 +9,7 @@ import {
   UsersIcon,
   CursorIcon,
   ClockIcon,
+  ChevronDownIcon,
 } from "../../../../assets/icons/HeatmapIcons";
 import type {
   DeviceType,
@@ -32,22 +33,10 @@ interface UserBehaviorHeatmapProps {
     clicks: string;
     duration: string;
   };
+  pageOptions: { label: string; value: string }[];
+  interactionOptions: string[];
 }
 
-// constants
-const INTERACTION_OPTIONS: InteractionType[] = ["Click", "Scroll", "Hover"];
-
-const PAGE_OPTIONS = [
-  { label: "Homepage (Current)", value: "Homepage (Current)" },
-  {
-    label: "Product Page - Hiking Boots",
-    value: "Product Page - Hiking Boots",
-  },
-  { label: "Cart", value: "Cart" },
-  { label: "Checkout", value: "Checkout" },
-];
-
-// helpers
 function CustomHeatmapSelect({
   value,
   options,
@@ -59,29 +48,25 @@ function CustomHeatmapSelect({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [hasOpened, setHasOpened] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
 
   const selectedLabel =
-    options.find((opt) => opt.value === value)?.label || value;
+    options.find((opt) => opt.value === value)?.label || "Select an option";
 
   return (
-    <div
-      className={`ubh-custom-dropdown ${isOpen ? "is-open" : ""}`}
-      ref={dropdownRef}
-    >
+    <div className="ubh-custom-dropdown" ref={ref}>
       <div
         className={`ubh-dropdown-trigger ${isOpen ? "active" : ""}`}
         onClick={() => {
@@ -90,22 +75,10 @@ function CustomHeatmapSelect({
         }}
       >
         <span>{selectedLabel}</span>
-        <svg
-          className={`ubh-dropdown-arrow ${isOpen ? "open" : ""}`}
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#111827"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <polyline points="6 9 12 15 18 9"></polyline>
-        </svg>
+        <div className={`ubh-dropdown-arrow ${isOpen ? "open" : ""}`}>
+          <ChevronDownIcon />
+        </div>
       </div>
-
       <div
         className={`ubh-dropdown-options ${isOpen ? "open" : hasOpened ? "closed" : ""}`}
       >
@@ -126,7 +99,7 @@ function CustomHeatmapSelect({
   );
 }
 
-// component
+// component chính
 export default function UserBehaviorHeatmap({
   selectedPage,
   onPageChange,
@@ -134,15 +107,17 @@ export default function UserBehaviorHeatmap({
   onDeviceChange,
   interactionType,
   onInteractionChange,
-  stats,
   startDate,
   onStartDateChange,
   endDate,
   onEndDateChange,
+  stats,
+  pageOptions,
+  interactionOptions,
 }: UserBehaviorHeatmapProps) {
-  // render
   return (
     <div className="ubh-container">
+      {/* Header */}
       <div className="ubh-header">
         <div>
           <h1 className="ubh-title">User Behavior Heatmap</h1>
@@ -153,112 +128,126 @@ export default function UserBehaviorHeatmap({
       </div>
 
       <div className="ubh-layout">
-        <div className="ubh-left-panel">
-          <div className="ubh-visual-preview">
-            <div className="ubh-website-preview">
-              <div className="ubh-preview-header"></div>
-              <div className="ubh-preview-content">
-                <div className="ubh-hotspot header-zone"></div>
-                <div className="ubh-hotspot content-zone"></div>
-                <div className="ubh-hotspot footer-zone"></div>
+        {/* Bản đồ nhiệt*/}
+        <div className="ubh-left-panel" style={{ padding: "24px" }}>
+          <div className="ubh-real-heatmap-wrapper">
+            {/* 1. Khung hộp xám nét đứt chờ API (Đã khớp với CSS của bạn) */}
+            <div className="ubh-heatmap-canvas-container">
+              <div className="ubh-heatmap-empty-state">
+                <CursorIcon />
+                <h3>Bản đồ nhiệt (Heatmap)</h3>
+                <p>
+                  Hệ thống đã kết nối dữ liệu thống kê từ API.
+                  <br />
+                  Tính năng vẽ bản đồ trực quan đang chờ tích hợp thư viện thật.
+                </p>
               </div>
             </div>
 
+            {/* 2. Thanh chú thích (Legend) của bạn giữ nguyên */}
             <div className="ubh-color-scale-wrapper">
               <div className="ubh-color-bar"></div>
               <div className="ubh-color-labels">
-                <span>Low Interaction (Blue)</span>
-                <span>High Interaction (Red)</span>
+                <span>Cold</span>
+                <span>Warm</span>
+                <span>Hot</span>
               </div>
               <p className="ubh-scale-desc">
-                Colors indicate the density of user interactions. Red shows high
-                engagement, blue shows low engagement.
+                Heatmap visualization for:{" "}
+                <strong>{selectedPage || "All Pages"}</strong> <br />
+                Device: <strong>{device}</strong> | Interaction:{" "}
+                <strong>{interactionType || "All"}</strong>
+                {startDate && endDate && ` | Date: ${startDate} - ${endDate}`}
               </p>
             </div>
           </div>
         </div>
 
+        {/* bộ lọc và thống kê */}
         <div className="ubh-right-panel">
+          <h2 className="ubh-panel-title">Filters</h2>
+
+          {/* Lọc Trang */}
           <div className="ubh-control-group">
-            <label className="ubh-label">Select Page</label>
+            <label className="ubh-label">Page/Screen</label>
             <CustomHeatmapSelect
               value={selectedPage}
-              options={PAGE_OPTIONS}
+              options={pageOptions}
               onChange={onPageChange}
             />
           </div>
 
-          <div className="ubh-control-group">
+          {/* Lọc Thiết bị */}
+          <div className="ubh-control-group" style={{ marginTop: "16px" }}>
+            <label className="ubh-label">Device Type</label>
+            <div className="ubh-device-toggles">
+              {(["Desktop", "Mobile", "Tablet"] as const).map((type) => (
+                <button
+                  key={type}
+                  className={`ubh-device-btn ${device === type ? "active" : ""}`}
+                  onClick={() => onDeviceChange(type)}
+                >
+                  {type === "Desktop" && <DesktopIcon />}
+                  {type === "Mobile" && <MobileIcon />}
+                  {type === "Tablet" && <TabletIcon />}
+                  {type}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Lọc Thời gian */}
+          <div className="ubh-control-group" style={{ marginTop: "16px" }}>
             <label className="ubh-label">Date Range</label>
             <div className="ubh-date-inputs">
               <div className="ubh-date-box">
                 <CalendarIcon />
                 <input
                   type="date"
-                  className="ubh-date-input"
                   value={startDate}
                   onChange={(e) => onStartDateChange(e.target.value)}
+                  className="ubh-date-input"
                 />
               </div>
-              <span>-</span>
+              <span className="ubh-date-separator">-</span>
               <div className="ubh-date-box">
                 <CalendarIcon />
                 <input
                   type="date"
-                  className="ubh-date-input"
                   value={endDate}
                   onChange={(e) => onEndDateChange(e.target.value)}
+                  className="ubh-date-input"
                 />
               </div>
             </div>
           </div>
 
-          <div className="ubh-control-group">
-            <label className="ubh-label">Device</label>
-            <div className="ubh-device-toggles">
-              <button
-                className={`ubh-device-btn ${device === "Desktop" ? "active" : ""}`}
-                onClick={() => onDeviceChange("Desktop")}
-              >
-                <DesktopIcon /> Desktop
-              </button>
-              <button
-                className={`ubh-device-btn ${device === "Mobile" ? "active" : ""}`}
-                onClick={() => onDeviceChange("Mobile")}
-              >
-                <MobileIcon /> Mobile
-              </button>
-              <button
-                className={`ubh-device-btn ${device === "Tablet" ? "active" : ""}`}
-                onClick={() => onDeviceChange("Tablet")}
-              >
-                <TabletIcon /> Tablet
-              </button>
-            </div>
-          </div>
-
-          <div className="ubh-control-group">
+          {/* Lọc Tương tác */}
+          <div className="ubh-control-group" style={{ marginTop: "16px" }}>
             <label className="ubh-label">Interaction Type</label>
             <div className="ubh-radio-group">
-              {INTERACTION_OPTIONS.map((type) => (
+              {interactionOptions.map((type) => (
                 <label key={type} className="ubh-radio-label">
+                  <input
+                    type="radio"
+                    name="interactionType"
+                    value={type}
+                    checked={interactionType === type}
+                    onChange={() => onInteractionChange(type)}
+                    className="ubh-radio-input"
+                  />
                   <div
                     className={`ubh-radio-custom ${interactionType === type ? "checked" : ""}`}
                   >
                     <div className="ubh-radio-dot"></div>
                   </div>
-                  <input
-                    type="radio"
-                    name="interaction"
-                    checked={interactionType === type}
-                    onChange={() => onInteractionChange(type)}
-                  />
-                  <span>{type}</span>
+                  <span className="ubh-radio-text">{type}</span>
                 </label>
               ))}
             </div>
           </div>
 
+          {/* Thống kê chung */}
           <div className="ubh-control-group" style={{ marginTop: "16px" }}>
             <label className="ubh-label">Statistics Summary</label>
             <div className="ubh-stats-grid">

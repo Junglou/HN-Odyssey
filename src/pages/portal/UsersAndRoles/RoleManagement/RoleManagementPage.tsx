@@ -4,7 +4,6 @@ import ConfirmDeleteModal from "../../../../components/portal/common/ConfirmDele
 import { useRoleManagement } from "../../../../hooks/portal/UserAndRoles/RoleManagement/useRoleManagement";
 import "./RoleManagementPage.css";
 
-// container bọc logic chính
 export default function RoleManagementPage() {
   const {
     roles,
@@ -19,7 +18,6 @@ export default function RoleManagementPage() {
     executeDelete,
   } = useRoleManagement();
 
-  // render ui layout
   return (
     <div className="rm-page-container">
       <RoleManagement
@@ -29,7 +27,6 @@ export default function RoleManagementPage() {
       />
 
       <RoleModal
-        // force reset form
         key={
           modalConfig.isOpen
             ? `${modalConfig.mode}-${modalConfig.editingRole?.id || "new"}`

@@ -52,58 +52,6 @@
   overflow: hidden;
 }
 
-.ubh-visual-preview {
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-/* khung nền web */
-.ubh-website-preview {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  background-color: #1a1a1a;
-  border-radius: 8px;
-  position: relative;
-  overflow: hidden;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
-  background-size: 20px 20px;
-}
-
-/* đốm nhiệt hotspot */
-.ubh-hotspot {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(25px);
-  opacity: 0.8;
-}
-
-/* mock dữ liệu vị trí hotspot */
-.header-zone {
-  width: 150px;
-  height: 150px;
-  background: radial-gradient(circle, red, yellow, transparent);
-  top: 20%;
-  right: 25%;
-}
-.content-zone {
-  width: 200px;
-  height: 200px;
-  background: radial-gradient(circle, orange, green, transparent);
-  bottom: 10%;
-  left: 10%;
-}
-.footer-zone {
-  width: 100px;
-  height: 100px;
-  background: radial-gradient(circle, red, orange, transparent);
-  top: 40%;
-  left: 30%;
-}
-
 /* thanh chú thích màu nhiệt độ */
 .ubh-color-scale-wrapper {
   display: flex;
@@ -407,6 +355,57 @@
   font-size: 1.4rem;
   font-weight: 800;
   color: #111827;
+}
+
+/* Khung chờ heatmap */
+.ubh-real-heatmap-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+}
+
+.ubh-heatmap-canvas-container {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 400px;
+  background-color: #f9fafb;
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.ubh-heatmap-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: #6b7280;
+  text-align: center;
+  padding: 20px;
+}
+
+.ubh-heatmap-empty-state svg {
+  width: 48px;
+  height: 48px;
+  opacity: 0.5;
+}
+
+.ubh-heatmap-empty-state h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.ubh-heatmap-empty-state p {
+  margin: 0;
+  font-size: 0.9rem;
+  max-width: 350px;
 }
 
 /* animation*/

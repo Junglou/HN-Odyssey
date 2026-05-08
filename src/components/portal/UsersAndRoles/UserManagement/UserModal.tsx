@@ -5,9 +5,11 @@ import { ChevronDownSmallIcon } from "../../../../assets/icons/UserManagementIco
 
 // types
 export interface User {
-  id: number;
+  id: string;
   name: string;
   email: string;
+  phone: string;
+  department: string;
   role: string;
   status: string;
   lastLogin: string;
@@ -17,23 +19,26 @@ export interface User {
 export interface UserFormData {
   name: string;
   email: string;
-  username: string;
+  phone: string;
   password?: string;
   role: string;
+  department: string;
   status: string;
+}
+
+interface DropdownOption {
+  label: string;
+  value: string;
 }
 
 interface UserModalProps {
   isOpen: boolean;
   mode: "add" | "edit" | "view";
   initialData: User | null;
+  dynamicRoleOptions: DropdownOption[];
+  dynamicDeptOptions: DropdownOption[];
   onClose: () => void;
   onSubmit: (data: UserFormData) => void;
-}
-
-interface DropdownOption {
-  label: string;
-  value: string;
 }
 
 // helpers
@@ -110,16 +115,8 @@ function CustomModalSelect({
   );
 }
 
-// constants
-const MODAL_ROLE_OPTIONS: DropdownOption[] = [
-  { label: "Administrator", value: "Administrator" },
-  { label: "Content Manager", value: "Content Manager" },
-  { label: "Sale Staff", value: "Sale Staff" },
-];
-
-// component
+// component wrapper
 export default function UserModal(props: UserModalProps) {
-  // dùng key để ép React reset lại component mỗi khi mở, loại bỏ hoàn toàn useEffect
   if (!props.isOpen) return null;
   const componentKey =
     props.mode === "add" ? "add-new" : props.initialData?.id || "modal";
@@ -130,25 +127,30 @@ export default function UserModal(props: UserModalProps) {
 function ModalContent({
   mode,
   initialData,
+  dynamicRoleOptions,
+  dynamicDeptOptions,
   onClose,
   onSubmit,
 }: Omit<UserModalProps, "isOpen">) {
-  // khởi tạo state trực tiếp
+  // Khởi tạo state
   const [formData, setFormData] = useState<UserFormData>(() => {
     if ((mode === "edit" || mode === "view") && initialData) {
       return {
-        name: initialData.name,
-        email: initialData.email,
-        username: initialData.email.split("@")[0],
-        password: "",
-        role: initialData.role,
-        status: initialData.status,
+        name: initialData.name || "",
+        email: initialData.email || "",
+        phone: initialData.phone || "",
+        department: initialData.department || "",
+        password: mode === "view" ? "••••••••" : "",
+        role: initialData.role || "",
+        status: initialData.status || "Active",
       };
     }
+
     return {
       name: "",
       email: "",
-      username: "",
+      phone: "",
+      department: "",
       password: "",
       role: "",
       status: "Active",
@@ -158,9 +160,7 @@ function ModalContent({
   const isViewOnly = mode === "view";
 
   // handlers
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
@@ -179,6 +179,10 @@ function ModalContent({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isViewOnly) {
+      onClose();
+      return;
+    }
     onSubmit(formData);
   };
 
@@ -201,82 +205,96 @@ function ModalContent({
         <form className="um-modal-form" onSubmit={handleSubmit}>
           <div className="um-form-group">
             <label>
-              Name <span className="req">*</span>
+              Name {mode === "add" && <span className="req">*</span>}
             </label>
             <input
               type="text"
               name="name"
-              placeholder="e.g. John Doe"
               value={formData.name}
               onChange={handleChange}
               disabled={isViewOnly}
-              required
+              placeholder="Ví dụ: Trần Văn A"
+              required={mode === "add"}
             />
           </div>
 
           <div className="um-form-group">
             <label>
-              Email Address <span className="req">*</span>
+              Email Address {mode === "add" && <span className="req">*</span>}
             </label>
             <input
               type="email"
               name="email"
-              placeholder="e.g. john@example.com"
               value={formData.email}
               onChange={handleChange}
-              disabled={isViewOnly}
-              required
+              disabled={isViewOnly || mode === "edit"}
+              placeholder="admin@hnodyssey.com"
+              required={mode === "add"}
             />
           </div>
 
-          <div className="um-form-group">
-            <label>
-              Username <span className="req">*</span>
-            </label>
-            <input
-              type="text"
-              name="username"
-              placeholder="e.g. johndoe123"
-              value={formData.username}
-              onChange={handleChange}
-              disabled={isViewOnly}
-              required
-            />
-          </div>
+          <div className="um-form-row">
+            <div className="um-form-group">
+              <label>Phone Number</label>
+              <input
+                name="phone"
+                type="text"
+                value={formData.phone}
+                onChange={handleChange}
+                disabled={isViewOnly}
+                placeholder="09..."
+              />
+            </div>
 
-          {mode !== "view" && (
             <div className="um-form-group">
               <label>
-                Password{" "}
-                {mode === "edit" ? (
-                  "(Leave blank to keep current)"
-                ) : (
-                  <span className="req">*</span>
-                )}
+                Password {mode === "add" && <span className="req">*</span>}
               </label>
               <input
                 type="password"
                 name="password"
-                placeholder="Enter strong password"
                 value={formData.password}
                 onChange={handleChange}
+                disabled={isViewOnly}
+                placeholder={
+                  mode === "add"
+                    ? "Ít nhất 8 ký tự, có hoa, thường, số"
+                    : isViewOnly
+                      ? "••••••••"
+                      : "Để trống nếu giữ nguyên mật khẩu"
+                }
                 required={mode === "add"}
               />
             </div>
-          )}
+          </div>
 
-          <div className="um-form-group">
-            <label>
-              Role <span className="req">*</span>
-            </label>
-            <CustomModalSelect
-              name="role"
-              value={formData.role}
-              options={MODAL_ROLE_OPTIONS}
-              onChange={handleSelectChange}
-              disabled={isViewOnly}
-              placeholder="Select role"
-            />
+          <div className="um-form-row">
+            <div className="um-form-group">
+              <label>
+                Role {mode === "add" && <span className="req">*</span>}
+              </label>
+              <CustomModalSelect
+                name="role"
+                value={formData.role}
+                options={dynamicRoleOptions}
+                onChange={handleSelectChange}
+                disabled={isViewOnly}
+                placeholder="Select Role"
+              />
+            </div>
+            <div className="um-form-group">
+              <label>
+                Department {mode === "add" && <span className="req">*</span>}
+              </label>
+              <CustomModalSelect
+                name="department"
+                value={formData.department}
+                options={dynamicDeptOptions}
+                onChange={handleSelectChange}
+                disabled={isViewOnly}
+                placeholder="Select Department"
+              />
+            </div>
           </div>
 
           <div className="um-form-group">

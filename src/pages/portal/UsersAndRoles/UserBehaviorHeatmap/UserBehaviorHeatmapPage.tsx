@@ -2,7 +2,6 @@ import UserBehaviorHeatmap from "../../../../components/portal/UsersAndRoles/Use
 import { useUserBehaviorHeatmap } from "../../../../hooks/portal/UserAndRoles/UserBehaviorHeatmap/useUserBehaviorHeatmap";
 import "./UserBehaviorHeatmapPage.css";
 
-// container gọi hook và truyền data xuống ui
 export default function UserBehaviorHeatmapPage() {
   const {
     selectedPage,
@@ -16,6 +15,8 @@ export default function UserBehaviorHeatmapPage() {
     endDate,
     setEndDate,
     stats,
+    pageOptions,
+    interactionOptions,
   } = useUserBehaviorHeatmap();
 
   return (
@@ -32,6 +33,8 @@ export default function UserBehaviorHeatmapPage() {
         endDate={endDate}
         onEndDateChange={setEndDate}
         stats={stats}
+        pageOptions={pageOptions}
+        interactionOptions={interactionOptions}
       />
     </div>
   );

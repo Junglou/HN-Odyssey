@@ -1,5 +1,5 @@
 // imports
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import "./UserManagement.css";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 import {
@@ -12,7 +12,10 @@ import {
   ChevronDownSmallIcon,
 } from "../../../../assets/icons/UserManagementIcons";
 import type { User } from "./UserModal";
-import type { BulkAction } from "../../../../hooks/portal/UserAndRoles/UserManagement/useUserManagement";
+import type {
+  BulkAction,
+  DropdownOption,
+} from "../../../../hooks/portal/UserAndRoles/UserManagement/useUserManagement";
 
 // types
 interface UserManagementProps {
@@ -26,24 +29,23 @@ interface UserManagementProps {
     endIndex: number;
     totalFiltered: number;
   };
+  options: {
+    roles: DropdownOption[];
+    status: DropdownOption[];
+  };
   actions: {
     changeFilter: (key: "search" | "status" | "role", val: string) => void;
     clearFilter: () => void;
     changePage: (page: number) => void;
     changeLimit: (limit: number) => void;
-    selectUser: (id: number) => void;
+    selectUser: (id: string) => void;
     selectAll: (isAll: boolean) => void;
     bulk: (action: BulkAction) => void;
-    toggleStatus: (id: number, status: string) => void;
-    lockUnlock: (id: number, status: string) => void;
-    deleteSingle: (id: number) => void;
+    toggleStatus: (id: string, status: string) => void;
+    lockUnlock: (id: string, status: string) => void;
+    deleteSingle: (id: string) => void;
     openModal: (mode: "add" | "edit" | "view", user?: User) => void;
   };
-}
-
-interface DropdownOption {
-  label: string;
-  value: string;
 }
 
 // helpers
@@ -76,7 +78,7 @@ function CustomDropdown({
   }, []);
 
   const selectedLabel =
-    options.find((opt) => opt.value === value)?.label || options[0].label;
+    options.find((opt) => opt.value === value)?.label || options[0]?.label;
 
   return (
     <div
@@ -117,33 +119,21 @@ function CustomDropdown({
   );
 }
 
-// constants
-const STATUS_OPTIONS: DropdownOption[] = [
-  { label: "All Status", value: "Status" },
-  { label: "Active", value: "Active" },
-  { label: "Inactive", value: "Inactive" },
-  { label: "Locked", value: "Locked" },
-];
-
-const ROLE_OPTIONS: DropdownOption[] = [
-  { label: "All Roles", value: "Role" },
-  { label: "Administrator", value: "Administrator" },
-  { label: "Content Manager", value: "Content Manager" },
-  { label: "Sale Staff", value: "Sale Staff" },
-];
-
 // component
 export default function UserManagement({
   data,
   filters,
   pagination,
+  options,
   actions,
 }: UserManagementProps) {
   // state
-  const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
-  const [hasDropdownOpened, setHasDropdownOpened] = useState<{
-    [key: number]: boolean;
-  }>({});
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+
+  // Sửa [key: number] thành Record<string, boolean> (tương đương [key: string])
+  const [hasDropdownOpened, setHasDropdownOpened] = useState<
+    Record<string, boolean>
+  >({});
 
   const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
   const [hasLimitOpened, setHasLimitOpened] = useState(false);
@@ -185,13 +175,13 @@ export default function UserManagement({
           />
           <CustomDropdown
             value={filters.status}
-            options={STATUS_OPTIONS}
+            options={options.status}
             onChange={(val) => actions.changeFilter("status", val)}
             className="um-filter-dropdown"
           />
           <CustomDropdown
             value={filters.role}
-            options={ROLE_OPTIONS}
+            options={options.roles}
             onChange={(val) => actions.changeFilter("role", val)}
             className="um-filter-dropdown"
           />
