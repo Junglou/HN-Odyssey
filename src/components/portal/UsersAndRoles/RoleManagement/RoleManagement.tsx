@@ -41,7 +41,6 @@ interface RoleManagementProps {
   };
 }
 
-// constants
 // component
 export default function RoleManagement({
   data,
@@ -191,12 +190,16 @@ export default function RoleManagement({
               {data.permissions.map((module) => {
                 const isExpanded = expandedModules[module.moduleId] !== false;
                 const hasOpened = hasModuleOpened[module.moduleId];
+                const allModuleActions = Array.from(
+                  new Set(
+                    module.subModules.flatMap((sub) => sub.availableActions),
+                  ),
+                );
 
                 return (
                   <div key={module.moduleId} className="rm-module-card">
-                    {/* Header của Module không còn các thẻ span chia cột nữa */}
                     <div
-                      className="rm-module-header-dynamic"
+                      className="rm-module-header"
                       onClick={() => toggleModule(module.moduleId)}
                     >
                       <div className="rm-module-name-col">
@@ -211,6 +214,14 @@ export default function RoleManagement({
                           {module.moduleName}
                         </span>
                       </div>
+                      {/* Header */}
+                      <div className="rm-perm-headers">
+                        {allModuleActions.map((action) => (
+                          <span key={action} title={action.toUpperCase()}>
+                            {action.toUpperCase()}
+                          </span>
+                        ))}
+                      </div>
                     </div>
 
                     <div
@@ -218,45 +229,61 @@ export default function RoleManagement({
                     >
                       <div className="rm-submodules-list">
                         {module.subModules.map((sub) => (
-                          <div
-                            key={sub.subId}
-                            className="rm-submodule-row-dynamic"
-                          >
+                          <div key={sub.subId} className="rm-submodule-row">
                             <div className="rm-submodule-name">
                               {sub.subName}
                             </div>
 
-                            {/* Danh sách các quyền được hiển thị tự do bằng Flexbox */}
-                            <div className="rm-perm-actions-dynamic">
-                              {sub.availableActions.map((action) => (
-                                <label
-                                  key={action}
-                                  className="rm-checkbox-label-dynamic"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    className="rm-checkbox"
-                                    checked={sub.grantedActions.includes(
-                                      action,
-                                    )}
-                                    onChange={() =>
-                                      actions.togglePermission(
-                                        module.moduleId,
-                                        sub.subId,
+                            {/* Danh sách các quyền */}
+                            <div className="rm-perm-checkboxes">
+                              {allModuleActions.map((action) => {
+                                const isAvailable =
+                                  sub.availableActions.includes(action);
+
+                                if (!isAvailable) {
+                                  return (
+                                    <div
+                                      key={action}
+                                      className="rm-empty-cell"
+                                    ></div>
+                                  );
+                                }
+
+                                return (
+                                  <label
+                                    key={action}
+                                    className="rm-checkbox-label"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      className="rm-checkbox"
+                                      checked={sub.grantedActions.includes(
                                         action,
-                                      )
-                                    }
-                                  />
-                                  <span className="rm-custom-check">
-                                    <CheckIcon />
-                                  </span>
-                                  <span className="rm-checkbox-text">
-                                    {/* Viết hoa chữ cái đầu */}
-                                    {action.charAt(0).toUpperCase() +
-                                      action.slice(1)}
-                                  </span>
-                                </label>
-                              ))}
+                                      )}
+                                      onChange={() =>
+                                        actions.togglePermission(
+                                          module.moduleId,
+                                          sub.subId,
+                                          action,
+                                        )
+                                      }
+                                    />
+                                    <span className="rm-custom-check">
+                                      <CheckIcon />
+                                    </span>
+                                    <span
+                                      className="rm-checkbox-text"
+                                      title={
+                                        action.charAt(0).toUpperCase() +
+                                        action.slice(1)
+                                      }
+                                    >
+                                      {action.charAt(0).toUpperCase() +
+                                        action.slice(1)}
+                                    </span>
+                                  </label>
+                                );
+                              })}
                             </div>
                           </div>
                         ))}

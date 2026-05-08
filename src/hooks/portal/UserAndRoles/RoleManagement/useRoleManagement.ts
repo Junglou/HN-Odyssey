@@ -255,7 +255,6 @@ export function useRoleManagement() {
 
           let granted: string[] = [];
           if (bePerm) {
-            // NẾU BE TRẢ VỀ CHỮ "MANAGE" -> CẤP FULL QUYỀN (LẤY TẤT CẢ AVAILABLE ACTIONS)
             if (bePerm.actions.includes("MANAGE")) {
               granted = [...sub.availableActions];
             } else {
@@ -270,8 +269,8 @@ export function useRoleManagement() {
         }),
       }));
 
-      setPermissions(mappedPermissions);
-      setOriginalPermissions(mappedPermissions);
+      setPermissions(JSON.parse(JSON.stringify(mappedPermissions)));
+      setOriginalPermissions(JSON.parse(JSON.stringify(mappedPermissions)));
     },
 
     togglePermission: (moduleId: string, subId: string, action: string) => {
@@ -300,13 +299,11 @@ export function useRoleManagement() {
       if (!selectedRoleId) return;
 
       try {
-        // ĐÃ FIX: Payload phân quyền khớp 100% với format [{resource, actions}] của DTO
         const bePermissionsPayload: BackendPermission[] = [];
 
         permissions.forEach((mod) => {
           mod.subModules.forEach((sub) => {
             if (sub.grantedActions.length > 0) {
-              // NẾU SỐ LƯỢNG Ô ĐƯỢC TÍCH = TỔNG SỐ Ô CÓ SẴN CỦA MODULE ĐÓ -> GOM THÀNH "MANAGE"
               let actionsToSave = sub.grantedActions;
               if (
                 sub.availableActions.length > 0 &&
@@ -345,8 +342,9 @@ export function useRoleManagement() {
     },
 
     cancelChanges: () => {
-      setPermissions(originalPermissions);
+      setPermissions(JSON.parse(JSON.stringify(originalPermissions)));
       setHasUnsavedChanges(false);
+      setSelectedRoleId(null);
     },
 
     openModal: (mode: "add" | "edit", role?: Role) => {
