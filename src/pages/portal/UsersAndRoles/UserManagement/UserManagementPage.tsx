@@ -2,7 +2,6 @@ import UserManagement from "../../../../components/portal/UsersAndRoles/UserMana
 import UserModal from "../../../../components/portal/UsersAndRoles/UserManagement/UserModal";
 import ConfirmDeleteModal from "../../../../components/portal/common/ConfirmDeleteModal";
 import { useUserManagement } from "../../../../hooks/portal/UserAndRoles/UserManagement/useUserManagement";
-import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 import "./UserManagementPage.css";
 
 export default function UserManagementPage() {
@@ -13,6 +12,9 @@ export default function UserManagementPage() {
     totalPages,
     startIndex,
     totalFiltered,
+    roleOptions,
+    STATUS_OPTIONS,
+    departmentOptions,
     modalConfig,
     setModalConfig,
     deleteConfig,
@@ -35,6 +37,10 @@ export default function UserManagementPage() {
           endIndex: startIndex + pagination.limit,
           totalFiltered,
         }}
+        options={{
+          roles: roleOptions,
+          status: STATUS_OPTIONS,
+        }}
         actions={actions}
       />
 
@@ -47,6 +53,9 @@ export default function UserManagementPage() {
         isOpen={modalConfig.isOpen}
         mode={modalConfig.mode}
         initialData={modalConfig.editingUser}
+        // Loại bỏ placeholder "All Roles" khi vào Modal chọn quyền
+        dynamicRoleOptions={roleOptions.filter((opt) => opt.value !== "Role")}
+        dynamicDeptOptions={departmentOptions}
         onClose={() => setModalConfig({ ...modalConfig, isOpen: false })}
         onSubmit={handleModalSubmit}
       />

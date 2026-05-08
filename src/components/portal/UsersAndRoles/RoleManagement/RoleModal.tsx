@@ -21,7 +21,8 @@ export default function RoleModal({
   onClose,
   onSubmit,
 }: RoleModalProps) {
-  // tự động thiết lập lại state form khi initialData thay đổi
+  // Không cần dùng useEffect, File Page cha đã gán "key" cho component
+  // Mỗi khi Modal mở, React sẽ khởi tạo lại toàn bộ vòng đời Component này với Data mới
   const [formData, setFormData] = useState<RoleFormData>({
     name: initialData?.name || "",
     status: initialData?.status || "Active",

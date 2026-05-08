@@ -10,13 +10,11 @@ import {
   ClockIcon,
 } from "../../../../assets/icons/HeatmapIcons";
 
-// lấy type từ hook để đồng bộ dữ liệu
 import type {
   DeviceType,
   InteractionType,
 } from "../../../../hooks/portal/UserAndRoles/UserBehaviorHeatmap/useUserBehaviorHeatmap";
 
-// định nghĩa props cho dữ liệu đầu vào
 interface UserBehaviorHeatmapProps {
   selectedPage: string;
   onPageChange: (page: string) => void;
@@ -33,21 +31,11 @@ interface UserBehaviorHeatmapProps {
     clicks: string;
     duration: string;
   };
+  // Thêm props mới để nhận data list
+  pageOptions: { label: string; value: string }[];
+  interactionOptions: string[];
 }
 
-const INTERACTION_OPTIONS: InteractionType[] = ["Click", "Scroll", "Hover"];
-
-const PAGE_OPTIONS = [
-  { label: "Homepage (Current)", value: "Homepage (Current)" },
-  {
-    label: "Product Page - Hiking Boots",
-    value: "Product Page - Hiking Boots",
-  },
-  { label: "Cart", value: "Cart" },
-  { label: "Checkout", value: "Checkout" },
-];
-
-// component custom dropdown thay thế cho thẻ select mặc định
 function CustomHeatmapSelect({
   value,
   options,
@@ -60,7 +48,6 @@ function CustomHeatmapSelect({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // xử lý đóng menu khi click ra ngoài vùng dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -70,12 +57,15 @@ function CustomHeatmapSelect({
         setIsOpen(false);
       }
     };
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const selectedLabel =
-    options.find((opt) => opt.value === value)?.label || value;
+    options.find((opt) => opt.value === value)?.label ||
+    value ||
+    "Select Page...";
 
   return (
     <div
@@ -122,7 +112,6 @@ function CustomHeatmapSelect({
   );
 }
 
-// component render giao diện chính
 export default function UserBehaviorHeatmap({
   selectedPage,
   onPageChange,
@@ -135,6 +124,8 @@ export default function UserBehaviorHeatmap({
   onStartDateChange,
   endDate,
   onEndDateChange,
+  pageOptions,
+  interactionOptions,
 }: UserBehaviorHeatmapProps) {
   return (
     <div className="ubh-container">
@@ -147,23 +138,18 @@ export default function UserBehaviorHeatmap({
         </div>
       </div>
 
-      {/* chia layout heatmap và thanh điều khiển */}
       <div className="ubh-layout">
-        {/* khung hiện biểu đồ nhiệt */}
         <div className="ubh-left-panel">
           <div className="ubh-visual-preview">
-            {/* background mock data */}
             <div className="ubh-website-preview">
               <div className="ubh-preview-header"></div>
               <div className="ubh-preview-content">
-                {/* vùng hotspot mô phỏng tương tác người dùng */}
                 <div className="ubh-hotspot header-zone"></div>
                 <div className="ubh-hotspot content-zone"></div>
                 <div className="ubh-hotspot footer-zone"></div>
               </div>
             </div>
 
-            {/* thanh chú thích màu sắc biểu đồ */}
             <div className="ubh-color-scale-wrapper">
               <div className="ubh-color-bar"></div>
               <div className="ubh-color-labels">
@@ -178,14 +164,12 @@ export default function UserBehaviorHeatmap({
           </div>
         </div>
 
-        {/* form điều khiển filter và bảng tóm tắt số liệu */}
         <div className="ubh-right-panel">
           <div className="ubh-control-group">
             <label className="ubh-label">Select Page</label>
-            {/* sử dụng custom dropdown thay cho thẻ select */}
             <CustomHeatmapSelect
               value={selectedPage}
-              options={PAGE_OPTIONS}
+              options={pageOptions}
               onChange={onPageChange}
             />
           </div>
@@ -215,7 +199,6 @@ export default function UserBehaviorHeatmap({
             </div>
           </div>
 
-          {/* cụm nút chọn loại thiết bị */}
           <div className="ubh-control-group">
             <label className="ubh-label">Device</label>
             <div className="ubh-device-toggles">
@@ -242,9 +225,11 @@ export default function UserBehaviorHeatmap({
 
           <div className="ubh-control-group">
             <label className="ubh-label">Interaction Type</label>
-            <div className="ubh-radio-group">
-              {/* lặp để tạo các radio button */}
-              {INTERACTION_OPTIONS.map((type) => (
+            <div
+              className="ubh-radio-group"
+              style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+            >
+              {interactionOptions.map((type) => (
                 <label key={type} className="ubh-radio-label">
                   <div
                     className={`ubh-radio-custom ${interactionType === type ? "checked" : ""}`}
@@ -263,7 +248,6 @@ export default function UserBehaviorHeatmap({
             </div>
           </div>
 
-          {/* hiển thị thẻ thống kê */}
           <div className="ubh-control-group" style={{ marginTop: "16px" }}>
             <label className="ubh-label">Statistics Summary</label>
             <div className="ubh-stats-grid">

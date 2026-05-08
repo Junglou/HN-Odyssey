@@ -1,11 +1,10 @@
 import { useState } from "react";
 import "./RoleManagement.css";
 
-// Icon
-import type {
-  Role,
-  ModulePermission,
-  Permission,
+import {
+  type Role,
+  type ModulePermission,
+  STANDARD_ACTIONS,
 } from "../../../../hooks/portal/UserAndRoles/RoleManagement/useRoleManagement";
 import {
   EditIcon,
@@ -19,41 +18,32 @@ import {
   CheckIcon,
 } from "../../../../assets/icons/RoleManagementIcons";
 
-// props interface
 interface RoleManagementProps {
   data: {
     roles: Role[];
     permissions: ModulePermission[];
   };
   uiState: {
-    selectedRoleId: number | null;
+    selectedRoleId: string | null;
     hasUnsavedChanges: boolean;
     searchTerm: string;
   };
   actions: {
     changeSearch: (val: string) => void;
-    selectRole: (id: number) => void;
-    togglePermission: (
-      moduleId: string,
-      subId: string,
-      action: keyof Permission,
-    ) => void;
+    selectRole: (id: string) => void;
+    togglePermission: (moduleId: string, subId: string, action: string) => void;
     saveChanges: () => void;
     cancelChanges: () => void;
     openModal: (mode: "add" | "edit", role?: Role) => void;
-    deleteRole: (id: number) => void;
+    deleteRole: (id: string) => void;
   };
 }
-
-// Các thao tác check list
-const PERMISSION_ACTIONS = ["view", "create", "edit", "delete"] as const;
 
 export default function RoleManagement({
   data,
   uiState,
   actions,
 }: RoleManagementProps) {
-  // state đóng/mở accordion module
   const [expandedModules, setExpandedModules] = useState<
     Record<string, boolean>
   >({});
@@ -72,7 +62,6 @@ export default function RoleManagement({
 
   return (
     <div className="rm-container">
-      {/* header tổng */}
       <div className="rm-header">
         <div>
           <h1 className="rm-title">Roles Management</h1>
@@ -81,7 +70,6 @@ export default function RoleManagement({
       </div>
 
       <div className="rm-layout">
-        {/* danh sách roles */}
         <div className="rm-left-panel">
           <div className="rm-left-header">
             <h2 className="rm-panel-title">Roles</h2>
@@ -157,7 +145,6 @@ export default function RoleManagement({
           </div>
         </div>
 
-        {/* chi tiết quyền */}
         {uiState.selectedRoleId !== null && (
           <div className="rm-right-panel">
             <div className="rm-right-header">
@@ -187,10 +174,16 @@ export default function RoleManagement({
               </div>
             </div>
 
-            {/* list check phân quyền */}
             <div className="rm-permissions-container">
               {data.permissions.map((module) => {
                 const isExpanded = expandedModules[module.moduleId] !== false;
+
+                // ÉP CỐ ĐỊNH 5 CỘT CHO TẤT CẢ CÁC NHÓM
+                const gridColumnsStyle = {
+                  display: "grid",
+                  gridTemplateColumns: "repeat(5, 1fr)",
+                  gap: "10px",
+                };
 
                 return (
                   <div key={module.moduleId} className="rm-module-card">
@@ -210,11 +203,13 @@ export default function RoleManagement({
                           {module.moduleName}
                         </span>
                       </div>
-                      <div className="rm-perm-headers">
-                        <span>View</span>
-                        <span>Create</span>
-                        <span>Edit</span>
-                        <span>Delete</span>
+
+                      {/* --- RENDER HEADERS LUÔN HIỆN CHỮ OTHER --- */}
+                      <div className="rm-perm-headers" style={gridColumnsStyle}>
+                        {STANDARD_ACTIONS.map((action) => (
+                          <span key={action}>{action}</span>
+                        ))}
+                        <span>OTHER</span>
                       </div>
                     </div>
 
@@ -225,33 +220,130 @@ export default function RoleManagement({
                             <div className="rm-submodule-name">
                               {sub.subName}
                             </div>
-                            <div className="rm-perm-checkboxes">
-                              {PERMISSION_ACTIONS.map((action) => (
-                                <label
-                                  key={action}
-                                  className="rm-checkbox-label"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    className="rm-checkbox"
-                                    checked={sub.permissions[action]}
-                                    onChange={() =>
-                                      actions.togglePermission(
-                                        module.moduleId,
-                                        sub.subId,
+
+                            <div
+                              className="rm-perm-checkboxes"
+                              style={gridColumnsStyle}
+                            >
+                              {/* 1. RENDER 4 CỘT CRUD CHUẨN */}
+                              {STANDARD_ACTIONS.map((action) => {
+                                const isActionAvailable =
+                                  sub.availableActions.includes(action);
+
+                                if (!isActionAvailable) {
+                                  return (
+                                    <span
+                                      key={action}
+                                      className="rm-checkbox-label"
+                                      style={{ visibility: "hidden" }}
+                                    ></span>
+                                  );
+                                }
+
+                                return (
+                                  <label
+                                    key={action}
+                                    className="rm-checkbox-label"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      className="rm-checkbox"
+                                      checked={sub.grantedActions.includes(
                                         action,
-                                      )
+                                      )}
+                                      onChange={() =>
+                                        actions.togglePermission(
+                                          module.moduleId,
+                                          sub.subId,
+                                          action,
+                                        )
+                                      }
+                                    />
+                                    <span className="rm-custom-check">
+                                      <CheckIcon />
+                                    </span>
+                                    <span className="rm-checkbox-text">
+                                      {action}
+                                    </span>
+                                  </label>
+                                );
+                              })}
+
+                              {/* 2. RENDER CỘT OTHER BỔ SUNG */}
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gridTemplateColumns: "1fr",
+                                  gap: "8px",
+                                  alignItems: "flex-start",
+                                }}
+                              >
+                                {module.uniqueOtherActions &&
+                                module.uniqueOtherActions.length > 0 ? (
+                                  module.uniqueOtherActions.map((action) => {
+                                    const isActionAvailable =
+                                      sub.availableActions.includes(action);
+
+                                    // Ẩn checkbox nếu không có quyền này
+                                    if (!isActionAvailable) {
+                                      return (
+                                        <span
+                                          key={action}
+                                          className="rm-checkbox-label"
+                                          style={{
+                                            visibility: "hidden",
+                                            height: "20px",
+                                          }}
+                                        ></span>
+                                      );
                                     }
-                                  />
-                                  <span className="rm-custom-check">
-                                    <CheckIcon />
-                                  </span>
-                                  <span className="rm-checkbox-text">
-                                    {action.charAt(0).toUpperCase() +
-                                      action.slice(1)}
-                                  </span>
-                                </label>
-                              ))}
+
+                                    return (
+                                      <label
+                                        key={action}
+                                        className="rm-checkbox-label"
+                                        style={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "flex-start", // Ép lề trái cực mạnh đè lên CSS cũ
+                                          margin: 0,
+                                        }}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          className="rm-checkbox"
+                                          checked={sub.grantedActions.includes(
+                                            action,
+                                          )}
+                                          onChange={() =>
+                                            actions.togglePermission(
+                                              module.moduleId,
+                                              sub.subId,
+                                              action,
+                                            )
+                                          }
+                                        />
+                                        <span className="rm-custom-check">
+                                          <CheckIcon />
+                                        </span>
+                                        <span className="rm-checkbox-text">
+                                          {action}
+                                        </span>
+                                      </label>
+                                    );
+                                  })
+                                ) : (
+                                  // Khối tàng hình để giữ chuẩn grid 5 cột cho Dashboard / các mục không có OTHER
+                                  <span
+                                    className="rm-checkbox-label"
+                                    style={{
+                                      visibility: "hidden",
+                                      height: "20px",
+                                    }}
+                                  ></span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         ))}

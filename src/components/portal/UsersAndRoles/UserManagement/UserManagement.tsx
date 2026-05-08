@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import "./UserManagement.css";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 
@@ -12,9 +12,11 @@ import {
   ChevronDownSmallIcon,
 } from "../../../../assets/icons/UserManagementIcons";
 import type { User } from "./UserModal";
-import type { BulkAction } from "../../../../hooks/portal/UserAndRoles/UserManagement/useUserManagement";
+import type {
+  BulkAction,
+  DropdownOption,
+} from "../../../../hooks/portal/UserAndRoles/UserManagement/useUserManagement";
 
-// props truyền từ container
 interface UserManagementProps {
   data: User[];
   filters: { search: string; status: string; role: string };
@@ -26,27 +28,25 @@ interface UserManagementProps {
     endIndex: number;
     totalFiltered: number;
   };
+  options: {
+    roles: DropdownOption[];
+    status: DropdownOption[];
+  };
   actions: {
     changeFilter: (key: "search" | "status" | "role", val: string) => void;
     clearFilter: () => void;
     changePage: (page: number) => void;
     changeLimit: (limit: number) => void;
-    selectUser: (id: number) => void;
+    selectUser: (id: string) => void;
     selectAll: (isAll: boolean) => void;
     bulk: (action: BulkAction) => void;
-    toggleStatus: (id: number, status: string) => void;
-    lockUnlock: (id: number, status: string) => void;
-    deleteSingle: (id: number) => void;
+    toggleStatus: (id: string, status: string) => void;
+    lockUnlock: (id: string, status: string) => void;
+    deleteSingle: (id: string) => void;
     openModal: (mode: "add" | "edit" | "view", user?: User) => void;
   };
 }
 
-interface DropdownOption {
-  label: string;
-  value: string;
-}
-
-// component dropdown
 function CustomDropdown({
   value,
   options,
@@ -61,7 +61,6 @@ function CustomDropdown({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // tắt dropdown khi click ngoài vùng dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -76,7 +75,7 @@ function CustomDropdown({
   }, []);
 
   const selectedLabel =
-    options.find((opt) => opt.value === value)?.label || options[0].label;
+    options.find((opt) => opt.value === value)?.label || options[0]?.label;
 
   return (
     <div
@@ -113,35 +112,19 @@ function CustomDropdown({
   );
 }
 
-// data mock bộ lọc
-const STATUS_OPTIONS: DropdownOption[] = [
-  { label: "All Status", value: "Status" },
-  { label: "Active", value: "Active" },
-  { label: "Inactive", value: "Inactive" },
-  { label: "Locked", value: "Locked" },
-];
-
-const ROLE_OPTIONS: DropdownOption[] = [
-  { label: "All Roles", value: "Role" },
-  { label: "Administrator", value: "Administrator" },
-  { label: "Content Manager", value: "Content Manager" },
-  { label: "Sale Staff", value: "Sale Staff" },
-];
-
-// ui chính của bảng người dùng
 export default function UserManagement({
   data,
   filters,
   pagination,
+  options,
   actions,
 }: UserManagementProps) {
-  const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
   const limitRef = useRef<HTMLDivElement>(null);
   useClickOutside(limitRef, () => setIsLimitDropdownOpen(false));
 
   const isAllSelected = data.length > 0 && data.every((user) => user.selected);
-  // biến kiểm tra xem có dòng nào đang được chọn hay không để disable nút
   const hasSelection = data.some((user) => user.selected);
 
   const pageNumbers = Array.from(
@@ -151,7 +134,6 @@ export default function UserManagement({
 
   return (
     <div className="um-container">
-      {/* header và nút tạo mới */}
       <div className="um-header">
         <div>
           <h1 className="um-title">User Management</h1>
@@ -166,9 +148,7 @@ export default function UserManagement({
         </button>
       </div>
 
-      {/* khung trắng bọc ngoài bảng tool */}
       <div className="um-filters-card">
-        {/* thanh search và filter */}
         <div className="um-filters-row">
           <input
             type="text"
@@ -179,13 +159,13 @@ export default function UserManagement({
           />
           <CustomDropdown
             value={filters.status}
-            options={STATUS_OPTIONS}
+            options={options.status}
             onChange={(val) => actions.changeFilter("status", val)}
             className="um-filter-dropdown"
           />
           <CustomDropdown
             value={filters.role}
-            options={ROLE_OPTIONS}
+            options={options.roles}
             onChange={(val) => actions.changeFilter("role", val)}
             className="um-filter-dropdown"
           />
@@ -201,7 +181,6 @@ export default function UserManagement({
           </button>
         </div>
 
-        {/* cụm nút thao tác chọn nhiều */}
         <div className="um-bulk-actions">
           <button
             type="button"
@@ -238,7 +217,6 @@ export default function UserManagement({
           </button>
         </div>
 
-        {/* cuộn ngang cho bảng */}
         <div className="um-table-wrapper">
           <table className="um-table">
             <thead>
@@ -259,7 +237,6 @@ export default function UserManagement({
               </tr>
             </thead>
             <tbody>
-              {/* lặp data ra dòng bảng */}
               {data.length > 0 ? (
                 data.map((user) => (
                   <tr
@@ -303,7 +280,6 @@ export default function UserManagement({
                           <EditIcon stroke="#111827" />
                         </button>
 
-                        {/* nút switch đóng mở trạng thái */}
                         <div
                           className={`um-toggle-switch ${user.status === "Active" ? "on" : ""} ${user.status === "Locked" ? "disabled" : ""}`}
                           onClick={() =>
@@ -329,7 +305,6 @@ export default function UserManagement({
                             <DotsIcon fill="#111827" />
                           </button>
 
-                          {/* menu popup 3 chấm */}
                           {openDropdownId === user.id && (
                             <div
                               className="um-dropdown-menu"
@@ -386,7 +361,6 @@ export default function UserManagement({
           </table>
         </div>
 
-        {/* phân trang */}
         <div className="um-pagination">
           <span>
             Showing{" "}
@@ -396,7 +370,6 @@ export default function UserManagement({
           </span>
 
           <div className="um-page-numbers">
-            {/* nút lùi trang */}
             <button
               type="button"
               className="um-page-num"
@@ -411,7 +384,6 @@ export default function UserManagement({
               &lt;
             </button>
 
-            {/* danh sách các số trang */}
             {pageNumbers.map((num) => (
               <button
                 type="button"
@@ -423,7 +395,6 @@ export default function UserManagement({
               </button>
             ))}
 
-            {/* nút tiến trang */}
             <button
               type="button"
               className="um-page-num"
@@ -448,7 +419,6 @@ export default function UserManagement({
               &gt;
             </button>
 
-            {/* custom dropdown chọn số lượng hiển thị */}
             <div className="um-limit-dropdown" ref={limitRef}>
               <div
                 className={`um-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}

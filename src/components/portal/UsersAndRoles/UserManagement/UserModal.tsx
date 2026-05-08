@@ -2,39 +2,41 @@ import { useState, useRef, useEffect } from "react";
 import "./UserModal.css";
 import { ChevronDownSmallIcon } from "../../../../assets/icons/UserManagementIcons";
 
-// model user chung
 export interface User {
-  id: number;
+  id: string; // Chuyển sang string
   name: string;
   email: string;
+  phone: string;
+  department: string;
   role: string;
   status: string;
   lastLogin: string;
   selected: boolean;
 }
 
-// schema form để trả dữ liệu về component cha
 export interface UserFormData {
   name: string;
   email: string;
-  username: string;
+  phone: string; // Đã đổi từ username sang phone
   password?: string;
   role: string;
+  department: string; // Bổ sung theo Schema BE
   status: string;
+}
+
+interface DropdownOption {
+  label: string;
+  value: string;
 }
 
 interface UserModalProps {
   isOpen: boolean;
   mode: "add" | "edit" | "view";
   initialData: User | null;
+  dynamicRoleOptions: DropdownOption[];
+  dynamicDeptOptions: DropdownOption[];
   onClose: () => void;
   onSubmit: (data: UserFormData) => void;
-}
-
-// --- Component Custom Select dành riêng cho Modal ---
-interface DropdownOption {
-  label: string;
-  value: string;
 }
 
 function CustomModalSelect({
@@ -55,7 +57,6 @@ function CustomModalSelect({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Xử lý click ra ngoài để đóng menu
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -108,56 +109,51 @@ function CustomModalSelect({
   );
 }
 
-// Data mock cho Role
-const ROLE_OPTIONS: DropdownOption[] = [
-  { label: "Administrator", value: "Administrator" },
-  { label: "Content Manager", value: "Content Manager" },
-  { label: "Sale Staff", value: "Sale Staff" },
-];
-
-// modal form popup
 export default function UserModal({
   isOpen,
   mode,
   initialData,
+  dynamicRoleOptions,
+  dynamicDeptOptions,
   onClose,
   onSubmit,
 }: UserModalProps) {
-  // khởi tạo state form (tự động refresh nhờ cơ chế key ở page ngoài)
   const [formData, setFormData] = useState<UserFormData>({
     name: initialData?.name || "",
     email: initialData?.email || "",
-    username: initialData?.email.split("@")[0] || "",
+    phone: initialData?.phone || "",
     password: mode === "add" ? "" : "••••••••",
     role: initialData?.role || "",
+    department: initialData?.department || "",
     status: initialData?.status || "Active",
   });
 
-  // check flag để vô hiệu hóa input
   const isViewOnly = mode === "view";
 
-  // update state theo input text thường
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // update state riêng cho custom dropdown
   const handleCustomSelectChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // validate trước khi trả data ra ngoài
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.role) {
+    if (
+      !formData.name ||
+      !formData.email ||
+      !formData.role ||
+      !formData.phone ||
+      !formData.department
+    ) {
       alert("Vui lòng điền đầy đủ các trường bắt buộc (*)");
       return;
     }
     onSubmit(formData);
   };
 
-  // Switch khóa/kích hoạt tài khoản
   const handleToggleStatus = () => {
     if (!isViewOnly) {
       setFormData((prev) => ({
@@ -191,7 +187,7 @@ export default function UserModal({
               value={formData.name}
               onChange={handleInputChange}
               disabled={isViewOnly}
-              placeholder="Enter full name"
+              placeholder="Ví dụ: Trần Văn A"
               required
             />
           </div>
@@ -206,30 +202,29 @@ export default function UserModal({
               value={formData.email}
               onChange={handleInputChange}
               disabled={isViewOnly}
-              placeholder="Enter email"
+              placeholder="admin@hnodyssey.com"
               required
             />
           </div>
 
-          {/* chia hai cột username và password */}
           <div className="um-form-row">
             <div className="um-form-group">
               <label>
-                Username <span className="req">*</span>
+                Phone Number <span className="req">*</span>
               </label>
               <input
-                name="username"
+                name="phone"
                 type="text"
-                value={formData.username}
+                value={formData.phone}
                 onChange={handleInputChange}
                 disabled={isViewOnly}
-                placeholder="Enter username"
+                placeholder="09..."
                 required
               />
             </div>
             <div className="um-form-group">
               <label>
-                Password <span className="req">*</span>
+                Password {mode === "add" && <span className="req">*</span>}
               </label>
               <input
                 name="password"
@@ -237,28 +232,42 @@ export default function UserModal({
                 value={formData.password}
                 onChange={handleInputChange}
                 disabled={isViewOnly}
-                placeholder="Enter password"
+                placeholder="Ít nhất 8 ký tự, có Hoa, thường, số"
                 required={mode === "add"}
               />
             </div>
           </div>
 
-          <div className="um-form-group">
-            <label>
-              Role <span className="req">*</span>
-            </label>
-            {/* Thay thế thẻ select gốc bằng CustomModalSelect */}
-            <CustomModalSelect
-              name="role"
-              value={formData.role}
-              options={ROLE_OPTIONS}
-              onChange={handleCustomSelectChange}
-              disabled={isViewOnly}
-              placeholder="Select Role"
-            />
+          {/* Dùng Layout Grid cũ chia 2 Dropdown (Role & Dept) ra làm 2 cột tuyệt đẹp */}
+          <div className="um-form-row">
+            <div className="um-form-group">
+              <label>
+                Role <span className="req">*</span>
+              </label>
+              <CustomModalSelect
+                name="role"
+                value={formData.role}
+                options={dynamicRoleOptions}
+                onChange={handleCustomSelectChange}
+                disabled={isViewOnly}
+                placeholder="Select Role"
+              />
+            </div>
+            <div className="um-form-group">
+              <label>
+                Department <span className="req">*</span>
+              </label>
+              <CustomModalSelect
+                name="department"
+                value={formData.department}
+                options={dynamicDeptOptions}
+                onChange={handleCustomSelectChange}
+                disabled={isViewOnly}
+                placeholder="Select Department"
+              />
+            </div>
           </div>
 
-          {/* cụm thông tin trạng thái với toggle ui */}
           <div className="um-form-group">
             <label>{mode === "view" ? "Status" : "Account Status"}</label>
             <div className="um-modal-status-flex">
@@ -272,7 +281,6 @@ export default function UserModal({
             </div>
           </div>
 
-          {/* cụm nút */}
           <div className="um-modal-actions">
             {!isViewOnly ? (
               <>
