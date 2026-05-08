@@ -1,21 +1,20 @@
+// imports
 import { useState, useRef } from "react";
 import "./CouponManagement.css";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
-// icon
 import {
   SearchIcon,
   ChevronDownIcon,
   EditIcon,
   ViewIcon,
 } from "../../../../assets/icons/CouponManagementIcons";
-
 import type {
   CouponRecord,
   CouponStatus,
   DiscountType,
 } from "../../../../hooks/portal/MarketingSuite/CouponManagement/useCouponManagement";
 
-// props
+// types
 interface CouponManagementProps {
   data: CouponRecord[];
   search: string;
@@ -49,6 +48,86 @@ interface CouponManagementProps {
   };
 }
 
+interface DropdownOption {
+  label: string;
+  value: string;
+}
+
+// helpers
+function CustomDropdown({
+  value,
+  options,
+  onChange,
+  prefix = "",
+}: {
+  value: string;
+  options: DropdownOption[];
+  onChange: (val: string) => void;
+  prefix?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [hasOpened, setHasOpened] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useClickOutside(dropdownRef, () => setIsOpen(false));
+
+  const selectedLabel =
+    options.find((opt) => opt.value === value)?.label || value;
+
+  return (
+    <div className="coupon-custom-dropdown" ref={dropdownRef}>
+      <div
+        className={`coupon-dropdown-trigger ${isOpen ? "active" : ""}`}
+        onClick={() => {
+          setIsOpen(!isOpen);
+          if (!hasOpened) setHasOpened(true);
+        }}
+      >
+        <span>
+          {prefix}
+          {selectedLabel}
+        </span>
+        <div className={`coupon-dropdown-arrow ${isOpen ? "open" : ""}`}>
+          <ChevronDownIcon />
+        </div>
+      </div>
+      <div
+        className={`coupon-dropdown-options ${isOpen ? "open" : hasOpened ? "closed" : ""}`}
+      >
+        {options.map((opt) => (
+          <div
+            key={opt.value}
+            className={`coupon-dropdown-option ${value === opt.value ? "active" : ""}`}
+            onClick={() => {
+              onChange(opt.value);
+              setIsOpen(false);
+            }}
+          >
+            {opt.label}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// constants
+const STATUS_OPTIONS: DropdownOption[] = [
+  { label: "All", value: "All" },
+  { label: "Active", value: "Active" },
+  { label: "Inactive", value: "Inactive" },
+  { label: "Scheduled", value: "Scheduled" },
+  { label: "Expired", value: "Expired" },
+  { label: "Draft", value: "Draft" },
+];
+
+const TYPE_OPTIONS: DropdownOption[] = [
+  { label: "All", value: "All" },
+  { label: "Percentage", value: "Percentage" },
+  { label: "Fixed Amount", value: "Fixed Amount" },
+];
+
+// component
 export default function CouponManagement({
   data,
   search,
@@ -59,27 +138,18 @@ export default function CouponManagement({
   actions,
   bulkActions,
 }: CouponManagementProps) {
-  // State quản lý dropdown
-  const [isStatusOpen, setIsStatusOpen] = useState(false);
-  const [isTypeOpen, setIsTypeOpen] = useState(false);
+  // state limit dropdown
   const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
-
-  // Ref xử lý click outside
-  const statusRef = useRef<HTMLDivElement>(null);
-  const typeRef = useRef<HTMLDivElement>(null);
+  const [hasLimitOpened, setHasLimitOpened] = useState(false);
   const limitRef = useRef<HTMLDivElement>(null);
-
-  useClickOutside(statusRef, () => setIsStatusOpen(false));
-  useClickOutside(typeRef, () => setIsTypeOpen(false));
   useClickOutside(limitRef, () => setIsLimitDropdownOpen(false));
 
-  // Trạng thái checkbox tổng
   const isAllSelected =
     data.length > 0 && data.every((r) => selectedIds.has(r.id));
   const isPartiallySelected =
     data.some((r) => selectedIds.has(r.id)) && !isAllSelected;
 
-  // Render badge trạng thái
+  // render helpers
   const renderStatusBadge = (status: CouponStatus) => {
     switch (status) {
       case "Active":
@@ -103,7 +173,6 @@ export default function CouponManagement({
     }
   };
 
-  // Render phạm vi áp dụng
   const renderScope = (scope: CouponRecord["applicableScope"]) => {
     if (scope.isAllProducts) return "All Products";
     const parts = [];
@@ -115,9 +184,9 @@ export default function CouponManagement({
     return parts.length > 0 ? parts.join(", ") : "None";
   };
 
+  // render
   return (
     <div className="coupon-container">
-      {/* Header */}
       <div className="coupon-header">
         <div>
           <h1 className="coupon-title">Coupon Management</h1>
@@ -134,11 +203,9 @@ export default function CouponManagement({
         </button>
       </div>
 
-      {/* Bộ lọc và thanh công cụ */}
       <div className="coupon-filters-card">
         <div className="coupon-toolbar">
           <div className="coupon-filters-row">
-            {/* Thanh tìm kiếm */}
             <div className="coupon-search-wrapper">
               <SearchIcon />
               <input
@@ -150,75 +217,23 @@ export default function CouponManagement({
               />
             </div>
 
-            {/* Dropdown trạng thái */}
-            <div className="coupon-custom-dropdown" ref={statusRef}>
-              <div
-                className={`coupon-dropdown-trigger ${isStatusOpen ? "active" : ""}`}
-                onClick={() => setIsStatusOpen(!isStatusOpen)}
-              >
-                <span>
-                  Status: {statusFilter === "All" ? "All" : statusFilter}
-                </span>
-                <ChevronDownIcon />
-              </div>
-              {isStatusOpen && (
-                <div className="coupon-dropdown-options">
-                  {(
-                    [
-                      "All",
-                      "Active",
-                      "Inactive",
-                      "Scheduled",
-                      "Expired",
-                      "Draft",
-                    ] as const
-                  ).map((opt) => (
-                    <div
-                      key={opt}
-                      className={`coupon-dropdown-option ${statusFilter === opt ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changeStatusFilter(opt);
-                        setIsStatusOpen(false);
-                      }}
-                    >
-                      {opt}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <CustomDropdown
+              value={statusFilter}
+              options={STATUS_OPTIONS}
+              onChange={(val) =>
+                actions.changeStatusFilter(val as CouponStatus | "All")
+              }
+              prefix="Status: "
+            />
 
-            {/* Dropdown loại giảm giá */}
-            <div className="coupon-custom-dropdown" ref={typeRef}>
-              <div
-                className={`coupon-dropdown-trigger ${isTypeOpen ? "active" : ""}`}
-                onClick={() => setIsTypeOpen(!isTypeOpen)}
-              >
-                <span>
-                  Type:{" "}
-                  {discountTypeFilter === "All" ? "All" : discountTypeFilter}
-                </span>
-                <ChevronDownIcon />
-              </div>
-              {isTypeOpen && (
-                <div className="coupon-dropdown-options">
-                  {(["All", "Percentage", "Fixed Amount"] as const).map(
-                    (opt) => (
-                      <div
-                        key={opt}
-                        className={`coupon-dropdown-option ${discountTypeFilter === opt ? "active" : ""}`}
-                        onClick={() => {
-                          actions.changeDiscountTypeFilter(opt);
-                          setIsTypeOpen(false);
-                        }}
-                      >
-                        {opt}
-                      </div>
-                    ),
-                  )}
-                </div>
-              )}
-            </div>
+            <CustomDropdown
+              value={discountTypeFilter}
+              options={TYPE_OPTIONS}
+              onChange={(val) =>
+                actions.changeDiscountTypeFilter(val as DiscountType | "All")
+              }
+              prefix="Type: "
+            />
 
             <button
               type="button"
@@ -229,7 +244,6 @@ export default function CouponManagement({
             </button>
           </div>
 
-          {/* Thao tác hàng loạt */}
           <div className="coupon-bulk-actions">
             <button
               type="button"
@@ -258,7 +272,6 @@ export default function CouponManagement({
           </div>
         </div>
 
-        {/* Bảng dữ liệu */}
         <div className="coupon-table-wrapper">
           <table className="coupon-table">
             <thead>
@@ -311,11 +324,9 @@ export default function CouponManagement({
                     </td>
                     <td data-label="Discount Type">{record.discountType}</td>
                     <td data-label="Discount Value">{record.discountValue}</td>
-
                     <td data-label="Applicable Scope">
                       {renderScope(record.applicableScope)}
                     </td>
-
                     <td data-label="Usage Limit">
                       {record.perCustomerLimit || record.usedCount}/
                       {record.totalUses}
@@ -326,7 +337,6 @@ export default function CouponManagement({
                     <td data-label="Start Date">{record.startDate}</td>
                     <td data-label="End Date">{record.endDate}</td>
                     <td data-label="Actions">
-                      {/* Cụm nút hành động */}
                       <div className="coupon-row-actions">
                         <button
                           type="button"
@@ -359,7 +369,6 @@ export default function CouponManagement({
           </table>
         </div>
 
-        {/* Phân trang */}
         <div className="coupon-pagination">
           <span className="coupon-pagination-info">
             Showing{" "}
@@ -400,35 +409,37 @@ export default function CouponManagement({
               &gt;
             </button>
 
-            {/* Dropdown */}
             <div className="coupon-limit-dropdown" ref={limitRef}>
               <div
                 className={`coupon-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}
-                onClick={() => setIsLimitDropdownOpen(!isLimitDropdownOpen)}
+                onClick={() => {
+                  setIsLimitDropdownOpen(!isLimitDropdownOpen);
+                  if (!hasLimitOpened) setHasLimitOpened(true);
+                }}
               >
                 <span>{pagination.limit} / page</span>
                 <div
-                  className={`coupon-limit-icon ${isLimitDropdownOpen ? "open" : ""}`}
+                  className={`coupon-dropdown-arrow ${isLimitDropdownOpen ? "open" : ""}`}
                 >
                   <ChevronDownIcon />
                 </div>
               </div>
-              {isLimitDropdownOpen && (
-                <div className="coupon-limit-options">
-                  {[10, 20, 50].map((val) => (
-                    <div
-                      key={val}
-                      className={`coupon-limit-option ${pagination.limit === val ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changeLimit(val);
-                        setIsLimitDropdownOpen(false);
-                      }}
-                    >
-                      {val} / page
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div
+                className={`coupon-limit-options ${isLimitDropdownOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
+              >
+                {[10, 20, 50].map((val) => (
+                  <div
+                    key={val}
+                    className={`coupon-limit-option ${pagination.limit === val ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changeLimit(val);
+                      setIsLimitDropdownOpen(false);
+                    }}
+                  >
+                    {val} / page
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

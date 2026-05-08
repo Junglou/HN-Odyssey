@@ -58,11 +58,15 @@ export default function BannerManagement({
 }: BannerManagementProps) {
   // quản lý trạng thái mở rộng của bộ lọc
   const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const [hasStatusOpened, setHasStatusOpened] = useState(false);
   const [isPositionOpen, setIsPositionOpen] = useState(false);
+  const [hasPositionOpened, setHasPositionOpened] = useState(false);
   const [isLimitOpen, setIsLimitOpen] = useState(false);
+  const [hasLimitOpened, setHasLimitOpened] = useState(false);
+
   const [openActionId, setOpenActionId] = useState<string | null>(null);
 
-  // xử lý đóng dropdown khi click ra ngoài
+  // clickoutside
   const statusRef = useRef<HTMLDivElement>(null);
   const positionRef = useRef<HTMLDivElement>(null);
   const limitRef = useRef<HTMLDivElement>(null);
@@ -78,11 +82,7 @@ export default function BannerManagement({
     data.length > 0 && data.every((r) => selectedIds.includes(r.id));
   const isPartiallySelected =
     data.some((r) => selectedIds.includes(r.id)) && !isAllSelected;
-
-  // lấy ngày hôm nay chuẩn ISO để đối chiếu thời gian
   const todayDate = new Date().toISOString().split("T")[0];
-
-  // render chấm màu và text trạng thái
   const renderStatus = (status: BannerStatus, isExpired: boolean) => {
     let statusClass = "";
     let displayText = status;
@@ -141,37 +141,43 @@ export default function BannerManagement({
             <div className="bm-custom-dropdown" ref={statusRef}>
               <div
                 className={`bm-dropdown-trigger ${isStatusOpen ? "active" : ""}`}
-                onClick={() => setIsStatusOpen(!isStatusOpen)}
+                onClick={() => {
+                  setIsStatusOpen(!isStatusOpen);
+                  if (!hasStatusOpened) setHasStatusOpened(true);
+                }}
               >
                 <span>{statusFilter === "All" ? "Status" : statusFilter}</span>
                 <ChevronDownSmallIcon
                   className={isStatusOpen ? "rotated" : ""}
                 />
               </div>
-              {isStatusOpen && (
-                <div className="bm-dropdown-options">
-                  {(["All", "Active", "Inactive", "Pending"] as const).map(
-                    (opt) => (
-                      <div
-                        key={opt}
-                        className={`bm-dropdown-option ${statusFilter === opt ? "active" : ""}`}
-                        onClick={() => {
-                          actions.changeStatusFilter(opt);
-                          setIsStatusOpen(false);
-                        }}
-                      >
-                        {opt}
-                      </div>
-                    ),
-                  )}
-                </div>
-              )}
+              <div
+                className={`bm-dropdown-options ${isStatusOpen ? "open" : hasStatusOpened ? "closed" : ""}`}
+              >
+                {(["All", "Active", "Inactive", "Pending"] as const).map(
+                  (opt) => (
+                    <div
+                      key={opt}
+                      className={`bm-dropdown-option ${statusFilter === opt ? "active" : ""}`}
+                      onClick={() => {
+                        actions.changeStatusFilter(opt);
+                        setIsStatusOpen(false);
+                      }}
+                    >
+                      {opt}
+                    </div>
+                  ),
+                )}
+              </div>
             </div>
 
             <div className="bm-custom-dropdown" ref={positionRef}>
               <div
                 className={`bm-dropdown-trigger ${isPositionOpen ? "active" : ""}`}
-                onClick={() => setIsPositionOpen(!isPositionOpen)}
+                onClick={() => {
+                  setIsPositionOpen(!isPositionOpen);
+                  if (!hasPositionOpened) setHasPositionOpened(true);
+                }}
               >
                 <span>
                   {positionFilter === "All" ? "Position" : positionFilter}
@@ -180,24 +186,24 @@ export default function BannerManagement({
                   className={isPositionOpen ? "rotated" : ""}
                 />
               </div>
-              {isPositionOpen && (
-                <div className="bm-dropdown-options">
-                  {(
-                    ["All", "Homepage Slider", "Category", "Promotion"] as const
-                  ).map((opt) => (
-                    <div
-                      key={opt}
-                      className={`bm-dropdown-option ${positionFilter === opt ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changePositionFilter(opt);
-                        setIsPositionOpen(false);
-                      }}
-                    >
-                      {opt}
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div
+                className={`bm-dropdown-options ${isPositionOpen ? "open" : hasPositionOpened ? "closed" : ""}`}
+              >
+                {(
+                  ["All", "Homepage Slider", "Category", "Promotion"] as const
+                ).map((opt) => (
+                  <div
+                    key={opt}
+                    className={`bm-dropdown-option ${positionFilter === opt ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changePositionFilter(opt);
+                      setIsPositionOpen(false);
+                    }}
+                  >
+                    {opt}
+                  </div>
+                ))}
+              </div>
             </div>
 
             <button
@@ -349,7 +355,6 @@ export default function BannerManagement({
                             ></button>
                           </div>
 
-                          {/* Khối bọc Menu 3 chấm được đồng bộ từ ProductManagement */}
                           <div
                             className={`bm-action-dropdown-wrapper ${openActionId === record.id ? "is-open" : ""}`}
                             ref={
@@ -445,33 +450,36 @@ export default function BannerManagement({
               &gt;
             </button>
 
-            {/* dropdown giới hạn số lượng bản ghi hiển thị */}
+            {/* pagination */}
             <div className="bm-limit-dropdown" ref={limitRef}>
               <div
                 className={`bm-limit-trigger ${isLimitOpen ? "active" : ""}`}
-                onClick={() => setIsLimitOpen(!isLimitOpen)}
+                onClick={() => {
+                  setIsLimitOpen(!isLimitOpen);
+                  if (!hasLimitOpened) setHasLimitOpened(true);
+                }}
               >
                 <span>{pagination.limit} / page</span>
                 <ChevronDownSmallIcon
                   className={isLimitOpen ? "rotated" : ""}
                 />
               </div>
-              {isLimitOpen && (
-                <div className="bm-limit-options">
-                  {[10, 20, 50].map((val) => (
-                    <div
-                      key={val}
-                      className={`bm-limit-option ${pagination.limit === val ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changeLimit(val);
-                        setIsLimitOpen(false);
-                      }}
-                    >
-                      {val} / page
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div
+                className={`bm-limit-options ${isLimitOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
+              >
+                {[10, 20, 50].map((val) => (
+                  <div
+                    key={val}
+                    className={`bm-limit-option ${pagination.limit === val ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changeLimit(val);
+                      setIsLimitOpen(false);
+                    }}
+                  >
+                    {val} / page
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

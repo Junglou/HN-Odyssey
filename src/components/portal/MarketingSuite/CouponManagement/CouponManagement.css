@@ -32,7 +32,7 @@
 
 .coupon-breadcrumb {
   font-size: clamp(0.75rem, 1vw, 0.85rem);
-  color: #666;
+  color: #6b7280;
   margin: 0;
 }
 
@@ -50,7 +50,7 @@
   justify-content: center;
   gap: 8px;
   white-space: nowrap;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease;
   font-family: inherit;
 }
 
@@ -117,13 +117,12 @@
 
 .coupon-filter-input:hover,
 .coupon-filter-input:focus {
-  border-color: #000000;
-  outline: none;
+  border-color: #111827;
 }
 
 /* Custom dropdown */
 .coupon-custom-dropdown {
-  flex: 1 1 130px;
+  flex: 1 1 140px;
   position: relative;
   font-family: inherit;
   font-size: clamp(0.85rem, 1vw, 0.95rem);
@@ -138,7 +137,7 @@
   border: 1px solid #d1d5db;
   border-radius: 8px;
   background-color: #fff;
-  color: #111827;
+  color: #374151;
   cursor: pointer;
   transition: border-color 0.2s;
   height: 100%;
@@ -148,13 +147,24 @@
 
 .coupon-dropdown-trigger.active,
 .coupon-dropdown-trigger:hover {
-  border-color: #000000;
+  border-color: #111827;
 }
 
-.coupon-dropdown-trigger svg {
+.coupon-dropdown-arrow {
+  display: flex;
+  align-items: center;
+  transition: transform 0.2s ease;
   margin-left: 8px;
+  color: inherit;
+}
+
+.coupon-dropdown-arrow svg {
   width: 16px;
   height: 16px;
+}
+
+.coupon-dropdown-arrow.open {
+  transform: rotate(180deg);
 }
 
 .coupon-dropdown-options {
@@ -168,8 +178,20 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 100;
   overflow: hidden;
-  animation: cm-slideFadeIn 0.2s ease-out forwards;
   transform-origin: top center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+}
+
+.coupon-dropdown-options.open {
+  pointer-events: auto;
+  animation: cm-slideFadeDown 0.2s ease-out forwards;
+}
+
+.coupon-dropdown-options.closed {
+  pointer-events: none;
+  animation: cm-slideFadeUp 0.2s ease-out forwards;
 }
 
 .coupon-dropdown-option {
@@ -181,11 +203,12 @@
 
 .coupon-dropdown-option:hover {
   background-color: #f3f4f6;
+  color: #111827;
 }
 
 .coupon-dropdown-option.active {
-  background-color: #e9e9e9;
-  color: #000000;
+  background-color: #e5e7eb;
+  color: #111827;
   font-weight: 600;
 }
 
@@ -193,7 +216,7 @@
 .coupon-btn-clear {
   flex: 1 1 auto;
   padding: clamp(8px, 1.2vw, 10px) 20px;
-  background-color: #fff;
+  background-color: #ffffff;
   border: 1px solid #d1d5db;
   border-radius: 8px;
   font-weight: 600;
@@ -207,7 +230,7 @@
 
 .coupon-btn-clear:hover {
   background-color: #f9fafb;
-  border-color: #000000;
+  border-color: #111827;
   color: #111827;
 }
 
@@ -226,7 +249,7 @@
 
 .coupon-btn-bulk {
   padding: clamp(6px, 1vw, 8px) clamp(12px, 1.5vw, 16px);
-  background-color: #fff;
+  background-color: #ffffff;
   border: 1px solid #d1d5db;
   border-radius: 6px;
   font-weight: 600;
@@ -248,19 +271,20 @@
 }
 
 .coupon-btn-bulk:hover:not(:disabled) {
-  background-color: #f9fafb;
-  border-color: #000000;
+  background-color: #f3f4f6;
+  border-color: #111827;
+  color: #111827;
 }
 
 .coupon-btn-bulk.danger {
-  background-color: #e1251b;
+  background-color: #ef4444;
   color: white;
-  border-color: #e1251b;
+  border-color: #ef4444;
 }
 
 .coupon-btn-bulk.danger:hover:not(:disabled) {
-  background-color: #c91f16;
-  border-color: #c91f16;
+  background-color: #dc2626;
+  border-color: #dc2626;
 }
 
 .coupon-btn-bulk:disabled {
@@ -309,17 +333,18 @@
 }
 
 .coupon-table tr:nth-child(even) {
-  background-color: #fafafa;
+  background-color: #fcfcfc;
 }
 
 .coupon-table tr.coupon-selected-row td {
-  background-color: #f5e1cd;
+  background-color: #faebd7;
 }
 
 .coupon-checkbox {
   width: 16px;
   height: 16px;
   cursor: pointer;
+  accent-color: #111827;
 }
 
 .coupon-text-strong {
@@ -389,15 +414,12 @@
 
 .coupon-icon-btn:hover {
   background-color: #f3f4f6;
-  border-color: #000000;
+  border-color: #111827;
+  color: #111827;
 }
 
 .coupon-icon-btn:focus {
   outline: none;
-}
-
-.coupon-icon-btn:focus:not(:hover) {
-  border-color: #d1d5db;
 }
 
 .coupon-icon-btn svg {
@@ -410,19 +432,7 @@
 .coupon-empty-state {
   text-align: center;
   padding: 30px;
-  color: #666;
-}
-
-/* animation */
-@keyframes cm-slideFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  color: #6b7280;
 }
 
 /* Phân trang */
@@ -462,12 +472,13 @@
 }
 
 .coupon-page-num.active {
-  background-color: #f3f4f6;
+  background-color: #111827;
+  color: #ffffff;
   font-weight: 700;
 }
 
 .coupon-page-num:hover:not(.active):not(:disabled) {
-  background-color: #f9fafb;
+  background-color: #f3f4f6;
 }
 
 .coupon-page-num:disabled {
@@ -494,7 +505,7 @@
   background-color: #fff;
   color: #374151;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+  transition: all 0.2s ease;
   box-sizing: border-box;
   font-weight: 500;
 }
@@ -502,19 +513,7 @@
 .coupon-limit-trigger:hover,
 .coupon-limit-trigger.active {
   border-color: #111827;
-  background-color: #f9fafb;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
   color: #111827;
-}
-
-.coupon-limit-icon {
-  display: flex;
-  align-items: center;
-  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
-}
-
-.coupon-limit-icon.open {
-  transform: rotate(180deg);
 }
 
 .coupon-limit-options {
@@ -528,8 +527,20 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   z-index: 100;
   overflow: hidden;
-  animation: cm-slideFadeDownLimit 0.25s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
   transform-origin: top center;
+}
+
+.coupon-limit-options.open {
+  pointer-events: auto;
+  animation: cm-slideFadeDown 0.2s ease-out forwards;
+}
+
+.coupon-limit-options.closed {
+  pointer-events: none;
+  animation: cm-slideFadeUp 0.2s ease-out forwards;
 }
 
 .coupon-limit-option {
@@ -543,7 +554,6 @@
 .coupon-limit-option:hover {
   background-color: #f3f4f6;
   color: #111827;
-  padding-left: 20px;
 }
 
 .coupon-limit-option.active {
@@ -552,7 +562,8 @@
   font-weight: 700;
 }
 
-@keyframes cm-slideFadeDownLimit {
+/* Animations */
+@keyframes cm-slideFadeDown {
   from {
     opacity: 0;
     transform: translateY(-10px);
@@ -560,5 +571,16 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes cm-slideFadeUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
   }
 }

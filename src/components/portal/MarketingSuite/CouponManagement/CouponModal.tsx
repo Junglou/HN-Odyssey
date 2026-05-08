@@ -3,6 +3,7 @@ import "./CouponModal.css";
 import {
   ArrowLeftIcon,
   CloseIcon,
+  ChevronDownIcon,
 } from "../../../../assets/icons/CouponManagementIcons";
 import type {
   CouponRecord,
@@ -56,6 +57,75 @@ const defaultFormData: CouponFormData = {
   },
   isDraft: false,
 };
+
+const DISCOUNT_OPTIONS = [
+  { label: "Percentage - %", value: "Percentage" },
+  { label: "Fixed Amount - $", value: "Fixed Amount" },
+];
+
+function CustomSelect({
+  value,
+  options,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  options: { label: string; value: string }[];
+  onChange: (val: string) => void;
+  disabled?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [hasOpened, setHasOpened] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setIsOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedLabel = options.find((o) => o.value === value)?.label || value;
+
+  return (
+    <div
+      className={`coupon-custom-select ${disabled ? "disabled" : ""}`}
+      ref={ref}
+    >
+      <div
+        className={`coupon-select-trigger ${isOpen ? "active" : ""}`}
+        onClick={() => {
+          if (disabled) return;
+          setIsOpen(!isOpen);
+          if (!hasOpened) setHasOpened(true);
+        }}
+      >
+        <span>{selectedLabel}</span>
+        <div className={`coupon-dropdown-arrow ${isOpen ? "open" : ""}`}>
+          <ChevronDownIcon />
+        </div>
+      </div>
+      <div
+        className={`coupon-select-options ${isOpen ? "open" : hasOpened ? "closed" : ""}`}
+      >
+        {options.map((opt) => (
+          <div
+            key={opt.value}
+            className={`coupon-select-item ${value === opt.value ? "selected" : ""}`}
+            onClick={() => {
+              onChange(opt.value);
+              setIsOpen(false);
+            }}
+          >
+            {opt.label}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // Component dropdown
 function MultiSelectDropdown({
@@ -165,9 +235,36 @@ function MultiSelectDropdown({
 
 // Component chính
 export default function CouponModal(props: CouponModalProps) {
-  if (!props.isOpen) return null;
+  const [shouldRender, setShouldRender] = useState(props.isOpen);
+  const [isClosing, setIsClosing] = useState(false);
+
+  if (props.isOpen && !shouldRender) {
+    setShouldRender(true);
+    setIsClosing(false);
+  }
+
+  useEffect(() => {
+    if (!props.isOpen && shouldRender) {
+      const startClosingTimer = setTimeout(() => {
+        setIsClosing(true);
+      }, 0);
+
+      const unmountTimer = setTimeout(() => {
+        setShouldRender(false);
+        setIsClosing(false);
+      }, 300);
+
+      return () => {
+        clearTimeout(startClosingTimer);
+        clearTimeout(unmountTimer);
+      };
+    }
+  }, [props.isOpen, shouldRender]);
+
+  if (!shouldRender) return null;
+
   const componentKey = props.mode === "add" ? "add-new" : props.initialData?.id;
-  return <ModalContent key={componentKey} {...props} />;
+  return <ModalContent key={componentKey} {...props} isClosing={isClosing} />;
 }
 
 function ModalContent({
@@ -175,7 +272,8 @@ function ModalContent({
   initialData,
   onClose,
   onSubmit,
-}: Omit<CouponModalProps, "isOpen">) {
+  isClosing,
+}: Omit<CouponModalProps, "isOpen"> & { isClosing?: boolean }) {
   // Khởi tạo state
   const [formData, setFormData] = useState<CouponFormData>(() => {
     if ((mode === "edit" || mode === "view") && initialData) {
@@ -287,8 +385,11 @@ function ModalContent({
   return (
     <>
       {/* Overlay */}
-      <div className="coupon-modal-overlay" onClick={onClose}></div>
-      <div className="coupon-modal-container">
+      <div
+        className={`coupon-modal-overlay ${isClosing ? "closing" : ""}`}
+        onClick={onClose}
+      ></div>
+      <div className={`coupon-modal-container ${isClosing ? "closing" : ""}`}>
         <form onSubmit={handleSubmit} className="coupon-modal-form">
           {/* Header */}
           <div className="coupon-modal-header">
@@ -322,17 +423,14 @@ function ModalContent({
 
             <div className="coupon-form-group">
               <label className="coupon-form-label">Discount Type</label>
-              <select
-                className="coupon-form-select"
+              <CustomSelect
                 value={formData.discountType}
-                onChange={(e) =>
-                  handleChange("discountType", e.target.value as DiscountType)
+                options={DISCOUNT_OPTIONS}
+                onChange={(val) =>
+                  handleChange("discountType", val as DiscountType)
                 }
                 disabled={isViewMode}
-              >
-                <option value="Percentage">Percentage - %</option>
-                <option value="Fixed Amount">Fixed Amount - $</option>
-              </select>
+              />
             </div>
 
             <div className="coupon-form-row">

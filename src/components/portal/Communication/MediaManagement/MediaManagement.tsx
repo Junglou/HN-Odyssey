@@ -53,39 +53,36 @@ export default function MediaManagement({
   pagination,
   actions,
 }: MediaManagementProps) {
-  // quản lý trạng thái đóng mở của các dropdown bộ lọc
+  // dropdown state
   const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const [hasStatusOpened, setHasStatusOpened] = useState(false);
   const [isTypeOpen, setIsTypeOpen] = useState(false);
+  const [hasTypeOpened, setHasTypeOpened] = useState(false);
   const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
+  const [hasLimitOpened, setHasLimitOpened] = useState(false);
 
-  // trạng thái kéo thả file
   const [isDragging, setIsDragging] = useState(false);
 
-  // tham chiếu để xử lý click outside cho dropdown
   const statusRef = useRef<HTMLDivElement>(null);
   const typeRef = useRef<HTMLDivElement>(null);
   const limitRef = useRef<HTMLDivElement>(null);
 
-  // tham chiếu tới các input file ẩn
   const fileInputRef = useRef<HTMLInputElement>(null);
   const replaceFileInputRef = useRef<HTMLInputElement>(null);
 
-  // lưu trữ id của phương tiện đang được yêu cầu thay thế
   const [replacingId, setReplacingId] = useState<string | null>(null);
 
-  // đăng ký sự kiện click outside
+  // click outside
   useClickOutside(statusRef, () => setIsStatusOpen(false));
   useClickOutside(typeRef, () => setIsTypeOpen(false));
   useClickOutside(limitRef, () => setIsLimitDropdownOpen(false));
 
-  // kích hoạt thẻ input file ẩn khi người dùng bấm nút upload
   const triggerFileInput = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
 
-  // xử lý hiệu ứng kéo file đè lên dropzone
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -98,7 +95,6 @@ export default function MediaManagement({
     setIsDragging(false);
   };
 
-  // xử lý khi thả file vào dropzone, truyền toàn bộ danh sách file vào hàm mở drawer
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -110,13 +106,11 @@ export default function MediaManagement({
     }
   };
 
-  // xử lý chọn file từ hộp thoại hệ thống, truyền toàn bộ danh sách file
   const handleFileInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
       actions.openUploadDrawer(files);
     }
-    // reset giá trị để có thể chọn lại chính file đó nếu cần
     e.target.value = "";
   };
 
@@ -188,61 +182,67 @@ export default function MediaManagement({
             <div className="mm-custom-dropdown" ref={statusRef}>
               <div
                 className="mm-dropdown-trigger"
-                onClick={() => setIsStatusOpen(!isStatusOpen)}
+                onClick={() => {
+                  setIsStatusOpen(!isStatusOpen);
+                  if (!hasStatusOpened) setHasStatusOpened(true);
+                }}
               >
                 <span>{statusFilter === "All" ? "Status" : statusFilter}</span>
                 <ChevronDownSmallIcon
                   className={`mm-dropdown-arrow ${isStatusOpen ? "open" : ""}`}
                 />
               </div>
-              {isStatusOpen && (
-                <div className="mm-dropdown-options">
-                  {(["All", "Published", "Draft", "Hidden"] as const).map(
-                    (opt) => (
-                      <div
-                        key={opt}
-                        className={`mm-dropdown-option ${statusFilter === opt ? "active" : ""}`}
-                        onClick={() => {
-                          actions.changeStatusFilter(opt);
-                          setIsStatusOpen(false);
-                        }}
-                      >
-                        {opt}
-                      </div>
-                    ),
-                  )}
-                </div>
-              )}
+              <div
+                className={`mm-dropdown-options ${isStatusOpen ? "open" : hasStatusOpened ? "closed" : ""}`}
+              >
+                {(["All", "Published", "Draft", "Hidden"] as const).map(
+                  (opt) => (
+                    <div
+                      key={opt}
+                      className={`mm-dropdown-option ${statusFilter === opt ? "active" : ""}`}
+                      onClick={() => {
+                        actions.changeStatusFilter(opt);
+                        setIsStatusOpen(false);
+                      }}
+                    >
+                      {opt}
+                    </div>
+                  ),
+                )}
+              </div>
             </div>
 
             <div className="mm-custom-dropdown" ref={typeRef}>
               <div
                 className="mm-dropdown-trigger"
-                onClick={() => setIsTypeOpen(!isTypeOpen)}
+                onClick={() => {
+                  setIsTypeOpen(!isTypeOpen);
+                  if (!hasTypeOpened) setHasTypeOpened(true);
+                }}
               >
                 <span>{typeFilter === "All" ? "Media Type" : typeFilter}</span>
                 <ChevronDownSmallIcon
                   className={`mm-dropdown-arrow ${isTypeOpen ? "open" : ""}`}
                 />
               </div>
-              {isTypeOpen && (
-                <div className="mm-dropdown-options">
-                  {(["All", "Category", "Product", "Variant"] as const).map(
-                    (opt) => (
-                      <div
-                        key={opt}
-                        className={`mm-dropdown-option ${typeFilter === opt ? "active" : ""}`}
-                        onClick={() => {
-                          actions.changeTypeFilter(opt);
-                          setIsTypeOpen(false);
-                        }}
-                      >
-                        {opt}
-                      </div>
-                    ),
-                  )}
-                </div>
-              )}
+              <div
+                className={`mm-dropdown-options ${isTypeOpen ? "open" : hasTypeOpened ? "closed" : ""}`}
+              >
+                {(["All", "Category", "Product", "Variant"] as const).map(
+                  (opt) => (
+                    <div
+                      key={opt}
+                      className={`mm-dropdown-option ${typeFilter === opt ? "active" : ""}`}
+                      onClick={() => {
+                        actions.changeTypeFilter(opt);
+                        setIsTypeOpen(false);
+                      }}
+                    >
+                      {opt}
+                    </div>
+                  ),
+                )}
+              </div>
             </div>
 
             <button
@@ -439,7 +439,10 @@ export default function MediaManagement({
             <div className="mm-limit-dropdown" ref={limitRef}>
               <div
                 className={`mm-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}
-                onClick={() => setIsLimitDropdownOpen(!isLimitDropdownOpen)}
+                onClick={() => {
+                  setIsLimitDropdownOpen(!isLimitDropdownOpen);
+                  if (!hasLimitOpened) setHasLimitOpened(true);
+                }}
               >
                 <span>{pagination.limit} / page</span>
                 <div
@@ -448,22 +451,22 @@ export default function MediaManagement({
                   <ChevronDownSmallIcon />
                 </div>
               </div>
-              {isLimitDropdownOpen && (
-                <div className="mm-limit-options">
-                  {[10, 20, 50].map((val) => (
-                    <div
-                      key={val}
-                      className={`mm-limit-option ${pagination.limit === val ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changeLimit(val);
-                        setIsLimitDropdownOpen(false);
-                      }}
-                    >
-                      {val} / page
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div
+                className={`mm-limit-options ${isLimitDropdownOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
+              >
+                {[10, 20, 50].map((val) => (
+                  <div
+                    key={val}
+                    className={`mm-limit-option ${pagination.limit === val ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changeLimit(val);
+                      setIsLimitDropdownOpen(false);
+                    }}
+                  >
+                    {val} / page
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

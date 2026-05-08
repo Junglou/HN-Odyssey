@@ -1,3 +1,4 @@
+// imports
 import { useState } from "react";
 import "./RoleModal.css";
 import type {
@@ -6,6 +7,7 @@ import type {
 } from "../../../../hooks/portal/UserAndRoles/RoleManagement/useRoleManagement";
 import { CloseIcon } from "../../../../assets/icons/RoleManagementIcons";
 
+// types
 interface RoleModalProps {
   isOpen: boolean;
   mode: "add" | "edit";
@@ -14,21 +16,31 @@ interface RoleModalProps {
   onSubmit: (data: RoleFormData) => void;
 }
 
-export default function RoleModal({
-  isOpen,
+// component wrapper (xử lý reset state tự động)
+export default function RoleModal(props: RoleModalProps) {
+  if (!props.isOpen) return null;
+  const modalKey =
+    props.mode === "add" ? "add-role" : `edit-${props.initialData?.id}`;
+  return <RoleModalContent key={modalKey} {...props} />;
+}
+
+// sub-component (nội dung chính)
+function RoleModalContent({
   mode,
   initialData,
   onClose,
   onSubmit,
-}: RoleModalProps) {
-  // tự động thiết lập lại state form khi initialData thay đổi
+}: Omit<RoleModalProps, "isOpen">) {
+  // state
   const [formData, setFormData] = useState<RoleFormData>({
     name: initialData?.name || "",
     status: initialData?.status || "Active",
   });
 
-  if (!isOpen) return null;
+  // Điều kiện kích hoạt nút Submit
+  const isValid = formData.name.trim().length > 0;
 
+  // handlers
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({ ...prev, name: e.target.value }));
   };
@@ -43,16 +55,22 @@ export default function RoleModal({
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) return;
+    if (!isValid) return;
     onSubmit(formData);
   };
 
+  // render
   return (
-    <div className="rm-modal-overlay">
+    <div
+      className="rm-modal-overlay"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div className="rm-modal-box">
         <div className="rm-modal-header">
           <h2 className="rm-modal-title">
-            {mode === "add" ? "Add Role" : "Edit Role"}
+            {mode === "add" ? "Create New Role" : "Edit Role Settings"}
           </h2>
           <button
             type="button"
@@ -92,7 +110,11 @@ export default function RoleModal({
           </div>
 
           <div className="rm-modal-actions">
-            <button type="submit" className="rm-btn-modal-submit">
+            <button
+              type="submit"
+              className={`rm-btn-modal-submit ${isValid ? "active" : "disabled"}`}
+              disabled={!isValid}
+            >
               {mode === "add" ? "Create Role" : "Save Role"}
             </button>
             <button

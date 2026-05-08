@@ -45,7 +45,9 @@ function BannerDrawerContent({
   });
 
   const [isPosOpen, setIsPosOpen] = useState(false);
+  const [hasPosOpened, setHasPosOpened] = useState(false);
   const [isCatOpen, setIsCatOpen] = useState(false);
+  const [hasCatOpened, setHasCatOpened] = useState(false);
 
   const posRef = useRef<HTMLDivElement>(null);
   const catRef = useRef<HTMLDivElement>(null);
@@ -219,33 +221,38 @@ function BannerDrawerContent({
             <div className="bm-custom-select">
               <div
                 className={`bm-select-trigger ${isViewMode ? "disabled" : ""} ${isPosOpen ? "active" : ""}`}
-                onClick={() => !isViewMode && setIsPosOpen(!isPosOpen)}
+                onClick={() => {
+                  if (!isViewMode) {
+                    setIsPosOpen(!isPosOpen);
+                    if (!hasPosOpened) setHasPosOpened(true);
+                  }
+                }}
               >
                 <span>{formData.position}</span>
                 <ChevronDownSmallIcon className={isPosOpen ? "open" : ""} />
               </div>
-              {isPosOpen && (
-                <div className="bm-select-options">
-                  {(
-                    [
-                      "Homepage Slider",
-                      "Category",
-                      "Promotion",
-                    ] as BannerPosition[]
-                  ).map((opt) => (
-                    <div
-                      key={opt}
-                      className={`bm-option ${formData.position === opt ? "active" : ""}`}
-                      onClick={() => {
-                        updateField("position", opt);
-                        setIsPosOpen(false);
-                      }}
-                    >
-                      {opt}
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div
+                className={`bm-select-options ${isPosOpen ? "open" : hasPosOpened ? "closed" : ""}`}
+              >
+                {(
+                  [
+                    "Homepage Slider",
+                    "Category",
+                    "Promotion",
+                  ] as BannerPosition[]
+                ).map((opt) => (
+                  <div
+                    key={opt}
+                    className={`bm-option ${formData.position === opt ? "active" : ""}`}
+                    onClick={() => {
+                      updateField("position", opt);
+                      setIsPosOpen(false);
+                    }}
+                  >
+                    {opt}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -255,29 +262,34 @@ function BannerDrawerContent({
               <div className="bm-custom-select">
                 <div
                   className={`bm-select-trigger ${isViewMode ? "disabled" : ""} ${isCatOpen ? "active" : ""}`}
-                  onClick={() => !isViewMode && setIsCatOpen(!isCatOpen)}
+                  onClick={() => {
+                    if (!isViewMode) {
+                      setIsCatOpen(!isCatOpen);
+                      if (!hasCatOpened) setHasCatOpened(true);
+                    }
+                  }}
                 >
                   <span>
                     {selectedCat ? selectedCat.name : "-- Select Category --"}
                   </span>
                   <ChevronDownSmallIcon className={isCatOpen ? "open" : ""} />
                 </div>
-                {isCatOpen && (
-                  <div className="bm-select-options">
-                    {CATEGORY_OPTIONS.map((cat) => (
-                      <div
-                        key={cat.id}
-                        className={`bm-option ${formData.categoryId === cat.id ? "active" : ""}`}
-                        onClick={() => {
-                          updateField("categoryId", cat.id);
-                          setIsCatOpen(false);
-                        }}
-                      >
-                        {cat.name}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <div
+                  className={`bm-select-options ${isCatOpen ? "open" : hasCatOpened ? "closed" : ""}`}
+                >
+                  {CATEGORY_OPTIONS.map((cat) => (
+                    <div
+                      key={cat.id}
+                      className={`bm-option ${formData.categoryId === cat.id ? "active" : ""}`}
+                      onClick={() => {
+                        updateField("categoryId", cat.id);
+                        setIsCatOpen(false);
+                      }}
+                    >
+                      {cat.name}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}

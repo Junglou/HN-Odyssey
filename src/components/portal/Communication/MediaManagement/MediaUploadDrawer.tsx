@@ -79,7 +79,6 @@ function MediaFormSection({
   isSubmitting: boolean;
   onChange: (index: number, updatedData: MediaFormData) => void;
 }) {
-  // thiết lập text hiển thị ban đầu cho ô tìm kiếm
   const [searchTerm, setSearchTerm] = useState(() => {
     if (initialTargetId && formData.type) {
       const targetList = MOCK_TARGETS[formData.type] || [];
@@ -90,14 +89,15 @@ function MediaFormSection({
   });
 
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
-  // state quản lý trạng thái đóng mở của dropdown Type
+  const [hasAutocompleteOpened, setHasAutocompleteOpened] = useState(false);
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
+  const [hasTypeDropdownOpened, setHasTypeDropdownOpened] = useState(false);
 
   const autocompleteRef = useRef<HTMLDivElement>(null);
   const typeDropdownRef = useRef<HTMLDivElement>(null);
   const isReadOnly = mode === "view";
 
-  // xử lý tự động đóng các dropdown khi người dùng click ra ngoài
+  // clickoutside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
@@ -184,6 +184,7 @@ function MediaFormSection({
             onClick={() => {
               if (!isSubmitting && !isReadOnly) {
                 setIsTypeDropdownOpen(!isTypeDropdownOpen);
+                if (!hasTypeDropdownOpened) setHasTypeDropdownOpened(true);
               }
             }}
           >
@@ -194,24 +195,24 @@ function MediaFormSection({
               className={isTypeDropdownOpen ? "open" : ""}
             />
           </div>
-          {isTypeDropdownOpen && !isSubmitting && !isReadOnly && (
-            <div className="mm-autocomplete-dropdown">
-              {(["Product", "Variant", "Category"] as const).map((opt) => (
-                <div
-                  key={opt}
-                  className={`mm-autocomplete-item ${
-                    formData.type === opt ? "active" : ""
-                  }`}
-                  onClick={() => {
-                    handleTypeChange(opt);
-                    setIsTypeDropdownOpen(false);
-                  }}
-                >
-                  {opt}
-                </div>
-              ))}
-            </div>
-          )}
+          <div
+            className={`mm-autocomplete-dropdown ${isTypeDropdownOpen ? "open" : hasTypeDropdownOpened ? "closed" : ""}`}
+          >
+            {(["Product", "Variant", "Category"] as const).map((opt) => (
+              <div
+                key={opt}
+                className={`mm-autocomplete-item ${
+                  formData.type === opt ? "active" : ""
+                }`}
+                onClick={() => {
+                  handleTypeChange(opt);
+                  setIsTypeDropdownOpen(false);
+                }}
+              >
+                {opt}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -228,32 +229,36 @@ function MediaFormSection({
               onChange={(e) => {
                 setSearchTerm(e.target.value);
                 setIsAutocompleteOpen(true);
+                if (!hasAutocompleteOpened) setHasAutocompleteOpened(true);
                 updateField("targetId", "");
               }}
-              onFocus={() => setIsAutocompleteOpen(true)}
+              onFocus={() => {
+                setIsAutocompleteOpen(true);
+                if (!hasAutocompleteOpened) setHasAutocompleteOpened(true);
+              }}
               disabled={isSubmitting || isReadOnly}
             />
-            {isAutocompleteOpen && !isReadOnly && (
-              <div className="mm-autocomplete-dropdown">
-                {filteredTargets.length > 0 ? (
-                  filteredTargets.map((opt) => (
-                    <div
-                      key={opt.id}
-                      className="mm-autocomplete-item"
-                      onClick={() => {
-                        updateField("targetId", opt.id);
-                        setSearchTerm(opt.label);
-                        setIsAutocompleteOpen(false);
-                      }}
-                    >
-                      {opt.label}
-                    </div>
-                  ))
-                ) : (
-                  <div className="mm-autocomplete-empty">No results found</div>
-                )}
-              </div>
-            )}
+            <div
+              className={`mm-autocomplete-dropdown ${isAutocompleteOpen ? "open" : hasAutocompleteOpened ? "closed" : ""}`}
+            >
+              {filteredTargets.length > 0 ? (
+                filteredTargets.map((opt) => (
+                  <div
+                    key={opt.id}
+                    className="mm-autocomplete-item"
+                    onClick={() => {
+                      updateField("targetId", opt.id);
+                      setSearchTerm(opt.label);
+                      setIsAutocompleteOpen(false);
+                    }}
+                  >
+                    {opt.label}
+                  </div>
+                ))
+              ) : (
+                <div className="mm-autocomplete-empty">No results found</div>
+              )}
+            </div>
           </div>
         </div>
       )}

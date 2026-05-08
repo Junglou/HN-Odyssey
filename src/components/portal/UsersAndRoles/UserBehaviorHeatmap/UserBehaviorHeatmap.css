@@ -152,7 +152,7 @@
   color: #111827;
 }
 
-/* thiết kế custom dropdown */
+/* dropdown */
 .ubh-custom-dropdown {
   position: relative;
   width: 100%;
@@ -205,8 +205,18 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 100;
   overflow: hidden;
-  animation: ubh-slideFadeIn 0.2s ease-out forwards;
   transform-origin: top center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+}
+.ubh-dropdown-options.open {
+  pointer-events: auto;
+  animation: ubh-slideFadeDown 0.2s ease-out forwards;
+}
+.ubh-dropdown-options.closed {
+  pointer-events: none;
+  animation: ubh-slideFadeUp 0.2s ease-out forwards;
 }
 
 .ubh-dropdown-item {
@@ -225,18 +235,6 @@
   background-color: #e9e9e9;
   color: #000000;
   font-weight: 600;
-}
-
-/* hiệu ứng mờ dần */
-@keyframes ubh-slideFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 /* layout cho ô nhập ngày tháng */
@@ -322,11 +320,11 @@
 }
 .ubh-device-btn:hover {
   background-color: #f9fafb;
-  border-color: #9ca3af;
+  border-color: #111827;
   color: #111827;
 }
 
-/* radio button loại tương tác */
+/* radio button */
 .ubh-radio-group {
   display: flex;
   gap: 16px;
@@ -377,7 +375,6 @@
   gap: 12px;
 }
 
-/* thẻ hiển thị số liệu */
 .ubh-stat-card {
   background-color: #fff;
   border: 1px solid #e5e7eb;
@@ -412,7 +409,29 @@
   color: #111827;
 }
 
-/* responsive điện thoại và máy tính bảng */
+/* animation*/
+@keyframes ubh-slideFadeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes ubh-slideFadeUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+/* responsive */
 @media (max-width: 1366px) {
   .ubh-layout {
     flex-direction: column;

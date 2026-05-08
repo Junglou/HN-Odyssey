@@ -60,12 +60,16 @@ export default function PromotionManagement({
 }: PromotionManagementProps) {
   // quản lý trạng thái đóng/mở dropdown
   const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const [hasStatusOpened, setHasStatusOpened] = useState(false);
+
   const [isTypeOpen, setIsTypeOpen] = useState(false);
+  const [hasTypeOpened, setHasTypeOpened] = useState(false);
 
   const statusRef = useRef<HTMLDivElement>(null);
   const typeRef = useRef<HTMLDivElement>(null);
 
   const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
+  const [hasLimitOpened, setHasLimitOpened] = useState(false);
   const limitRef = useRef<HTMLDivElement>(null);
   useClickOutside(limitRef, () => setIsLimitDropdownOpen(false));
 
@@ -133,64 +137,78 @@ export default function PromotionManagement({
             <div className="promo-custom-dropdown" ref={statusRef}>
               <div
                 className="promo-dropdown-trigger"
-                onClick={() => setIsStatusOpen(!isStatusOpen)}
+                onClick={() => {
+                  setIsStatusOpen(!isStatusOpen);
+                  if (!hasStatusOpened) setHasStatusOpened(true);
+                }}
               >
                 <span>{statusFilter === "All" ? "Status" : statusFilter}</span>
-                <ChevronDownIcon />
-              </div>
-              {isStatusOpen && (
-                <div className="promo-dropdown-options">
-                  {(
-                    [
-                      "All",
-                      "Active",
-                      "Inactive",
-                      "Scheduled",
-                      "Expired",
-                      "Draft",
-                    ] as const
-                  ).map((opt) => (
-                    <div
-                      key={opt}
-                      className={`promo-dropdown-option ${statusFilter === opt ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changeStatusFilter(opt);
-                        setIsStatusOpen(false);
-                      }}
-                    >
-                      {opt}
-                    </div>
-                  ))}
+                <div
+                  className={`promo-dropdown-arrow ${isStatusOpen ? "open" : ""}`}
+                >
+                  <ChevronDownIcon />
                 </div>
-              )}
+              </div>
+              <div
+                className={`promo-dropdown-options ${isStatusOpen ? "open" : hasStatusOpened ? "closed" : ""}`}
+              >
+                {(
+                  [
+                    "All",
+                    "Active",
+                    "Inactive",
+                    "Scheduled",
+                    "Expired",
+                    "Draft",
+                  ] as const
+                ).map((opt) => (
+                  <div
+                    key={opt}
+                    className={`promo-dropdown-option ${statusFilter === opt ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changeStatusFilter(opt);
+                      setIsStatusOpen(false);
+                    }}
+                  >
+                    {opt}
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="promo-custom-dropdown" ref={typeRef}>
               <div
                 className="promo-dropdown-trigger"
-                onClick={() => setIsTypeOpen(!isTypeOpen)}
+                onClick={() => {
+                  setIsTypeOpen(!isTypeOpen);
+                  if (!hasTypeOpened) setHasTypeOpened(true);
+                }}
               >
                 <span>
                   {typeFilter === "All" ? "Promotion Type" : typeFilter}
                 </span>
-                <ChevronDownIcon />
-              </div>
-              {isTypeOpen && (
-                <div className="promo-dropdown-options">
-                  {(["All", "Flash Sale", "Discount"] as const).map((opt) => (
-                    <div
-                      key={opt}
-                      className={`promo-dropdown-option ${typeFilter === opt ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changeTypeFilter(opt);
-                        setIsTypeOpen(false);
-                      }}
-                    >
-                      {opt}
-                    </div>
-                  ))}
+                <div
+                  className={`promo-dropdown-icon ${isTypeOpen ? "open" : ""}`}
+                >
+                  <ChevronDownIcon />
                 </div>
-              )}
+              </div>
+              <div
+                className={`promo-dropdown-options ${isTypeOpen ? "open" : hasTypeOpened ? "closed" : ""}`}
+              >
+                {(["All", "Flash Sale", "Discount"] as const).map((opt) => (
+                  <div
+                    key={opt}
+                    className={`promo-dropdown-option ${typeFilter === opt ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changeTypeFilter(opt);
+                      setIsTypeOpen(false);
+                    }}
+                  >
+                    {opt}
+                  </div>
+                ))}
+              </div>
             </div>
 
             <button
@@ -366,7 +384,10 @@ export default function PromotionManagement({
             <div className="promo-limit-dropdown" ref={limitRef}>
               <div
                 className={`promo-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}
-                onClick={() => setIsLimitDropdownOpen(!isLimitDropdownOpen)}
+                onClick={() => {
+                  setIsLimitDropdownOpen(!isLimitDropdownOpen);
+                  if (!hasLimitOpened) setHasLimitOpened(true);
+                }}
               >
                 <span>{pagination.limit} / page</span>
                 <div
@@ -375,22 +396,22 @@ export default function PromotionManagement({
                   <ChevronDownIcon />
                 </div>
               </div>
-              {isLimitDropdownOpen && (
-                <div className="promo-limit-options">
-                  {[10, 20, 50].map((val) => (
-                    <div
-                      key={val}
-                      className={`promo-limit-option ${pagination.limit === val ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changeLimit(val);
-                        setIsLimitDropdownOpen(false);
-                      }}
-                    >
-                      {val} / page
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div
+                className={`promo-limit-options ${isLimitDropdownOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
+              >
+                {[10, 20, 50].map((val) => (
+                  <div
+                    key={val}
+                    className={`promo-limit-option ${pagination.limit === val ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changeLimit(val);
+                      setIsLimitDropdownOpen(false);
+                    }}
+                  >
+                    {val} / page
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

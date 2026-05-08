@@ -159,7 +159,9 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 100;
   overflow: hidden;
-  animation: pm-slideFadeIn 0.2s ease-out forwards;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
   transform-origin: top center;
 }
 .promo-dropdown-option {
@@ -474,15 +476,18 @@
   color: #111827;
 }
 
+.promo-dropdown-arrow,
 .promo-limit-icon {
   display: flex;
   align-items: center;
   transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 }
+.promo-dropdown-arrow.open,
 .promo-limit-icon.open {
   transform: rotate(180deg);
 }
 
+.promo-dropdown-options,
 .promo-limit-options {
   position: absolute;
   top: calc(100% + 8px);
@@ -494,8 +499,21 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   z-index: 100;
   overflow: hidden;
-  animation: pm-slideFadeDownLimit 0.25s cubic-bezier(0.25, 1, 0.5, 1) forwards;
   transform-origin: top center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+}
+.promo-dropdown-options.open,
+.promo-limit-options.open {
+  pointer-events: auto;
+  animation: pm-slideFadeDown 0.2s ease-out forwards;
+}
+
+.promo-dropdown-options.closed,
+.promo-limit-options.closed {
+  pointer-events: none;
+  animation: pm-slideFadeUp 0.2s ease-out forwards;
 }
 
 .promo-limit-option {
@@ -518,7 +536,8 @@
   font-weight: 700;
 }
 
-@keyframes pm-slideFadeDownLimit {
+/* animation */
+@keyframes pm-slideFadeDown {
   from {
     opacity: 0;
     transform: translateY(-10px);
@@ -526,6 +545,17 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes pm-slideFadeUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
   }
 }
 

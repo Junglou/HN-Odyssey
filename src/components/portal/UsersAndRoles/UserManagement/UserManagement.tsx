@@ -1,7 +1,7 @@
+// imports
 import { useState, useEffect, useRef } from "react";
 import "./UserManagement.css";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
-
 import {
   ViewIcon,
   EditIcon,
@@ -14,7 +14,7 @@ import {
 import type { User } from "./UserModal";
 import type { BulkAction } from "../../../../hooks/portal/UserAndRoles/UserManagement/useUserManagement";
 
-// props truyền từ container
+// types
 interface UserManagementProps {
   data: User[];
   filters: { search: string; status: string; role: string };
@@ -46,7 +46,7 @@ interface DropdownOption {
   value: string;
 }
 
-// component dropdown
+// helpers
 function CustomDropdown({
   value,
   options,
@@ -59,9 +59,9 @@ function CustomDropdown({
   className?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [hasOpened, setHasOpened] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // tắt dropdown khi click ngoài vùng dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -85,7 +85,10 @@ function CustomDropdown({
     >
       <div
         className={`um-dropdown-trigger ${isOpen ? "active" : ""}`}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          setIsOpen(!isOpen);
+          if (!hasOpened) setHasOpened(true);
+        }}
       >
         <span>{selectedLabel}</span>
         <ChevronDownSmallIcon
@@ -93,27 +96,28 @@ function CustomDropdown({
           style={{ color: "#333" }}
         />
       </div>
-      {isOpen && (
-        <div className="um-dropdown-options">
-          {options.map((opt) => (
-            <div
-              key={opt.value}
-              className={`um-dropdown-option ${value === opt.value ? "selected" : ""}`}
-              onClick={() => {
-                onChange(opt.value);
-                setIsOpen(false);
-              }}
-            >
-              {opt.label}
-            </div>
-          ))}
-        </div>
-      )}
+
+      <div
+        className={`um-dropdown-options ${isOpen ? "open" : hasOpened ? "closed" : ""}`}
+      >
+        {options.map((opt) => (
+          <div
+            key={opt.value}
+            className={`um-dropdown-option ${value === opt.value ? "selected" : ""}`}
+            onClick={() => {
+              onChange(opt.value);
+              setIsOpen(false);
+            }}
+          >
+            {opt.label}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-// data mock bộ lọc
+// constants
 const STATUS_OPTIONS: DropdownOption[] = [
   { label: "All Status", value: "Status" },
   { label: "Active", value: "Active" },
@@ -128,30 +132,34 @@ const ROLE_OPTIONS: DropdownOption[] = [
   { label: "Sale Staff", value: "Sale Staff" },
 ];
 
-// ui chính của bảng người dùng
+// component
 export default function UserManagement({
   data,
   filters,
   pagination,
   actions,
 }: UserManagementProps) {
+  // state
   const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
+  const [hasDropdownOpened, setHasDropdownOpened] = useState<{
+    [key: number]: boolean;
+  }>({});
+
   const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
+  const [hasLimitOpened, setHasLimitOpened] = useState(false);
   const limitRef = useRef<HTMLDivElement>(null);
   useClickOutside(limitRef, () => setIsLimitDropdownOpen(false));
 
   const isAllSelected = data.length > 0 && data.every((user) => user.selected);
-  // biến kiểm tra xem có dòng nào đang được chọn hay không để disable nút
   const hasSelection = data.some((user) => user.selected);
-
   const pageNumbers = Array.from(
     { length: pagination.totalPages },
     (_, i) => i + 1,
   );
 
+  // render
   return (
     <div className="um-container">
-      {/* header và nút tạo mới */}
       <div className="um-header">
         <div>
           <h1 className="um-title">User Management</h1>
@@ -166,9 +174,7 @@ export default function UserManagement({
         </button>
       </div>
 
-      {/* khung trắng bọc ngoài bảng tool */}
       <div className="um-filters-card">
-        {/* thanh search và filter */}
         <div className="um-filters-row">
           <input
             type="text"
@@ -201,7 +207,6 @@ export default function UserManagement({
           </button>
         </div>
 
-        {/* cụm nút thao tác chọn nhiều */}
         <div className="um-bulk-actions">
           <button
             type="button"
@@ -238,7 +243,6 @@ export default function UserManagement({
           </button>
         </div>
 
-        {/* cuộn ngang cho bảng */}
         <div className="um-table-wrapper">
           <table className="um-table">
             <thead>
@@ -259,7 +263,6 @@ export default function UserManagement({
               </tr>
             </thead>
             <tbody>
-              {/* lặp data ra dòng bảng */}
               {data.length > 0 ? (
                 data.map((user) => (
                   <tr
@@ -303,7 +306,6 @@ export default function UserManagement({
                           <EditIcon stroke="#111827" />
                         </button>
 
-                        {/* nút switch đóng mở trạng thái */}
                         <div
                           className={`um-toggle-switch ${user.status === "Active" ? "on" : ""} ${user.status === "Locked" ? "disabled" : ""}`}
                           onClick={() =>
@@ -321,55 +323,57 @@ export default function UserManagement({
                             className="um-icon-btn"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setOpenDropdownId(
-                                openDropdownId === user.id ? null : user.id,
-                              );
+                              const isOpening = openDropdownId !== user.id;
+                              setOpenDropdownId(isOpening ? user.id : null);
+                              if (isOpening && !hasDropdownOpened[user.id]) {
+                                setHasDropdownOpened((prev) => ({
+                                  ...prev,
+                                  [user.id]: true,
+                                }));
+                              }
                             }}
                           >
                             <DotsIcon fill="#111827" />
                           </button>
 
-                          {/* menu popup 3 chấm */}
-                          {openDropdownId === user.id && (
-                            <div
-                              className="um-dropdown-menu"
-                              onClick={(e) => e.stopPropagation()}
+                          <div
+                            className={`um-dropdown-menu ${openDropdownId === user.id ? "open" : hasDropdownOpened[user.id] ? "closed" : ""}`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              className="um-dropdown-item um-item-delete"
+                              onClick={() => {
+                                actions.deleteSingle(user.id);
+                                setOpenDropdownId(null);
+                              }}
                             >
+                              <TrashIcon stroke="#ffffff" /> Delete
+                            </button>
+                            {user.status === "Locked" ? (
                               <button
                                 type="button"
-                                className="um-dropdown-item um-item-delete"
+                                className="um-dropdown-item um-item-unlock"
                                 onClick={() => {
-                                  actions.deleteSingle(user.id);
+                                  actions.lockUnlock(user.id, user.status);
                                   setOpenDropdownId(null);
                                 }}
                               >
-                                <TrashIcon stroke="#ffffff" /> Delete
+                                <UnlockIcon stroke="#111827" /> Unlock
                               </button>
-                              {user.status === "Locked" ? (
-                                <button
-                                  type="button"
-                                  className="um-dropdown-item um-item-unlock"
-                                  onClick={() => {
-                                    actions.lockUnlock(user.id, user.status);
-                                    setOpenDropdownId(null);
-                                  }}
-                                >
-                                  <UnlockIcon stroke="#111827" /> Unlock
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  className="um-dropdown-item um-item-lock"
-                                  onClick={() => {
-                                    actions.lockUnlock(user.id, user.status);
-                                    setOpenDropdownId(null);
-                                  }}
-                                >
-                                  <LockIcon stroke="#111827" /> Lock
-                                </button>
-                              )}
-                            </div>
-                          )}
+                            ) : (
+                              <button
+                                type="button"
+                                className="um-dropdown-item um-item-lock"
+                                onClick={() => {
+                                  actions.lockUnlock(user.id, user.status);
+                                  setOpenDropdownId(null);
+                                }}
+                              >
+                                <LockIcon stroke="#111827" /> Lock
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -386,7 +390,6 @@ export default function UserManagement({
           </table>
         </div>
 
-        {/* phân trang */}
         <div className="um-pagination">
           <span>
             Showing{" "}
@@ -396,7 +399,6 @@ export default function UserManagement({
           </span>
 
           <div className="um-page-numbers">
-            {/* nút lùi trang */}
             <button
               type="button"
               className="um-page-num"
@@ -411,7 +413,6 @@ export default function UserManagement({
               &lt;
             </button>
 
-            {/* danh sách các số trang */}
             {pageNumbers.map((num) => (
               <button
                 type="button"
@@ -423,7 +424,6 @@ export default function UserManagement({
               </button>
             ))}
 
-            {/* nút tiến trang */}
             <button
               type="button"
               className="um-page-num"
@@ -448,11 +448,13 @@ export default function UserManagement({
               &gt;
             </button>
 
-            {/* custom dropdown chọn số lượng hiển thị */}
             <div className="um-limit-dropdown" ref={limitRef}>
               <div
                 className={`um-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}
-                onClick={() => setIsLimitDropdownOpen(!isLimitDropdownOpen)}
+                onClick={() => {
+                  setIsLimitDropdownOpen(!isLimitDropdownOpen);
+                  if (!hasLimitOpened) setHasLimitOpened(true);
+                }}
               >
                 <span>{pagination.limit} / page</span>
                 <div
@@ -461,22 +463,22 @@ export default function UserManagement({
                   <ChevronDownSmallIcon />
                 </div>
               </div>
-              {isLimitDropdownOpen && (
-                <div className="um-limit-options">
-                  {[5, 10, 20, 50].map((val) => (
-                    <div
-                      key={val}
-                      className={`um-limit-option ${pagination.limit === val ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changeLimit(val);
-                        setIsLimitDropdownOpen(false);
-                      }}
-                    >
-                      {val} / page
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div
+                className={`um-limit-options ${isLimitDropdownOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
+              >
+                {[5, 10, 20, 50].map((val) => (
+                  <div
+                    key={val}
+                    className={`um-limit-option ${pagination.limit === val ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changeLimit(val);
+                      setIsLimitDropdownOpen(false);
+                    }}
+                  >
+                    {val} / page
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

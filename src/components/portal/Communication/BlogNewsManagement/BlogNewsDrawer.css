@@ -163,11 +163,20 @@
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 1050;
-  overflow: hidden;
-  animation: ban-slideFadeDown 0.2s ease-out forwards;
-  transform-origin: top center;
-  max-height: 220px;
   overflow-y: auto;
+  max-height: 220px;
+  transform-origin: top center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+}
+.ban-drawer-dropdown-options.open {
+  pointer-events: auto;
+  animation: ban-slideFadeDown 0.2s ease-out forwards;
+}
+.ban-drawer-dropdown-options.closed {
+  pointer-events: none;
+  animation: ban-slideFadeUp 0.2s ease-out forwards;
 }
 
 .ban-drawer-dropdown-option {
@@ -537,7 +546,16 @@
   font-weight: 700;
   cursor: pointer;
 }
-
+@keyframes ban-slideFadeUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
 @keyframes ban-fadeIn {
   from {
     opacity: 0;

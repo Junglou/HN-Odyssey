@@ -159,8 +159,18 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 100;
   overflow: hidden;
-  animation: bm-slideFadeDown 0.2s ease-out forwards;
   transform-origin: top center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+}
+.bm-dropdown-options.open {
+  pointer-events: auto;
+  animation: bm-slideFadeDown 0.2s ease-out forwards;
+}
+.bm-dropdown-options.closed {
+  pointer-events: none;
+  animation: bm-slideFadeUp 0.2s ease-out forwards;
 }
 
 .bm-dropdown-option {
@@ -533,8 +543,18 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   z-index: 100;
   overflow: hidden;
-  animation: bm-slideFadeDown 0.2s ease-out forwards;
   transform-origin: top center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+}
+.bm-limit-options.open {
+  pointer-events: auto;
+  animation: bm-slideFadeDown 0.2s ease-out forwards;
+}
+.bm-limit-options.closed {
+  pointer-events: none;
+  animation: bm-slideFadeUp 0.2s ease-out forwards;
 }
 
 .bm-limit-option {
@@ -563,7 +583,7 @@
   gap: 4px;
 }
 
-/* Khối bọc Action Dropdown (Đồng bộ từ Product Management) */
+/* action dropdown */
 .bm-action-dropdown-wrapper {
   position: relative;
 }
@@ -585,11 +605,12 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  animation: bm-slideFadeDown 0.2s ease-out forwards;
   transform-origin: top right;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
 }
 
-/* Mũi tên chỉ lên trên */
 .bm-action-dropdown-menu::after {
   content: "";
   position: absolute;
@@ -634,6 +655,16 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+@keyframes bm-slideFadeUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
   }
 }
 

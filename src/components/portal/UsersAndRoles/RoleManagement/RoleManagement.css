@@ -160,6 +160,10 @@
   justify-content: center;
   cursor: pointer;
   color: #111827;
+  transition: border-color 0.2s;
+}
+.rm-icon-btn:hover:not(.disabled):not(:disabled) {
+  border-color: #111827;
 }
 .rm-icon-btn.disabled {
   background-color: #f3f4f6;
@@ -212,6 +216,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  animation: rm-fadeSlideUp 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
 
 .rm-right-header {
@@ -272,6 +277,11 @@
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
+  transition: all 0.2s;
+}
+.rm-btn-cancel:hover {
+  border-color: #111827;
+  background-color: #f9fafb;
 }
 
 /* grid table phân quyền */
@@ -424,6 +434,42 @@
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+}
+
+/* Animation trượt phải */
+@keyframes rm-fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Accordion Animation */
+.rm-accordion-wrapper {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition:
+    grid-template-rows 0.3s ease-out,
+    opacity 0.3s ease-out;
+  opacity: 0;
+  pointer-events: none;
+}
+.rm-accordion-wrapper.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  pointer-events: auto;
+}
+.rm-accordion-wrapper.closed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+.rm-submodules-list {
+  overflow: hidden;
 }
 
 /* Responsive */

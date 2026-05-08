@@ -1,7 +1,6 @@
+// imports
 import { useState } from "react";
 import "./RoleManagement.css";
-
-// Icon
 import type {
   Role,
   ModulePermission,
@@ -19,7 +18,7 @@ import {
   CheckIcon,
 } from "../../../../assets/icons/RoleManagementIcons";
 
-// props interface
+// types
 interface RoleManagementProps {
   data: {
     roles: Role[];
@@ -45,24 +44,32 @@ interface RoleManagementProps {
   };
 }
 
-// Các thao tác check list
+// constants
 const PERMISSION_ACTIONS = ["view", "create", "edit", "delete"] as const;
 
+// component
 export default function RoleManagement({
   data,
   uiState,
   actions,
 }: RoleManagementProps) {
-  // state đóng/mở accordion module
+  // state
   const [expandedModules, setExpandedModules] = useState<
     Record<string, boolean>
   >({});
+  const [hasModuleOpened, setHasModuleOpened] = useState<
+    Record<string, boolean>
+  >({});
 
+  // handlers
   const toggleModule = (moduleId: string) => {
     setExpandedModules((prev) => ({
       ...prev,
       [moduleId]: prev[moduleId] === undefined ? false : !prev[moduleId],
     }));
+    if (!hasModuleOpened[moduleId]) {
+      setHasModuleOpened((prev) => ({ ...prev, [moduleId]: true }));
+    }
   };
 
   const selectedRole = data.roles.find((r) => r.id === uiState.selectedRoleId);
@@ -70,9 +77,9 @@ export default function RoleManagement({
     r.name.toLowerCase().includes(uiState.searchTerm.toLowerCase()),
   );
 
+  // render
   return (
     <div className="rm-container">
-      {/* header tổng */}
       <div className="rm-header">
         <div>
           <h1 className="rm-title">Roles Management</h1>
@@ -81,7 +88,6 @@ export default function RoleManagement({
       </div>
 
       <div className="rm-layout">
-        {/* danh sách roles */}
         <div className="rm-left-panel">
           <div className="rm-left-header">
             <h2 className="rm-panel-title">Roles</h2>
@@ -157,9 +163,8 @@ export default function RoleManagement({
           </div>
         </div>
 
-        {/* chi tiết quyền */}
         {uiState.selectedRoleId !== null && (
-          <div className="rm-right-panel">
+          <div className="rm-right-panel" key={uiState.selectedRoleId}>
             <div className="rm-right-header">
               <div className="rm-right-title-group">
                 <h2 className="rm-role-title">Role: {selectedRole?.name}</h2>
@@ -187,10 +192,10 @@ export default function RoleManagement({
               </div>
             </div>
 
-            {/* list check phân quyền */}
             <div className="rm-permissions-container">
               {data.permissions.map((module) => {
                 const isExpanded = expandedModules[module.moduleId] !== false;
+                const hasOpened = hasModuleOpened[module.moduleId];
 
                 return (
                   <div key={module.moduleId} className="rm-module-card">
@@ -218,7 +223,9 @@ export default function RoleManagement({
                       </div>
                     </div>
 
-                    {isExpanded && (
+                    <div
+                      className={`rm-accordion-wrapper ${isExpanded ? "open" : hasOpened ? "closed" : ""}`}
+                    >
                       <div className="rm-submodules-list">
                         {module.subModules.map((sub) => (
                           <div key={sub.subId} className="rm-submodule-row">
@@ -256,7 +263,7 @@ export default function RoleManagement({
                           </div>
                         ))}
                       </div>
-                    )}
+                    </div>
                   </div>
                 );
               })}

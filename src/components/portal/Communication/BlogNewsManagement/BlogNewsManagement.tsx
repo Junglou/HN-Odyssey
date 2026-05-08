@@ -55,7 +55,9 @@ export default function BlogNewsManagement({
 }: BlogNewsManagementProps) {
   // quản lý trạng thái đóng mở cho bộ lọc và phân trang
   const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const [hasStatusOpened, setHasStatusOpened] = useState(false);
   const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
+  const [hasLimitOpened, setHasLimitOpened] = useState(false);
 
   const statusRef = useRef<HTMLDivElement>(null);
   const limitRef = useRef<HTMLDivElement>(null);
@@ -95,31 +97,35 @@ export default function BlogNewsManagement({
             <div className="ban-custom-dropdown" ref={statusRef}>
               <div
                 className={`ban-dropdown-trigger ${isStatusOpen ? "active" : ""}`}
-                onClick={() => setIsStatusOpen(!isStatusOpen)}
+                onClick={() => {
+                  setIsStatusOpen(!isStatusOpen);
+                  if (!hasStatusOpened) setHasStatusOpened(true);
+                }}
               >
                 <span>{statusFilter === "All" ? "Status" : statusFilter}</span>
                 <ChevronDownIcon
                   className={`ban-dropdown-arrow ${isStatusOpen ? "open" : ""}`}
                 />
               </div>
-              {isStatusOpen && (
-                <div className="ban-dropdown-options">
-                  {(["All", "Published", "Draft", "Hidden"] as const).map(
-                    (opt) => (
-                      <div
-                        key={opt}
-                        className={`ban-dropdown-option ${statusFilter === opt ? "active" : ""}`}
-                        onClick={() => {
-                          actions.changeStatusFilter(opt);
-                          setIsStatusOpen(false);
-                        }}
-                      >
-                        {opt}
-                      </div>
-                    ),
-                  )}
-                </div>
-              )}
+
+              <div
+                className={`ban-dropdown-options ${isStatusOpen ? "open" : hasStatusOpened ? "closed" : ""}`}
+              >
+                {(["All", "Published", "Draft", "Hidden"] as const).map(
+                  (opt) => (
+                    <div
+                      key={opt}
+                      className={`ban-dropdown-option ${statusFilter === opt ? "active" : ""}`}
+                      onClick={() => {
+                        actions.changeStatusFilter(opt);
+                        setIsStatusOpen(false);
+                      }}
+                    >
+                      {opt}
+                    </div>
+                  ),
+                )}
+              </div>
             </div>
 
             <button
@@ -300,29 +306,33 @@ export default function BlogNewsManagement({
             <div className="ban-limit-dropdown" ref={limitRef}>
               <div
                 className={`ban-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}
-                onClick={() => setIsLimitDropdownOpen(!isLimitDropdownOpen)}
+                onClick={() => {
+                  setIsLimitDropdownOpen(!isLimitDropdownOpen);
+                  if (!hasLimitOpened) setHasLimitOpened(true); // Sửa ở đây
+                }}
               >
                 <span>{pagination.limit} / page</span>
                 <ChevronDownIcon
                   className={`ban-dropdown-arrow ${isLimitDropdownOpen ? "open" : ""}`}
                 />
               </div>
-              {isLimitDropdownOpen && (
-                <div className="ban-limit-options">
-                  {[10, 20, 50].map((val) => (
-                    <div
-                      key={val}
-                      className={`ban-limit-option ${pagination.limit === val ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changeLimit(val);
-                        setIsLimitDropdownOpen(false);
-                      }}
-                    >
-                      {val} / page
-                    </div>
-                  ))}
-                </div>
-              )}
+
+              <div
+                className={`ban-limit-options ${isLimitDropdownOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
+              >
+                {[10, 20, 50].map((val) => (
+                  <div
+                    key={val}
+                    className={`ban-limit-option ${pagination.limit === val ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changeLimit(val);
+                      setIsLimitDropdownOpen(false);
+                    }}
+                  >
+                    {val} / page
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

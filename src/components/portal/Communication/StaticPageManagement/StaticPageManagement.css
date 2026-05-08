@@ -153,7 +153,18 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 100;
   overflow: hidden;
-  animation: sp-slideFadeIn 0.2s ease-out forwards;
+  transform-origin: top center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+}
+.sp-dropdown-options.open {
+  pointer-events: auto;
+  animation: sp-slideFadeDown 0.2s ease-out forwards;
+}
+.sp-dropdown-options.closed {
+  pointer-events: none;
+  animation: sp-slideFadeUp 0.2s ease-out forwards;
 }
 
 .sp-dropdown-option {
@@ -429,8 +440,18 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   z-index: 100;
   overflow: hidden;
-  animation: sp-slideFadeDown 0.2s ease-out forwards;
   transform-origin: top center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+}
+.sp-limit-options.open {
+  pointer-events: auto;
+  animation: sp-slideFadeDown 0.2s ease-out forwards;
+}
+.sp-limit-options.closed {
+  pointer-events: none;
+  animation: sp-slideFadeUp 0.2s ease-out forwards;
 }
 
 .sp-limit-option {
@@ -452,6 +473,7 @@
   font-weight: 700;
 }
 
+/* Animation */
 @keyframes sp-slideFadeIn {
   from {
     opacity: 0;
@@ -463,7 +485,6 @@
   }
 }
 
-/* Animation */
 @keyframes sp-slideFadeDown {
   from {
     opacity: 0;
@@ -472,6 +493,16 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+@keyframes sp-slideFadeUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
   }
 }
 
@@ -660,7 +691,6 @@
     border-bottom: none;
   }
 
-  /* Lấy data-label tự động tạo thành tiêu đề cột trên mobile */
   .sp-table td::before {
     content: attr(data-label);
     font-weight: 700;

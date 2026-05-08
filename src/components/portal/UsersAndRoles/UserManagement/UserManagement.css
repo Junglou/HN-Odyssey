@@ -33,7 +33,7 @@
   margin: 0;
 }
 
-/* nút add new user */
+/* nút add new user  */
 .um-btn-add {
   background-color: #3b82f6;
   color: white;
@@ -49,6 +49,9 @@
   gap: 8px;
   white-space: nowrap;
   transition: all 0.2s ease;
+}
+.um-btn-add:hover {
+  background-color: #2563eb;
 }
 
 /* wrapper trắng bọc ngoài filter và table */
@@ -126,7 +129,7 @@
   transform: rotate(180deg);
 }
 
-/* dropdown menu - animation fade in */
+/* dropdown menu - animation fade in/down */
 .um-dropdown-options {
   position: absolute;
   top: calc(100% + 6px);
@@ -138,9 +141,20 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 100;
   overflow: hidden;
-  animation: um-slideFadeIn 0.2s ease-out forwards;
   transform-origin: top center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
 }
+.um-dropdown-options.open {
+  pointer-events: auto;
+  animation: um-slideFadeDown 0.2s ease-out forwards;
+}
+.um-dropdown-options.closed {
+  pointer-events: none;
+  animation: um-slideFadeUp 0.2s ease-out forwards;
+}
+
 .um-dropdown-option {
   padding: 10px 16px;
   cursor: pointer;
@@ -149,6 +163,7 @@
 }
 .um-dropdown-option:hover {
   background-color: #f3f4f6;
+  color: #111827;
 }
 .um-dropdown-option.selected {
   background-color: #e9e9e9;
@@ -159,25 +174,28 @@
   z-index: 50;
 }
 
-/* nút clear filter */
+/* nút clear filter (chuẩn hóa hover) */
 .um-btn-clear {
   flex: 1 1 auto;
   padding: clamp(8px, 1.2vw, 10px) 20px;
-  background-color: #fff;
+  background-color: #ffffff;
   border: 1px solid #d1d5db;
   border-radius: 8px;
   font-weight: 600;
   font-size: clamp(0.85rem, 1vw, 0.95rem);
   cursor: pointer;
   white-space: nowrap;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
+  font-family: inherit;
+  color: #374151;
 }
 .um-btn-clear:hover {
-  background-color: #f9fafb;
-  border-color: #000000;
+  background-color: #f3f4f6;
+  border-color: #111827;
+  color: #111827;
 }
 
-/* container nút bulk action (activate, deactivate, delete) */
+/* container nút bulk action (chuẩn hóa hover) */
 .um-bulk-actions {
   display: flex;
   flex-wrap: wrap;
@@ -187,7 +205,7 @@
 }
 .um-btn-bulk {
   padding: clamp(6px, 1vw, 8px) clamp(12px, 1.5vw, 16px);
-  background-color: #fff;
+  background-color: #ffffff;
   border: 1px solid #d1d5db;
   border-radius: 6px;
   font-weight: 600;
@@ -196,6 +214,7 @@
   white-space: nowrap;
   transition: all 0.2s;
   flex: 0 1 auto;
+  color: #374151;
 }
 .um-btn-bulk:focus {
   outline: none;
@@ -203,25 +222,23 @@
 .um-btn-bulk:active {
   transform: scale(0.97);
 }
-.um-btn-bulk:hover {
-  background-color: #f9fafb;
-  border-color: #000000;
+.um-btn-bulk:hover:not(:disabled) {
+  background-color: #f3f4f6;
+  border-color: #111827;
+  color: #111827;
 }
 .um-btn-bulk.delete {
-  background-color: #e1251b;
+  background-color: #ef4444;
   color: white;
-  border-color: #e1251b;
+  border-color: #ef4444;
+}
+.um-btn-bulk.delete:hover:not(:disabled) {
+  background-color: #dc2626;
+  border-color: #dc2626;
 }
 .um-btn-bulk:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-.um-btn-bulk:disabled:hover {
-  background-color: #fff;
-  border-color: #d1d5db;
-}
-.um-btn-bulk.delete:disabled:hover {
-  background-color: #e1251b;
 }
 
 /* wrapper thanh cuộn ngang cho table */
@@ -349,6 +366,12 @@
   cursor: pointer;
   color: #4b5563;
   padding: 0;
+  transition: all 0.2s;
+}
+.um-icon-btn:hover {
+  background-color: #f3f4f6;
+  border-color: #111827;
+  color: #111827;
 }
 
 /* custom switch cho status */
@@ -387,17 +410,7 @@
   cursor: not-allowed;
 }
 
-/* animation keyframes chung cho popup/dropdown */
-@keyframes um-slideFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+/* action dropdown */
 .um-dropdown-wrapper {
   position: relative;
 }
@@ -414,8 +427,18 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  animation: um-slideFadeIn 0.2s ease-out forwards;
   transform-origin: top right;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+}
+.um-dropdown-menu.open {
+  pointer-events: auto;
+  animation: um-slideFadeDown 0.2s ease-out forwards;
+}
+.um-dropdown-menu.closed {
+  pointer-events: none;
+  animation: um-slideFadeUp 0.2s ease-out forwards;
 }
 .um-dropdown-item {
   width: 100%;
@@ -429,15 +452,24 @@
   gap: 8px;
   font-family: inherit;
   font-size: 0.85rem;
+  background-color: transparent;
+  transition: background-color 0.2s;
 }
 .um-item-delete {
-  background-color: #e1251b;
+  background-color: #ef4444;
   color: white;
+}
+.um-item-delete:hover {
+  background-color: #dc2626;
 }
 .um-item-lock,
 .um-item-unlock {
   background-color: #f3f4f6;
   color: #111827;
+}
+.um-item-lock:hover,
+.um-item-unlock:hover {
+  background-color: #e5e7eb;
 }
 
 /* container pagination và select limit */
@@ -467,9 +499,14 @@
   cursor: pointer;
   background-color: transparent;
   border: none;
+  transition: all 0.2s;
+}
+.um-page-num:hover:not(:disabled):not(.active) {
+  background-color: #f3f4f6;
 }
 .um-page-num.active {
-  background-color: #f3f4f6;
+  background-color: #111827;
+  color: #fff;
   font-weight: 700;
 }
 .um-page-num:disabled {
@@ -529,8 +566,18 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   z-index: 100;
   overflow: hidden;
-  animation: um-slideFadeDownLimit 0.25s cubic-bezier(0.25, 1, 0.5, 1) forwards;
   transform-origin: top center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+}
+.um-limit-options.open {
+  pointer-events: auto;
+  animation: um-slideFadeDown 0.2s ease-out forwards;
+}
+.um-limit-options.closed {
+  pointer-events: none;
+  animation: um-slideFadeUp 0.2s ease-out forwards;
 }
 
 .um-limit-option {
@@ -553,7 +600,8 @@
   font-weight: 700;
 }
 
-@keyframes um-slideFadeDownLimit {
+/* === KEYFRAMES BỊ THIẾU === */
+@keyframes um-slideFadeDown {
   from {
     opacity: 0;
     transform: translateY(-10px);
@@ -563,8 +611,18 @@
     transform: translateY(0);
   }
 }
+@keyframes um-slideFadeUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
 
-/* responsive cho mobile: chuyển table thành dạng list card */
+/* responsive */
 @media (max-width: 767px) {
   .um-header {
     flex-direction: column;

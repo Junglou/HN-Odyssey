@@ -1,6 +1,5 @@
 import { useState, useRef } from "react";
 import "./StaticPageManagement.css";
-// sử dụng hook xử lý click ra ngoài để đóng dropdown
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 import {
   SearchIcon,
@@ -14,7 +13,7 @@ import type {
   PageType,
 } from "../../../../hooks/portal/Communication/StaticPageManagement/useStaticPageManagement";
 
-// định nghĩa props nhận từ page
+// props.
 interface StaticPageManagementProps {
   data: StaticPageRecord[];
   search: string;
@@ -58,10 +57,15 @@ export default function StaticPageManagement({
   actions,
   bulkActions,
 }: StaticPageManagementProps) {
-  // state quản lý đóng mở các menu dropdown
+  // state
   const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const [hasStatusOpened, setHasStatusOpened] = useState(false);
+
   const [isTypeOpen, setIsTypeOpen] = useState(false);
+  const [hasTypeOpened, setHasTypeOpened] = useState(false);
+
   const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
+  const [hasLimitOpened, setHasLimitOpened] = useState(false);
 
   const statusRef = useRef<HTMLDivElement>(null);
   const typeRef = useRef<HTMLDivElement>(null);
@@ -76,7 +80,6 @@ export default function StaticPageManagement({
   const isPartiallySelected =
     data.some((r) => selectedIds.has(r.id)) && !isAllSelected;
 
-  // hàm render màu badge theo từng trạng thái cụ thể
   const renderStatusBadge = (status: PageStatus) => {
     switch (status) {
       case "Published":
@@ -125,66 +128,72 @@ export default function StaticPageManagement({
             <div className="sp-custom-dropdown" ref={statusRef}>
               <div
                 className={`sp-dropdown-trigger ${isStatusOpen ? "active" : ""}`}
-                onClick={() => setIsStatusOpen(!isStatusOpen)}
+                onClick={() => {
+                  setIsStatusOpen(!isStatusOpen);
+                  if (!hasStatusOpened) setHasStatusOpened(true);
+                }}
               >
                 <span>{statusFilter === "All" ? "Status" : statusFilter}</span>
                 <ChevronDownIcon />
               </div>
-              {isStatusOpen && (
-                <div className="sp-dropdown-options">
-                  {(["All", "Published", "Draft", "Hidden"] as const).map(
-                    (opt) => (
-                      <div
-                        key={opt}
-                        className={`sp-dropdown-option ${statusFilter === opt ? "active" : ""}`}
-                        onClick={() => {
-                          actions.changeStatusFilter(opt);
-                          setIsStatusOpen(false);
-                        }}
-                      >
-                        {opt}
-                      </div>
-                    ),
-                  )}
-                </div>
-              )}
+              <div
+                className={`sp-dropdown-options ${isStatusOpen ? "open" : hasStatusOpened ? "closed" : ""}`}
+              >
+                {(["All", "Published", "Draft", "Hidden"] as const).map(
+                  (opt) => (
+                    <div
+                      key={opt}
+                      className={`sp-dropdown-option ${statusFilter === opt ? "active" : ""}`}
+                      onClick={() => {
+                        actions.changeStatusFilter(opt);
+                        setIsStatusOpen(false);
+                      }}
+                    >
+                      {opt}
+                    </div>
+                  ),
+                )}
+              </div>
             </div>
 
             <div className="sp-custom-dropdown" ref={typeRef}>
               <div
                 className={`sp-dropdown-trigger ${isTypeOpen ? "active" : ""}`}
-                onClick={() => setIsTypeOpen(!isTypeOpen)}
+                onClick={() => {
+                  setIsTypeOpen(!isTypeOpen);
+                  if (!hasTypeOpened) setHasTypeOpened(true);
+                }}
               >
                 <span>{typeFilter === "All" ? "Type" : typeFilter}</span>
                 <ChevronDownIcon />
               </div>
-              {isTypeOpen && (
-                <div className="sp-dropdown-options">
-                  {(
-                    [
-                      "All",
-                      "About Us",
-                      "Policy",
-                      "FAQ",
-                      "Contact",
-                      "Guide",
-                      "Promotion",
-                      "Company News",
-                    ] as const
-                  ).map((opt) => (
-                    <div
-                      key={opt}
-                      className={`sp-dropdown-option ${typeFilter === opt ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changeTypeFilter(opt);
-                        setIsTypeOpen(false);
-                      }}
-                    >
-                      {opt}
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div
+                className={`sp-dropdown-options ${isTypeOpen ? "open" : hasTypeOpened ? "closed" : ""}`}
+              >
+                {(
+                  [
+                    "All",
+                    "About Us",
+                    "Policy",
+                    "FAQ",
+                    "Contact",
+                    "Guide",
+                    "Promotion",
+                    "Company News",
+                  ] as const
+                ).map((opt) => (
+                  <div
+                    key={opt}
+                    className={`sp-dropdown-option ${typeFilter === opt ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changeTypeFilter(opt);
+                      setIsTypeOpen(false);
+                    }}
+                  >
+                    {opt}
+                  </div>
+                ))}
+              </div>
             </div>
 
             <button
@@ -195,7 +204,6 @@ export default function StaticPageManagement({
               Clear Filter
             </button>
 
-            {/* thao tác nhóm đẩy sang góc phải theo thiết kế */}
             <div className="sp-bulk-actions">
               <button
                 type="button"
@@ -358,7 +366,10 @@ export default function StaticPageManagement({
             <div className="sp-limit-dropdown" ref={limitRef}>
               <div
                 className={`sp-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}
-                onClick={() => setIsLimitDropdownOpen(!isLimitDropdownOpen)}
+                onClick={() => {
+                  setIsLimitDropdownOpen(!isLimitDropdownOpen);
+                  if (!hasLimitOpened) setHasLimitOpened(true);
+                }}
               >
                 <span>{pagination.limit} / page</span>
                 <div
@@ -367,22 +378,22 @@ export default function StaticPageManagement({
                   <ChevronDownIcon />
                 </div>
               </div>
-              {isLimitDropdownOpen && (
-                <div className="sp-limit-options">
-                  {[10, 20, 50].map((val) => (
-                    <div
-                      key={val}
-                      className={`sp-limit-option ${pagination.limit === val ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changeLimit(val);
-                        setIsLimitDropdownOpen(false);
-                      }}
-                    >
-                      {val} / page
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div
+                className={`sp-limit-options ${isLimitDropdownOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
+              >
+                {[10, 20, 50].map((val) => (
+                  <div
+                    key={val}
+                    className={`sp-limit-option ${pagination.limit === val ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changeLimit(val);
+                      setIsLimitDropdownOpen(false);
+                    }}
+                  >
+                    {val} / page
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

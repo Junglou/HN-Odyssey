@@ -1,14 +1,83 @@
-import { useState, type FormEvent } from "react";
+// imports
+import { useState, useRef, useEffect, type FormEvent } from "react";
 import SunEditor from "suneditor-react";
 import "suneditor/dist/css/suneditor.min.css";
 import "./StaticPageModal.css";
-import { ArrowLeftIcon } from "../../../../assets/icons/StaticPageManagementIcons";
+import {
+  ArrowLeftIcon,
+  ChevronDownIcon,
+} from "../../../../assets/icons/StaticPageManagementIcons";
 import type {
   StaticPageRecord,
   StaticPageFormData,
   PageType,
 } from "../../../../hooks/portal/Communication/StaticPageManagement/useStaticPageManagement";
 
+// helpers
+function CustomSelect({
+  value,
+  options,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (val: string) => void;
+  disabled?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [hasOpened, setHasOpened] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedLabel =
+    options.find((o) => o.value === value)?.label || "Choose category";
+
+  return (
+    <div className="sp-custom-select-wrapper" ref={ref}>
+      <div
+        className={`sp-custom-select-trigger ${isOpen ? "active" : ""} ${disabled ? "disabled" : ""}`}
+        onClick={() => {
+          if (disabled) return;
+          setIsOpen(!isOpen);
+          if (!hasOpened) setHasOpened(true);
+        }}
+      >
+        <span>{selectedLabel}</span>
+        <div className={`sp-select-arrow ${isOpen ? "open" : ""}`}>
+          <ChevronDownIcon />
+        </div>
+      </div>
+      <div
+        className={`sp-custom-select-options ${isOpen ? "open" : hasOpened ? "closed" : ""}`}
+      >
+        {options.map((opt) => (
+          <div
+            key={opt.value}
+            className={`sp-custom-select-option ${value === opt.value ? "selected" : ""}`}
+            onClick={() => {
+              onChange(opt.value);
+              setIsOpen(false);
+            }}
+          >
+            {opt.label}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// props
 interface StaticPageModalProps {
   isOpen: boolean;
   mode: "add" | "edit" | "view";
@@ -17,6 +86,7 @@ interface StaticPageModalProps {
   onSubmit: (data: StaticPageFormData) => void;
 }
 
+// constants
 const defaultFormData: StaticPageFormData = {
   title: "",
   slug: "",
@@ -25,12 +95,24 @@ const defaultFormData: StaticPageFormData = {
   status: "Draft",
 };
 
+const PAGE_TYPE_OPTIONS = [
+  { value: "About Us", label: "About Us" },
+  { value: "Policy", label: "Policy" },
+  { value: "FAQ", label: "FAQ" },
+  { value: "Contact", label: "Contact" },
+  { value: "Guide", label: "Guide" },
+  { value: "Promotion", label: "Promotion" },
+  { value: "Company News", label: "Company News" },
+];
+
+// component
 export default function StaticPageModal(props: StaticPageModalProps) {
   if (!props.isOpen) return null;
   const componentKey = props.mode === "add" ? "add-new" : props.initialData?.id;
   return <ModalContent key={componentKey} {...props} />;
 }
 
+// sub-component
 function ModalContent({
   mode,
   initialData,
@@ -58,6 +140,7 @@ function ModalContent({
         ? "Edit Static Page"
         : "Static Page Details";
 
+  // handlers
   const handleChange = (field: keyof StaticPageFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
@@ -90,6 +173,7 @@ function ModalContent({
     handleChange("slug", newSlug);
   };
 
+  // render
   return (
     <>
       <div
@@ -147,25 +231,12 @@ function ModalContent({
               <label className="sp-form-label">
                 Page Type <span className="sp-required">*</span>
               </label>
-              <select
-                className="sp-form-select"
+              <CustomSelect
                 value={formData.type}
-                onChange={(e) =>
-                  handleChange("type", e.target.value as PageType)
-                }
+                options={PAGE_TYPE_OPTIONS}
+                onChange={(val) => handleChange("type", val as PageType)}
                 disabled={isViewMode || initialData?.isSystem}
-              >
-                <option value="" disabled>
-                  Choose category
-                </option>
-                <option value="About Us">About Us</option>
-                <option value="Policy">Policy</option>
-                <option value="FAQ">FAQ</option>
-                <option value="Contact">Contact</option>
-                <option value="Guide">Guide</option>
-                <option value="Promotion">Promotion</option>
-                <option value="Company News">Company News</option>
-              </select>
+              />
             </div>
 
             <div
@@ -176,7 +247,6 @@ function ModalContent({
                 Content <span className="sp-required">*</span>
               </label>
 
-              {/* new: vùng chứa SunEditor */}
               <div
                 className={`sp-suneditor-wrapper ${isViewMode ? "disabled" : ""}`}
               >
@@ -186,7 +256,7 @@ function ModalContent({
                   disable={isViewMode}
                   setOptions={{
                     height: "350px",
-                    resizingBar: false /* new: Tắt thanh kéo giãn ở dưới cùng */,
+                    resizingBar: false,
                     buttonList: [
                       ["undo", "redo"],
                       ["font", "fontSize", "formatBlock"],

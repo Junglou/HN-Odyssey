@@ -71,6 +71,7 @@ function DrawerContent({
 
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const [hasCategoryOpened, setHasCategoryOpened] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const categoryRef = useRef<HTMLDivElement>(null);
@@ -197,7 +198,7 @@ function DrawerContent({
             />
           </div>
 
-          {/* khu vực chọn danh mục (đã chuyển thành Dropdown) */}
+          {/* khu vực chọn danh mục */}
           <div className="ban-form-group">
             <label>
               Category <span className="ban-required">*</span>
@@ -208,6 +209,7 @@ function DrawerContent({
                 onClick={() => {
                   if (!isViewMode && !isSubmitting) {
                     setIsCategoryOpen(!isCategoryOpen);
+                    if (!hasCategoryOpened) setHasCategoryOpened(true); // Sửa ở đây
                   }
                 }}
               >
@@ -218,22 +220,23 @@ function DrawerContent({
                 </span>
                 <ChevronDownIcon className={isCategoryOpen ? "open" : ""} />
               </div>
-              {isCategoryOpen && (
-                <div className="ban-drawer-dropdown-options">
-                  {ACTIVE_CATEGORIES.map((cat) => (
-                    <div
-                      key={cat}
-                      className={`ban-drawer-dropdown-option ${formData.category === cat ? "active" : ""}`}
-                      onClick={() => {
-                        handleChange("category", cat);
-                        setIsCategoryOpen(false);
-                      }}
-                    >
-                      {cat}
-                    </div>
-                  ))}
-                </div>
-              )}
+
+              <div
+                className={`ban-drawer-dropdown-options ${isCategoryOpen ? "open" : hasCategoryOpened ? "closed" : ""}`}
+              >
+                {ACTIVE_CATEGORIES.map((cat) => (
+                  <div
+                    key={cat}
+                    className={`ban-drawer-dropdown-option ${formData.category === cat ? "active" : ""}`}
+                    onClick={() => {
+                      handleChange("category", cat);
+                      setIsCategoryOpen(false);
+                    }}
+                  >
+                    {cat}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 

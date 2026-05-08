@@ -84,8 +84,7 @@
   color: #ef4444;
 }
 
-.sp-form-input,
-.sp-form-select {
+.sp-form-input {
   width: 100%;
   padding: 10px 14px;
   border: 1px solid #d1d5db;
@@ -97,19 +96,114 @@
   background-color: #ffffff;
 }
 
-.sp-form-input:focus,
-.sp-form-select:focus {
+.sp-form-input:focus {
   border-color: #000000;
 }
 
-.sp-form-input:disabled,
-.sp-form-select:disabled {
+.sp-form-input:disabled {
   background-color: #f9fafb;
   cursor: not-allowed;
   color: #6b7280;
 }
 
-/* Giao diện khung soạn thảo văn bản giả lập */
+/* custom select */
+.sp-custom-select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.sp-custom-select-trigger {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background-color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: border-color 0.2s;
+  user-select: none;
+}
+
+.sp-custom-select-trigger:hover:not(.disabled),
+.sp-custom-select-trigger.active {
+  border-color: #000000;
+}
+
+.sp-custom-select-trigger.disabled {
+  background-color: #f9fafb;
+  cursor: not-allowed;
+  color: #6b7280;
+}
+
+.sp-select-arrow {
+  display: flex;
+  align-items: center;
+  transition: transform 0.2s ease;
+}
+.sp-select-arrow svg {
+  width: 16px;
+  height: 16px;
+  color: inherit;
+}
+
+.sp-select-arrow.open {
+  transform: rotate(180deg);
+}
+
+.sp-custom-select-options {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 100%;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  max-height: 200px;
+  overflow-y: auto;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-5px);
+}
+
+.sp-custom-select-options.open {
+  pointer-events: auto;
+  animation: sp-modalSlideDown 0.2s ease-out forwards;
+  transform-origin: top center;
+}
+
+.sp-custom-select-options.closed {
+  pointer-events: none;
+  animation: sp-modalSlideUp 0.2s ease-out forwards;
+  transform-origin: top center;
+}
+
+.sp-custom-select-option {
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: #374151;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+
+.sp-custom-select-option:hover {
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+.sp-custom-select-option.selected {
+  background-color: #e5e7eb;
+  font-weight: 700;
+  color: #111827;
+}
+
+/* text editor */
 .sp-suneditor-wrapper {
   display: flex;
   flex-direction: column;
@@ -130,7 +224,14 @@
   margin: 0 4px;
 }
 
-/* Phần trạng thái (Status) */
+.sp-editor-footer {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin-top: 4px;
+  text-align: right;
+}
+
+/* status */
 .sp-status-section {
   display: flex;
   align-items: center;
@@ -207,7 +308,7 @@
 }
 
 .sp-toggle-input:checked + .sp-toggle-slider {
-  background-color: #6366f1; /* màu tím nhạt theo thiết kế cho công tắc */
+  background-color: #6366f1;
 }
 
 .sp-toggle-input:checked + .sp-toggle-slider:before {
@@ -220,7 +321,7 @@
   color: #374151;
 }
 
-/* cấu trúc flexbox cho khu vực chân trang chứa nút */
+/* footer */
 .sp-modal-footer {
   padding: 16px 24px;
   border-top: 1px solid #e5e7eb;
@@ -230,7 +331,6 @@
   background-color: #ffffff;
 }
 
-/* tạo khoảng cách giữa nút lưu và nút hủy */
 .sp-footer-buttons {
   display: flex;
   gap: 12px;
@@ -248,13 +348,13 @@
 }
 
 .sp-btn-primary {
-  background-color: #d1d5db;
+  background-color: #111827;
   color: #ffffff;
   border: none;
 }
 
 .sp-btn-primary:hover {
-  background-color: #9ca3af;
+  background-color: #374151;
 }
 
 .sp-btn-secondary {
@@ -268,11 +368,34 @@
   border-color: #9ca3af;
 }
 
+/* animations */
 @keyframes sp-slideInRight {
   from {
     transform: translateX(100%);
   }
   to {
     transform: translateX(0);
+  }
+}
+
+@keyframes sp-modalSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sp-modalSlideUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-5px);
   }
 }

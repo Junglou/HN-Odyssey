@@ -1,8 +1,9 @@
+// imports
 import { useState, useRef, useEffect } from "react";
 import "./UserModal.css";
 import { ChevronDownSmallIcon } from "../../../../assets/icons/UserManagementIcons";
 
-// model user chung
+// types
 export interface User {
   id: number;
   name: string;
@@ -13,7 +14,6 @@ export interface User {
   selected: boolean;
 }
 
-// schema form để trả dữ liệu về component cha
 export interface UserFormData {
   name: string;
   email: string;
@@ -31,12 +31,12 @@ interface UserModalProps {
   onSubmit: (data: UserFormData) => void;
 }
 
-// --- Component Custom Select dành riêng cho Modal ---
 interface DropdownOption {
   label: string;
   value: string;
 }
 
+// helpers
 function CustomModalSelect({
   name,
   value,
@@ -53,15 +53,12 @@ function CustomModalSelect({
   placeholder?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [hasOpened, setHasOpened] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
-  // Xử lý click ra ngoài để đóng menu
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -69,129 +66,150 @@ function CustomModalSelect({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const selectedLabel = options.find((opt) => opt.value === value)?.label;
+  const selectedOption = options.find((o) => o.value === value);
 
   return (
     <div
-      className={`um-modal-custom-dropdown ${isOpen ? "is-open" : ""} ${disabled ? "disabled" : ""}`}
-      ref={dropdownRef}
+      className={`um-modal-custom-dropdown ${disabled ? "disabled" : ""}`}
+      ref={ref}
     >
       <div
         className={`um-modal-dropdown-trigger ${isOpen ? "active" : ""}`}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={() => {
+          if (disabled) return;
+          setIsOpen(!isOpen);
+          if (!hasOpened) setHasOpened(true);
+        }}
       >
-        <span className={!selectedLabel ? "placeholder" : ""}>
-          {selectedLabel || placeholder}
-        </span>
+        {selectedOption ? (
+          <span>{selectedOption.label}</span>
+        ) : (
+          <span className="placeholder">{placeholder || "Select..."}</span>
+        )}
         <ChevronDownSmallIcon
           className={`um-modal-dropdown-arrow ${isOpen ? "open" : ""}`}
-          style={{ color: disabled ? "#9ca3af" : "#333" }}
         />
       </div>
-      {isOpen && !disabled && (
-        <div className="um-modal-dropdown-options">
-          {options.map((opt) => (
-            <div
-              key={opt.value}
-              className={`um-modal-dropdown-item ${value === opt.value ? "selected" : ""}`}
-              onClick={() => {
-                onChange(name, opt.value);
-                setIsOpen(false);
-              }}
-            >
-              {opt.label}
-            </div>
-          ))}
-        </div>
-      )}
+      <div
+        className={`um-modal-dropdown-options ${isOpen ? "open" : hasOpened ? "closed" : ""}`}
+      >
+        {options.map((opt) => (
+          <div
+            key={opt.value}
+            className={`um-modal-dropdown-option ${value === opt.value ? "selected" : ""}`}
+            onClick={() => {
+              onChange(name, opt.value);
+              setIsOpen(false);
+            }}
+          >
+            {opt.label}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-// Data mock cho Role
-const ROLE_OPTIONS: DropdownOption[] = [
+// constants
+const MODAL_ROLE_OPTIONS: DropdownOption[] = [
   { label: "Administrator", value: "Administrator" },
   { label: "Content Manager", value: "Content Manager" },
   { label: "Sale Staff", value: "Sale Staff" },
 ];
 
-// modal form popup
-export default function UserModal({
-  isOpen,
+// component
+export default function UserModal(props: UserModalProps) {
+  // dùng key để ép React reset lại component mỗi khi mở, loại bỏ hoàn toàn useEffect
+  if (!props.isOpen) return null;
+  const componentKey =
+    props.mode === "add" ? "add-new" : props.initialData?.id || "modal";
+  return <ModalContent key={componentKey} {...props} />;
+}
+
+// sub-component
+function ModalContent({
   mode,
   initialData,
   onClose,
   onSubmit,
-}: UserModalProps) {
-  // khởi tạo state form (tự động refresh nhờ cơ chế key ở page ngoài)
-  const [formData, setFormData] = useState<UserFormData>({
-    name: initialData?.name || "",
-    email: initialData?.email || "",
-    username: initialData?.email.split("@")[0] || "",
-    password: mode === "add" ? "" : "••••••••",
-    role: initialData?.role || "",
-    status: initialData?.status || "Active",
+}: Omit<UserModalProps, "isOpen">) {
+  // khởi tạo state trực tiếp
+  const [formData, setFormData] = useState<UserFormData>(() => {
+    if ((mode === "edit" || mode === "view") && initialData) {
+      return {
+        name: initialData.name,
+        email: initialData.email,
+        username: initialData.email.split("@")[0],
+        password: "",
+        role: initialData.role,
+        status: initialData.status,
+      };
+    }
+    return {
+      name: "",
+      email: "",
+      username: "",
+      password: "",
+      role: "",
+      status: "Active",
+    };
   });
 
-  // check flag để vô hiệu hóa input
   const isViewOnly = mode === "view";
 
-  // update state theo input text thường
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // handlers
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // update state riêng cho custom dropdown
-  const handleCustomSelectChange = (name: string, value: string) => {
+  const handleSelectChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // validate trước khi trả data ra ngoài
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleToggleStatus = () => {
+    if (isViewOnly) return;
+    setFormData((prev) => ({
+      ...prev,
+      status: prev.status === "Active" ? "Inactive" : "Active",
+    }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.role) {
-      alert("Vui lòng điền đầy đủ các trường bắt buộc (*)");
-      return;
-    }
     onSubmit(formData);
   };
 
-  // Switch khóa/kích hoạt tài khoản
-  const handleToggleStatus = () => {
-    if (!isViewOnly) {
-      setFormData((prev) => ({
-        ...prev,
-        status: prev.status === "Active" ? "Inactive" : "Active",
-      }));
-    }
-  };
-
-  if (!isOpen) return null;
-
+  // render
   return (
-    <div className="um-modal-overlay">
+    <div
+      className="um-modal-overlay"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div className="um-modal-box">
         <h2 className="um-modal-title">
           {mode === "add"
-            ? "Add User"
+            ? "Create User"
             : mode === "edit"
               ? "Edit User"
-              : "User Details"}
+              : "View User Details"}
         </h2>
-
-        <form onSubmit={handleFormSubmit} className="um-modal-form">
+        <form className="um-modal-form" onSubmit={handleSubmit}>
           <div className="um-form-group">
             <label>
-              Full Name <span className="req">*</span>
+              Name <span className="req">*</span>
             </label>
             <input
-              name="name"
               type="text"
+              name="name"
+              placeholder="e.g. John Doe"
               value={formData.name}
-              onChange={handleInputChange}
+              onChange={handleChange}
               disabled={isViewOnly}
-              placeholder="Enter full name"
               required
             />
           </div>
@@ -201,64 +219,66 @@ export default function UserModal({
               Email Address <span className="req">*</span>
             </label>
             <input
-              name="email"
               type="email"
+              name="email"
+              placeholder="e.g. john@example.com"
               value={formData.email}
-              onChange={handleInputChange}
+              onChange={handleChange}
               disabled={isViewOnly}
-              placeholder="Enter email"
               required
             />
           </div>
 
-          {/* chia hai cột username và password */}
-          <div className="um-form-row">
+          <div className="um-form-group">
+            <label>
+              Username <span className="req">*</span>
+            </label>
+            <input
+              type="text"
+              name="username"
+              placeholder="e.g. johndoe123"
+              value={formData.username}
+              onChange={handleChange}
+              disabled={isViewOnly}
+              required
+            />
+          </div>
+
+          {mode !== "view" && (
             <div className="um-form-group">
               <label>
-                Username <span className="req">*</span>
+                Password{" "}
+                {mode === "edit" ? (
+                  "(Leave blank to keep current)"
+                ) : (
+                  <span className="req">*</span>
+                )}
               </label>
               <input
-                name="username"
-                type="text"
-                value={formData.username}
-                onChange={handleInputChange}
-                disabled={isViewOnly}
-                placeholder="Enter username"
-                required
-              />
-            </div>
-            <div className="um-form-group">
-              <label>
-                Password <span className="req">*</span>
-              </label>
-              <input
-                name="password"
                 type="password"
+                name="password"
+                placeholder="Enter strong password"
                 value={formData.password}
-                onChange={handleInputChange}
-                disabled={isViewOnly}
-                placeholder="Enter password"
+                onChange={handleChange}
                 required={mode === "add"}
               />
             </div>
-          </div>
+          )}
 
           <div className="um-form-group">
             <label>
               Role <span className="req">*</span>
             </label>
-            {/* Thay thế thẻ select gốc bằng CustomModalSelect */}
             <CustomModalSelect
               name="role"
               value={formData.role}
-              options={ROLE_OPTIONS}
-              onChange={handleCustomSelectChange}
+              options={MODAL_ROLE_OPTIONS}
+              onChange={handleSelectChange}
               disabled={isViewOnly}
-              placeholder="Select Role"
+              placeholder="Select role"
             />
           </div>
 
-          {/* cụm thông tin trạng thái với toggle ui */}
           <div className="um-form-group">
             <label>{mode === "view" ? "Status" : "Account Status"}</label>
             <div className="um-modal-status-flex">
@@ -272,7 +292,6 @@ export default function UserModal({
             </div>
           </div>
 
-          {/* cụm nút */}
           <div className="um-modal-actions">
             {!isViewOnly ? (
               <>
