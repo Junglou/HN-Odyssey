@@ -98,6 +98,9 @@ export class User {
 
   @Prop({ type: Types.ObjectId, ref: 'Warehouse', default: null })
   assigned_warehouse: Types.ObjectId; // Phục vụ AC10: Phân quyền theo kho
+
+  @Prop({ type: Date, default: null })
+  last_login_at: Date;
 }
 
 export type UserDocument = User & Document;

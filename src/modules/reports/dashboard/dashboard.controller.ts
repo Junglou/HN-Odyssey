@@ -3,9 +3,7 @@ import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { PermissionsGuard } from 'src/common/guards/permissions.guard';
-import { Roles } from 'src/common/decorators/roles.decorator';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
-import { Role } from 'src/common/enums/role.enum';
 import { Resource, Action } from 'src/common/enums/resource.enum';
 import { BaseResponse } from 'src/common/dtos/base-response.dto';
 import {
@@ -20,7 +18,7 @@ export class DashboardController {
 
   // [US3 - AC3] Widget Cảnh báo tồn kho
   @Get('stock-alerts')
-  @Roles(Role.SUPER_ADMIN, Role.WAREHOUSE_MANAGER, Role.WAREHOUSE_STAFF)
+  @RequirePermissions(Resource.DASHBOARD, Action.READ)
   async getStockAlertsWidget() {
     const data = await this.dashboardService.getStockAlertsWidget();
     return new BaseResponse(

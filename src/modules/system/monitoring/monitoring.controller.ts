@@ -7,10 +7,10 @@ import {
 } from '@nestjs/terminus';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { Role } from 'src/common/enums/role.enum';
 import { BaseResponse } from 'src/common/dtos/base-response.dto';
 import { MonitoringService } from './monitoring.service';
+import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+import { Action, Resource } from 'src/common/enums/resource.enum';
 
 @Controller('admin/system-monitoring')
 export class MonitoringController {
@@ -35,7 +35,7 @@ export class MonitoringController {
   // US2 - Hiệu năng Server
   @Get('performance-stats')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @RequirePermissions(Resource.SYSTEM, Action.READ)
   async getPerformanceStats() {
     const data = await this.monitoringService.getPerformanceStats();
     return new BaseResponse(true, 'Lấy hiệu năng hệ thống thành công', data);
@@ -44,7 +44,7 @@ export class MonitoringController {
   // US5 - Trạng thái API đối tác
   @Get('third-party-status')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @RequirePermissions(Resource.SYSTEM, Action.READ)
   async getThirdPartyStatus() {
     const data = await this.monitoringService.getThirdPartyStatus();
     return new BaseResponse(true, 'Lấy trạng thái đối tác thành công', data);
@@ -53,7 +53,7 @@ export class MonitoringController {
   // US1 - AC2: Đèn trạng thái tổng quan
   @Get('status-widget')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @RequirePermissions(Resource.SYSTEM, Action.READ)
   async getSystemStatusWidget() {
     const data = await this.monitoringService.getSystemStatusWidget();
     return new BaseResponse(true, 'Lấy trạng thái hệ thống thành công', data);
@@ -62,7 +62,7 @@ export class MonitoringController {
   // US1-AC6 & US2-AC6: Lịch sử hiệu năng vẽ biểu đồ
   @Get('performance-history-24h')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @RequirePermissions(Resource.SYSTEM, Action.READ)
   async getPerformanceHistory() {
     const data = await this.monitoringService.getPerformanceHistory24h();
     return new BaseResponse(true, 'Lấy lịch sử hiệu năng 24h thành công', data);
@@ -71,7 +71,7 @@ export class MonitoringController {
   // US3 - AC6: Lấy lịch sử lỗi giao dịch thanh toán
   @Get('payment-errors')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @RequirePermissions(Resource.SYSTEM, Action.READ)
   async getPaymentErrors(
     @Query('page') page?: string,
     @Query('limit') limit?: string,

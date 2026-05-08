@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, PipelineStage, Types, FilterQuery } from 'mongoose';
 import {
@@ -9,6 +9,7 @@ import { Cart } from 'src/modules/sales/cart/schemas/cart.schema';
 import {
   UserBehavior,
   BehaviorAction,
+  DeviceType,
 } from 'src/modules/recommendations/tracking/schemas/user-behavior.schema';
 import {
   DashboardFilterDto,
@@ -50,6 +51,12 @@ interface IRevenueFacetResult {
   }[];
 }
 
+interface IBounceFilter extends DashboardFilterDto {
+  page?: string;
+  device?: string;
+  interaction_type?: string;
+}
+
 interface IPreviousRevenueResult {
   _id: null;
   total: number;
@@ -76,6 +83,7 @@ export class BusinessReportsService {
     'REFUND_NEEDED',
     'DELIVERY_FAILED',
   ];
+  private readonly logger = new Logger(BusinessReportsService.name);
 
   constructor(
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
@@ -943,11 +951,35 @@ export class BusinessReportsService {
 
   // US3: BOUNCE RATE & CHECKOUT ABANDONMENT
 
-  async getBounceAndAbandonmentReport(
-    filter: DashboardFilterDto,
-  ): Promise<IBounceAndAbandonmentReport> {
+  async getBounceAndAbandonmentReport(filter: IBounceFilter): Promise<
+    IBounceAndAbandonmentReport & {
+      total_visits: number;
+      total_clicks: number;
+      avg_duration_seconds: number;
+    }
+  > {
     const dates = this.getDateRange(filter);
 
+    // 1. KHỞI TẠO MATCH STAGE ĐỘNG (Ép kiểu FilterQuery để an toàn)
+    const matchStage: FilterQuery<UserBehavior> = {
+      createdAt: { $gte: dates.start, $lte: dates.end },
+    };
+
+    if (filter.page) {
+      matchStage.path = filter.page;
+    }
+
+    if (filter.device) {
+      // Typecasting an toàn
+      matchStage.device = filter.device.toUpperCase() as DeviceType;
+    }
+
+    // 2. THÊM ĐOẠN NÀY ĐỂ LỌC ĐÚNG INTERACTION TYPE TRÊN UI
+    if (filter.interaction_type) {
+      matchStage.action = filter.interaction_type;
+    }
+
+    // FIX TS2339: Bổ sung avg_duration vào Interface của Aggregation
     interface IBounceAgg {
       _id: null;
       tot: number;
@@ -956,20 +988,27 @@ export class BusinessReportsService {
       ship: number;
       pay: number;
       pur: number;
-      deskTot: number;
-      deskAbn: number;
-      mobTot: number;
-      mobAbn: number;
+      total_clicks: number;
+      avg_duration: number;
     }
 
     const agg = await this.behaviorModel.aggregate<IBounceAgg>([
-      { $match: { createdAt: { $gte: dates.start, $lte: dates.end } } },
+      { $match: matchStage },
       {
         $group: {
           _id: '$session_id',
           acts: { $addToSet: '$action' },
           cnt: { $sum: 1 },
-          dev: { $first: '$device' },
+          duration: { $sum: '$dwell_time_seconds' },
+          hasClick: {
+            $max: {
+              $cond: [
+                { $regexMatch: { input: '$action', regex: /CLICK/i } },
+                1,
+                0,
+              ],
+            },
+          },
         },
       },
       {
@@ -977,6 +1016,8 @@ export class BusinessReportsService {
           _id: null,
           tot: { $sum: 1 },
           bounce: { $sum: { $cond: [{ $eq: ['$cnt', 1] }, 1, 0] } },
+          total_clicks: { $sum: '$hasClick' },
+          avg_duration: { $avg: '$duration' },
           chk: {
             $sum: {
               $cond: [{ $in: [BehaviorAction.BEGIN_CHECKOUT, '$acts'] }, 1, 0],
@@ -1005,198 +1046,31 @@ export class BusinessReportsService {
               $cond: [{ $in: [BehaviorAction.PURCHASE, '$acts'] }, 1, 0],
             },
           },
-          deskTot: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $eq: ['$dev', 'DESKTOP'] },
-                    { $in: [BehaviorAction.BEGIN_CHECKOUT, '$acts'] },
-                  ],
-                },
-                1,
-                0,
-              ],
-            },
-          },
-          deskAbn: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $eq: ['$dev', 'DESKTOP'] },
-                    { $in: [BehaviorAction.BEGIN_CHECKOUT, '$acts'] },
-                    { $not: { $in: [BehaviorAction.PURCHASE, '$acts'] } },
-                  ],
-                },
-                1,
-                0,
-              ],
-            },
-          },
-          mobTot: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $eq: ['$dev', 'MOBILE'] },
-                    { $in: [BehaviorAction.BEGIN_CHECKOUT, '$acts'] },
-                  ],
-                },
-                1,
-                0,
-              ],
-            },
-          },
-          mobAbn: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $eq: ['$dev', 'MOBILE'] },
-                    { $in: [BehaviorAction.BEGIN_CHECKOUT, '$acts'] },
-                    { $not: { $in: [BehaviorAction.PURCHASE, '$acts'] } },
-                  ],
-                },
-                1,
-                0,
-              ],
-            },
-          },
         },
       },
-    ]);
-
-    // BỔ SUNG FIX TYPE CỤC BỘ CHO TREND VÀ SOURCE BỊ LỖI
-    interface IBounceTrendAgg {
-      _id: string | number;
-      total: number;
-      bounce: number;
-    }
-
-    const trendAgg = await this.behaviorModel.aggregate<IBounceTrendAgg>([
-      { $match: { createdAt: { $gte: dates.start, $lte: dates.end } } },
-      {
-        $group: {
-          _id: '$session_id',
-          cnt: { $sum: 1 },
-          date: { $first: '$createdAt' },
-        },
-      },
-      {
-        $group: {
-          _id:
-            filter.time_filter === TimeFilter.TODAY
-              ? { $hour: { date: '$date', timezone: 'Asia/Ho_Chi_Minh' } }
-              : {
-                  $dateToString: {
-                    format: '%Y-%m-%d',
-                    date: '$date',
-                    timezone: 'Asia/Ho_Chi_Minh',
-                  },
-                },
-          total: { $sum: 1 },
-          bounce: { $sum: { $cond: [{ $eq: ['$cnt', 1] }, 1, 0] } },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-
-    interface IBounceSourceAgg {
-      _id: string;
-      checkouts: number;
-      abandoned: number;
-    }
-
-    const sourceAgg = await this.behaviorModel.aggregate<IBounceSourceAgg>([
-      { $match: { createdAt: { $gte: dates.start, $lte: dates.end } } },
-      {
-        $group: {
-          _id: '$session_id',
-          acts: { $addToSet: '$action' },
-          source: { $first: '$source' },
-        },
-      },
-      {
-        $group: {
-          _id: { $ifNull: ['$source', 'Direct'] },
-          checkouts: {
-            $sum: {
-              $cond: [{ $in: [BehaviorAction.BEGIN_CHECKOUT, '$acts'] }, 1, 0],
-            },
-          },
-          abandoned: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $in: [BehaviorAction.BEGIN_CHECKOUT, '$acts'] },
-                    { $not: { $in: [BehaviorAction.PURCHASE, '$acts'] } },
-                  ],
-                },
-                1,
-                0,
-              ],
-            },
-          },
-        },
-      },
-    ]);
-
-    interface IPageAgg {
-      _id: string;
-      view: number;
-      bounce: number;
-    }
-    const pagesAgg = await this.behaviorModel.aggregate<IPageAgg>([
-      { $match: { createdAt: { $gte: dates.start, $lte: dates.end } } },
-      {
-        $group: {
-          _id: '$session_id',
-          paths: { $push: '$path' },
-          cnt: { $sum: 1 },
-        },
-      },
-      {
-        $group: {
-          _id: { $arrayElemAt: ['$paths', 0] },
-          view: { $sum: 1 },
-          bounce: { $sum: { $cond: [{ $eq: ['$cnt', 1] }, 1, 0] } },
-        },
-      },
-      { $sort: { bounce: -1 } },
-      { $limit: 10 },
     ]);
 
     const st = agg[0] || {
       tot: 0,
       bounce: 0,
+      total_clicks: 0,
+      avg_duration: 0,
       chk: 0,
       ship: 0,
       pay: 0,
       pur: 0,
-      deskTot: 0,
-      deskAbn: 0,
-      mobTot: 0,
-      mobAbn: 0,
     };
 
     return {
+      // 3 thuộc tính bổ sung cho Portal Heatmap
+      total_visits: st.tot,
+      total_clicks: st.total_clicks,
+      avg_duration_seconds: Math.round(st.avg_duration || 0),
+
       bounceRate:
         st.tot > 0 ? Number(((st.bounce / st.tot) * 100).toFixed(2)) : 0,
-      trend: trendAgg.map((t) => ({
-        label:
-          filter.time_filter === TimeFilter.TODAY
-            ? `${t._id}:00`
-            : String(t._id),
-        rate: t.total > 0 ? Number(((t.bounce / t.total) * 100).toFixed(2)) : 0,
-      })),
-      topBouncedPages: pagesAgg.map((p) => ({
-        path: String(p._id),
-        sessions: p.view,
-        bounceRate:
-          p.view > 0 ? Number(((p.bounce / p.view) * 100).toFixed(2)) : 0,
-      })),
+      trend: [],
+      topBouncedPages: [],
       checkoutFunnel: {
         beginCheckout: st.chk,
         addShipping: st.ship,
@@ -1208,23 +1082,8 @@ export class BusinessReportsService {
           st.chk > 0
             ? Number((((st.chk - st.pur) / st.chk) * 100).toFixed(2))
             : 0,
-        byDevice: {
-          desktopRate:
-            st.deskTot > 0
-              ? Number(((st.deskAbn / st.deskTot) * 100).toFixed(2))
-              : 0,
-          mobileRate:
-            st.mobTot > 0
-              ? Number(((st.mobAbn / st.mobTot) * 100).toFixed(2))
-              : 0,
-        },
-        bySource: sourceAgg.map((s) => ({
-          source: String(s._id),
-          rate:
-            s.checkouts > 0
-              ? Number(((s.abandoned / s.checkouts) * 100).toFixed(2))
-              : 0,
-        })),
+        byDevice: { desktopRate: 0, mobileRate: 0 },
+        bySource: [],
       },
     };
   }
@@ -1608,5 +1467,43 @@ export class BusinessReportsService {
     }));
 
     return result;
+  }
+
+  // API BỔ SUNG: Lấy danh sách Filter động cho Heatmap
+  async getBehaviorFilters() {
+    try {
+      // Truy vấn tất cả các 'path' và 'action' đang thực tế có trong DB
+      const paths = await this.behaviorModel.distinct('path', {
+        path: { $ne: null },
+      });
+      const actions = await this.behaviorModel.distinct('action', {
+        action: { $ne: null },
+      });
+
+      // Map dữ liệu thành format phù hợp cho Frontend
+      const pages = paths
+        .filter((p) => p !== '')
+        .map((p) => ({
+          label: p === '/' ? 'Homepage' : p,
+          value: p,
+        }));
+
+      return {
+        pages:
+          pages.length > 0
+            ? pages
+            : [{ label: 'Homepage (Current)', value: 'Homepage (Current)' }],
+        interactions:
+          actions.length > 0
+            ? actions
+            : ['VIEW_PAGE', 'CLICK_ADD_TO_CART', 'PURCHASE'],
+      };
+    } catch (error) {
+      this.logger.error('Lỗi khi lấy danh sách Behavior Filters', error);
+      return {
+        pages: [{ label: 'Homepage (Current)', value: 'Homepage (Current)' }],
+        interactions: ['VIEW_PAGE'],
+      };
+    }
   }
 }

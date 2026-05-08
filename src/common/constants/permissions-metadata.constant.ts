@@ -17,7 +17,6 @@ export const PERMISSION_METADATA = [
           Action.CREATE,
           Action.UPDATE,
           Action.DELETE,
-          Action.MANAGE,
         ],
       },
       {
@@ -98,7 +97,12 @@ export const PERMISSION_METADATA = [
       {
         code: Resource.NOTIFICATIONS,
         name: 'Thông báo (Push/Email)',
-        availableActions: [Action.READ, Action.CREATE, Action.PUBLISH],
+        availableActions: [
+          Action.READ,
+          Action.CREATE,
+          Action.UPDATE,
+          Action.PUBLISH,
+        ],
       },
       {
         code: Resource.LOYALTY,
@@ -134,7 +138,14 @@ export const PERMISSION_METADATA = [
       {
         code: Resource.CUSTOMERS,
         name: 'Khách hàng',
-        availableActions: [Action.READ, Action.UPDATE, Action.EXPORT],
+        availableActions: [
+          Action.READ,
+          Action.CREATE,
+          Action.UPDATE,
+          Action.DELETE,
+          Action.EXPORT,
+          Action.MANAGE,
+        ],
       },
     ],
   },
@@ -196,7 +207,12 @@ export const PERMISSION_METADATA = [
       {
         code: Resource.REVIEWS,
         name: 'Duyệt Đánh giá',
-        availableActions: [Action.READ, Action.APPROVE, Action.DELETE],
+        availableActions: [
+          Action.READ,
+          Action.APPROVE,
+          Action.UPDATE,
+          Action.DELETE,
+        ],
       },
     ],
   },
@@ -206,7 +222,7 @@ export const PERMISSION_METADATA = [
       {
         code: Resource.REPORTS,
         name: 'Báo cáo thống kê',
-        availableActions: [Action.READ, Action.EXPORT],
+        availableActions: [Action.READ, Action.UPDATE, Action.EXPORT],
       },
       {
         code: Resource.PAYMENT,

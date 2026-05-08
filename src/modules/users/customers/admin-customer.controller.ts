@@ -23,6 +23,7 @@ import { PaginationQueryDto } from 'src/common/dtos/pagination-query.dto';
 import { AdminUpdateCustomerDto } from './dto/admin-update-customer.dto';
 import { UpdateCustomerStatusDto } from './dto/update-status.dto';
 import { AdminCustomerQueryDto } from './dto/admin-customer-query.dto';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 
 interface IAdminUser {
   _id: string;
@@ -31,7 +32,7 @@ interface IAdminUser {
 }
 
 @Controller('admin/customers')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class CustomersAdminController {
   constructor(private readonly customersService: CustomersAdminService) {}
 
@@ -52,7 +53,7 @@ export class CustomersAdminController {
 
   // US.117 - AC1: Thêm mới hồ sơ khách hàng thủ công
   @Post()
-  @RequirePermissions(Resource.USERS, Action.MANAGE)
+  @RequirePermissions(Resource.CUSTOMERS, Action.CREATE)
   async create(
     @Body() dto: AdminCreateCustomerDto,
     @CurrentUser() user: IAdminUser,
@@ -146,7 +147,7 @@ export class CustomersAdminController {
 
   // US.117 - AC6: Xóa vĩnh viễn tài khoản (Hard delete)
   @Delete(':id/permanent')
-  @RequirePermissions(Resource.USERS, Action.DELETE)
+  @RequirePermissions(Resource.CUSTOMERS, Action.DELETE)
   async deletePermanent(
     @Param('id') id: string,
     @CurrentUser() user: IAdminUser,

@@ -18,8 +18,6 @@ import { TrackEventDto, MergeSessionDto } from './dto/track-event.dto';
 import { BaseResponse } from 'src/common/dtos/base-response.dto';
 import { ConfigService } from '@nestjs/config';
 import { Public } from 'src/common/decorators/public.decorator';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { Role } from 'src/common/enums/role.enum';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Resource, Action } from 'src/common/enums/resource.enum';
 import {
@@ -84,7 +82,6 @@ export class TrackingController {
   }
 
   @Get('campaigns')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @RequirePermissions(Resource.REPORTS, Action.READ)
   async getCampaignsReport(@Query() filter: TrackingFilterDto) {
     const data = await this.trackingService.getCampaignPerformance(filter);
@@ -92,7 +89,6 @@ export class TrackingController {
   }
 
   @Get('coupons')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @RequirePermissions(Resource.PROMOTIONS, Action.READ)
   async getCouponsReport(@Query() filter: CouponFilterDto) {
     const data = await this.trackingService.getCouponPerformance(filter);
@@ -100,7 +96,6 @@ export class TrackingController {
   }
 
   @Get('loyalty-health')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @RequirePermissions(Resource.LOYALTY, Action.READ)
   async getLoyaltyHealthReport(@Query() filter: LoyaltyFilterDto) {
     const data = await this.trackingService.getLoyaltyHealth(filter);
@@ -147,7 +142,7 @@ export class TrackingController {
 
   // US4 - AC1: Cập nhật chi phí quảng cáo (Ad Spend)
   @Patch('campaigns/:id/ad-spend')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN) // Dành cho Sales & Marketing
+  // Dành cho Sales & Marketing
   @RequirePermissions(Resource.REPORTS, Action.UPDATE)
   async updateAdSpend(
     @Param('id') id: string,
@@ -162,7 +157,6 @@ export class TrackingController {
 
   // US1 - AC8 & US4 - AC5: Biểu đồ xu hướng chiến dịch
   @Get('campaigns/:id/trend')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @RequirePermissions(Resource.REPORTS, Action.READ)
   async getCampaignTrend(
     @Param('id') id: string,
@@ -174,7 +168,6 @@ export class TrackingController {
 
   // US2 - AC2: Tra cứu chi tiết đơn hàng theo mã giảm giá
   @Get('coupons/:code/orders')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @RequirePermissions(Resource.PROMOTIONS, Action.READ)
   async getCouponOrders(
     @Param('code') code: string,

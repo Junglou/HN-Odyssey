@@ -9,6 +9,7 @@ import {
   Req,
   Query,
   Logger,
+  UseGuards,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
@@ -23,6 +24,11 @@ import {
   GHTK_INTERNAL_MAP,
 } from 'src/common/constants/shipping.constant';
 import { GhtkService } from './providers/ghtk.service';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+import { Action, Resource } from 'src/common/enums/resource.enum';
 
 interface IGhnWebhookPayload {
   OrderCode: string;
@@ -121,6 +127,8 @@ export class ShippingController {
   }
 
   @Get('sync/:orderId')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @RequirePermissions(Resource.ORDERS, Action.UPDATE)
   @ApiOperation({ summary: 'Đồng bộ trạng thái thủ công từ ĐVVC' })
   async manualSync(@Param('orderId') orderId: string, @Req() req: Request) {
     const orderRaw = await this.ordersService.findOne(orderId);

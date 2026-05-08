@@ -541,15 +541,16 @@ export class AuthService {
 
     const hashed = await bcrypt.hash(refreshToken, 10);
 
-    await this.userModel.updateOne(
-      { _id: user._id },
-      { $set: { refresh_token: hashed } },
-    );
+    // FIX: Luôn luôn cập nhật last_login_at cho bất kỳ ai login thành công
+    const updatePayload: Record<string, any> = {
+      refresh_token: hashed,
+      last_login_at: new Date(), // Cập nhật cho mọi user
+    };
+
+    await this.userModel.updateOne({ _id: user._id }, { $set: updatePayload });
 
     let employeeCode: string | undefined = undefined;
-
     if ('employee_code' in user) {
-      // Ép kiểu user sang Staff để lấy employee_code mà không bị Eslint báo lỗi
       const staffUser = user as unknown as Staff;
       employeeCode = staffUser.employee_code;
     }
@@ -577,18 +578,6 @@ export class AuthService {
       ip: ip,
       user_agent: userAgent,
     });
-
-    const currentHour = new Date().getHours();
-
-    // AC5: Cảnh báo ngoài giờ làm việc (Từ 23h đêm đến 5h sáng)
-    if (currentHour >= 23 || currentHour <= 5) {
-      this.eventEmitter.emit(NOTIFY_EVENTS.SECURITY_ALERT, {
-        severity: 'MEDIUM',
-        message: `Tài khoản ${user.email} vừa đăng nhập vào khung giờ lạ (${currentHour}h sáng). IP: ${ip}`,
-        user_id: user._id.toString(),
-        ip: ip,
-      });
-    }
 
     return {
       access_token: accessToken,

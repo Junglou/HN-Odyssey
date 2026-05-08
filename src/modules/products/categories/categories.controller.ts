@@ -14,8 +14,6 @@ import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { UpdateCategoryOrderDto } from './dto/update-category-order.dto';
-import { Roles } from '../../../common/decorators/roles.decorator';
-import { Role } from '../../../common/enums/role.enum';
 import { Public } from '../../../common/decorators/public.decorator';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
@@ -107,7 +105,6 @@ export class CategoriesController {
   }
 
   @Delete('delete/:id')
-  @Roles(Role.SUPER_ADMIN)
   @RequirePermissions(Resource.CATEGORIES, Action.DELETE)
   remove(
     @Param('id') id: string,

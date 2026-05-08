@@ -8,8 +8,6 @@ import {
 } from 'src/common/interfaces/business-report.interface';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { Role } from 'src/common/enums/role.enum';
 import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
@@ -21,7 +19,6 @@ export class BusinessReportsController {
   constructor(private readonly reportsService: BusinessReportsService) {}
 
   @Get('revenue')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @RequirePermissions(Resource.REPORTS, Action.READ)
   async getRevenueReport(
     @Query() filter: DashboardFilterDto,
@@ -31,7 +28,6 @@ export class BusinessReportsController {
   }
 
   @Get('retention')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @RequirePermissions(Resource.REPORTS, Action.READ)
   async getRetentionReport(
     @Query() filter: DashboardFilterDto,
@@ -45,7 +41,6 @@ export class BusinessReportsController {
   }
 
   @Get('abandoned-carts')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @RequirePermissions(Resource.REPORTS, Action.READ)
   async getAbandonedCarts(@Query() filter: DashboardFilterDto) {
     const data = await this.reportsService.getAbandonedProducts(filter);
@@ -57,7 +52,6 @@ export class BusinessReportsController {
   }
 
   @Get('conversion')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @RequirePermissions(Resource.REPORTS, Action.READ)
   async getConversionReport(@Query() filter: DashboardFilterDto) {
     const data = await this.reportsService.getConversionReport(filter);
@@ -69,7 +63,6 @@ export class BusinessReportsController {
   }
 
   @Get('behavior-abandonment')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @RequirePermissions(Resource.REPORTS, Action.READ)
   async getBehaviorAndAbandonmentReport(@Query() filter: DashboardFilterDto) {
     const data =
@@ -84,7 +77,6 @@ export class BusinessReportsController {
   //  CÁC ROUTE NÂNG CAO (BI ADVANCED)
 
   @Get('inventory-correlation')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @RequirePermissions(Resource.REPORTS, Action.READ)
   async getInventoryCorrelation(@Query() filter: ReportFilterDto) {
     const data = await this.reportsService.getInventorySalesCorrelation(filter);
@@ -96,7 +88,6 @@ export class BusinessReportsController {
   }
 
   @Get('yoy-comparison')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @RequirePermissions(Resource.REPORTS, Action.READ)
   async getYoYComparison(@Query('year') year: string) {
     const targetYear = year || new Date().getFullYear().toString();
@@ -109,13 +100,23 @@ export class BusinessReportsController {
   }
 
   @Get('forecast')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @RequirePermissions(Resource.REPORTS, Action.READ)
   async getRevenueForecast() {
     const data = await this.reportsService.getRevenueForecast();
     return new BaseResponse(
       true,
       'Lấy dự báo doanh thu tương lai thành công',
+      data,
+    );
+  }
+
+  @Get('behavior-filters')
+  @RequirePermissions(Resource.REPORTS, Action.READ)
+  async getBehaviorFilters() {
+    const data = await this.reportsService.getBehaviorFilters();
+    return new BaseResponse(
+      true,
+      'Lấy danh sách bộ lọc hành vi thành công',
       data,
     );
   }

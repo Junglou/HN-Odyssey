@@ -27,6 +27,7 @@ import { Role, RoleDocument } from '../roles/schemas/role.schema';
 import { RoleLevel } from 'src/common/enums/role-level.enum';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
+import { BulkChangeStatusDto, BulkDeleteDto } from './dto/bulk-action.dto';
 
 interface MongoError extends Error {
   code?: number;
@@ -271,7 +272,7 @@ export class AdminService {
       }
     }
 
-    if (id === currentUserId && dto.is_active === false) {
+    if (id === currentUserId.toString() && dto.is_active === false) {
       throw new ForbiddenException('Không thể tự khóa chính mình.');
     }
 
@@ -375,7 +376,7 @@ export class AdminService {
     const user = await this.userModel.findById(id);
     if (!user) throw new NotFoundException('Nhân sự không tồn tại.');
 
-    if (id === currentUserId) {
+    if (id === currentUserId.toString()) {
       throw new ForbiddenException(
         'Bạn không thể tự vô hiệu hóa tài khoản của chính mình.',
       );
@@ -438,7 +439,11 @@ export class AdminService {
     };
 
     if (search) {
-      filter.$text = { $search: search };
+      filter.$or = [
+        { email: { $regex: search, $options: 'i' } }, // Tìm theo email (không phân biệt hoa thường)
+        { first_Name: { $regex: search, $options: 'i' } }, // Tìm theo tên
+        { last_Name: { $regex: search, $options: 'i' } }, // Tìm theo họ
+      ];
     }
 
     if (employee_code) {
@@ -456,10 +461,12 @@ export class AdminService {
       if (isActiveBool) {
         filter.status = UserStatus.ACTIVE;
       } else {
-        filter.status = {
-          $in: [UserStatus.SUSPENDED, UserStatus.TERMINATED] as any[],
-        };
+        // [FIXED] Chỉ lấy những tài khoản bị KHÓA, tuyệt đối KHÔNG lấy tài khoản đã XÓA
+        filter.status = UserStatus.SUSPENDED;
       }
+    } else {
+      // [FIXED] BẮT BUỘC: Mặc định luôn ẩn các tài khoản đã bị xóa (Terminated)
+      filter.status = { $ne: UserStatus.TERMINATED };
     }
 
     const [total, users] = await Promise.all([
@@ -508,7 +515,7 @@ export class AdminService {
     const user = await this.userModel.findById(id);
     if (!user) throw new NotFoundException('Nhân sự không tồn tại.');
 
-    if (id === actorId)
+    if (id === actorId.toString())
       throw new ForbiddenException(
         'Không thể tự thay đổi trạng thái của chính mình.',
       );
@@ -541,5 +548,105 @@ export class AdminService {
     });
 
     return { message: 'Cập nhật trạng thái thành công.' };
+  }
+
+  // 6. CẬP NHẬT TRẠNG THÁI HÀNG LOẠT
+  async bulkChangeStatus(
+    dto: BulkChangeStatusDto,
+    adminId: string,
+    ip: string,
+    userAgent: string,
+  ) {
+    let targetIds = dto.userIds;
+    if (!dto.is_active) {
+      targetIds = dto.userIds.filter((id) => id !== adminId.toString());
+      if (targetIds.length === 0) {
+        throw new ForbiddenException(
+          'Bạn không thể tự khóa tài khoản của chính mình.',
+        );
+      }
+    }
+
+    const newStatus = dto.is_active ? UserStatus.ACTIVE : UserStatus.SUSPENDED;
+
+    // Định nghĩa rõ type thay vì dùng 'any' để Eslint hết báo lỗi unsafe
+    const updateData: {
+      $set: { status: UserStatus };
+      $inc?: { token_version: number };
+    } = {
+      $set: { status: newStatus },
+    };
+
+    // Nếu khóa (is_active = false), thì tăng token_version để force logout
+    if (!dto.is_active) {
+      updateData.$inc = { token_version: 1 };
+    }
+
+    const result = await this.staffModel.updateMany(
+      { _id: { $in: targetIds } }, // Chỉ update những ID đã được lọc
+      updateData,
+    );
+
+    // 2. Ghi Audit Log chuẩn theo DTO của hệ thống
+    await this.auditLogsService.log({
+      action: 'BULK_CHANGE_STAFF_STATUS',
+      collection_name: 'users',
+      actor_id: adminId,
+      department: Department.MANAGEMENT,
+      detail: {
+        target_ids: targetIds,
+        new_status: newStatus,
+        modified_count: result.modifiedCount,
+      },
+      ip,
+      user_agent: userAgent,
+    });
+
+    return {
+      message: `Đã cập nhật trạng thái cho ${result.modifiedCount} tài khoản`,
+    };
+  }
+
+  // 7. XÓA MỀM HÀNG LOẠT
+  async bulkSoftDelete(
+    dto: BulkDeleteDto,
+    adminId: string,
+    ip: string,
+    userAgent: string,
+  ) {
+    const targetIds = dto.userIds.filter((id) => id !== adminId.toString());
+
+    // THÊM ĐOẠN NÀY ĐỂ CHẶN ADMIN TỰ SÁT:
+    if (targetIds.length === 0) {
+      throw new ForbiddenException(
+        'Bạn không thể tự xóa tài khoản của chính mình.',
+      );
+    }
+
+    // Xóa mềm: Đổi status thành TERMINATED và force logout
+    const result = await this.staffModel.updateMany(
+      { _id: { $in: targetIds } },
+      {
+        $set: { status: UserStatus.TERMINATED },
+        $inc: { token_version: 1 },
+      },
+    );
+
+    // Ghi Audit Log chuẩn
+    await this.auditLogsService.log({
+      action: 'BULK_DELETE_STAFF',
+      collection_name: 'users',
+      actor_id: adminId,
+      department: Department.MANAGEMENT,
+      detail: {
+        target_ids: targetIds,
+        reason: 'Bulk soft delete request by Admin',
+        modified_count: result.modifiedCount,
+      },
+      ip,
+      user_agent: userAgent,
+    });
+
+    return { message: `Đã vô hiệu hóa ${result.modifiedCount} tài khoản` };
   }
 }

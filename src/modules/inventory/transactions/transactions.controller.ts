@@ -170,7 +170,7 @@ export class TransactionsController {
   }
 
   @Post('export/:id/cancel')
-  @RequirePermissions(Resource.TRANSFERS, Action.UPDATE)
+  @RequirePermissions(Resource.TRANSFERS, Action.CANCEL)
   async cancelExportNote(
     @Param('id') id: string,
     @Body('reason') reason: string,

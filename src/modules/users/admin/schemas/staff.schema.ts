@@ -12,9 +12,6 @@ export class Staff extends User {
   // Phân quyền chi tiết (RBAC)
   @Prop([String])
   permissions: string[]; // VD: ['MANAGE_ORDER', 'VIEW_REPORT', 'APPROVE_RETURN']
-
-  @Prop({ type: Date })
-  last_login_at: Date; // Để theo dõi hoạt động nhân viên
 }
 
 export const StaffSchema = SchemaFactory.createForClass(Staff);

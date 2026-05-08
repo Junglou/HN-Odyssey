@@ -14,8 +14,6 @@ import { TagsService } from './tags.service';
 import { CreateTagDto } from './dto/create-tag.dto';
 import { UpdateTagDto } from './dto/update-tag.dto';
 import { TagScope } from '../../../common/enums/tag-scope.enum';
-import { Roles } from '../../../common/decorators/roles.decorator';
-import { Role } from '../../../common/enums/role.enum';
 import { MergeTagsDto } from './dto/merge-tag.dto';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
@@ -57,7 +55,6 @@ export class TagsController {
   }
 
   @Delete(':id')
-  @Roles(Role.SUPER_ADMIN)
   @RequirePermissions(Resource.ATTRIBUTES, Action.DELETE)
   remove(
     @Param('id') id: string,
@@ -69,7 +66,6 @@ export class TagsController {
   }
 
   @Post('merge')
-  @Roles(Role.SUPER_ADMIN)
   @RequirePermissions(Resource.ATTRIBUTES, Action.UPDATE)
   merge(
     @Body() mergeDto: MergeTagsDto,

@@ -25,8 +25,6 @@ import {
   UpdateProductPriceDto,
   UpdateProductStatusDto,
 } from './dto/update-product.dto';
-import { Roles } from '../../../common/decorators/roles.decorator';
-import { Role } from '../../../common/enums/role.enum';
 import { Public } from '../../../common/decorators/public.decorator';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
@@ -143,7 +141,6 @@ export class ProductsController {
 
   @Get('price-requests/pending')
   @RequirePermissions(Resource.PRODUCTS, Action.READ)
-  @Roles(Role.SUPER_ADMIN)
   findPendingPriceRequests(@Query() query: ProductQueryParam) {
     return this.productsService.findPendingPriceRequests(query);
   }
@@ -174,7 +171,6 @@ export class ProductsController {
 
   @Patch(':id/status')
   @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
-  @Roles(Role.SUPER_ADMIN)
   updateStatus(
     @Param('id') id: string,
     @Body() statusDto: UpdateProductStatusDto,
@@ -214,7 +210,6 @@ export class ProductsController {
   // US.77: Quản lý duyệt giá
   @Patch(':id/price-approval')
   @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
-  @Roles(Role.SUPER_ADMIN)
   approvePrice(
     @Param('id') id: string,
     @Body('action') action: 'approve' | 'reject',
@@ -233,7 +228,6 @@ export class ProductsController {
 
   @Delete(':id')
   @RequirePermissions(Resource.PRODUCTS, Action.DELETE)
-  @Roles(Role.SUPER_ADMIN)
   remove(
     @Param('id') id: string,
     @CurrentUser() user: IUser,
@@ -315,7 +309,6 @@ export class ProductsController {
   // AC3: Quản lý duyệt/từ chối HÀNG LOẠT
   @Patch('price-requests/bulk-action')
   @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
-  @Roles(Role.SUPER_ADMIN)
   bulkApprovePrice(
     @Body()
     body: {
@@ -400,7 +393,7 @@ export class ProductsController {
 
   // Trong products.controller.ts
   @Get('trigger-algolia-setup')
-  @Roles(Role.SUPER_ADMIN)
+  @RequirePermissions(Resource.SYSTEM, Action.UPDATE)
   async triggerAlgoliaSetup() {
     return this.algoliaService.setupAlgoliaIndicesAndReplicas();
   }

@@ -30,6 +30,7 @@ import {
   UpdatePostDto,
   UpdateStaticPageDto,
 } from './dto/update-content.dto';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 
 interface RequestWithUser extends Request {
   user: {
@@ -46,7 +47,7 @@ export class ContentController {
   // API: BLOG POSTS (US.125)
 
   @Post('posts')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @RequirePermissions(Resource.BLOG, Action.CREATE)
   async createPost(@Body() dto: CreatePostDto, @Req() req: RequestWithUser) {
     const data = await this.contentService.createPost(

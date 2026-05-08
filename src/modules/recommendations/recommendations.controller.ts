@@ -42,8 +42,6 @@ import { AuditLogsService } from '../system/audit-logs/audit-logs.service';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { PermissionsGuard } from 'src/common/guards/permissions.guard';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { Role } from 'src/common/enums/role.enum';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 
 export class SubmitFeedbackDto implements IRecommendationFeedback {
@@ -278,7 +276,6 @@ export class RecommendationsController {
 
   // API dành riêng cho Admin báo cáo
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   @RequirePermissions(Resource.REPORTS, Action.READ)
   @Get('admin/replenishment-list')
   async getAdminReplenishment(@Req() req: RequestWithUser) {

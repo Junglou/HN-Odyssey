@@ -26,8 +26,6 @@ import { LoginDto } from './dto/login.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { CreateRecoveryDto } from './dto/create-recovery.dto';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { Role } from '../../common/enums/role.enum';
 import { ProcessRecoveryDto } from './dto/process-recovery.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
@@ -238,7 +236,6 @@ export class AuthController {
 
   //8. ADMIN: LẤY DANH SÁCH YÊU CẦU (AC3)
   @Get('admin/recovery-requests')
-  @Roles(Role.SUPER_ADMIN)
   @RequirePermissions(Resource.USERS, Action.READ)
   async getPendingRecoveries() {
     return this.authService.getPendingRecoveries();
@@ -246,7 +243,6 @@ export class AuthController {
 
   //9. ADMIN: DUYỆT/TỪ CHỐI (AC4, AC5)
   @Post('admin/recovery-requests/process/:id')
-  @Roles(Role.SUPER_ADMIN)
   @RequirePermissions(Resource.USERS, Action.UPDATE)
   async processRecovery(
     @Param('id') id: string,

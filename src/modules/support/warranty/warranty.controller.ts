@@ -11,8 +11,6 @@ import {
 import { WarrantyService } from './warranty.service';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { Role } from 'src/common/enums/role.enum';
 import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Resource, Action } from 'src/common/enums/resource.enum';
@@ -48,7 +46,6 @@ export class WarrantyController {
   //  AC8 & AC10: ADMIN CẬP NHẬT TRẠNG THÁI
   @Patch('admin/claim/:id/status')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   @RequirePermissions(Resource.WARRANTY, Action.UPDATE)
   async updateClaimStatus(
     @Param('id') claimId: string,

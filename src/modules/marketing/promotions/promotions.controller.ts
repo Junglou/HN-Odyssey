@@ -25,9 +25,10 @@ import { UpdateCouponDto } from './dto/update-coupon.dto';
 import type { RequestWithUser } from 'src/common/interfaces/request-with-user.interface';
 import type { QueryFlashSaleDto } from './flash-sales.service';
 import type { QueryCouponDto } from './coupons.service';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 
 @Controller('promotions')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class PromotionsController {
   constructor(
     private readonly promotionService: PromotionEngineService,

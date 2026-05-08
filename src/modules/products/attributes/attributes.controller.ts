@@ -12,8 +12,6 @@ import {
 import { AttributesService } from './attributes.service';
 import { CreateAttributeDto } from './dto/create-attribute.dto';
 import { UpdateAttributeDto } from './dto/update-attribute.dto';
-import { Roles } from '../../../common/decorators/roles.decorator';
-import { Role } from '../../../common/enums/role.enum';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
 import { Public } from 'src/common/decorators/public.decorator';
@@ -76,7 +74,6 @@ export class AttributesController {
 
   // 5. XÓA
   @Delete(':id')
-  @Roles(Role.SUPER_ADMIN)
   @RequirePermissions(Resource.ATTRIBUTES, Action.DELETE)
   remove(
     @Param('id') id: string,

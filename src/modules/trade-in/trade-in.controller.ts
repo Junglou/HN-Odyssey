@@ -51,7 +51,6 @@ export class TradeInController {
   //  CỦA ADMIN (AC9)
   @Patch('admin/request/:id/inspect')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   @RequirePermissions(Resource.TRADE_IN, Action.UPDATE)
   async inspectItem(
     @Req() req: RequestWithUser,
@@ -63,7 +62,6 @@ export class TradeInController {
 
   @Patch('admin/request/:id/payout')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   @RequirePermissions(Resource.TRADE_IN, Action.APPROVE)
   async processPayout(@Req() req: RequestWithUser, @Param('id') id: string) {
     return this.tradeInService.processPayout(req.user._id, id);
@@ -88,7 +86,6 @@ export class TradeInController {
   //  API CHO AC9 (Admin)
   @Get('admin/requests')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   @RequirePermissions(Resource.TRADE_IN, Action.READ)
   async getAdminRequests(@Query() query: QueryAdminTradeInDto) {
     return this.tradeInService.getAdminRequests(query);
