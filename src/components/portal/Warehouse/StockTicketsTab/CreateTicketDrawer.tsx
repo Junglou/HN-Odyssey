@@ -49,13 +49,13 @@ interface UITicketItem extends TicketItem {
   uiId: string;
 }
 
-// custom dropdown component
+// dropdown
 function CustomDrawerDropdown({
   value,
   options,
   onChange,
   placeholder = "Select...",
-  showSearch = false, // thêm cờ bật tắt ô tìm kiếm
+  showSearch = false,
 }: {
   value: string;
   options: { value: string; label: string }[];
@@ -64,7 +64,8 @@ function CustomDrawerDropdown({
   showSearch?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(""); // state lưu từ khóa
+  const [hasOpened, setHasOpened] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -79,6 +80,7 @@ function CustomDrawerDropdown({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
   const selectedOption = options.find((opt) => opt.value === value);
 
   const filteredOptions = options.filter((opt) =>
@@ -89,7 +91,10 @@ function CustomDrawerDropdown({
     <div className="ctd-custom-dropdown" ref={dropdownRef}>
       <div
         className={`ctd-dropdown-trigger ${isOpen ? "active" : ""}`}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          setIsOpen(!isOpen);
+          if (!hasOpened) setHasOpened(true);
+        }}
       >
         <span className={!selectedOption ? "placeholder" : ""}>
           {selectedOption ? selectedOption.label : placeholder}
@@ -98,41 +103,42 @@ function CustomDrawerDropdown({
           className={`ctd-dropdown-arrow ${isOpen ? "open" : ""}`}
         />
       </div>
-      {isOpen && (
-        <div className="ctd-dropdown-options">
-          {/* Ô nhập từ khóa tìm kiếm */}
-          {showSearch && (
-            <div className="ctd-dropdown-search">
-              <input
-                type="text"
-                placeholder="Search SKU..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                autoFocus
-              />
-            </div>
-          )}
 
-          {/* Render danh sách đã lọc */}
-          {filteredOptions.length > 0 ? (
-            filteredOptions.map((opt) => (
-              <div
-                key={opt.value}
-                className={`ctd-dropdown-option ${value === opt.value ? "selected" : ""}`}
-                onClick={() => {
-                  onChange(opt.value);
-                  setIsOpen(false);
-                }}
-              >
-                {opt.label}
-              </div>
-            ))
-          ) : (
-            <div className="ctd-dropdown-empty">No results found.</div>
-          )}
-        </div>
-      )}
+      <div
+        className={`ctd-dropdown-options ${isOpen ? "open" : hasOpened ? "closed" : ""}`}
+      >
+        {/* Ô nhập từ khóa tìm kiếm */}
+        {showSearch && (
+          <div className="ctd-dropdown-search">
+            <input
+              type="text"
+              placeholder="Search SKU..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              autoFocus
+            />
+          </div>
+        )}
+
+        {/* Render danh sách đã lọc */}
+        {filteredOptions.length > 0 ? (
+          filteredOptions.map((opt) => (
+            <div
+              key={opt.value}
+              className={`ctd-dropdown-option ${value === opt.value ? "selected" : ""}`}
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+            >
+              {opt.label}
+            </div>
+          ))
+        ) : (
+          <div className="ctd-dropdown-empty">No results found.</div>
+        )}
+      </div>
     </div>
   );
 }

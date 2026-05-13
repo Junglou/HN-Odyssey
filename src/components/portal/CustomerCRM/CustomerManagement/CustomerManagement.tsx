@@ -63,7 +63,9 @@ export default function CustomerManagement({
   bulkActions,
 }: CustomerManagementProps) {
   const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const [hasStatusOpened, setHasStatusOpened] = useState(false);
   const [isTypeOpen, setIsTypeOpen] = useState(false);
+  const [hasTypeOpened, setHasTypeOpened] = useState(false);
   const [openActionId, setOpenActionId] = useState<string | null>(null);
 
   const statusRef = useRef<HTMLDivElement>(null);
@@ -71,6 +73,7 @@ export default function CustomerManagement({
   const actionMenuRef = useRef<HTMLDivElement>(null);
 
   const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
+  const [hasLimitOpened, setHasLimitOpened] = useState(false);
   const limitRef = useRef<HTMLDivElement>(null);
 
   useClickOutside(statusRef, () => setIsStatusOpen(false));
@@ -138,37 +141,43 @@ export default function CustomerManagement({
             <div className="crm-custom-dropdown" ref={statusRef}>
               <div
                 className="crm-dropdown-trigger"
-                onClick={() => setIsStatusOpen(!isStatusOpen)}
+                onClick={() => {
+                  setIsStatusOpen(!isStatusOpen);
+                  if (!hasStatusOpened) setHasStatusOpened(true);
+                }}
               >
                 <span>{statusFilter === "All" ? "Status" : statusFilter}</span>
                 <ChevronDownSmallIcon
                   className={`crm-dropdown-arrow ${isStatusOpen ? "open" : ""}`}
                 />
               </div>
-              {isStatusOpen && (
-                <div className="crm-dropdown-options">
-                  {(["All", "Active", "Inactive", "Locked"] as const).map(
-                    (opt) => (
-                      <div
-                        key={opt}
-                        className={`crm-dropdown-option ${statusFilter === opt ? "active" : ""}`}
-                        onClick={() => {
-                          actions.changeStatusFilter(opt);
-                          setIsStatusOpen(false);
-                        }}
-                      >
-                        {opt}
-                      </div>
-                    ),
-                  )}
-                </div>
-              )}
+              <div
+                className={`crm-dropdown-options ${isStatusOpen ? "open" : hasStatusOpened ? "closed" : ""}`}
+              >
+                {(["All", "Active", "Inactive", "Locked"] as const).map(
+                  (opt) => (
+                    <div
+                      key={opt}
+                      className={`crm-dropdown-option ${statusFilter === opt ? "active" : ""}`}
+                      onClick={() => {
+                        actions.changeStatusFilter(opt);
+                        setIsStatusOpen(false);
+                      }}
+                    >
+                      {opt}
+                    </div>
+                  ),
+                )}
+              </div>
             </div>
 
             <div className="crm-custom-dropdown" ref={typeRef}>
               <div
                 className="crm-dropdown-trigger"
-                onClick={() => setIsTypeOpen(!isTypeOpen)}
+                onClick={() => {
+                  setIsTypeOpen(!isTypeOpen);
+                  if (!hasTypeOpened) setHasTypeOpened(true);
+                }}
               >
                 <span>
                   {typeFilter === "All" ? "Customer Type" : typeFilter}
@@ -177,31 +186,31 @@ export default function CustomerManagement({
                   className={`crm-dropdown-arrow ${isTypeOpen ? "open" : ""}`}
                 />
               </div>
-              {isTypeOpen && (
-                <div className="crm-dropdown-options">
-                  {(
-                    [
-                      "All",
-                      "Standard",
-                      "Trade-in Customer",
-                      "Silver",
-                      "Gold",
-                      "VIP",
-                    ] as const
-                  ).map((opt) => (
-                    <div
-                      key={opt}
-                      className={`crm-dropdown-option ${typeFilter === opt ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changeTypeFilter(opt);
-                        setIsTypeOpen(false);
-                      }}
-                    >
-                      {opt}
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div
+                className={`crm-dropdown-options ${isTypeOpen ? "open" : hasTypeOpened ? "closed" : ""}`}
+              >
+                {(
+                  [
+                    "All",
+                    "Standard",
+                    "Trade-in Customer",
+                    "Silver",
+                    "Gold",
+                    "VIP",
+                  ] as const
+                ).map((opt) => (
+                  <div
+                    key={opt}
+                    className={`crm-dropdown-option ${typeFilter === opt ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changeTypeFilter(opt);
+                      setIsTypeOpen(false);
+                    }}
+                  >
+                    {opt}
+                  </div>
+                ))}
+              </div>
             </div>
 
             <button
@@ -455,7 +464,10 @@ export default function CustomerManagement({
             <div className="crm-limit-dropdown" ref={limitRef}>
               <div
                 className={`crm-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}
-                onClick={() => setIsLimitDropdownOpen(!isLimitDropdownOpen)}
+                onClick={() => {
+                  setIsLimitDropdownOpen(!isLimitDropdownOpen);
+                  if (!hasLimitOpened) setHasLimitOpened(true);
+                }}
               >
                 <span>{pagination.limit} / page</span>
                 <div
@@ -464,22 +476,22 @@ export default function CustomerManagement({
                   <ChevronDownSmallIcon />
                 </div>
               </div>
-              {isLimitDropdownOpen && (
-                <div className="crm-limit-options">
-                  {[10, 20, 50].map((val) => (
-                    <div
-                      key={val}
-                      className={`crm-limit-option ${pagination.limit === val ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changeLimit(val);
-                        setIsLimitDropdownOpen(false);
-                      }}
-                    >
-                      {val} / page
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div
+                className={`crm-limit-options ${isLimitDropdownOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
+              >
+                {[10, 20, 50].map((val) => (
+                  <div
+                    key={val}
+                    className={`crm-limit-option ${pagination.limit === val ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changeLimit(val);
+                      setIsLimitDropdownOpen(false);
+                    }}
+                  >
+                    {val} / page
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

@@ -38,6 +38,7 @@ export default function UpdateStatusModal({
 
   // dropdown states
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [hasDropdownOpened, setHasDropdownOpened] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // logic: sync currentStatus
@@ -82,7 +83,10 @@ export default function UpdateStatusModal({
             <div className="usm-custom-dropdown" ref={dropdownRef}>
               <div
                 className={`usm-dropdown-trigger ${isDropdownOpen ? "active" : ""}`}
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                onClick={() => {
+                  setIsDropdownOpen(!isDropdownOpen);
+                  if (!hasDropdownOpened) setHasDropdownOpened(true);
+                }}
               >
                 <span>{selectedStatus}</span>
                 <div
@@ -92,24 +96,24 @@ export default function UpdateStatusModal({
                 </div>
               </div>
 
-              {isDropdownOpen && (
-                <div className="usm-dropdown-options">
-                  {STATUS_LIST.map((status) => (
-                    <div
-                      key={status}
-                      className={`usm-dropdown-option ${
-                        selectedStatus === status ? "selected" : ""
-                      }`}
-                      onClick={() => {
-                        setSelectedStatus(status);
-                        setIsDropdownOpen(false);
-                      }}
-                    >
-                      {status}
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div
+                className={`usm-dropdown-options ${isDropdownOpen ? "open" : hasDropdownOpened ? "closed" : ""}`}
+              >
+                {STATUS_LIST.map((status) => (
+                  <div
+                    key={status}
+                    className={`usm-dropdown-option ${
+                      selectedStatus === status ? "selected" : ""
+                    }`}
+                    onClick={() => {
+                      setSelectedStatus(status);
+                      setIsDropdownOpen(false);
+                    }}
+                  >
+                    {status}
+                  </div>
+                ))}
+              </div>
             </div>
 
             <textarea

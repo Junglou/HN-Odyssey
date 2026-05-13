@@ -15,7 +15,7 @@ interface FinalizeValueModalProps {
   ) => void;
 }
 
-// options - Chốt theo thiết kế: Chỉ Voucher / Dịch vụ / Điểm thưởng
+// options
 const PAYOUT_METHODS = [
   "Store Credit / Voucher",
   "Reward Points",
@@ -36,6 +36,7 @@ export default function FinalizeValueModal({
 
   const [prevIsOpen, setPrevIsOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [hasDropdownOpened, setHasDropdownOpened] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // logic: reset state safely
@@ -46,6 +47,7 @@ export default function FinalizeValueModal({
       setMethod(PAYOUT_METHODS[0]);
       setNote("");
       setIsDropdownOpen(false);
+      setHasDropdownOpened(false);
     }
   }
 
@@ -101,7 +103,10 @@ export default function FinalizeValueModal({
             <div className="fvm-custom-dropdown" ref={dropdownRef}>
               <div
                 className={`fvm-dropdown-trigger ${isDropdownOpen ? "active" : ""}`}
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                onClick={() => {
+                  setIsDropdownOpen(!isDropdownOpen);
+                  if (!hasDropdownOpened) setHasDropdownOpened(true);
+                }}
               >
                 <span>{method}</span>
                 <div
@@ -111,22 +116,22 @@ export default function FinalizeValueModal({
                 </div>
               </div>
 
-              {isDropdownOpen && (
-                <div className="fvm-dropdown-options">
-                  {PAYOUT_METHODS.map((m) => (
-                    <div
-                      key={m}
-                      className={`fvm-dropdown-option ${method === m ? "selected" : ""}`}
-                      onClick={() => {
-                        setMethod(m);
-                        setIsDropdownOpen(false);
-                      }}
-                    >
-                      {m}
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div
+                className={`fvm-dropdown-options ${isDropdownOpen ? "open" : hasDropdownOpened ? "closed" : ""}`}
+              >
+                {PAYOUT_METHODS.map((m) => (
+                  <div
+                    key={m}
+                    className={`fvm-dropdown-option ${method === m ? "selected" : ""}`}
+                    onClick={() => {
+                      setMethod(m);
+                      setIsDropdownOpen(false);
+                    }}
+                  >
+                    {m}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 

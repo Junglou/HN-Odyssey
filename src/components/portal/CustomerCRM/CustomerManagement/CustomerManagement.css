@@ -580,6 +580,24 @@
   font-weight: 700;
 }
 
+/* animation */
+.crm-dropdown-options:not(.open):not(.closed),
+.crm-limit-options:not(.open):not(.closed) {
+  display: none;
+}
+
+.crm-dropdown-options.open,
+.crm-limit-options.open {
+  pointer-events: auto;
+  animation: crm-slideFadeDown 0.2s ease-out forwards;
+}
+
+.crm-dropdown-options.closed,
+.crm-limit-options.closed {
+  pointer-events: none;
+  animation: crm-slideFadeUp 0.15s ease-out forwards;
+}
+
 @keyframes crm-slideFadeDown {
   from {
     opacity: 0;
@@ -588,6 +606,17 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes crm-slideFadeUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
   }
 }
 

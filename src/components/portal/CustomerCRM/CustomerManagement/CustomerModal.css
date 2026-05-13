@@ -53,10 +53,12 @@
 .crm-modal-body {
   padding: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 16px;
   scrollbar-width: thin;
+  padding-bottom: 4px;
 }
 
 .crm-grid-2 {
@@ -167,7 +169,47 @@
   z-index: 1002;
   max-height: 200px;
   overflow-y: auto;
-  animation: crm-fadeIn 0.2s ease-out;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+  transform-origin: top center;
+}
+
+.crm-modal-dropdown-options:not(.open):not(.closed) {
+  display: none;
+}
+
+.crm-modal-dropdown-options.open {
+  pointer-events: auto;
+  animation: crm-modal-slideFadeDown 0.2s ease-out forwards;
+}
+
+.crm-modal-dropdown-options.closed {
+  pointer-events: none;
+  animation: crm-modal-slideFadeUp 0.15s ease-out forwards;
+}
+
+/* animation */
+@keyframes crm-modal-slideFadeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes crm-modal-slideFadeUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
 }
 
 .crm-modal-dropdown-option {

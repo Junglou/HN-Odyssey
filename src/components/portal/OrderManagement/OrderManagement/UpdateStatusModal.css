@@ -102,7 +102,6 @@
     0 2px 4px -1px rgba(0, 0, 0, 0.06);
   z-index: 10;
   overflow: hidden;
-  animation: dropdownFadeIn 0.2s ease-out forwards;
   transform-origin: top;
 }
 
@@ -198,6 +197,20 @@
   cursor: not-allowed;
 }
 
+.usm-dropdown-options:not(.open):not(.closed) {
+  display: none;
+}
+
+.usm-dropdown-options.open {
+  pointer-events: auto;
+  animation: usm-slideFadeDownAnim 0.2s ease-out forwards;
+}
+
+.usm-dropdown-options.closed {
+  pointer-events: none;
+  animation: usm-slideFadeUpAnim 0.2s ease-out forwards;
+}
+
 /* Animations */
 @keyframes fadeIn {
   from {
@@ -219,13 +232,24 @@
   }
 }
 
-@keyframes dropdownFadeIn {
+@keyframes usm-slideFadeDownAnim {
   from {
     opacity: 0;
-    transform: scaleY(0.95);
+    transform: translateY(-10px);
   }
   to {
     opacity: 1;
-    transform: scaleY(1);
+    transform: translateY(0);
+  }
+}
+
+@keyframes usm-slideFadeUpAnim {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
   }
 }

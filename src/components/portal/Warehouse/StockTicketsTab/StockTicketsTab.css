@@ -93,7 +93,6 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 100;
   overflow: hidden;
-  animation: stt-slideFadeIn 0.2s ease-out forwards;
   transform-origin: top center;
 }
 
@@ -453,7 +452,6 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 100;
   overflow: hidden;
-  animation: stt-slideFadeIn 0.2s ease-out forwards;
   transform-origin: top center;
   display: flex;
   flex-direction: column;
@@ -562,19 +560,25 @@
   background-color: transparent;
 }
 
-/* Animations */
-@keyframes stt-slideFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.stt-dropdown-options:not(.open):not(.closed),
+.stt-limit-options:not(.open):not(.closed) {
+  display: none;
 }
 
-@keyframes stt-slideDownFade {
+.stt-dropdown-options.open,
+.stt-limit-options.open {
+  pointer-events: auto;
+  animation: stt-slideFadeDownAnim 0.2s ease-out forwards;
+}
+
+.stt-dropdown-options.closed,
+.stt-limit-options.closed {
+  pointer-events: none;
+  animation: stt-slideFadeUpAnim 0.2s ease-out forwards;
+}
+
+/* Animations */
+@keyframes stt-slideFadeDownAnim {
   from {
     opacity: 0;
     transform: translateY(-10px);
@@ -585,7 +589,7 @@
   }
 }
 
-@keyframes stt-slideUpFade {
+@keyframes stt-slideFadeUpAnim {
   from {
     opacity: 1;
     transform: translateY(0);
