@@ -67,6 +67,43 @@ export class ChatService {
     //this.onlineAgents.add('fake-agent-de-test');
   }
 
+  async initOrGetConversation(sessionId: string, customerId?: string) {
+    // 1. Tìm xem khách này (Guest hoặc User) đang có hội thoại nào chưa đóng không?
+    const query: FilterQuery<Conversation> = customerId
+      ? { customer_id: new Types.ObjectId(customerId) }
+      : { session_id: sessionId };
+
+    query.status = { $ne: ConversationStatus.CLOSED }; // Bỏ qua các hội thoại đã đóng/đánh giá xong
+
+    let conv = await this.convModel
+      .findOne(query)
+      .sort({ createdAt: -1 })
+      .exec();
+
+    // 2. Nếu đã có hội thoại cũ đang chat dở -> Trả về luôn
+    if (conv) {
+      return {
+        is_new: false,
+        conversation_id: conv._id.toString(),
+        status: conv.status,
+      };
+    }
+
+    // 3. Nếu chưa có hoặc cái cũ đã CLOSED -> Tạo mới hoàn toàn
+    conv = await this.convModel.create({
+      session_id: sessionId,
+      customer_id: customerId ? new Types.ObjectId(customerId) : undefined,
+      status: ConversationStatus.BOT,
+      context: {},
+    });
+
+    return {
+      is_new: true,
+      conversation_id: conv._id.toString(),
+      status: conv.status,
+    };
+  }
+
   private filterProfanity(text: string): string {
     const badWords = ['đm', 'vcl', 'địt', 'chó', 'ngu', 'fuck', 'shit'];
     let filteredText = text;
@@ -337,6 +374,8 @@ export class ChatService {
         },
       );
 
+      console.log('n8n Response:', response.data);
+
       return response.data as AiEngineResponse;
     } catch (error) {
       this.logger.error(
@@ -376,6 +415,8 @@ export class ChatService {
       data.content,
       {},
     );
+
+    this.logger.debug(`AI raw response: ${JSON.stringify(aiResponse)}`);
 
     // Bọc lót: Nếu aiResponse.reply bị undefined, dùng câu dự phòng
     const finalReply =

@@ -24,11 +24,12 @@ export class ChatGateway {
   // 1. THÊM EVENT NÀY ĐỂ USER/AGENT JOIN VÀO PHÒNG CHAT
   @SubscribeMessage('join_room')
   async handleJoinRoom(
-    @MessageBody() conversationId: string,
+    @MessageBody() data: { conversationId: string }, // Nhận object
     @ConnectedSocket() client: Socket,
-  ): Promise<void> {
-    await client.join(conversationId);
-    this.logger.log(`Client ${client.id} joined room: ${conversationId}`);
+  ) {
+    const room = data.conversationId;
+    await client.join(room);
+    this.logger.log(`Client ${client.id} joined room: ${room}`);
   }
 
   // 2. LOGIC GỬI TIN NHẮN

@@ -21,10 +21,25 @@ export class FilterConversationDto {
   page?: number;
 }
 
+export class InitChatDto {
+  sessionId: string; // FE tự random 1 chuỗi lưu vào LocalStorage
+  customerId?: string; // Nếu khách đã login thì FE truyền thêm cái này
+}
+
 @Controller('support/chats')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
+
+  // API Khởi tạo hội thoại dành cho Frontend
+  @Public()
+  @Post('init')
+  async initChat(@Body() body: InitChatDto) {
+    return this.chatService.initOrGetConversation(
+      body.sessionId,
+      body.customerId,
+    );
+  }
 
   @Get()
   @RequirePermissions(Resource.SUPPORT, Action.READ)
