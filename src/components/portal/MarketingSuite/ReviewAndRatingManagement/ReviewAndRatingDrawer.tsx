@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import "./ReviewAndRatingDrawer.css";
+import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 import {
   StarIcon,
   HeartIcon,
+  ArrowLeftIcon,
+  ChevronDownSmallIcon,
 } from "../../../../assets/icons/ReviewAndRatingManagementIcons";
 import type {
   ReviewRecord,
@@ -30,9 +33,42 @@ interface ReviewAndRatingDrawerProps {
 export default function ReviewAndRatingDrawer(
   props: ReviewAndRatingDrawerProps,
 ) {
-  if (!props.isOpen || !props.review) return null;
+  const [shouldRender, setShouldRender] = useState(props.isOpen);
+  const [isClosing, setIsClosing] = useState(false);
+
+  if (props.isOpen && !shouldRender) {
+    setShouldRender(true);
+    setIsClosing(false);
+  }
+
+  useEffect(() => {
+    if (!props.isOpen && shouldRender) {
+      const startClosingTimer = setTimeout(() => {
+        setIsClosing(true);
+      }, 0);
+
+      const unmountTimer = setTimeout(() => {
+        setShouldRender(false);
+        setIsClosing(false);
+      }, 300);
+
+      return () => {
+        clearTimeout(startClosingTimer);
+        clearTimeout(unmountTimer);
+      };
+    }
+  }, [props.isOpen, shouldRender]);
+
+  // Render an toàn để giữ animation đóng
+  if (!shouldRender || (!props.review && !isClosing)) return null;
+
   return (
-    <DrawerContent key={props.review.id} {...props} review={props.review} />
+    <DrawerContent
+      key={props.review?.id || "empty-review-key"}
+      {...props}
+      review={props.review as ReviewRecord}
+      isClosing={isClosing}
+    />
   );
 }
 
@@ -41,10 +77,11 @@ function DrawerContent({
   mode,
   onClose,
   onSave,
+  isClosing,
 }: Omit<ReviewAndRatingDrawerProps, "isOpen" | "review"> & {
   review: ReviewRecord;
+  isClosing?: boolean;
 }) {
-  // State lưu trữ dữ liệu form tạm thời
   const [tempResponse, setTempResponse] = useState(
     review.officialResponse || "",
   );
@@ -58,37 +95,38 @@ function DrawerContent({
   );
   const [isBlockSubmitted, setIsBlockSubmitted] = useState(review.isUserBanned);
 
-  // Validation form
+  // State cho Custom Dropdown
+  const [isReasonOpen, setIsReasonOpen] = useState(false);
+  const [hasReasonOpened, setHasReasonOpened] = useState(false);
+  const reasonRef = useRef<HTMLDivElement>(null);
+
+  useClickOutside(reasonRef, () => setIsReasonOpen(false));
+
   const isPublishValid = tempResponse.trim() !== "";
   const isSubmitValid =
     tempBlockReason !== "" &&
     (tempBlockReason !== "Other" || tempBlockNote.trim() !== "");
 
-  // Render sao đánh giá
-  const renderStars = (rating: number) => {
-    return (
-      <div className="rarm-drawer-stars">
-        {Array.from({ length: 5 }).map((_, idx) => (
-          <StarIcon
-            key={idx}
-            className={idx < rating ? "rarm-star-active" : "rarm-star-inactive"}
-          />
-        ))}
-      </div>
-    );
-  };
+  const renderStars = (rating: number) => (
+    <div className="rarm-drawer-stars">
+      {Array.from({ length: 5 }).map((_, idx) => (
+        <StarIcon
+          key={idx}
+          className={idx < rating ? "rarm-star-active" : "rarm-star-inactive"}
+        />
+      ))}
+    </div>
+  );
 
-  // Xử lý phản hồi
   const handlePublish = () => {
     if (tempResponse.trim() === "") {
       toast.error("Vui lòng nhập nội dung phản hồi.");
       return;
     }
     setIsResponsePublished(true);
-    toast.success("Đã ghi nhận phản hồi (Chờ Confirm để lưu).");
+    toast.success("Đã ghi nhận phản hồi (Chờ Confirm).");
   };
 
-  // Xử lý khóa tài khoản
   const handleSubmitBlock = () => {
     if (tempBlockReason === "") {
       toast.error("Vui lòng chọn lý do khóa.");
@@ -99,10 +137,9 @@ function DrawerContent({
       return;
     }
     setIsBlockSubmitted(true);
-    toast.warning("Đã ghi nhận lệnh khóa tài khoản (Chờ Confirm để lưu).");
+    toast.warning("Đã ghi nhận lệnh khóa (Chờ Confirm).");
   };
 
-  // Xác nhận lưu thay đổi
   const handleConfirm = () => {
     onSave(review.id, {
       officialResponse: isResponsePublished
@@ -118,30 +155,22 @@ function DrawerContent({
 
   return (
     <>
-      <div className="rarm-drawer-overlay" onClick={onClose}></div>
-
-      <div className="rarm-drawer-container">
+      <div
+        className={`rarm-drawer-overlay ${isClosing ? "closing" : ""}`}
+        onClick={onClose}
+      />
+      <div className={`rarm-drawer-container ${isClosing ? "closing" : ""}`}>
         <div className="rarm-drawer-header">
           <button type="button" className="rarm-btn-back" onClick={onClose}>
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="19" y1="12" x2="5" y2="12" />
-              <polyline points="12 19 5 12 12 5" />
-            </svg>
+            <ArrowLeftIcon />
           </button>
           <h2 className="rarm-drawer-title">Review Details</h2>
 
           <button
             type="button"
-            className={`rarm-drawer-heart-btn ${tempIsPinned ? "pinned" : ""}`}
+            className={`rarm-drawer-heart-btn ${tempIsPinned ? "pinned" : ""} ${
+              mode === "view" ? "readonly" : ""
+            }`}
             onClick={() => {
               if (mode === "edit") {
                 setTempIsPinned(!tempIsPinned);
@@ -153,7 +182,6 @@ function DrawerContent({
               }
             }}
             disabled={mode === "view"}
-            style={{ cursor: mode === "view" ? "not-allowed" : "pointer" }}
             title={
               mode === "view"
                 ? "Read-only mode"
@@ -167,7 +195,6 @@ function DrawerContent({
         </div>
 
         <div className="rarm-drawer-body">
-          {/* Thông tin đánh giá */}
           <div className="rarm-review-info-section">
             <h3 className="rarm-product-name">{review.productName}</h3>
             <span className="rarm-customer-name">{review.customerName}</span>
@@ -178,13 +205,13 @@ function DrawerContent({
             </p>
           </div>
 
-          {/* Form nhập liệu */}
           {mode === "edit" && (
             <div className="rarm-edit-forms">
+              {/* Form Response */}
               <div className="rarm-form-block">
                 <label className="rarm-form-label">Response</label>
                 <textarea
-                  className="rarm-textarea"
+                  className={`rarm-textarea ${review.officialResponse ? "disabled" : ""}`}
                   placeholder="Response customer here... (Max 500 characters)"
                   value={tempResponse}
                   maxLength={500}
@@ -194,59 +221,83 @@ function DrawerContent({
                   }}
                   rows={4}
                   disabled={Boolean(review.officialResponse)}
-                  style={{
-                    backgroundColor: review.officialResponse
-                      ? "#f9fafb"
-                      : "#ffffff",
-                  }}
                 />
-                <div
-                  className="rarm-btn-right-wrapper"
-                  style={{
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
+                <div className="rarm-btn-row-space">
                   <span
-                    style={{
-                      fontSize: "0.8rem",
-                      color: tempResponse.length >= 500 ? "#ef4444" : "#9ca3af",
-                    }}
+                    className={`rarm-char-count ${tempResponse.length >= 500 ? "limit" : ""}`}
                   >
                     {tempResponse.length}/500
                   </span>
                   <button
                     type="button"
-                    className={`rarm-btn-publish ${isPublishValid ? "active" : ""}`}
+                    className={`rarm-btn-publish ${isPublishValid ? "active" : ""} ${
+                      review.officialResponse ? "readonly" : ""
+                    }`}
                     onClick={handlePublish}
                     disabled={Boolean(review.officialResponse)}
-                    style={{
-                      opacity: review.officialResponse ? 0.5 : 1,
-                      cursor: review.officialResponse
-                        ? "not-allowed"
-                        : "pointer",
-                    }}
                   >
                     {isResponsePublished ? "Published" : "Publish"}
                   </button>
                 </div>
               </div>
 
+              {/* Form Block */}
               <div className="rarm-form-block">
-                <select
-                  className="rarm-select rarm-reason-select"
-                  value={tempBlockReason}
-                  onChange={(e) => {
-                    setTempBlockReason(e.target.value);
-                    setIsBlockSubmitted(false);
-                  }}
-                >
-                  <option value="">Choose reason</option>
-                  <option value="Spam">Spam or fake review</option>
-                  <option value="Offensive">Offensive language</option>
-                  <option value="Other">Other</option>
-                </select>
+                {/* Custom Dropdown Reason */}
+                <div className="rarm-drawer-dropdown" ref={reasonRef}>
+                  <div
+                    className={`rarm-drawer-dropdown-trigger ${isReasonOpen ? "active" : ""}`}
+                    onClick={() => {
+                      setIsReasonOpen(!isReasonOpen);
+                      if (!hasReasonOpened) setHasReasonOpened(true);
+                    }}
+                  >
+                    <span
+                      className={
+                        tempBlockReason === "" ? "rarm-placeholder" : ""
+                      }
+                    >
+                      {tempBlockReason === ""
+                        ? "Choose reason"
+                        : tempBlockReason === "Spam"
+                          ? "Spam or fake review"
+                          : tempBlockReason === "Offensive"
+                            ? "Offensive language"
+                            : "Other"}
+                    </span>
+                    <ChevronDownSmallIcon
+                      className={`rarm-drawer-dropdown-arrow ${isReasonOpen ? "open" : ""}`}
+                    />
+                  </div>
 
+                  <div
+                    className={`rarm-drawer-dropdown-options ${
+                      isReasonOpen ? "open" : hasReasonOpened ? "closed" : ""
+                    }`}
+                  >
+                    {[
+                      { value: "Spam", label: "Spam or fake review" },
+                      { value: "Offensive", label: "Offensive language" },
+                      { value: "Other", label: "Other" },
+                    ].map((opt) => (
+                      <div
+                        key={opt.value}
+                        className={`rarm-drawer-dropdown-option ${
+                          tempBlockReason === opt.value ? "active" : ""
+                        }`}
+                        onClick={() => {
+                          setTempBlockReason(opt.value);
+                          setIsBlockSubmitted(false);
+                          setIsReasonOpen(false);
+                        }}
+                      >
+                        {opt.label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Textarea Detail Reason */}
                 {tempBlockReason === "Other" && (
                   <textarea
                     className="rarm-textarea rarm-reason-input"
@@ -260,11 +311,11 @@ function DrawerContent({
                   />
                 )}
 
+                {/* Submit Button */}
                 <div
-                  className="rarm-btn-right-wrapper"
-                  style={{
-                    marginTop: tempBlockReason === "Other" ? "0" : "8px",
-                  }}
+                  className={`rarm-btn-right-wrapper ${
+                    tempBlockReason === "Other" ? "no-mt" : ""
+                  }`}
                 >
                   <button
                     type="button"
