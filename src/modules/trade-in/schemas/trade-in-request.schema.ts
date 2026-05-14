@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import {
+  EvaluationMethod,
   PayoutMethod,
   TradeInStatus,
   TradeInTimelineEvent,
@@ -23,6 +24,15 @@ class TimelineItem implements TradeInTimelineEvent {
   note?: string;
 }
 
+@Schema({ _id: false })
+class ShippingAddress {
+  @Prop({ required: true }) street_address: string;
+  @Prop() apt_suite?: string;
+  @Prop({ required: true }) city: string;
+  @Prop({ required: true }) state: string;
+  @Prop({ required: true }) zip_code: string;
+}
+
 @Schema({ timestamps: true, collection: 'trade_in_requests' })
 export class TradeInRequest {
   @Prop({ unique: true, required: true })
@@ -36,9 +46,17 @@ export class TradeInRequest {
   })
   customer_id: Types.ObjectId;
 
-  // AC1 & AC3: Thông tin sản phẩm và Danh mục
   @Prop({ required: true })
-  product_name: string;
+  full_name: string;
+
+  @Prop({ required: true })
+  email: string;
+
+  @Prop({ required: true })
+  phone_number: string;
+
+  @Prop()
+  product_name?: string;
 
   @Prop({
     type: MongooseSchema.Types.ObjectId,
@@ -47,16 +65,21 @@ export class TradeInRequest {
   })
   category_id: Types.ObjectId;
 
-  @Prop({ required: true, min: 1, max: 5 })
-  condition_score: number;
-
-  @Prop()
+  @Prop({ required: true })
   condition_description: string;
 
-  @Prop({ type: [String], required: true }) // AC1: Ít nhất 1 ảnh/video
+  @Prop({ type: [String], required: true })
   media_urls: string[];
 
-  // AC2: Định giá
+  @Prop({ required: true, enum: EvaluationMethod })
+  evaluation_method: EvaluationMethod;
+
+  @Prop({ type: ShippingAddress })
+  shipping_address?: ShippingAddress;
+
+  @Prop({ required: true })
+  agreed_to_terms: boolean;
+
   @Prop({ default: 0 })
   estimated_value: number;
 
@@ -66,31 +89,30 @@ export class TradeInRequest {
   @Prop({
     required: true,
     enum: TradeInStatus,
-    default: TradeInStatus.PENDING_VALUATION,
+    default: TradeInStatus.PENDING,
     index: true,
   })
   status: TradeInStatus;
 
-  // AC4: Reverse Logistics
   @Prop()
   rma_order_code?: string;
 
-  // AC6: Thanh toán
   @Prop({ enum: PayoutMethod, default: PayoutMethod.VOUCHER })
   payout_method: PayoutMethod;
 
   @Prop({ type: Object })
   payout_details?: {
-    bank_name?: string;
-    account_number?: string;
-    account_name?: string;
     voucher_code?: string;
+    points_earned?: number;
+    expiry_date?: string;
   };
 
-  // AC7: Tracking Timeline
-  @Prop({ type: [SchemaFactory.createForClass(TimelineItem)], default: [] })
+  @Prop({ default: [] })
   timeline: TimelineItem[];
 }
 
 export const TradeInRequestSchema =
   SchemaFactory.createForClass(TradeInRequest);
+
+const TimelineItemSchema = SchemaFactory.createForClass(TimelineItem);
+TradeInRequestSchema.path('timeline', [TimelineItemSchema]);

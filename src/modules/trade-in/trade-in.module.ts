@@ -12,16 +12,11 @@ import {
 } from '../products/categories/schemas/category.schema';
 import { ProductSchema } from '../products/catalog/schemas/product.schema';
 import { OrderSchema } from '../sales/orders/schemas/order.schema';
-import {
-  TradeInPriceList,
-  TradeInPriceListSchema,
-} from './schemas/trade-in-price-list.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: TradeInRequest.name, schema: TradeInRequestSchema },
-      { name: TradeInPriceList.name, schema: TradeInPriceListSchema },
       { name: Category.name, schema: CategorySchema },
       { name: 'Product', schema: ProductSchema },
       { name: 'Order', schema: OrderSchema },

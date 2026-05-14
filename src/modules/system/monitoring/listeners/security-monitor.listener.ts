@@ -39,7 +39,7 @@ export class SecurityMonitorListener {
     private readonly emailService: EmailService,
     @InjectModel(AuthSession.name)
     private sessionModel: Model<AuthSessionDocument>,
-    @InjectModel(AuthSession.name)
+    @InjectModel('IntegrationLog')
     private integrationLogModel: Model<IntegrationLogDocument>, // Thêm dòng này
   ) {}
 
@@ -50,7 +50,7 @@ export class SecurityMonitorListener {
     error_code: string;
     message: string;
   }) {
-    if (!payload.error_code.startsWith('PAYMENT_FAILED_')) return;
+    if (!payload?.error_code?.startsWith('PAYMENT_FAILED_')) return;
 
     const provider = payload.error_code.replace('PAYMENT_FAILED_', '');
     const redisKey = `spike:payment_fail:${provider}`;
