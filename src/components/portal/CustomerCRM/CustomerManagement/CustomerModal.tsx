@@ -48,6 +48,7 @@ function CustomerModalContent({
 
   // State và ref cho custom dropdown Customer Type
   const [isTypeOpen, setIsTypeOpen] = useState(false);
+  const [hasTypeOpened, setHasTypeOpened] = useState(false);
   const typeRef = useRef<HTMLDivElement>(null);
   useClickOutside(typeRef, () => setIsTypeOpen(false));
 
@@ -211,36 +212,40 @@ function CustomerModalContent({
               <div
                 className={`crm-modal-select-trigger ${isSubmitting ? "disabled" : ""} ${errors.customerType ? "error" : ""}`}
                 onClick={() => {
-                  if (!isSubmitting) setIsTypeOpen(!isTypeOpen);
+                  if (!isSubmitting) {
+                    setIsTypeOpen(!isTypeOpen);
+                    if (!hasTypeOpened) setHasTypeOpened(true);
+                  }
                 }}
               >
                 <span>{formData.customerType || "Select Type"}</span>
                 <ChevronDownSmallIcon className={isTypeOpen ? "open" : ""} />
               </div>
-              {isTypeOpen && !isSubmitting && (
-                <div className="crm-modal-dropdown-options">
-                  {(
-                    [
-                      "Standard",
-                      "Trade-in Customer",
-                      "Silver",
-                      "Gold",
-                      "VIP",
-                    ] as const
-                  ).map((opt) => (
-                    <div
-                      key={opt}
-                      className={`crm-modal-dropdown-option ${formData.customerType === opt ? "active" : ""}`}
-                      onClick={() => {
-                        updateField("customerType", opt);
-                        setIsTypeOpen(false);
-                      }}
-                    >
-                      {opt}
-                    </div>
-                  ))}
-                </div>
-              )}
+
+              <div
+                className={`crm-modal-dropdown-options ${isTypeOpen ? "open" : hasTypeOpened ? "closed" : ""}`}
+              >
+                {(
+                  [
+                    "Standard",
+                    "Trade-in Customer",
+                    "Silver",
+                    "Gold",
+                    "VIP",
+                  ] as const
+                ).map((opt) => (
+                  <div
+                    key={opt}
+                    className={`crm-modal-dropdown-option ${formData.customerType === opt ? "active" : ""}`}
+                    onClick={() => {
+                      updateField("customerType", opt);
+                      setIsTypeOpen(false);
+                    }}
+                  >
+                    {opt}
+                  </div>
+                ))}
+              </div>
             </div>
             {errors.customerType && (
               <span className="crm-error-text">{errors.customerType}</span>

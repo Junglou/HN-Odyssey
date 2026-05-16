@@ -1,0 +1,133 @@
+@import url("https://fonts.googleapis.com/css2?family=Lemon&display=swap");
+
+/* container */
+.jfy-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  background-color: #ffffff;
+  padding-top: 60px;
+}
+
+/* text wrapper */
+.jfy-text-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  max-width: 1300px;
+  margin: 0 auto 50px auto;
+  padding: 0 40px;
+  box-sizing: border-box;
+}
+
+.jfy-title {
+  font-family: "Lemon", cursive;
+  font-weight: 400;
+  font-size: clamp(24px, 4vw, 32px);
+  color: #000000;
+  margin: 0;
+  text-align: center;
+}
+
+.jfy-subtitle {
+  font-family: "Ledger", serif;
+  font-weight: 400;
+  font-size: clamp(16px, 3vw, 24px);
+  line-height: 1.7;
+  letter-spacing: 0.5px;
+  color: #000000;
+  margin: 0;
+  text-align: center;
+}
+
+/* slider window */
+.jfy-slider-window {
+  position: relative;
+  width: 100%;
+  min-height: 700px;
+  height: 45vw;
+  max-height: 900px;
+  overflow: hidden;
+}
+
+.jfy-slider-track {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.jfy-slide-item {
+  flex: 0 0 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  position: relative;
+}
+
+/* canvas layer (No-Code Grid) */
+.jfy-canvas-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* Tránh block tương tác nền */
+}
+
+.jfy-canvas-layer > * {
+  pointer-events: auto; /* Mở tương tác lại cho element */
+}
+
+.jfy-dynamic-btn {
+  transition: transform 0.2s ease;
+}
+
+.jfy-dynamic-btn:hover {
+  transform: scale(1.05);
+}
+
+/* dots */
+.jfy-dots-container {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 10;
+}
+
+.jfy-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.jfy-dot.active {
+  background: #ffffff;
+  transform: scale(1.2);
+}
+
+/* responsive */
+@media (max-width: 768px) {
+  .jfy-text-wrapper {
+    gap: 12px;
+    margin-bottom: 30px;
+    padding: 0 20px;
+  }
+
+  /* Auto Scale content config layer cho mobile */
+  .jfy-canvas-layer {
+    transform: scale(0.6);
+    transform-origin: top left;
+  }
+}

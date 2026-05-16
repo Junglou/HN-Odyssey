@@ -140,8 +140,24 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 100;
   overflow: hidden;
-  animation: rarm-slideFadeIn 0.2s ease-out forwards;
   transform-origin: top center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+}
+
+.rarm-dropdown-options:not(.open):not(.closed) {
+  display: none;
+}
+
+.rarm-dropdown-options.open {
+  pointer-events: auto;
+  animation: rarm-slideFadeDown 0.2s ease-out forwards;
+}
+
+.rarm-dropdown-options.closed {
+  pointer-events: none;
+  animation: rarm-slideFadeUp 0.2s ease-out forwards;
 }
 
 .rarm-dropdown-option {
@@ -184,18 +200,7 @@
   outline: none;
 }
 
-@keyframes rarm-slideFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Thao tác hàng loạt */
+/* Bulk */
 .rarm-bulk-actions {
   display: flex;
   flex-wrap: wrap;
@@ -549,9 +554,26 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   z-index: 100;
   overflow: hidden;
-  animation: rarm-slideFadeDownLimit 0.25s cubic-bezier(0.25, 1, 0.5, 1)
-    forwards;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
   transform-origin: top center;
+}
+
+.rarm-limit-options:not(.open):not(.closed) {
+  display: none;
+}
+
+.rarm-limit-options.open {
+  display: block;
+  pointer-events: auto;
+  animation: rarm-slideFadeDown 0.2s ease-out forwards;
+}
+
+.rarm-limit-options.closed {
+  display: block;
+  pointer-events: none;
+  animation: rarm-slideFadeUp 0.15s ease-out forwards;
 }
 
 .rarm-limit-option {
@@ -574,7 +596,17 @@
   font-weight: 700;
 }
 
-@keyframes rarm-slideFadeDownLimit {
+/* Icon ghim */
+.rarm-pin-indicator {
+  color: #ef4444;
+  fill: #ef4444;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* animation */
+@keyframes rarm-slideFadeDown {
   from {
     opacity: 0;
     transform: translateY(-10px);
@@ -585,11 +617,13 @@
   }
 }
 
-/* Icon ghim */
-.rarm-pin-indicator {
-  color: #ef4444;
-  fill: #ef4444;
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
+@keyframes rarm-slideFadeUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
 }

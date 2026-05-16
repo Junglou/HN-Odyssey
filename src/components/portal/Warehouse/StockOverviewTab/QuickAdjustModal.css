@@ -230,3 +230,40 @@
   background-color: #000000;
   color: #ffffff;
 }
+
+.qam-select-options:not(.open):not(.closed) {
+  display: none;
+}
+
+.qam-select-options.open {
+  pointer-events: auto;
+  animation: qam-slideFadeDown 0.2s ease-out forwards;
+}
+
+.qam-select-options.closed {
+  pointer-events: none;
+  animation: qam-slideFadeUp 0.2s ease-out forwards;
+}
+
+/* animation */
+@keyframes qam-slideFadeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes qam-slideFadeUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}

@@ -34,6 +34,7 @@ function CustomDropdown({
   className?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [hasOpened, setHasOpened] = useState(false); // Thêm state
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -56,29 +57,33 @@ function CustomDropdown({
     <div className={`rt-custom-dropdown ${className}`} ref={dropdownRef}>
       <div
         className={`rt-dropdown-trigger ${isOpen ? "active" : ""}`}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          setIsOpen(!isOpen);
+          if (!hasOpened) setHasOpened(true);
+        }}
       >
         <span>{selectedLabel}</span>
         <ChevronDownIcon
           className={`rt-dropdown-arrow ${isOpen ? "open" : ""}`}
         />
       </div>
-      {isOpen && (
-        <div className="rt-dropdown-options">
-          {options.map((opt) => (
-            <div
-              key={opt.value}
-              className={`rt-dropdown-option ${value === opt.value ? "selected" : ""}`}
-              onClick={() => {
-                onChange(opt.value);
-                setIsOpen(false);
-              }}
-            >
-              {opt.label}
-            </div>
-          ))}
-        </div>
-      )}
+
+      <div
+        className={`rt-dropdown-options ${isOpen ? "open" : hasOpened ? "closed" : ""}`}
+      >
+        {options.map((opt) => (
+          <div
+            key={opt.value}
+            className={`rt-dropdown-option ${value === opt.value ? "selected" : ""}`}
+            onClick={() => {
+              onChange(opt.value);
+              setIsOpen(false);
+            }}
+          >
+            {opt.label}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -104,6 +109,7 @@ export default function RequestTab({
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [isLimitOpen, setIsLimitOpen] = useState(false);
+  const [hasLimitOpened, setHasLimitOpened] = useState(false);
   const limitRef = useRef<HTMLDivElement>(null);
 
   // Pagination
@@ -403,33 +409,36 @@ export default function RequestTab({
             &gt;
           </button>
 
-          {/* ĐÃ CHUYỂN DROPDOWN LIMIT XUỐNG DƯỚI NÚT NEXT ">" */}
           <div className="rt-limit-dropdown" ref={limitRef}>
             <div
               className={`rt-limit-trigger ${isLimitOpen ? "active" : ""}`}
-              onClick={() => setIsLimitOpen(!isLimitOpen)}
+              onClick={() => {
+                setIsLimitOpen(!isLimitOpen);
+                if (!hasLimitOpened) setHasLimitOpened(true);
+              }}
             >
               <span>{pagination.limit} / page</span>
               <ChevronDownIcon
                 className={`rt-limit-icon ${isLimitOpen ? "open" : ""}`}
               />
             </div>
-            {isLimitOpen && (
-              <div className="rt-limit-options">
-                {[10, 20, 50].map((val) => (
-                  <div
-                    key={val}
-                    className={`rt-limit-option ${pagination.limit === val ? "active" : ""}`}
-                    onClick={() => {
-                      actions.changeLimit?.(val);
-                      setIsLimitOpen(false);
-                    }}
-                  >
-                    {val} / page
-                  </div>
-                ))}
-              </div>
-            )}
+
+            <div
+              className={`rt-limit-options ${isLimitOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
+            >
+              {[10, 20, 50].map((val) => (
+                <div
+                  key={val}
+                  className={`rt-limit-option ${pagination.limit === val ? "active" : ""}`}
+                  onClick={() => {
+                    actions.changeLimit?.(val);
+                    setIsLimitOpen(false);
+                  }}
+                >
+                  {val} / page
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

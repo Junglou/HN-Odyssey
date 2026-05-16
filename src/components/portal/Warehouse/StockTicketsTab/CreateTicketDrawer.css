@@ -289,8 +289,8 @@
 
 .ctd-btn-cancel:hover {
   background-color: #f9fafb;
-  border-color: #111827;
-  color: #111827;
+  border-color: #000000;
+  color: #000000;
 }
 
 .ctd-btn-submit {
@@ -452,14 +452,39 @@
   color: #111827;
 }
 
-@keyframes ctd-slideFadeIn {
+.ctd-dropdown-options:not(.open):not(.closed) {
+  display: none;
+}
+
+.ctd-dropdown-options.open {
+  pointer-events: auto;
+  animation: ctd-slideFadeDownAnim 0.2s ease-out forwards;
+}
+
+.ctd-dropdown-options.closed {
+  pointer-events: none;
+  animation: ctd-slideFadeUpAnim 0.15s ease-out forwards;
+}
+
+@keyframes ctd-slideFadeDownAnim {
   from {
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateY(-10px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes ctd-slideFadeUpAnim {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
   }
 }
 

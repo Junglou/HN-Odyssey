@@ -16,6 +16,7 @@ interface PromotionModalProps {
   onClose: () => void;
   onSubmit?: (data: PromotionFormData) => void;
 }
+
 interface CategoryNode {
   id: string;
   name: string;
@@ -29,6 +30,7 @@ const MOCK_PRODUCTS = [
   { id: "p3", name: "Denim Jeans" },
   { id: "p4", name: "Running Sneakers" },
 ];
+
 const MOCK_CATEGORIES_TREE: CategoryNode[] = [
   {
     id: "c1",
@@ -52,26 +54,24 @@ const MOCK_CATEGORIES_TREE: CategoryNode[] = [
     ],
   },
 ];
+
 const flattenCategories = (
   nodes: CategoryNode[],
   parentPath = "",
 ): { id: string; name: string }[] => {
   let result: { id: string; name: string }[] = [];
-
   for (const node of nodes) {
-    // nối tên danh mục cha với danh mục con
     const currentPath = parentPath ? `${parentPath} > ${node.name}` : node.name;
-
     result.push({ id: node.id, name: currentPath });
-
-    // nếu có danh mục con, tiếp tục đệ quy
     if (node.children) {
       result = result.concat(flattenCategories(node.children, currentPath));
     }
   }
   return result;
 };
+
 const MOCK_CATEGORIES = flattenCategories(MOCK_CATEGORIES_TREE);
+
 const MOCK_TAGS = [
   { id: "t1", name: "Summer Collection" },
   { id: "t2", name: "New Arrival" },
@@ -79,7 +79,7 @@ const MOCK_TAGS = [
   { id: "t4", name: "Bestseller" },
 ];
 
-// component dropdown chọn nhiều item có hỗ trợ tìm kiếm
+// multi select dropdown
 function MultiSelectDropdown({
   options,
   selectedValues,
@@ -110,7 +110,6 @@ function MultiSelectDropdown({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // lọc các tùy chọn chưa được chọn và khớp với từ khóa tìm kiếm
   const filteredOptions = options.filter(
     (opt) =>
       opt.name.toLowerCase().includes(search.toLowerCase()) &&
@@ -120,7 +119,7 @@ function MultiSelectDropdown({
   const handleSelect = (name: string) => {
     onChange([...selectedValues, name]);
     setSearch("");
-    setIsOpen(false); // ẩn dropdown sau khi chọn để user thấy chip vừa thêm
+    setIsOpen(false);
   };
 
   const handleRemove = (name: string) => {
@@ -129,7 +128,6 @@ function MultiSelectDropdown({
 
   return (
     <div className="promo-multi-select-container" ref={dropdownRef}>
-      {/* tìm kiếm và dropdown */}
       {!disabled && (
         <div className="promo-select-input-wrapper">
           <input
@@ -164,7 +162,6 @@ function MultiSelectDropdown({
         </div>
       )}
 
-      {/* 2. Danh sách đã chọn */}
       <div
         className="promo-selected-chips"
         style={{ marginTop: selectedValues.length > 0 ? "12px" : "0" }}
@@ -188,22 +185,48 @@ function MultiSelectDropdown({
   );
 }
 
-// component bọc ngoài quản lý vòng đời form
+// modal wrapper
 export default function PromotionModal(props: PromotionModalProps) {
-  if (!props.isOpen || props.mode === "delete") return null;
+  const [shouldRender, setShouldRender] = useState(props.isOpen);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  if (props.isOpen && !shouldRender) {
+    setShouldRender(true);
+  }
+
+  useEffect(() => {
+    let animTimer: ReturnType<typeof setTimeout>;
+    let unmountTimer: ReturnType<typeof setTimeout>;
+
+    if (props.isOpen) {
+      animTimer = setTimeout(() => setIsAnimating(true), 10);
+    } else if (shouldRender) {
+      animTimer = setTimeout(() => setIsAnimating(false), 0);
+      unmountTimer = setTimeout(() => setShouldRender(false), 300);
+    }
+
+    return () => {
+      clearTimeout(animTimer);
+      clearTimeout(unmountTimer);
+    };
+  }, [props.isOpen, shouldRender]);
+
+  if (!shouldRender || props.mode === "delete") return null;
 
   const formKey = props.initialData?.id || "new-promo";
-  return <PromotionModalContent key={formKey} {...props} />;
+  return (
+    <PromotionModalContent key={formKey} {...props} isAnimating={isAnimating} />
+  );
 }
 
-// component chứa logic form
+// modal content
 function PromotionModalContent({
-  isOpen,
   mode,
   initialData,
   onClose,
   onSubmit,
-}: PromotionModalProps) {
+  isAnimating,
+}: PromotionModalProps & { isAnimating?: boolean }) {
   const isViewMode = mode === "view";
 
   const [formData, setFormData] = useState<PromotionFormData>(() => {
@@ -261,7 +284,7 @@ function PromotionModalContent({
 
   return (
     <div
-      className={`promo-modal-overlay ${isOpen ? "open" : ""}`}
+      className={`promo-modal-overlay ${isAnimating ? "open" : ""}`}
       onClick={onClose}
     >
       <div

@@ -1,0 +1,12 @@
+/* container */
+.home-page-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  background-color: #ffffff;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}

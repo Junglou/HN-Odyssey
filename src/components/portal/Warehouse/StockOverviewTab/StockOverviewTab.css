@@ -93,7 +93,6 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 100;
   overflow: hidden;
-  animation: sot-slideFadeIn 0.2s ease-out forwards;
   transform-origin: top center;
 }
 
@@ -467,7 +466,6 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 100;
   overflow: hidden;
-  animation: sot-slideFadeIn 0.2s ease-out forwards;
   transform-origin: top center;
   display: flex;
   flex-direction: column;
@@ -495,22 +493,28 @@
   outline: none;
 }
 
-@keyframes sot-slideFadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.sot-dropdown-options:not(.open):not(.closed),
+.sot-limit-options:not(.open):not(.closed) {
+  display: none;
+}
+
+.sot-dropdown-options.open,
+.sot-limit-options.open {
+  pointer-events: auto;
+  animation: sot-slideFadeDownAnim 0.2s ease-out forwards;
+}
+
+.sot-dropdown-options.closed,
+.sot-limit-options.closed {
+  pointer-events: none;
+  animation: sot-slideFadeUpAnim 0.2s ease-out forwards;
 }
 
 /* Animations */
-@keyframes sot-slideFadeIn {
+@keyframes sot-slideFadeDownAnim {
   from {
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateY(-10px);
   }
   to {
     opacity: 1;
@@ -518,6 +522,16 @@
   }
 }
 
+@keyframes sot-slideFadeUpAnim {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
 @keyframes sot-slideDownFade {
   from {
     opacity: 0;

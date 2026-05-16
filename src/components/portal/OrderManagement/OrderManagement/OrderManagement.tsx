@@ -36,6 +36,7 @@ function CustomDropdown({
 }) {
   // states
   const [isOpen, setIsOpen] = useState(false);
+  const [hasOpened, setHasOpened] = useState(false); // Thêm state này
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // effects
@@ -59,29 +60,32 @@ function CustomDropdown({
     <div className={`om-custom-dropdown ${className}`} ref={dropdownRef}>
       <div
         className={`om-dropdown-trigger ${isOpen ? "active" : ""}`}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          setIsOpen(!isOpen);
+          if (!hasOpened) setHasOpened(true);
+        }}
       >
         <span>{selectedOption.label}</span>
         <div className={`om-dropdown-arrow ${isOpen ? "open" : ""}`}>
           <ChevronDownSmallIcon />
         </div>
       </div>
-      {isOpen && (
-        <div className="om-dropdown-options">
-          {options.map((opt) => (
-            <div
-              key={opt.value}
-              className={`om-dropdown-option ${value === opt.value ? "selected" : ""}`}
-              onClick={() => {
-                onChange(opt.value);
-                setIsOpen(false);
-              }}
-            >
-              {opt.label}
-            </div>
-          ))}
-        </div>
-      )}
+      <div
+        className={`om-dropdown-options ${isOpen ? "open" : hasOpened ? "closed" : ""}`}
+      >
+        {options.map((opt) => (
+          <div
+            key={opt.value}
+            className={`om-dropdown-option ${value === opt.value ? "selected" : ""}`}
+            onClick={() => {
+              onChange(opt.value);
+              setIsOpen(false);
+            }}
+          >
+            {opt.label}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -130,6 +134,7 @@ export default function OrderManagement({
 }: OrderManagementProps) {
   // states
   const [isLimitOpen, setIsLimitOpen] = useState(false);
+  const [hasLimitOpened, setHasLimitOpened] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -506,29 +511,33 @@ export default function OrderManagement({
             <div className="om-limit-dropdown" ref={limitRef}>
               <div
                 className={`om-limit-trigger ${isLimitOpen ? "active" : ""}`}
-                onClick={() => setIsLimitOpen(!isLimitOpen)}
+                onClick={() => {
+                  setIsLimitOpen(!isLimitOpen);
+                  if (!hasLimitOpened) setHasLimitOpened(true);
+                }}
               >
                 <span>{pagination.limit} / page</span>
                 <div className={`om-limit-icon ${isLimitOpen ? "open" : ""}`}>
                   <ChevronDownSmallIcon />
                 </div>
               </div>
-              {isLimitOpen && (
-                <div className="om-limit-options">
-                  {[10, 20, 50].map((val) => (
-                    <div
-                      key={val}
-                      className={`om-limit-option ${pagination.limit === val ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changeLimit(val);
-                        setIsLimitOpen(false);
-                      }}
-                    >
-                      {val} / page
-                    </div>
-                  ))}
-                </div>
-              )}
+
+              <div
+                className={`om-limit-options ${isLimitOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
+              >
+                {[10, 20, 50].map((val) => (
+                  <div
+                    key={val}
+                    className={`om-limit-option ${pagination.limit === val ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changeLimit(val);
+                      setIsLimitOpen(false);
+                    }}
+                  >
+                    {val} / page
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

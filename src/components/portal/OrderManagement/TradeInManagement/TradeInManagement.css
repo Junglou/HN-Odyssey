@@ -94,7 +94,7 @@
 }
 
 .tim-filter-input:focus {
-  border-color: #111827;
+  border-color: #000000;
 }
 
 /* action buttons */
@@ -122,7 +122,7 @@
 .tim-btn-clear:focus,
 .tim-btn-action-top:focus {
   background-color: #f3f4f6;
-  border-color: #111827;
+  border-color: #000000;
   outline: none;
 }
 
@@ -146,8 +146,9 @@
   color: #111827;
   transition: border-color 0.2s;
 }
-.tim-dropdown-trigger.active {
-  border-color: #111827;
+.tim-dropdown-trigger.active,
+.tim-dropdown-trigger:hover {
+  border-color: #000000;
 }
 
 .tim-dropdown-arrow {
@@ -171,7 +172,6 @@
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   z-index: 10;
   overflow: hidden;
-  animation: tim-slideFadeIn 0.2s ease-out forwards;
   transform-origin: top center;
 }
 
@@ -321,7 +321,7 @@
 .tim-btn-outline-primary:hover,
 .tim-btn-outline-primary:focus {
   background-color: #f3f4f6;
-  border-color: #111827;
+  border-color: #000000;
   transform: translateY(-2px);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   outline: none;
@@ -421,7 +421,7 @@
 
 .tim-limit-trigger:hover,
 .tim-limit-trigger.active {
-  border-color: #111827;
+  border-color: #000000;
   background-color: #f9fafb;
 }
 
@@ -446,7 +446,6 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   z-index: 100;
   overflow: hidden;
-  animation: tim-slideFadeIn 0.2s ease-out forwards;
   transform-origin: top center;
 }
 
@@ -467,15 +466,43 @@
   color: #111827;
 }
 
+.tim-dropdown-options:not(.open):not(.closed),
+.tim-limit-options:not(.open):not(.closed) {
+  display: none;
+}
+
+.tim-dropdown-options.open,
+.tim-limit-options.open {
+  pointer-events: auto;
+  animation: tim-slideFadeDownAnim 0.2s ease-out forwards;
+}
+
+.tim-dropdown-options.closed,
+.tim-limit-options.closed {
+  pointer-events: none;
+  animation: tim-slideFadeUpAnim 0.2s ease-out forwards;
+}
+
 /* animations */
-@keyframes tim-slideFadeIn {
+@keyframes tim-slideFadeDownAnim {
   from {
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateY(-10px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes tim-slideFadeUpAnim {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
   }
 }
 

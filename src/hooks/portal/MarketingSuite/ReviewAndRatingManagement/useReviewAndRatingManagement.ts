@@ -186,7 +186,7 @@ export function useReviewAndRatingManagement() {
       setDrawerConfig({ isOpen: true, selectedReview: record, mode });
     },
     closeDrawer: () => {
-      setDrawerConfig({ isOpen: false, selectedReview: null, mode: null });
+      setDrawerConfig((prev) => ({ ...prev, isOpen: false }));
     },
 
     openDeleteModal: (record?: ReviewRecord) => {

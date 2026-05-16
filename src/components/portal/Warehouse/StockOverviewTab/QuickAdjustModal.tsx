@@ -18,7 +18,7 @@ interface QuickAdjustModalProps {
   }) => void;
 }
 
-// custom select bên trong modal
+// custom
 function ModalSelect({
   value,
   options,
@@ -29,9 +29,9 @@ function ModalSelect({
   onChange: (val: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [hasOpened, setHasOpened] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // xử lý click ra ngoài để đóng dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -52,29 +52,33 @@ function ModalSelect({
     <div className="qam-custom-select" ref={dropdownRef}>
       <div
         className={`qam-select-trigger ${isOpen ? "active" : ""}`}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          setIsOpen(!isOpen);
+          if (!hasOpened) setHasOpened(true);
+        }}
       >
         <span>{currentLabel}</span>
         <ChevronDownIcon
           className={`qam-select-arrow ${isOpen ? "open" : ""}`}
         />
       </div>
-      {isOpen && (
-        <div className="qam-select-options">
-          {options.map((opt) => (
-            <div
-              key={opt.value}
-              className={`qam-select-option ${value === opt.value ? "selected" : ""}`}
-              onClick={() => {
-                onChange(opt.value);
-                setIsOpen(false);
-              }}
-            >
-              {opt.label}
-            </div>
-          ))}
-        </div>
-      )}
+
+      <div
+        className={`qam-select-options ${isOpen ? "open" : hasOpened ? "closed" : ""}`}
+      >
+        {options.map((opt) => (
+          <div
+            key={opt.value}
+            className={`qam-select-option ${value === opt.value ? "selected" : ""}`}
+            onClick={() => {
+              onChange(opt.value);
+              setIsOpen(false);
+            }}
+          >
+            {opt.label}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -62,8 +62,11 @@ export default function ReviewAndRatingManagement({
 }: ReviewAndRatingManagementProps) {
   // State quản lý đóng mở dropdown
   const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const [hasStatusOpened, setHasStatusOpened] = useState(false);
   const [isRatingOpen, setIsRatingOpen] = useState(false);
+  const [hasRatingOpened, setHasRatingOpened] = useState(false);
   const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
+  const [hasLimitOpened, setHasLimitOpened] = useState(false);
 
   // Ref xử lý click outside
   const statusRef = useRef<HTMLDivElement>(null);
@@ -149,7 +152,10 @@ export default function ReviewAndRatingManagement({
             <div className="rarm-custom-dropdown" ref={statusRef}>
               <div
                 className={`rarm-dropdown-trigger ${isStatusOpen ? "active" : ""}`}
-                onClick={() => setIsStatusOpen(!isStatusOpen)}
+                onClick={() => {
+                  setIsStatusOpen(!isStatusOpen);
+                  if (!hasStatusOpened) setHasStatusOpened(true);
+                }}
               >
                 <span>
                   Status: {statusFilter === "hidden" ? "Hidden" : statusFilter}
@@ -158,29 +164,33 @@ export default function ReviewAndRatingManagement({
                   className={`rarm-dropdown-arrow ${isStatusOpen ? "open" : ""}`}
                 />
               </div>
-              {isStatusOpen && (
-                <div className="rarm-dropdown-options">
-                  {(["All", "Replied", "New", "hidden"] as const).map((opt) => (
-                    <div
-                      key={opt}
-                      className={`rarm-dropdown-option ${statusFilter === opt ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changeStatusFilter(opt);
-                        setIsStatusOpen(false);
-                      }}
-                    >
-                      {opt === "hidden" ? "Hidden" : opt}
-                    </div>
-                  ))}
-                </div>
-              )}
+
+              <div
+                className={`rarm-dropdown-options ${isStatusOpen ? "open" : hasStatusOpened ? "closed" : ""}`}
+              >
+                {(["All", "Replied", "New", "hidden"] as const).map((opt) => (
+                  <div
+                    key={opt}
+                    className={`rarm-dropdown-option ${statusFilter === opt ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changeStatusFilter(opt);
+                      setIsStatusOpen(false);
+                    }}
+                  >
+                    {opt === "hidden" ? "Hidden" : opt}
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Dropdown số sao */}
             <div className="rarm-custom-dropdown" ref={ratingRef}>
               <div
                 className={`rarm-dropdown-trigger ${isRatingOpen ? "active" : ""}`}
-                onClick={() => setIsRatingOpen(!isRatingOpen)}
+                onClick={() => {
+                  setIsRatingOpen(!isRatingOpen);
+                  if (!hasRatingOpened) setHasRatingOpened(true);
+                }}
               >
                 <span>
                   Rating:{" "}
@@ -190,22 +200,23 @@ export default function ReviewAndRatingManagement({
                   className={`rarm-dropdown-arrow ${isRatingOpen ? "open" : ""}`}
                 />
               </div>
-              {isRatingOpen && (
-                <div className="rarm-dropdown-options">
-                  {["All", "5", "4", "3", "2", "1"].map((opt) => (
-                    <div
-                      key={opt}
-                      className={`rarm-dropdown-option ${ratingFilter === opt ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changeRatingFilter(opt);
-                        setIsRatingOpen(false);
-                      }}
-                    >
-                      {opt === "All" ? "All" : `${opt} Stars`}
-                    </div>
-                  ))}
-                </div>
-              )}
+
+              <div
+                className={`rarm-dropdown-options ${isRatingOpen ? "open" : hasRatingOpened ? "closed" : ""}`}
+              >
+                {["All", "5", "4", "3", "2", "1"].map((opt) => (
+                  <div
+                    key={opt}
+                    className={`rarm-dropdown-option ${ratingFilter === opt ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changeRatingFilter(opt);
+                      setIsRatingOpen(false);
+                    }}
+                  >
+                    {opt === "All" ? "All" : `${opt} Stars`}
+                  </div>
+                ))}
+              </div>
             </div>
 
             <button
@@ -415,11 +426,14 @@ export default function ReviewAndRatingManagement({
               &gt;
             </button>
 
-            {/* Dropdown giới hạn số bản ghi */}
+            {/* Dropdown */}
             <div className="rarm-limit-dropdown" ref={limitRef}>
               <div
                 className={`rarm-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}
-                onClick={() => setIsLimitDropdownOpen(!isLimitDropdownOpen)}
+                onClick={() => {
+                  setIsLimitDropdownOpen(!isLimitDropdownOpen);
+                  if (!hasLimitOpened) setHasLimitOpened(true);
+                }}
               >
                 <span>{pagination.limit} / page</span>
                 <div
@@ -428,22 +442,23 @@ export default function ReviewAndRatingManagement({
                   <ChevronDownSmallIcon />
                 </div>
               </div>
-              {isLimitDropdownOpen && (
-                <div className="rarm-limit-options">
-                  {[10, 20, 50].map((val) => (
-                    <div
-                      key={val}
-                      className={`rarm-limit-option ${pagination.limit === val ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changeLimit(val);
-                        setIsLimitDropdownOpen(false);
-                      }}
-                    >
-                      {val} / page
-                    </div>
-                  ))}
-                </div>
-              )}
+
+              <div
+                className={`rarm-limit-options ${isLimitDropdownOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
+              >
+                {[10, 20, 50].map((val) => (
+                  <div
+                    key={val}
+                    className={`rarm-limit-option ${pagination.limit === val ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changeLimit(val);
+                      setIsLimitDropdownOpen(false);
+                    }}
+                  >
+                    {val} / page
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

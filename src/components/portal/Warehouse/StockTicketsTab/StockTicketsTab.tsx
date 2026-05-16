@@ -29,6 +29,7 @@ function CustomDropdown({
   className?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [hasOpened, setHasOpened] = useState(false); // Thêm state
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -51,29 +52,33 @@ function CustomDropdown({
     <div className={`stt-custom-dropdown ${className}`} ref={dropdownRef}>
       <div
         className={`stt-dropdown-trigger ${isOpen ? "active" : ""}`}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          setIsOpen(!isOpen);
+          if (!hasOpened) setHasOpened(true);
+        }}
       >
         <span>{selectedLabel}</span>
         <ChevronDownIcon
           className={`stt-dropdown-arrow ${isOpen ? "open" : ""}`}
         />
       </div>
-      {isOpen && (
-        <div className="stt-dropdown-options">
-          {options.map((opt) => (
-            <div
-              key={opt.value}
-              className={`stt-dropdown-option ${value === opt.value ? "selected" : ""}`}
-              onClick={() => {
-                onChange(opt.value);
-                setIsOpen(false);
-              }}
-            >
-              {opt.label}
-            </div>
-          ))}
-        </div>
-      )}
+
+      <div
+        className={`stt-dropdown-options ${isOpen ? "open" : hasOpened ? "closed" : ""}`}
+      >
+        {options.map((opt) => (
+          <div
+            key={opt.value}
+            className={`stt-dropdown-option ${value === opt.value ? "selected" : ""}`}
+            onClick={() => {
+              onChange(opt.value);
+              setIsOpen(false);
+            }}
+          >
+            {opt.label}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -113,6 +118,7 @@ export default function StockTicketsTab({
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [isLimitOpen, setIsLimitOpen] = useState(false);
+  const [hasLimitOpened, setHasLimitOpened] = useState(false);
   const limitRef = useRef<HTMLDivElement>(null);
 
   const [completeModal, setCompleteModal] = useState<{
@@ -551,29 +557,33 @@ export default function StockTicketsTab({
           <div className="stt-limit-dropdown" ref={limitRef}>
             <div
               className={`stt-limit-trigger ${isLimitOpen ? "active" : ""}`}
-              onClick={() => setIsLimitOpen(!isLimitOpen)}
+              onClick={() => {
+                setIsLimitOpen(!isLimitOpen);
+                if (!hasLimitOpened) setHasLimitOpened(true);
+              }}
             >
               <span>{pagination.limit} / page</span>
               <ChevronDownIcon
                 className={`stt-limit-icon ${isLimitOpen ? "open" : ""}`}
               />
             </div>
-            {isLimitOpen && (
-              <div className="stt-limit-options">
-                {[10, 20, 50].map((val) => (
-                  <div
-                    key={val}
-                    className={`stt-limit-option ${pagination.limit === val ? "active" : ""}`}
-                    onClick={() => {
-                      actions.changeLimit?.(val);
-                      setIsLimitOpen(false);
-                    }}
-                  >
-                    {val} / page
-                  </div>
-                ))}
-              </div>
-            )}
+
+            <div
+              className={`stt-limit-options ${isLimitOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
+            >
+              {[10, 20, 50].map((val) => (
+                <div
+                  key={val}
+                  className={`stt-limit-option ${pagination.limit === val ? "active" : ""}`}
+                  onClick={() => {
+                    actions.changeLimit?.(val);
+                    setIsLimitOpen(false);
+                  }}
+                >
+                  {val} / page
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

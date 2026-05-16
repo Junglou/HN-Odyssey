@@ -188,7 +188,7 @@ export default function PromotionManagement({
                   {typeFilter === "All" ? "Promotion Type" : typeFilter}
                 </span>
                 <div
-                  className={`promo-dropdown-icon ${isTypeOpen ? "open" : ""}`}
+                  className={`promo-dropdown-arrow ${isTypeOpen ? "open" : ""}`}
                 >
                   <ChevronDownIcon />
                 </div>

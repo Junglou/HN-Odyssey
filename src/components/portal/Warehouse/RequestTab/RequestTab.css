@@ -438,10 +438,49 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 100;
   overflow: hidden;
-  animation: rt-slideFadeIn 0.2s ease-out forwards;
   transform-origin: top center;
   display: flex;
   flex-direction: column;
+}
+
+.rt-dropdown-options:not(.open):not(.closed),
+.rt-limit-options:not(.open):not(.closed) {
+  display: none;
+}
+
+.rt-dropdown-options.open,
+.rt-limit-options.open {
+  pointer-events: auto;
+  animation: rt-slideFadeDown 0.2s ease-out forwards;
+}
+
+.rt-dropdown-options.closed,
+.rt-limit-options.closed {
+  pointer-events: none;
+  animation: rt-slideFadeUp 0.2s ease-out forwards;
+}
+
+/* animation */
+@keyframes rt-slideFadeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rt-slideFadeUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
 }
 
 .rt-limit-option {
@@ -539,7 +578,9 @@
 .rt-btn-outline:focus {
   background: #f3f4f6;
   outline: none;
-  box-shadow: 0 0 0 1px #111827;
+  border-color: #000000;
+  color: #000000;
+  box-shadow: 0 0 0 1px #000000;
 }
 .rt-btn-confirm-reject {
   padding: 8px 16px;

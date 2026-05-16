@@ -74,8 +74,9 @@
   transition: all 0.2s ease;
 }
 
-.fvm-dropdown-trigger:hover {
-  border-color: #9ca3af;
+.fvm-dropdown-trigger:hover,
+.fvm-dropdown-trigger.active {
+  border-color: #000000;
 }
 
 .fvm-dropdown-trigger.active {
@@ -111,7 +112,6 @@
     0 2px 4px -1px rgba(0, 0, 0, 0.06);
   z-index: 10;
   overflow: hidden;
-  animation: dropdownFadeIn 0.2s ease-out forwards;
   transform-origin: top;
 }
 
@@ -193,7 +193,8 @@
 
 .fvm-btn-cancel:hover {
   background-color: #f3f4f6;
-  border-color: #6b7280;
+  border-color: #000000;
+  color: #000000;
 }
 
 .fvm-btn-cancel:focus {
@@ -222,6 +223,20 @@
   cursor: not-allowed;
 }
 
+.fvm-dropdown-options:not(.open):not(.closed) {
+  display: none;
+}
+
+.fvm-dropdown-options.open {
+  pointer-events: auto;
+  animation: fvm-slideFadeDownAnim 0.2s ease-out forwards;
+}
+
+.fvm-dropdown-options.closed {
+  pointer-events: none;
+  animation: fvm-slideFadeUpAnim 0.2s ease-out forwards;
+}
+
 /* Animations */
 @keyframes fadeIn {
   from {
@@ -243,13 +258,24 @@
   }
 }
 
-@keyframes dropdownFadeIn {
+@keyframes fvm-slideFadeDownAnim {
   from {
     opacity: 0;
-    transform: scaleY(0.95);
+    transform: translateY(-10px);
   }
   to {
     opacity: 1;
-    transform: scaleY(1);
+    transform: translateY(0);
+  }
+}
+
+@keyframes fvm-slideFadeUpAnim {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
   }
 }

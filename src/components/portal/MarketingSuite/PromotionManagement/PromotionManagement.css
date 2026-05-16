@@ -143,9 +143,28 @@
 }
 
 .promo-dropdown-trigger svg {
-  margin-left: 8px;
   width: 16px;
   height: 16px;
+  display: block;
+}
+.promo-dropdown-arrow {
+  margin-left: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.promo-limit-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.promo-dropdown-arrow.open,
+.promo-limit-icon.open {
+  transform: rotate(180deg);
 }
 
 .promo-dropdown-options {
@@ -386,17 +405,6 @@
   flex-shrink: 0;
 }
 
-@keyframes pm-slideFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 .promo-empty-state {
   text-align: center;
   padding: 30px;
@@ -504,6 +512,12 @@
   pointer-events: none;
   transform: translateY(-10px);
 }
+
+.promo-dropdown-options:not(.open):not(.closed),
+.promo-limit-options:not(.open):not(.closed) {
+  display: none;
+}
+
 .promo-dropdown-options.open,
 .promo-limit-options.open {
   pointer-events: auto;
