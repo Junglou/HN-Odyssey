@@ -440,3 +440,17 @@
 .mm-drawer-select-trigger svg.open {
   transform: rotate(180deg);
 }
+
+.mm-drawer-video-render {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 8px;
+  background-color: #000000;
+}
+
+.mm-trigger-text-selected {
+  color: #333333;
+}
+.mm-trigger-text-placeholder {
+  color: #9ca3af;
+}

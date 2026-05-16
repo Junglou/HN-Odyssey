@@ -11,11 +11,10 @@ import {
 } from "../../../../assets/icons/BlogNewsManagementIcons";
 import {
   generateSlug,
-  ACTIVE_CATEGORIES,
-} from "../../../../hooks/portal/Communication/BlogNewsManagement/useBlogNewsManagement";
-import type {
-  BlogNewsFormData,
-  BlogNewsRecord,
+  type BlogNewsFormData,
+  type BlogNewsRecord,
+  type BECategoryResponse,
+  type BEProductResponse,
 } from "../../../../hooks/portal/Communication/BlogNewsManagement/useBlogNewsManagement";
 
 interface BlogNewsDrawerProps {
@@ -23,17 +22,11 @@ interface BlogNewsDrawerProps {
   mode: "add" | "edit" | "view";
   initialData: BlogNewsRecord | null;
   isSubmitting: boolean;
+  categories: BECategoryResponse[];
+  products: BEProductResponse[];
   onClose: () => void;
   onSubmit: (data: BlogNewsFormData) => void;
 }
-
-// mock data
-const MOCK_PRODUCTS = [
-  { id: "p1", name: "Áo Polo Malbon Golf", price: "1.200.000đ" },
-  { id: "p2", name: "Nước hoa CK One 100ml", price: "950.000đ" },
-  { id: "p3", name: "Bàn phím cơ MonsGeek M1", price: "2.500.000đ" },
-  { id: "p4", name: "Vợt cầu lông Yonex Astrox", price: "3.100.000đ" },
-];
 
 export default function BlogNewsDrawer(props: BlogNewsDrawerProps) {
   if (!props.isOpen) return null;
@@ -46,6 +39,8 @@ function DrawerContent({
   mode,
   initialData,
   isSubmitting,
+  categories,
+  products,
   onClose,
   onSubmit,
 }: Omit<BlogNewsDrawerProps, "isOpen">) {
@@ -53,13 +48,15 @@ function DrawerContent({
     if (initialData && (mode === "edit" || mode === "view")) {
       return {
         ...initialData,
+        categoryId:
+          categories.find((c) => c.name === initialData.category)?._id || "",
         attachedProducts: initialData.attachedProducts || [],
       };
     }
     return {
       title: "",
       slug: "",
-      category: "",
+      categoryId: "",
       status: "Draft",
       featuredImage: "",
       content: "",
@@ -77,7 +74,6 @@ function DrawerContent({
   const categoryRef = useRef<HTMLDivElement>(null);
   const isViewMode = mode === "view";
 
-  // Kiểm tra form hợp lệ: Các trường bắt buộc không được để trống
   const isContentEmpty =
     !formData.content ||
     formData.content.trim() === "" ||
@@ -85,46 +81,47 @@ function DrawerContent({
 
   const isFormValid =
     formData.title.trim() !== "" &&
-    formData.category.trim() !== "" &&
+    formData.categoryId.trim() !== "" &&
     formData.featuredImage.trim() !== "" &&
     formData.slug.trim() !== "" &&
     !isContentEmpty;
 
   const isSubmitDisabled = isSubmitting || !isFormValid;
 
-  // xử lý đóng dropdown danh mục khi click ra ngoài
   useClickOutside(categoryRef, () => setIsCategoryOpen(false));
 
-  // hàm xử lý thay đổi dữ liệu chung
   const handleChange = (
     field: keyof BlogNewsFormData,
     value: string | string[],
   ) => {
     setFormData((prev) => {
       const newData = { ...prev, [field]: value };
-
-      // tự động tạo slug và meta title khi người dùng nhập title ở chế độ add
+      // Auto tạo slug
       if (field === "title" && mode === "add" && typeof value === "string") {
         newData.slug = generateSlug(value);
         if (!newData.metaTitle) newData.metaTitle = value;
+      }
+      // THÊM MỚI: Nếu người dùng thay đổi danh mục -> Xóa trắng danh sách sản phẩm cũ
+      if (field === "categoryId" && prev.categoryId !== value) {
+        newData.attachedProducts = [];
       }
       return newData;
     });
   };
 
-  // đọc file ảnh từ máy tính chuyển sang base64
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onloadend = () => {
-      handleChange("featuredImage", reader.result as string);
+      if (typeof reader.result === "string") {
+        handleChange("featuredImage", reader.result);
+      }
     };
     reader.readAsDataURL(file);
   };
 
-  // chọn/bỏ chọn sản phẩm đính kèm
   const handleToggleProduct = (productId: string) => {
     setFormData((prev) => {
       const currentProducts = prev.attachedProducts;
@@ -144,15 +141,30 @@ function DrawerContent({
       onClose();
       return;
     }
-    // Chặn submit nếu form chưa hợp lệ (phòng trường hợp click bằng phím Enter)
     if (!isFormValid) return;
-
     onSubmit(formData);
   };
 
   const getProductName = (id: string) => {
-    return MOCK_PRODUCTS.find((p) => p.id === id)?.name || id;
+    return products.find((p) => p._id === id)?.name || id;
   };
+
+  const currentCategoryName = categories.find(
+    (c) => c._id === formData.categoryId,
+  )?.name;
+
+  // LỌC SẢN PHẨM DỰA THEO DANH MỤC ĐÃ CHỌN
+  const filteredProducts = products.filter((p) => {
+    if (!formData.categoryId || !p.categories || !Array.isArray(p.categories)) {
+      return false;
+    }
+
+    // Kiểm tra xem trong mảng danh mục của sản phẩm có chứa danh mục đang chọn không
+    return p.categories.some((cat) => {
+      const pCatId = typeof cat === "object" && cat !== null ? cat._id : cat;
+      return pCatId === formData.categoryId;
+    });
+  });
 
   return (
     <div
@@ -198,7 +210,6 @@ function DrawerContent({
             />
           </div>
 
-          {/* khu vực chọn danh mục */}
           <div className="ban-form-group">
             <label>
               Category <span className="ban-required">*</span>
@@ -209,14 +220,14 @@ function DrawerContent({
                 onClick={() => {
                   if (!isViewMode && !isSubmitting) {
                     setIsCategoryOpen(!isCategoryOpen);
-                    if (!hasCategoryOpened) setHasCategoryOpened(true); // Sửa ở đây
+                    if (!hasCategoryOpened) setHasCategoryOpened(true);
                   }
                 }}
               >
                 <span
-                  style={{ color: formData.category ? "#111827" : "#9ca3af" }}
+                  className={`ban-drawer-dropdown-value ${formData.categoryId ? "selected" : "placeholder"}`}
                 >
-                  {formData.category || "Select a category"}
+                  {currentCategoryName || "Select a category"}
                 </span>
                 <ChevronDownIcon className={isCategoryOpen ? "open" : ""} />
               </div>
@@ -224,16 +235,16 @@ function DrawerContent({
               <div
                 className={`ban-drawer-dropdown-options ${isCategoryOpen ? "open" : hasCategoryOpened ? "closed" : ""}`}
               >
-                {ACTIVE_CATEGORIES.map((cat) => (
+                {categories.map((cat) => (
                   <div
-                    key={cat}
-                    className={`ban-drawer-dropdown-option ${formData.category === cat ? "active" : ""}`}
+                    key={cat._id}
+                    className={`ban-drawer-dropdown-option ${formData.categoryId === cat._id ? "active" : ""}`}
                     onClick={() => {
-                      handleChange("category", cat);
+                      handleChange("categoryId", cat._id);
                       setIsCategoryOpen(false);
                     }}
                   >
-                    {cat}
+                    {cat.name}
                   </div>
                 ))}
               </div>
@@ -249,7 +260,7 @@ function DrawerContent({
               type="file"
               accept="image/*"
               ref={fileInputRef}
-              style={{ display: "none" }}
+              className="ban-hidden-file-input"
               onChange={handleFileUpload}
             />
 
@@ -356,10 +367,11 @@ function DrawerContent({
               <button
                 type="button"
                 className="ban-btn-attach-product"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !formData.categoryId}
                 onClick={() => setIsProductModalOpen(true)}
               >
-                + Select Attached Products
+                + Select Attached Products{" "}
+                {!formData.categoryId && "(Please select a category first)"}
               </button>
             )}
           </div>
@@ -394,8 +406,7 @@ function DrawerContent({
           <div className="ban-form-group">
             <label>Meta Description (Used as Short Description)</label>
             <textarea
-              className="ban-form-textarea"
-              style={{ minHeight: "60px" }}
+              className="ban-form-textarea ban-meta-textarea"
               placeholder="SEO Description & Short Summary (Max 160 characters)"
               value={formData.metaDescription}
               onChange={(e) => handleChange("metaDescription", e.target.value)}
@@ -435,7 +446,7 @@ function DrawerContent({
                   }
                 }}
               />
-              <span style={{ fontWeight: 600 }}>
+              <span className="ban-toggle-label">
                 {formData.status === "Published" ? "Published" : "Draft"}
               </span>
             </div>
@@ -448,9 +459,7 @@ function DrawerContent({
               type="submit"
               form="ban-form"
               className="ban-btn-submit"
-              disabled={
-                isSubmitDisabled
-              } /* Trạng thái nút bị mờ nếu chưa đủ field */
+              disabled={isSubmitDisabled}
             >
               {isSubmitting
                 ? "Saving..."
@@ -469,7 +478,6 @@ function DrawerContent({
           </button>
         </div>
 
-        {/* modal nội bộ chọn sản phẩm đính kèm */}
         {isProductModalOpen && (
           <div
             className="ban-product-modal-overlay"
@@ -491,19 +499,29 @@ function DrawerContent({
                 </button>
               </div>
               <div className="ban-product-list">
-                {MOCK_PRODUCTS.map((product) => (
-                  <label key={product.id} className="ban-product-item">
-                    <input
-                      type="checkbox"
-                      checked={formData.attachedProducts.includes(product.id)}
-                      onChange={() => handleToggleProduct(product.id)}
-                    />
-                    <div className="ban-product-info">
-                      <span className="ban-product-name">{product.name}</span>
-                      <span className="ban-product-price">{product.price}</span>
-                    </div>
-                  </label>
-                ))}
+                {filteredProducts.length > 0 ? (
+                  filteredProducts.map((product) => (
+                    <label key={product._id} className="ban-product-item">
+                      <input
+                        type="checkbox"
+                        checked={formData.attachedProducts.includes(
+                          product._id,
+                        )}
+                        onChange={() => handleToggleProduct(product._id)}
+                      />
+                      <div className="ban-product-info">
+                        <span className="ban-product-name">{product.name}</span>
+                        <span className="ban-product-price">
+                          {product.price}
+                        </span>
+                      </div>
+                    </label>
+                  ))
+                ) : (
+                  <div className="ban-product-empty-state">
+                    No products found in this category.
+                  </div>
+                )}
               </div>
               <button
                 type="button"

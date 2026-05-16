@@ -7,6 +7,8 @@ import "./BlogNewsManagementPage.css";
 export default function BlogNewsManagementPage() {
   const {
     records,
+    categoriesList,
+    productsList,
     pagination,
     search,
     statusFilter,
@@ -19,7 +21,6 @@ export default function BlogNewsManagementPage() {
 
   return (
     <div className="ban-page-container">
-      {/* Component chính: Bảng và Bộ lọc */}
       <BlogNewsManagement
         data={records}
         search={search}
@@ -30,17 +31,17 @@ export default function BlogNewsManagementPage() {
         bulkActions={bulkActions}
       />
 
-      {/* Component Ngăn kéo thêm/sửa bài viết */}
       <BlogNewsDrawer
         isOpen={drawerConfig.isOpen}
         mode={drawerConfig.mode}
         initialData={drawerConfig.editingRecord}
         isSubmitting={drawerConfig.isSubmitting}
+        categories={categoriesList}
+        products={productsList}
         onClose={actions.closeDrawer}
         onSubmit={actions.handleDrawerSubmit}
       />
 
-      {/* Modal xác nhận xóa chuẩn */}
       {deleteModalConfig.isOpen && (
         <ConfirmDeleteModal
           isOpen={deleteModalConfig.isOpen}

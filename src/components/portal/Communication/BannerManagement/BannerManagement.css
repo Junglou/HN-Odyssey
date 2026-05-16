@@ -782,3 +782,10 @@
     gap: 2px;
   }
 }
+
+.bm-action-dropdown-wrapper.is-open .bm-action-dropdown-menu {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+  animation: bm-slideFadeDown 0.2s ease-out forwards;
+}

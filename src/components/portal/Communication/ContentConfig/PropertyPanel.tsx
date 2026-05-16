@@ -12,6 +12,7 @@ import {
   SendBackwardIcon,
   SendToBackIcon,
 } from "../../../../assets/icons/ContentConfigIcons";
+import axiosClient from "../../../../api/axiosClient";
 
 // helpers
 function CustomSelect({
@@ -97,6 +98,14 @@ interface PropertyPanelProps {
   };
 }
 
+const getFullMediaUrl = (path: string) => {
+  if (path.startsWith("/")) {
+    const baseUrl = import.meta.env.VITE_API_URL.replace("/api", "");
+    return baseUrl + path;
+  }
+  return path;
+};
+
 // component
 export default function PropertyPanel({
   currentSection,
@@ -106,11 +115,28 @@ export default function PropertyPanel({
   type TextAlignType = NonNullable<EditorElement["style"]>["textAlign"];
   const bgInputRef = useRef<HTMLInputElement>(null);
 
-  const handleUploadBackground = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // FETCH API KHI ĐỔI BACKGROUND SECTION
+  const handleUploadBackground = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      actions.updateSectionBackground(url);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await axiosClient.post(
+          "/marketing/content/page-configs/upload",
+          formData,
+          {
+            headers: { "Content-Type": "multipart/form-data" },
+          },
+        );
+        const url = getFullMediaUrl(res.data.data.url);
+        actions.updateSectionBackground(url);
+      } catch (err) {
+        console.error("Upload background error", err);
+        alert("Có lỗi xảy ra khi Upload Background.");
+      }
       if (bgInputRef.current) bgInputRef.current.value = "";
     }
   };

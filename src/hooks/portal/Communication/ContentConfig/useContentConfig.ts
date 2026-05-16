@@ -1,7 +1,8 @@
-// imports
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { toast } from "react-toastify"; // THÊM IMPORT TOASTIFY
+import axiosClient from "../../../../api/axiosClient"; // Sửa lại đường dẫn nếu cần
 
-// types
+// --- THÊM LẠI VÀ EXPORT CÁC TYPE BỊ THIẾU ---
 export type PageType =
   | "homepage"
   | "about_us"
@@ -61,83 +62,56 @@ export interface SectionConfig {
   backgroundUrl: string;
   elements: EditorElement[];
 }
+// --------------------------------------------
 
-// mock data
-const MOCK_SECTIONS: SectionConfig[] = [
-  {
-    id: "sec-001",
-    pageId: "homepage",
-    name: "Main Hero Slider",
-    backgroundUrl: "https://via.placeholder.com/1200x600?text=Hero+Background",
-    elements: [
-      {
-        id: "el-1",
-        type: "heading",
-        x: 100,
-        y: 100,
-        width: 600,
-        height: 80,
-        content: "Giải pháp chuyển đổi số toàn diện",
-        tag: "h1",
-        rotate: 0,
-        style: {
-          color: "#111827",
-          fontSize: "48px",
-          fontWeight: "bold",
-          textAlign: "left",
-          lineHeight: "1.2",
-        },
-      },
-      {
-        id: "el-2",
-        type: "text",
-        x: 100,
-        y: 200,
-        width: 500,
-        height: 80,
-        content:
-          "Tối ưu hóa quy trình làm việc và tăng trưởng doanh thu với nền tảng của chúng tôi.",
-        tag: "p",
-        rotate: 0,
-        style: {
-          color: "#374151",
-          fontSize: "18px",
-          textAlign: "left",
-          lineHeight: "1.6",
-        },
-      },
-      {
-        id: "el-3",
-        type: "button",
-        x: 100,
-        y: 300,
-        width: 150,
-        height: 45,
-        content: "Khám phá ngay",
-        link: "/services",
-        rotate: 0,
-        style: {
-          backgroundColor: "#2563eb",
-          color: "#ffffff",
-          borderRadius: "8px",
-          textAlign: "center",
-        },
-      },
-    ],
-  },
-];
-
-// hook
 export function useContentConfig() {
   const [selectedPage, setSelectedPage] = useState<PageType>("homepage");
-  const [selectedSectionId, setSelectedSectionId] = useState<string>("sec-001");
-  const [sections, setSections] = useState<SectionConfig[]>(MOCK_SECTIONS);
+  const [selectedSectionId, setSelectedSectionId] = useState<string>("");
+  const [sections, setSections] = useState<SectionConfig[]>([]);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(
     null,
   );
 
-  const [history, setHistory] = useState<SectionConfig[][]>([MOCK_SECTIONS]);
+  const [history, setHistory] = useState<SectionConfig[][]>([]);
   const [historyIndex, setHistoryIndex] = useState(0);
+  const [isSaving, setIsSaving] = useState(false); // Thêm state tracking việc lưu
+
+  // FETCH DATA TỪ BACKEND ĐỂ RENDER (KHÔNG DÙNG MOCK)
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const res = await axiosClient.get(
+          `/marketing/content/page-configs/${selectedPage}`,
+        );
+        const data = res.data?.data;
+
+        if (data && data.sections && data.sections.length > 0) {
+          setSections(data.sections);
+          setHistory([data.sections]);
+          setHistoryIndex(0);
+          setSelectedSectionId(data.sections[0].id);
+        } else {
+          // Khởi tạo 1 section trắng mặc định nếu BE trả về rỗng (Bắt buộc để UI builder có chỗ vẽ)
+          const defaultSection: SectionConfig = {
+            id: `sec-${Date.now()}`,
+            pageId: selectedPage,
+            name: "Default Section",
+            backgroundUrl: "",
+            elements: [],
+          };
+          setSections([defaultSection]);
+          setHistory([[defaultSection]]);
+          setHistoryIndex(0);
+          setSelectedSectionId(defaultSection.id);
+        }
+      } catch (error) {
+        console.error("Lỗi lấy cấu hình từ API:", error);
+        toast.error("Không thể tải cấu hình giao diện từ Server!");
+      }
+    };
+
+    fetchConfig();
+  }, [selectedPage]);
 
   const saveHistory = useCallback(
     (newSections: SectionConfig[]) => {
@@ -154,7 +128,8 @@ export function useContentConfig() {
     return sections.find((s) => s.id === selectedSectionId) || null;
   }, [sections, selectedSectionId]);
 
-  const availableSections = sections.filter((s) => s.pageId === selectedPage);
+  // Vì API trả về list sections theo từng pageId riêng biệt, nên availableSections chính là sections
+  const availableSections = sections;
 
   const activeElementData =
     currentSection?.elements.find((el) => el.id === selectedElementId) || null;
@@ -162,12 +137,6 @@ export function useContentConfig() {
   const actions = {
     changePage: (page: PageType) => {
       setSelectedPage(page);
-      const firstSectionOfPage = sections.find((s) => s.pageId === page);
-      if (firstSectionOfPage) {
-        setSelectedSectionId(firstSectionOfPage.id);
-      } else {
-        setSelectedSectionId("");
-      }
       setSelectedElementId(null);
     },
 
@@ -180,6 +149,7 @@ export function useContentConfig() {
       setSelectedElementId(elementId);
     },
 
+    // Hàm tạo giá trị khởi tạo (Templates) cho một thẻ HTML bất kỳ lúc user kéo thả
     addElement: (
       type: ElementType,
       dropX: number,
@@ -210,7 +180,9 @@ export function useContentConfig() {
       } else if (type === "image") {
         defaultWidth = 200;
         defaultHeight = 200;
-        defaultContent = defaultContent || "https://via.placeholder.com/200";
+        defaultContent =
+          defaultContent ||
+          "https://placehold.co/200x200/e2e8f0/6b7280?text=Image";
         defaultStyle = { borderRadius: "0px" };
       } else if (type === "video-link") {
         defaultWidth = 400;
@@ -328,9 +300,7 @@ export function useContentConfig() {
         defaultWidth = 300;
         defaultHeight = 2;
         defaultContent = "";
-        defaultStyle = {
-          backgroundColor: "#d1d5db",
-        };
+        defaultStyle = { backgroundColor: "#d1d5db" };
       }
 
       const newElement: EditorElement = {
@@ -475,11 +445,22 @@ export function useContentConfig() {
       }
     },
 
-    saveConfig: () => {
-      console.log("Saving Final JSON:", currentSection);
-      alert(
-        `Đã lưu cấu hình section: ${currentSection?.name}. Mở Console (F12) để xem mã JSON xuất ra.`,
-      );
+    // GỌI API ĐỂ LƯU VỀ DATABSE (PATCH) VỚI GIAO DIỆN REACT-TOASTIFY
+    saveConfig: async () => {
+      setIsSaving(true);
+      try {
+        await axiosClient.patch(
+          `/marketing/content/page-configs/${selectedPage}`,
+          { sections },
+        );
+        toast.success(`Lưu cấu hình trang "${selectedPage}" thành công!`);
+      } catch (error: unknown) {
+        const err = error as { response?: { data?: unknown } };
+        console.error("Lỗi lưu JSON:", err.response?.data || error);
+        toast.error("Đã xảy ra lỗi khi lưu cấu hình. Vui lòng thử lại!");
+      } finally {
+        setIsSaving(false);
+      }
     },
   };
 
@@ -491,5 +472,6 @@ export function useContentConfig() {
     availableSections,
     activeElementData,
     actions,
+    isSaving, // Trả ra ngoài để nếu thích bạn có thể dùng disable nút Save khi đang call API
   };
 }

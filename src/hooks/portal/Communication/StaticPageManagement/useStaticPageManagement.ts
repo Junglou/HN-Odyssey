@@ -1,7 +1,7 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
+import axiosClient from "../../../../api/axiosClient"; // <-- XEM LẠI ĐƯỜNG DẪN NÀY NẾU CẦN
 
-// định nghĩa các kiểu dữ liệu dựa trên hình ảnh thiết kế
 export type PageStatus = "Published" | "Draft" | "Hidden";
 export type PageType =
   | "About Us"
@@ -12,7 +12,6 @@ export type PageType =
   | "Promotion"
   | "Company News";
 
-// cấu trúc dữ liệu hiển thị trên bảng
 export interface StaticPageRecord {
   id: string;
   title: string;
@@ -26,7 +25,6 @@ export interface StaticPageRecord {
   originalStatus?: "Published" | "Draft";
 }
 
-// cấu trúc dữ liệu dùng cho form tạo/sửa
 export interface StaticPageFormData {
   title: string;
   slug: string;
@@ -35,72 +33,32 @@ export interface StaticPageFormData {
   status: PageStatus;
 }
 
-// mock data chuẩn xác theo hình ảnh
-const INITIAL_PAGES: StaticPageRecord[] = [
-  {
-    id: "1",
-    title: "About Us",
-    slug: "/about-us",
-    type: "Promotion",
-    status: "Published",
-    publishDate: "01/06/2024",
-    content: "Our story begins in...",
-    lastSaved: "Nov 01, 11:45",
-    isSystem: true, // trang hệ thống cốt lõi
-  },
-  {
-    id: "2",
-    title: "Privacy Policy",
-    slug: "/privacy-policy",
-    type: "Company News",
-    status: "Published",
-    publishDate: "01/01/2024",
-    content:
-      "Our privacy policy outlines how we collect, use, and protect your personal information. We control smil contents perneres and restanding and contracts to penees themo...",
-    lastSaved: "Nov 01, 11:45",
-    isSystem: true, // trang hệ thống cốt lõi
-  },
-  {
-    id: "3",
-    title: "Shipping Information",
-    slug: "/shipping-info",
-    type: "Promotion",
-    status: "Draft",
-    publishDate: "15/11/2024",
-    content: "We offer worldwide shipping...",
-  },
-  {
-    id: "4",
-    title: "Contact Us",
-    slug: "/contact-us",
-    type: "Company News",
-    status: "Hidden",
-    publishDate: "01/03/2024",
-    content: "Get in touch with our team...",
-  },
-  {
-    id: "5",
-    title: "Product Care Guide",
-    slug: "/product-care",
-    type: "Promotion",
-    status: "Draft",
-    publishDate: "01/08/2024",
-    content: "How to take care of your products...",
-  },
-];
+interface PageApiResponse {
+  _id: string;
+  title: string;
+  slug: string;
+  type: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  content: string;
+  is_system: boolean;
+}
 
 export function useStaticPageManagement() {
-  const [records, setRecords] = useState<StaticPageRecord[]>(INITIAL_PAGES);
-  const nextIdCounter = useRef<number>(6);
+  const [records, setRecords] = useState<StaticPageRecord[]>([]);
+  const [totalFiltered, setTotalFiltered] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // quản lý state bộ lọc và tìm kiếm
+  // Filters & Pagination State
   const [search, setSearch] = useState<string>("");
+  const [apiSearch, setApiSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<PageStatus | "All">("All");
   const [typeFilter, setTypeFilter] = useState<PageType | "All">("All");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pagination, setPagination] = useState({ page: 1, limit: 10 });
 
-  // quản lý modal
+  // Modal State
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
     mode: "add" | "edit" | "view" | "delete";
@@ -108,35 +66,76 @@ export function useStaticPageManagement() {
     isSubmitting: boolean;
   }>({ isOpen: false, mode: "add", editingRecord: null, isSubmitting: false });
 
-  // lọc dữ liệu
-  const filteredRecords = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
+  // 1. DEBOUNCE EFFECT CHO SEARCH
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (apiSearch !== search) {
+        setApiSearch(search);
+        setPagination((p) => ({ ...p, page: 1 }));
+        setSelectedIds(new Set());
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [search, apiSearch]);
 
-    return records.filter((record) => {
-      const matchStatus =
-        statusFilter === "All" || record.status === statusFilter;
-      const matchType = typeFilter === "All" || record.type === typeFilter;
-      const matchSearch =
-        !normalizedSearch ||
-        record.title.toLowerCase().includes(normalizedSearch);
+  // 2. GỌI API LẤY DANH SÁCH (SERVER-SIDE)
+  const fetchPages = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const res = await axiosClient.get("/marketing/content/pages", {
+        params: {
+          page: pagination.page,
+          limit: pagination.limit,
+          status:
+            statusFilter !== "All" ? statusFilter.toUpperCase() : undefined,
+          type: typeFilter !== "All" ? typeFilter : undefined,
+          search: apiSearch || undefined,
+        },
+      });
 
-      return matchStatus && matchType && matchSearch;
-    });
-  }, [records, search, statusFilter, typeFilter]);
+      const { data, meta } = res.data.data;
 
-  // phân trang
-  const totalPages = Math.ceil(filteredRecords.length / pagination.limit);
+      const formattedData: StaticPageRecord[] = data.map(
+        (item: PageApiResponse) => {
+          const formattedStatus = (item.status.charAt(0) +
+            item.status.slice(1).toLowerCase()) as PageStatus;
+
+          return {
+            id: item._id,
+            title: item.title,
+            slug: item.slug,
+            type: (item.type as PageType) || "About Us",
+            status: formattedStatus,
+            publishDate: new Date(item.created_at).toLocaleDateString("vi-VN"),
+            content: item.content,
+            isSystem: item.is_system,
+            originalStatus: formattedStatus,
+            lastSaved: new Date(item.updated_at).toLocaleDateString("vi-VN"),
+          };
+        },
+      );
+
+      setRecords(formattedData);
+      setTotalFiltered(meta.totalItems);
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      toast.error(err.message || "Lỗi khi tải danh sách trang tĩnh");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [pagination.page, pagination.limit, statusFilter, typeFilter, apiSearch]);
+
+  useEffect(() => {
+    fetchPages();
+  }, [fetchPages]);
+
+  const totalPages = Math.ceil(totalFiltered / pagination.limit);
   const startIndex = (pagination.page - 1) * pagination.limit;
-  const currentRecords = filteredRecords.slice(
-    startIndex,
-    startIndex + pagination.limit,
-  );
 
+  // 3. CÁC HÀM XỬ LÝ (ACTIONS)
   const actions = {
     changeSearch: (val: string) => {
       setSearch(val);
-      setSelectedIds(new Set());
-      setPagination((p) => ({ ...p, page: 1 }));
     },
     changeStatusFilter: (status: PageStatus | "All") => {
       setStatusFilter(status);
@@ -150,6 +149,7 @@ export function useStaticPageManagement() {
     },
     clearFilters: () => {
       setSearch("");
+      setApiSearch("");
       setStatusFilter("All");
       setTypeFilter("All");
       setSelectedIds(new Set());
@@ -166,7 +166,7 @@ export function useStaticPageManagement() {
     toggleSelectAll: (isSelectAll: boolean) => {
       setSelectedIds((prev) => {
         const next = new Set(prev);
-        currentRecords.forEach((r) => {
+        records.forEach((r) => {
           if (isSelectAll) next.add(r.id);
           else next.delete(r.id);
         });
@@ -201,7 +201,6 @@ export function useStaticPageManagement() {
         isSubmitting: false,
       }),
     openDeleteModal: (record?: StaticPageRecord) => {
-      // kiểm tra nếu người dùng bấm nút xóa lẻ (hàng ngang) trên trang hệ thống
       if (record && record.isSystem) {
         toast.error("Không thể xóa trang hệ thống mặc định.");
         return;
@@ -221,154 +220,125 @@ export function useStaticPageManagement() {
         isSubmitting: false,
       }),
 
-    toggleHiddenStatus: (id: string) => {
-      setRecords((prev) =>
-        prev.map((r) => {
-          if (r.id === id) {
-            if (r.status === "Hidden") {
-              return { ...r, status: r.originalStatus || "Draft" };
-            } else {
-              return {
-                ...r,
-                status: "Hidden",
-                originalStatus: r.status as "Published" | "Draft",
-              };
-            }
-          }
-          return r;
-        }),
-      );
+    toggleHiddenStatus: async (id: string) => {
+      const record = records.find((r) => r.id === id);
+      if (!record) return;
+
+      const targetStatus = record.status === "Hidden" ? "DRAFT" : "HIDDEN";
+
+      try {
+        await axiosClient.patch(`/marketing/content/pages/${id}`, {
+          status: targetStatus,
+        });
+        toast.success("Cập nhật trạng thái hiển thị thành công!");
+        fetchPages();
+      } catch (error: unknown) {
+        const err = error as { message?: string };
+        toast.error(err.message || "Lỗi khi cập nhật trạng thái");
+      }
     },
 
-    handleConfirmDelete: () => {
-      if (modalConfig.editingRecord) {
-        const id = modalConfig.editingRecord.id;
-        setRecords((prev) => prev.filter((r) => r.id !== id));
-        setSelectedIds((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-        toast.success("Đã xóa trang tĩnh thành công!");
-      } else {
-        // lọc ra các trang có thể xóa (bỏ qua trang hệ thống)
-        const targets = records.filter(
-          (r) => selectedIds.has(r.id) && !r.isSystem,
-        );
-        if (targets.length < selectedIds.size) {
-          toast.warning(
-            "Các trang hệ thống trong danh sách chọn đã được giữ lại.",
+    handleConfirmDelete: async () => {
+      try {
+        if (modalConfig.editingRecord) {
+          await axiosClient.delete(
+            `/marketing/content/pages/${modalConfig.editingRecord.id}`,
           );
-        }
-
-        const targetIds = new Set(targets.map((t) => t.id));
-        setRecords((prev) => prev.filter((r) => !targetIds.has(r.id)));
-
-        if (targets.length > 0) {
+          toast.success("Đã xóa trang tĩnh thành công!");
+        } else {
+          const targets = records.filter(
+            (r) => selectedIds.has(r.id) && !r.isSystem,
+          );
+          if (targets.length < selectedIds.size) {
+            toast.warning(
+              "Các trang hệ thống trong danh sách chọn đã được giữ lại.",
+            );
+          }
+          await Promise.all(
+            targets.map((t) =>
+              axiosClient.delete(`/marketing/content/pages/${t.id}`),
+            ),
+          );
           toast.success(`Đã xóa ${targets.length} trang tĩnh thành công!`);
         }
         setSelectedIds(new Set());
+        fetchPages();
+        actions.closeModal();
+      } catch (error: unknown) {
+        const err = error as { message?: string };
+        toast.error(err.message || "Xóa thất bại!");
       }
-      setModalConfig((prev) => ({ ...prev, isOpen: false }));
     },
   };
 
-  const handleModalSubmit = (data: StaticPageFormData) => {
+  // 4. GỬI FORM (CREATE / UPDATE)
+  const handleModalSubmit = async (data: StaticPageFormData) => {
     const { mode, editingRecord } = modalConfig;
 
-    if (!data.title.trim()) {
-      toast.error("Vui lòng nhập tiêu đề trang.");
-      return;
-    }
-    if (!data.slug.trim()) {
-      toast.error("Vui lòng nhập URL / Slug.");
-      return;
-    }
-    if (!data.type) {
-      toast.error("Vui lòng chọn loại trang (Page Type).");
-      return;
-    }
-    if (!data.content.trim()) {
-      toast.error("Vui lòng nhập Nội dung trang.");
-      return;
-    }
+    if (!data.title.trim()) return toast.error("Vui lòng nhập tiêu đề trang.");
+    if (!data.slug.trim()) return toast.error("Vui lòng nhập URL / Slug.");
+    if (!data.type) return toast.error("Vui lòng chọn loại trang (Page Type).");
+    if (!data.content.trim())
+      return toast.error("Vui lòng nhập Nội dung trang.");
 
-    // kiểm tra trùng lặp slug (BR5)
-    const isDuplicate = records.some(
-      (r) => r.slug === data.slug && r.id !== editingRecord?.id,
-    );
-    if (isDuplicate) {
-      toast.error("Đường dẫn (Slug) này đã tồn tại, vui lòng chọn tên khác.");
-      return;
-    }
+    try {
+      setModalConfig((prev) => ({ ...prev, isSubmitting: true }));
 
-    setModalConfig((prev) => ({ ...prev, isSubmitting: true }));
+      const payload = {
+        title: data.title.trim(),
+        slug: data.slug.trim().replace(/^\/+/, "").replace(/\/+$/, ""),
+        type: data.type,
+        content: data.content,
+        status: data.status.toUpperCase(),
+      };
 
-    setTimeout(() => {
-      try {
-        const today = new Date();
-        const currentDateStr = `${today.getDate().toString().padStart(2, "0")}/${(today.getMonth() + 1).toString().padStart(2, "0")}/${today.getFullYear()}`;
-
-        if (mode === "add") {
-          const newRecord: StaticPageRecord = {
-            id: nextIdCounter.current.toString(),
-            title: data.title.trim(),
-            slug: data.slug.trim(),
-            type: data.type as PageType,
-            status: data.status,
-            publishDate: currentDateStr,
-            content: data.content,
-            lastSaved: "Vừa xong",
-            isSystem: false, // trang mới tạo không phải trang hệ thống
-          };
-          nextIdCounter.current += 1;
-          setRecords((prev) => [newRecord, ...prev]);
-          setPagination((p) => ({ ...p, page: 1 }));
-          toast.success("Tạo trang tĩnh thành công!");
-        } else if (mode === "edit" && editingRecord) {
-          setRecords((prev) =>
-            prev.map((r) =>
-              r.id === editingRecord.id
-                ? {
-                    ...r,
-                    title: data.title.trim(),
-                    slug: data.slug.trim(),
-                    type: data.type as PageType,
-                    status: data.status,
-                    content: data.content,
-                    lastSaved: "Vừa xong",
-                  }
-                : r,
-            ),
-          );
-          toast.success("Cập nhật trang tĩnh thành công!");
-        }
-        actions.closeModal();
-      } catch {
-        toast.error("Lưu dữ liệu thất bại.");
-        setModalConfig((prev) => ({ ...prev, isSubmitting: false }));
+      if (mode === "add") {
+        await axiosClient.post("/marketing/content/pages", payload);
+        toast.success("Tạo trang tĩnh thành công!");
+      } else if (mode === "edit" && editingRecord) {
+        await axiosClient.patch(
+          `/marketing/content/pages/${editingRecord.id}`,
+          payload,
+        );
+        toast.success("Cập nhật trang tĩnh thành công!");
       }
-    }, 400);
+
+      fetchPages();
+      actions.closeModal();
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      toast.error(err.message || "Lưu dữ liệu thất bại.");
+    } finally {
+      setModalConfig((prev) => ({ ...prev, isSubmitting: false }));
+    }
   };
 
+  // 5. BULK ACTIONS
   const bulkActions = {
-    bulkActivate: () => {
+    bulkActivate: async () => {
       const targets = records.filter(
         (r) => selectedIds.has(r.id) && r.status !== "Published",
       );
       if (targets.length === 0) return;
-      setRecords((prev) =>
-        prev.map((r) =>
-          selectedIds.has(r.id) ? { ...r, status: "Published" } : r,
-        ),
-      );
-      toast.success(`Đã xuất bản ${targets.length} trang!`);
-      setSelectedIds(new Set());
+      try {
+        await Promise.all(
+          targets.map((t) =>
+            axiosClient.patch(`/marketing/content/pages/${t.id}`, {
+              status: "PUBLISHED",
+            }),
+          ),
+        );
+        toast.success(`Đã xuất bản ${targets.length} trang!`);
+        setSelectedIds(new Set());
+        fetchPages();
+      } catch (error: unknown) {
+        // ĐÃ FIX: Khôi phục lại biến error để tránh lỗi syntax trên Vite đời cũ
+        const err = error as { message?: string };
+        toast.error(err.message || "Lỗi khi xuất bản hàng loạt");
+      }
     },
     bulkDelete: () => {
       if (selectedIds.size === 0) return;
-
-      // kiểm tra nếu người dùng chọn hàng loạt nhưng toàn trúng trang hệ thống
       const targets = records.filter(
         (r) => selectedIds.has(r.id) && !r.isSystem,
       );
@@ -378,17 +348,17 @@ export function useStaticPageManagement() {
         );
         return;
       }
-
       actions.openDeleteModal();
     },
   };
 
   return {
-    currentRecords,
+    currentRecords: records,
+    isLoading,
     pagination: {
       ...pagination,
       totalPages,
-      totalFiltered: filteredRecords.length,
+      totalFiltered,
       startIndex,
     },
     search,

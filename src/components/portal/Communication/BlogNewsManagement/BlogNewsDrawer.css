@@ -584,3 +584,32 @@
     transform: translateY(0);
   }
 }
+
+/* --- BỔ SUNG CÁC CLASS ĐƯỢC TÁCH TỪ INLINE CSS --- */
+
+.ban-drawer-dropdown-value.selected {
+  color: #111827;
+}
+
+.ban-drawer-dropdown-value.placeholder {
+  color: #9ca3af;
+}
+
+.ban-hidden-file-input {
+  display: none;
+}
+
+.ban-meta-textarea {
+  min-height: 60px;
+}
+
+.ban-toggle-label {
+  font-weight: 600;
+}
+
+.ban-product-empty-state {
+  padding: 16px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.9rem;
+}

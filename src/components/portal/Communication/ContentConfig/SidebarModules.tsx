@@ -22,6 +22,7 @@ import {
   EllipseIcon,
 } from "../../../../assets/icons/ContentConfigIcons";
 import type { ElementType } from "../../../../hooks/portal/Communication/ContentConfig/useContentConfig";
+import axiosClient from "../../../../api/axiosClient";
 
 // props
 interface SidebarModulesProps {
@@ -34,6 +35,15 @@ interface SidebarModulesProps {
     ) => void;
   };
 }
+
+// Helper Func để handle URL ảnh được Backend trả về (Tránh lỗi Path Relative)
+const getFullMediaUrl = (path: string) => {
+  if (path.startsWith("/")) {
+    const baseUrl = import.meta.env.VITE_API_URL.replace("/api", "");
+    return baseUrl + path;
+  }
+  return path;
+};
 
 // component
 export default function SidebarModules({ actions }: SidebarModulesProps) {
@@ -92,18 +102,50 @@ export default function SidebarModules({ actions }: SidebarModulesProps) {
     e.dataTransfer.setData("application/new-element", type);
   };
 
-  const handleUploadImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // FETCH API KHI UPLOAD ẢNH TỪ MÁY
+  const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      actions.addElement("image", 0, 0, url);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await axiosClient.post(
+          "/marketing/content/page-configs/upload",
+          formData,
+          {
+            headers: { "Content-Type": "multipart/form-data" },
+          },
+        );
+        const url = getFullMediaUrl(res.data.data.url);
+        actions.addElement("image", 0, 0, url);
+      } catch (err) {
+        console.error("Upload error", err);
+        alert("Có lỗi xảy ra khi Upload Ảnh.");
+      }
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
-  const handleUploadVideo = (e: React.ChangeEvent<HTMLInputElement>) => {
+
+  // FETCH API KHI UPLOAD VIDEO TỪ MÁY
+  const handleUploadVideo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      actions.addElement("video-upload", 0, 0, URL.createObjectURL(file));
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await axiosClient.post(
+          "/marketing/content/page-configs/upload",
+          formData,
+          {
+            headers: { "Content-Type": "multipart/form-data" },
+          },
+        );
+        const url = getFullMediaUrl(res.data.data.url);
+        actions.addElement("video-upload", 0, 0, url);
+      } catch (err) {
+        console.error("Upload error", err);
+        alert("Có lỗi xảy ra khi Upload Video.");
+      }
       if (videoInputRef.current) videoInputRef.current.value = "";
     }
   };

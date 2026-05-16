@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import "./MediaUploadDrawer.css";
 import {
   ArrowLeftIcon,
@@ -8,27 +8,9 @@ import type {
   MediaFormData,
   MediaType,
   MediaRecord,
+  TargetOption,
 } from "../../../../hooks/portal/Communication/MediaManagement/useMediaManagement";
 
-// mock data
-const MOCK_TARGETS: Record<string, { id: string; label: string }[]> = {
-  Product: [
-    { id: "CWT-001", label: "CWT-001 - Grey Slim Jacket" },
-    { id: "SHR-012", label: "SHR-012 - Classic White Shirt" },
-    { id: "PNT-008", label: "PNT-008 - Denim Jeans" },
-  ],
-  Category: [
-    { id: "c1", label: "Women" },
-    { id: "c1-1", label: "Outerwear" },
-    { id: "c1-1-1", label: "Jackets" },
-  ],
-  Variant: [
-    { id: "v1", label: "Grey Slim Jacket - Navy / M" },
-    { id: "v2", label: "Classic White Shirt - Cotton / L" },
-  ],
-};
-
-// định nghĩa cấu trúc cho một bản nháp đang được tải lên
 export interface UploadDraft {
   id: string;
   file: File;
@@ -44,13 +26,13 @@ export interface MediaUploadDrawerProps {
   uploadDrafts?: UploadDraft[];
   isSubmitting: boolean;
   onClose: () => void;
-  // hỗ trợ trả về mảng dữ liệu nếu ở chế độ upload
   onSubmit: (data: MediaFormData | MediaFormData[]) => void;
+  searchTargets: (type: MediaType, keyword: string) => Promise<TargetOption[]>;
+  resolveTargetName: (type: MediaType, id: string) => Promise<string>;
 }
 
 export default function MediaUploadDrawer(props: MediaUploadDrawerProps) {
   if (!props.isOpen) return null;
-  // tự động tạo key để ép React render lại Drawer khi dữ liệu khởi tạo thay đổi
   const modalKey =
     (props.mode === "edit" || props.mode === "view") && props.initialData
       ? props.initialData.id
@@ -59,7 +41,6 @@ export default function MediaUploadDrawer(props: MediaUploadDrawerProps) {
   return <DrawerContent key={modalKey} {...props} />;
 }
 
-// component con đại diện cho một khối điền thông tin của 1 phương tiện
 function MediaFormSection({
   index,
   mode,
@@ -69,6 +50,8 @@ function MediaFormSection({
   formData,
   isSubmitting,
   onChange,
+  searchTargets,
+  resolveTargetName, // Bóc tách resolveTargetName từ Props
 }: {
   index: number;
   mode: "upload" | "edit" | "view";
@@ -78,15 +61,12 @@ function MediaFormSection({
   formData: MediaFormData;
   isSubmitting: boolean;
   onChange: (index: number, updatedData: MediaFormData) => void;
+  searchTargets: (type: MediaType, keyword: string) => Promise<TargetOption[]>;
+  resolveTargetName: (type: MediaType, id: string) => Promise<string>;
 }) {
-  const [searchTerm, setSearchTerm] = useState(() => {
-    if (initialTargetId && formData.type) {
-      const targetList = MOCK_TARGETS[formData.type] || [];
-      const found = targetList.find((t) => t.id === initialTargetId);
-      return found ? found.label : initialTargetId;
-    }
-    return "";
-  });
+  const [searchTerm, setSearchTerm] = useState<string>(initialTargetId || "");
+  const [filteredTargets, setFilteredTargets] = useState<TargetOption[]>([]);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
 
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
   const [hasAutocompleteOpened, setHasAutocompleteOpened] = useState(false);
@@ -97,7 +77,6 @@ function MediaFormSection({
   const typeDropdownRef = useRef<HTMLDivElement>(null);
   const isReadOnly = mode === "view";
 
-  // clickoutside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
@@ -118,14 +97,59 @@ function MediaFormSection({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filteredTargets = useMemo(() => {
-    if (!formData.type) return [];
-    const list = MOCK_TARGETS[formData.type] || [];
-    if (!searchTerm) return list;
-    return list.filter((item) =>
-      item.label.toLowerCase().includes(searchTerm.toLowerCase()),
-    );
-  }, [formData.type, searchTerm]);
+  useEffect(() => {
+    if (!formData.type || !searchTerm.trim()) {
+      setFilteredTargets([]);
+      return;
+    }
+
+    const delayDebounceFn = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await searchTargets(
+          formData.type as MediaType,
+          searchTerm,
+        );
+        setFilteredTargets(results);
+      } catch (error) {
+        console.error("Lỗi khi fetch targets", error);
+        setFilteredTargets([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [formData.type, searchTerm, searchTargets]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (
+      (mode === "edit" || mode === "view") &&
+      initialTargetId &&
+      formData.targetId === initialTargetId
+    ) {
+      setIsSearching(true);
+      resolveTargetName(formData.type as MediaType, initialTargetId)
+        .then((name: string) => {
+          if (isMounted) setSearchTerm(name);
+        })
+        .finally(() => {
+          if (isMounted) setIsSearching(false);
+        });
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    mode,
+    initialTargetId,
+    formData.targetId,
+    formData.type,
+    resolveTargetName, // Đã fix dependency array warning
+  ]);
 
   const updateField = (field: keyof MediaFormData, value: string) => {
     onChange(index, { ...formData, [field]: value });
@@ -134,6 +158,7 @@ function MediaFormSection({
   const handleTypeChange = (newType: MediaType) => {
     onChange(index, { ...formData, type: newType, targetId: "" });
     setSearchTerm("");
+    setFilteredTargets([]);
   };
 
   const toggleStatus = () => {
@@ -156,12 +181,7 @@ function MediaFormSection({
               preload="metadata"
               playsInline
               controlsList="nodownload"
-              style={{
-                maxWidth: "100%",
-                maxHeight: "100%",
-                borderRadius: "8px",
-                backgroundColor: "#000",
-              }}
+              className="mm-drawer-video-render" // Thay thế cho toàn bộ cục style inline cũ
             />
           ) : (
             <img src={previewUrl} alt="Preview" />
@@ -188,7 +208,13 @@ function MediaFormSection({
               }
             }}
           >
-            <span style={{ color: formData.type ? "#333333" : "#9ca3af" }}>
+            <span
+              className={
+                formData.type
+                  ? "mm-trigger-text-selected"
+                  : "mm-trigger-text-placeholder"
+              }
+            >
               {formData.type || "Choose Type"}
             </span>
             <ChevronDownSmallIcon
@@ -196,7 +222,13 @@ function MediaFormSection({
             />
           </div>
           <div
-            className={`mm-autocomplete-dropdown ${isTypeDropdownOpen ? "open" : hasTypeDropdownOpened ? "closed" : ""}`}
+            className={`mm-autocomplete-dropdown ${
+              isTypeDropdownOpen
+                ? "open"
+                : hasTypeDropdownOpened
+                  ? "closed"
+                  : ""
+            }`}
           >
             {(["Product", "Variant", "Category"] as const).map((opt) => (
               <div
@@ -239,12 +271,20 @@ function MediaFormSection({
               disabled={isSubmitting || isReadOnly}
             />
             <div
-              className={`mm-autocomplete-dropdown ${isAutocompleteOpen ? "open" : hasAutocompleteOpened ? "closed" : ""}`}
+              className={`mm-autocomplete-dropdown ${
+                isAutocompleteOpen
+                  ? "open"
+                  : hasAutocompleteOpened
+                    ? "closed"
+                    : ""
+              }`}
             >
-              {filteredTargets.length > 0 ? (
-                filteredTargets.map((opt) => (
+              {isSearching ? (
+                <div className="mm-autocomplete-empty">Searching...</div>
+              ) : filteredTargets.length > 0 ? (
+                filteredTargets.map((opt, idx) => (
                   <div
-                    key={opt.id}
+                    key={`${opt.id}-${idx}`}
                     className="mm-autocomplete-item"
                     onClick={() => {
                       updateField("targetId", opt.id);
@@ -255,8 +295,12 @@ function MediaFormSection({
                     {opt.label}
                   </div>
                 ))
-              ) : (
+              ) : searchTerm.trim() !== "" ? (
                 <div className="mm-autocomplete-empty">No results found</div>
+              ) : (
+                <div className="mm-autocomplete-empty">
+                  Type to search {formData.type}...
+                </div>
               )}
             </div>
           </div>
@@ -281,7 +325,9 @@ function MediaFormSection({
             type="button"
             role="switch"
             aria-checked={formData.status === "Published"}
-            className={`mm-toggle-switch ${formData.status === "Published" ? "on" : ""}`}
+            className={`mm-toggle-switch ${
+              formData.status === "Published" ? "on" : ""
+            }`}
             onClick={toggleStatus}
             disabled={isSubmitting || isReadOnly}
           ></button>
@@ -303,8 +349,9 @@ function DrawerContent({
   isSubmitting,
   onClose,
   onSubmit,
+  searchTargets,
+  resolveTargetName, // Bóc tách từ Props
 }: Omit<MediaUploadDrawerProps, "isOpen">) {
-  // khởi tạo mảng form state tương ứng với số lượng phương tiện
   const [formsData, setFormsData] = useState<MediaFormData[]>(() => {
     if (mode === "upload" && uploadDrafts && uploadDrafts.length > 0) {
       return uploadDrafts.map(() => ({
@@ -327,7 +374,6 @@ function DrawerContent({
     return [];
   });
 
-  // phím tắt đóng Drawer
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !isSubmitting) onClose();
@@ -336,7 +382,6 @@ function DrawerContent({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose, isSubmitting]);
 
-  // cập nhật dữ liệu của một section cụ thể trong mảng
   const handleSectionChange = (index: number, updatedData: MediaFormData) => {
     setFormsData((prev) => {
       const newData = [...prev];
@@ -345,7 +390,6 @@ function DrawerContent({
     });
   };
 
-  // form chỉ hợp lệ khi toàn bộ các phương tiện đều đã được phân loại và gán đối tượng
   const isFormValid =
     formsData.length > 0 &&
     formsData.every((f) => f.type !== "" && f.targetId !== "");
@@ -400,6 +444,8 @@ function DrawerContent({
                 formData={formsData[i]}
                 isSubmitting={isSubmitting}
                 onChange={handleSectionChange}
+                searchTargets={searchTargets}
+                resolveTargetName={resolveTargetName} // Truyền xuống
               />
             ))
           ) : initialData ? (
@@ -412,6 +458,8 @@ function DrawerContent({
               formData={formsData[0]}
               isSubmitting={isSubmitting}
               onChange={handleSectionChange}
+              searchTargets={searchTargets}
+              resolveTargetName={resolveTargetName} // Truyền xuống
             />
           ) : null}
         </div>
@@ -420,7 +468,9 @@ function DrawerContent({
           {!isReadOnly && (
             <button
               type="button"
-              className={`mm-btn-submit ${isFormValid && !isSubmitting ? "active" : ""}`}
+              className={`mm-btn-submit ${
+                isFormValid && !isSubmitting ? "active" : ""
+              }`}
               onClick={handleSave}
               disabled={isSubmitting || !isFormValid}
             >

@@ -399,3 +399,10 @@
     transform: translateY(-5px);
   }
 }
+
+/* Trải dài phần Editor chiếm không gian trống trong Modal */
+.sp-form-group-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}

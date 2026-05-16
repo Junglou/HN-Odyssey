@@ -1,6 +1,9 @@
-import { useState, useRef, useMemo, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { toast } from "react-toastify";
+import { isAxiosError } from "axios";
+import axiosClient from "../../../../api/axiosClient";
 
+// --- ĐỊNH NGHĨA CÁC INTERFACE NGHIÊM NGẶT ---
 export type MediaStatus = "Published" | "Draft" | "Hidden";
 export type MediaType = "Product" | "Category" | "Variant";
 
@@ -29,63 +32,82 @@ export interface UploadDraft {
   previewUrl: string;
 }
 
-const INITIAL_MEDIA: MediaRecord[] = [
-  {
-    id: "img-1",
-    url: "https://placehold.co/400x300/ffedd5/ea580c?text=Orange+Jacket",
-    fileName: "Orange_Jacket.jpg",
-    type: "Product",
-    targetId: "CWT-001",
-    status: "Published",
-    isPrimary: true,
-    altText: "Orange winter jacket",
-    size: 1024000,
-  },
-  {
-    id: "img-2",
-    url: "https://placehold.co/400x300/fef08a/ca8a04?text=Yellow+Jacket",
-    fileName: "Yellow_Jacket.jpg",
-    type: "Product",
-    targetId: "SHR-012",
-    status: "Published",
-    isPrimary: false,
-    altText: "Yellow winter jacket",
-    size: 2048000,
-  },
-  {
-    id: "img-3",
-    url: "https://placehold.co/400x300/e0f2fe/0284c7?text=Winter+Category",
-    fileName: "Category_Winter.jpg",
-    type: "Category",
-    targetId: "c1",
-    status: "Published",
-    isPrimary: false,
-    altText: "Winter collection category",
-    size: 1500000,
-  },
-  {
-    id: "vid-1",
-    url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-    fileName: "Sample_Video.mp4",
-    type: "Product",
-    targetId: "CWT-001",
-    status: "Published",
-    isPrimary: false,
-    altText: "Sample product video",
-    size: 15400000,
-  },
-];
+export interface BackendMediaItem {
+  _id: string;
+  url: string;
+  fileName: string;
+  originalName: string;
+  type: string;
+  targetId: string;
+  status: string;
+  isPrimary: boolean;
+  altText: string;
+  size: number;
+  mimetype: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface BackendPaginatedMeta {
+  totalItems: number;
+  itemsPerPage: number;
+  currentPage: number;
+  totalPages: number;
+}
+
+export interface BackendPaginatedResponse<T> {
+  data: T[];
+  meta: BackendPaginatedMeta;
+}
+
+export interface BackendBaseResponse<T> {
+  success: boolean;
+  message: string;
+  data: T;
+}
+
+// Interface phục vụ tính năng Search Target (Product/Category)
+export interface TargetOption {
+  id: string;
+  label: string;
+}
+
+// Helper: Phân tích lỗi an toàn tuyệt đối không dùng any
+const getErrorMessage = (error: unknown): string => {
+  if (isAxiosError(error)) {
+    return error.response?.data?.message || error.message;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "Đã xảy ra lỗi không xác định.";
+};
+
+const getFullMediaUrl = (url: string): string => {
+  if (!url) return "";
+  if (url.startsWith("http")) return url;
+  const baseUrl = import.meta.env.VITE_API_URL || "";
+  const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, "");
+  return `${cleanBaseUrl}${url}`;
+};
+
+export interface CategoryTreeNode {
+  _id: string;
+  id?: string;
+  name: string;
+  children?: CategoryTreeNode[];
+}
 
 export function useMediaManagement() {
-  const [records, setRecords] = useState<MediaRecord[]>(INITIAL_MEDIA);
-  const nextIdCounter = useRef<number>(4);
+  const [records, setRecords] = useState<MediaRecord[]>([]);
+  const [totalFiltered, setTotalFiltered] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(0);
 
   const [search, setSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<MediaStatus | "All">("All");
   const [typeFilter, setTypeFilter] = useState<MediaType | "All">("All");
   const [pagination, setPagination] = useState({ page: 1, limit: 10 });
 
-  // thay đổi selectedFile đơn thành mảng uploadDrafts để hỗ trợ tải lên nhiều file
   const [drawerConfig, setDrawerConfig] = useState<{
     isOpen: boolean;
     mode: "upload" | "edit" | "view";
@@ -115,28 +137,184 @@ export function useMediaManagement() {
     mediaRecord: null,
   });
 
-  const filteredRecords = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
+  const fetchMedia = useCallback(async () => {
+    try {
+      const params: Record<string, string | number> = {
+        page: pagination.page,
+        limit: pagination.limit,
+        status: statusFilter,
+        type: typeFilter,
+      };
 
-    return records.filter((record) => {
-      const matchStatus =
-        statusFilter === "All" || record.status === statusFilter;
-      const matchType = typeFilter === "All" || record.type === typeFilter;
-      const matchSearch =
-        !normalizedSearch ||
-        record.fileName.toLowerCase().includes(normalizedSearch) ||
-        record.altText.toLowerCase().includes(normalizedSearch);
+      if (search.trim()) {
+        params.search = search.trim();
+      }
 
-      return matchStatus && matchType && matchSearch;
-    });
-  }, [records, search, statusFilter, typeFilter]);
+      const response = await axiosClient.get<
+        BackendBaseResponse<BackendPaginatedResponse<BackendMediaItem>>
+      >("/marketing/media", { params });
 
-  const totalPages = Math.ceil(filteredRecords.length / pagination.limit);
-  const startIndex = (pagination.page - 1) * pagination.limit;
-  const currentRecords = filteredRecords.slice(
-    startIndex,
-    startIndex + pagination.limit,
+      const { data, meta } = response.data.data;
+
+      const mappedRecords: MediaRecord[] = data.map((item) => ({
+        id: item._id,
+        url: getFullMediaUrl(item.url),
+        fileName: item.originalName || item.fileName,
+        type: item.type as MediaType,
+        targetId: item.targetId,
+        status: item.status as MediaStatus,
+        isPrimary: item.isPrimary,
+        altText: item.altText,
+        size: item.size,
+      }));
+
+      setRecords(mappedRecords);
+      setTotalFiltered(meta.totalItems);
+      setTotalPages(meta.totalPages);
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error));
+    }
+  }, [pagination.page, pagination.limit, search, statusFilter, typeFilter]);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchMedia();
+    }, 300);
+    return () => clearTimeout(delayDebounceFn);
+  }, [fetchMedia]);
+
+  // --- THAY THẾ TOÀN BỘ HÀM searchTargets BẰNG ĐOẠN NÀY ---
+  const searchTargets = useCallback(
+    async (type: MediaType, keyword: string): Promise<TargetOption[]> => {
+      try {
+        if (!keyword.trim()) return [];
+
+        if (type === "Category") {
+          const res = await axiosClient.get(`/categories/search`, {
+            params: { q: keyword },
+          });
+          const rawCategories = (res.data?.data || res.data) as Array<{
+            _id: string;
+            name: string;
+          }>;
+          return rawCategories.map((c) => ({
+            id: c._id,
+            label: c.name,
+          }));
+        }
+
+        // Định nghĩa Type chuẩn cho Product
+        interface ProductApiItem {
+          _id: string;
+          name: string;
+          has_variants?: boolean;
+          variants?: Array<{ sku: string; price: number }>;
+        }
+
+        if (type === "Product") {
+          const res = await axiosClient.get(`/products`, {
+            params: { keyword: keyword, limit: 10 },
+          });
+          // API /products không bọc BaseResponse, nên list nằm ngay ở res.data.data
+          const productsArray = (res.data.data || []) as ProductApiItem[];
+
+          return productsArray.map((p) => ({
+            id: p._id,
+            label: p.name,
+          }));
+        }
+
+        if (type === "Variant") {
+          const res = await axiosClient.get(`/products`, {
+            params: { keyword: keyword, limit: 10 },
+          });
+
+          const productsArray = (res.data.data || []) as ProductApiItem[];
+
+          const uniqueVariants = new Map<string, TargetOption>();
+
+          productsArray.forEach((product) => {
+            if (
+              product.has_variants &&
+              product.variants &&
+              product.variants.length > 0
+            ) {
+              product.variants.forEach((v) => {
+                uniqueVariants.set(v.sku, {
+                  id: v.sku,
+                  label: `${product.name} - [${v.sku}]`,
+                });
+              });
+            }
+          });
+
+          return Array.from(uniqueVariants.values());
+        }
+
+        return [];
+      } catch (error: unknown) {
+        console.error("Lỗi khi tìm kiếm Target:", getErrorMessage(error));
+        return [];
+      }
+    },
+    [],
   );
+
+  // --- THAY THẾ TOÀN BỘ HÀM resolveTargetName BẰNG ĐOẠN NÀY ---
+  const resolveTargetName = useCallback(
+    async (type: MediaType, id: string): Promise<string> => {
+      if (!id) return "";
+      try {
+        if (type === "Product") {
+          const res = await axiosClient.get(`/products/${id}`);
+          const data = res.data.data || res.data;
+          return (data as { name: string })?.name || id;
+        }
+
+        if (type === "Variant") {
+          const res = await axiosClient.get(`/products`, {
+            params: { keyword: id, limit: 1 },
+          });
+
+          const productsArray = (res.data.data || []) as Array<{
+            name: string;
+          }>;
+
+          if (productsArray.length > 0) {
+            return `${productsArray[0].name} - [${id}]`;
+          }
+          return id;
+        }
+
+        if (type === "Category") {
+          const res = await axiosClient.get(`/categories/admin/tree-view`);
+          const treeData = (res.data.data ||
+            res.data ||
+            []) as CategoryTreeNode[];
+
+          const findInTree = (nodes: CategoryTreeNode[]): string | null => {
+            for (const node of nodes) {
+              if (node._id === id || node.id === id) return node.name;
+              if (node.children && node.children.length > 0) {
+                const found = findInTree(node.children);
+                if (found) return found;
+              }
+            }
+            return null;
+          };
+
+          const name = findInTree(treeData);
+          return name || id;
+        }
+      } catch (error: unknown) {
+        console.error("Không thể dịch ID sang Tên:", error);
+      }
+      return id;
+    },
+    [],
+  );
+
+  const startIndex = (pagination.page - 1) * pagination.limit;
 
   const validateFile = useCallback((file: File): boolean => {
     const isImage = ["image/jpeg", "image/png", "image/webp"].includes(
@@ -150,17 +328,14 @@ export function useMediaManagement() {
       );
       return false;
     }
-
     if (isImage && file.size > 20 * 1024 * 1024) {
       toast.error(`Kích thước ảnh ${file.name} vượt quá giới hạn 20MB.`);
       return false;
     }
-
     if (isVideo && file.size > 200 * 1024 * 1024) {
       toast.error(`Kích thước video ${file.name} vượt quá giới hạn 200MB.`);
       return false;
     }
-
     return true;
   }, []);
 
@@ -186,10 +361,8 @@ export function useMediaManagement() {
     changePage: (page: number) => setPagination((p) => ({ ...p, page })),
     changeLimit: (limit: number) => setPagination({ page: 1, limit }),
 
-    // hỗ trợ nhận một mảng các file thay vì một file duy nhất
     openUploadDrawer: useCallback(
       (files: File | FileList | File[]) => {
-        // chuyển đổi an toàn mọi đầu vào thành mảng tiêu chuẩn
         const fileArray = files instanceof File ? [files] : Array.from(files);
 
         if (fileArray.length > 50) {
@@ -244,7 +417,6 @@ export function useMediaManagement() {
     },
 
     closeDrawer: () => {
-      // thu hồi url của toàn bộ các file tạm trong mảng tải lên
       if (
         drawerConfig.mode === "upload" &&
         drawerConfig.uploadDrafts.length > 0
@@ -263,35 +435,14 @@ export function useMediaManagement() {
       });
     },
 
-    setPrimaryMedia: (id: string) => {
-      setRecords((prev) => {
-        const targetMedia = prev.find((img) => img.id === id);
-
-        if (!targetMedia || !targetMedia.targetId) {
-          toast.error(
-            "Vui lòng gán phương tiện cho một Sản phẩm/Danh mục trước khi đặt làm ảnh chính.",
-          );
-          return prev;
-        }
-
-        if (targetMedia.fileName.toLowerCase().endsWith(".mp4")) {
-          toast.error(
-            "Hệ thống vô hiệu hóa chức năng đặt ảnh đại diện đối với tệp tin video.",
-          );
-          return prev;
-        }
-
-        return prev.map((img) => {
-          if (img.targetId === targetMedia.targetId) {
-            return {
-              ...img,
-              isPrimary: img.id === id,
-            };
-          }
-          return img;
-        });
-      });
-      toast.success("Đã cập nhật ảnh chính thức!");
+    setPrimaryMedia: async (id: string) => {
+      try {
+        await axiosClient.patch(`/marketing/media/${id}/primary`);
+        toast.success("Đã cập nhật ảnh chính thức!");
+        fetchMedia();
+      } catch (error: unknown) {
+        toast.error(getErrorMessage(error));
+      }
     },
 
     deleteMedia: (id: string) => {
@@ -302,32 +453,36 @@ export function useMediaManagement() {
       setDeleteModalConfig({ isOpen: false, mediaId: null });
     },
 
-    handleConfirmDelete: () => {
+    handleConfirmDelete: async () => {
       if (deleteModalConfig.mediaId) {
-        setRecords((prev) =>
-          prev.filter((img) => img.id !== deleteModalConfig.mediaId),
-        );
-        toast.success("Đã xóa phương tiện thành công!");
-        setDeleteModalConfig({ isOpen: false, mediaId: null });
+        try {
+          await axiosClient.delete(
+            `/marketing/media/${deleteModalConfig.mediaId}`,
+          );
+          toast.success("Đã xóa phương tiện thành công!");
+          setDeleteModalConfig({ isOpen: false, mediaId: null });
+          fetchMedia();
+        } catch (error: unknown) {
+          toast.error(getErrorMessage(error));
+        }
       }
     },
 
-    replaceMedia: (id: string, newFile: File) => {
+    replaceMedia: async (id: string, newFile: File) => {
       if (validateFile(newFile)) {
-        const newUrl = URL.createObjectURL(newFile);
-        setRecords((prev) =>
-          prev.map((img) =>
-            img.id === id
-              ? {
-                  ...img,
-                  url: newUrl,
-                  fileName: newFile.name,
-                  size: newFile.size,
-                }
-              : img,
-          ),
-        );
-        toast.success("Thay thế phương tiện thành công!");
+        try {
+          const formData = new FormData();
+          formData.append("file", newFile);
+
+          await axiosClient.post(`/marketing/media/${id}/replace`, formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+
+          toast.success("Thay thế phương tiện thành công!");
+          fetchMedia();
+        } catch (error: unknown) {
+          toast.error(getErrorMessage(error));
+        }
       }
     },
 
@@ -338,40 +493,32 @@ export function useMediaManagement() {
         );
         return;
       }
-
-      setCropModalConfig({
-        isOpen: true,
-        mediaRecord: record,
-      });
+      setCropModalConfig({ isOpen: true, mediaRecord: record });
     },
 
     closeCropModal: () => {
-      setCropModalConfig({
-        isOpen: false,
-        mediaRecord: null,
-      });
+      setCropModalConfig({ isOpen: false, mediaRecord: null });
     },
 
-    handleCropSave: (id: string, newFile: File, newUrl: string) => {
-      setRecords((prev) =>
-        prev.map((img) =>
-          img.id === id
-            ? {
-                ...img,
-                url: newUrl,
-                fileName: `cropped_${newFile.name}`,
-                size: newFile.size,
-              }
-            : img,
-        ),
-      );
-      toast.success("Cắt hình ảnh thành công!");
-      setCropModalConfig({ isOpen: false, mediaRecord: null });
+    handleCropSave: async (id: string, newFile: File) => {
+      try {
+        const formData = new FormData();
+        formData.append("file", newFile);
+
+        await axiosClient.post(`/marketing/media/${id}/crop`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+
+        toast.success("Cắt hình ảnh thành công!");
+        setCropModalConfig({ isOpen: false, mediaRecord: null });
+        fetchMedia();
+      } catch (error: unknown) {
+        toast.error(getErrorMessage(error));
+      }
     },
   };
 
-  // cập nhật hàm submit để hỗ trợ dạng dữ liệu mảng
-  const handleDrawerSubmit = (data: MediaFormData | MediaFormData[]) => {
+  const handleDrawerSubmit = async (data: MediaFormData | MediaFormData[]) => {
     setDrawerConfig((prev) => ({ ...prev, isSubmitting: true }));
 
     try {
@@ -380,9 +527,8 @@ export function useMediaManagement() {
         drawerConfig.uploadDrafts.length > 0
       ) {
         const formArray = data as MediaFormData[];
-
-        // kiểm tra điều kiện an toàn cho toàn bộ mảng dữ liệu
         const isValid = formArray.every((d) => d.type && d.targetId);
+
         if (!isValid) {
           toast.error(
             "Vui lòng chọn phân loại và gán đối tượng cho toàn bộ phương tiện.",
@@ -391,26 +537,31 @@ export function useMediaManagement() {
           return;
         }
 
-        const newRecords: MediaRecord[] = drawerConfig.uploadDrafts.map(
-          (draft, index) => ({
-            id: `img-${nextIdCounter.current + index}`,
-            url: draft.previewUrl,
-            fileName: draft.file.name,
-            size: draft.file.size,
-            type: formArray[index].type as MediaType,
-            targetId: formArray[index].targetId,
-            status: formArray[index].status,
-            altText: formArray[index].altText.trim(),
-            isPrimary: false,
-          }),
-        );
+        const formData = new FormData();
+        drawerConfig.uploadDrafts.forEach((draft) => {
+          formData.append("files", draft.file);
+        });
 
-        nextIdCounter.current += newRecords.length;
-        setRecords((prev) => [...newRecords, ...prev]);
-        setPagination((p) => ({ ...p, page: 1 }));
-        toast.success(`Tải lên ${newRecords.length} phương tiện thành công!`);
+        const metadataPayload = formArray.map((form) => ({
+          type: form.type,
+          targetId: form.targetId,
+          altText: form.altText.trim(),
+          status: form.status,
+        }));
 
-        setDrawerConfig((prev) => ({ ...prev, uploadDrafts: [] }));
+        formData.append("metadata", JSON.stringify(metadataPayload));
+
+        await axiosClient.post("/marketing/media/upload", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+
+        toast.success(`Tải lên phương tiện thành công!`);
+        setDrawerConfig((prev) => ({
+          ...prev,
+          uploadDrafts: [],
+          isOpen: false,
+        }));
+        fetchMedia();
       } else if (drawerConfig.mode === "edit" && drawerConfig.editingRecord) {
         const singleData = data as MediaFormData;
 
@@ -420,58 +571,41 @@ export function useMediaManagement() {
           return;
         }
 
-        // Kiểm tra xem người dùng có thay đổi đối tượng gán (targetId) hoặc loại (type) không
-        const isTargetChanged =
-          singleData.targetId !== drawerConfig.editingRecord.targetId ||
-          singleData.type !== drawerConfig.editingRecord.type;
-        // Kiểm tra xem ảnh đang sửa có đang là Primary hay không
-        const isCurrentlyPrimary = drawerConfig.editingRecord.isPrimary;
+        const payload = {
+          type: singleData.type,
+          targetId: singleData.targetId,
+          status: singleData.status,
+          altText: singleData.altText.trim(),
+        };
 
-        setRecords((prev) =>
-          prev.map((img) => {
-            if (img.id === drawerConfig.editingRecord!.id) {
-              return {
-                ...img,
-                type: singleData.type as MediaType,
-                targetId: singleData.targetId,
-                status: singleData.status,
-                altText: singleData.altText.trim(),
-              };
-            }
-            if (
-              isTargetChanged &&
-              isCurrentlyPrimary &&
-              img.targetId === singleData.targetId &&
-              img.type === singleData.type
-            ) {
-              return { ...img, isPrimary: false };
-            }
-
-            return img;
-          }),
+        await axiosClient.patch(
+          `/marketing/media/${drawerConfig.editingRecord.id}`,
+          payload,
         );
+
         toast.success("Cập nhật thông tin phương tiện thành công!");
+        setDrawerConfig({
+          isOpen: false,
+          mode: "upload",
+          uploadDrafts: [],
+          previewUrl: "",
+          editingRecord: null,
+          isSubmitting: false,
+        });
+        fetchMedia();
       }
-      setDrawerConfig({
-        isOpen: false,
-        mode: "upload",
-        uploadDrafts: [],
-        previewUrl: "",
-        editingRecord: null,
-        isSubmitting: false,
-      });
-    } catch {
-      toast.error("Đã xảy ra lỗi khi lưu dữ liệu.");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error));
       setDrawerConfig((prev) => ({ ...prev, isSubmitting: false }));
     }
   };
 
   return {
-    currentRecords,
+    currentRecords: records,
     pagination: {
       ...pagination,
       totalPages,
-      totalFiltered: filteredRecords.length,
+      totalFiltered,
       startIndex,
     },
     search,
@@ -482,5 +616,7 @@ export function useMediaManagement() {
     cropModalConfig,
     actions,
     handleDrawerSubmit,
+    searchTargets,
+    resolveTargetName,
   };
 }

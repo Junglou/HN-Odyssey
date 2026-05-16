@@ -1,4 +1,3 @@
-// imports
 import { useState, useRef, useEffect, type FormEvent } from "react";
 import SunEditor from "suneditor-react";
 import "suneditor/dist/css/suneditor.min.css";
@@ -154,23 +153,27 @@ function ModalContent({
     onSubmit(formData);
   };
 
+  // Chuẩn hóa Slug đúng định dạng Backend
   const formatSlug = (text: string) => {
     let slug = text.toLowerCase();
-    slug = slug.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    slug = slug.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Bỏ dấu tiếng Việt
     slug = slug.replace(/[đĐ]/g, "d");
-    slug = slug.replace(/[^a-z0-9\s-]/g, "");
-    slug = slug.replace(/\s+/g, "-");
-    slug = slug.replace(/-+/g, "-");
-    if (!slug.startsWith("/") && slug.length > 0) {
-      slug = "/" + slug;
-    }
-    if (slug === "/") slug = "";
+    slug = slug.replace(/[^a-z0-9\s-]/g, ""); // Bỏ ký tự đặc biệt
+    slug = slug.replace(/\s+/g, "-"); // Khoảng trắng thành gạch ngang
+    slug = slug.replace(/-+/g, "-"); // Xóa gạch ngang liên tiếp
+    slug = slug.replace(/^-+|-+$/g, ""); // Cắt gạch ngang thừa ở đầu và cuối
     return slug;
   };
 
   const handleSlugBlur = () => {
     const newSlug = formatSlug(formData.slug);
     handleChange("slug", newSlug);
+  };
+
+  const handleTitleBlur = () => {
+    if (!formData.slug && formData.title) {
+      handleChange("slug", formatSlug(formData.title));
+    }
   };
 
   // render
@@ -208,6 +211,7 @@ function ModalContent({
                 placeholder="e.g. Privacy Policy"
                 value={formData.title}
                 onChange={(e) => handleChange("title", e.target.value)}
+                onBlur={handleTitleBlur}
                 disabled={isViewMode}
               />
             </div>
@@ -219,7 +223,7 @@ function ModalContent({
               <input
                 type="text"
                 className="sp-form-input"
-                placeholder="e.g. /privacy-policy"
+                placeholder="e.g. privacy-policy"
                 value={formData.slug}
                 onChange={(e) => handleChange("slug", e.target.value)}
                 onBlur={handleSlugBlur}
@@ -239,10 +243,8 @@ function ModalContent({
               />
             </div>
 
-            <div
-              className="sp-form-group"
-              style={{ flex: 1, display: "flex", flexDirection: "column" }}
-            >
+            {/* ĐÃ CHỈNH SỬA: Bỏ inline style, thêm class .sp-form-group-editor */}
+            <div className="sp-form-group sp-form-group-editor">
               <label className="sp-form-label">
                 Content <span className="sp-required">*</span>
               </label>

@@ -1,12 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
+import axiosClient from "../../../../api/axiosClient";
 
-// Định nghĩa các kiểu dữ liệu cho trạng thái và vị trí
 export type BannerStatus = "Active" | "Inactive" | "Pending";
 export type BannerPosition = "Homepage Slider" | "Category" | "Promotion";
 export type DrawerMode = "create" | "edit" | "view";
 
-// Cấu trúc dữ liệu của một Banner trong hệ thống
 export interface BannerRecord {
   id: string;
   name: string;
@@ -22,7 +21,6 @@ export interface BannerRecord {
   targetUrl: string;
 }
 
-// Cấu trúc dữ liệu thu thập từ Drawer Form
 export interface BannerFormData {
   title: string;
   position: BannerPosition;
@@ -35,43 +33,79 @@ export interface BannerFormData {
   status: BannerStatus;
 }
 
-// Dữ liệu giả lập để kiểm thử giao diện
-const MOCK_BANNERS: BannerRecord[] = [
-  {
-    id: "bn-1",
-    name: "Summer Sale Hero",
-    imageDesktopUrl:
-      "https://placehold.co/1920x600/e0f2fe/0284c7?text=Desktop+Banner",
-    imageMobileUrl:
-      "https://placehold.co/800x1200/e0f2fe/0284c7?text=Mobile+Banner",
-    position: "Homepage Slider",
-    startDate: "2024-06-01",
-    endDate: "2024-08-31", // Ngày quá khứ để test khóa Expired
-    status: "Inactive",
-    createdBy: "Admin User",
-    lastUpdated: "Today, 10:30 AM",
-    targetUrl: "/collections/summer-sale",
-  },
-  {
-    id: "bn-2",
-    name: "Fashion Week",
-    imageDesktopUrl:
-      "https://placehold.co/1200x400/f3e8ff/7e22ce?text=Category+Desktop",
-    imageMobileUrl:
-      "https://placehold.co/800x800/f3e8ff/7e22ce?text=Category+Mobile",
-    position: "Category",
-    categoryId: "cat-fashion",
-    startDate: "2028-12-01", // Ngày tương lai để test khóa Pending
-    endDate: "2028-12-31",
-    status: "Pending",
-    createdBy: "Staff User",
-    lastUpdated: "Yesterday, 3:45 PM",
-    targetUrl: "/category/fashion",
-  },
-];
+// Interface thay thế cho "any" ở dòng 37
+export interface BEBannerResponse {
+  _id: string;
+  title?: string;
+  image_pc?: string;
+  image_mobile?: string;
+  position?: string;
+  category_id?: string;
+  start_date?: string;
+  end_date?: string;
+  status?: string;
+  updated_at?: string;
+  link?: string;
+  created_by?: string;
+}
+
+// Interface thay thế cho "any" ở dòng 107
+export interface FetchBannersParams {
+  page: number;
+  limit: number;
+  position?: string;
+  status?: string;
+}
+
+// Interface thay thế cho "any" ở dòng 296
+export interface BannerPayload {
+  title: string;
+  link: string;
+  position: string;
+  image_pc: string;
+  image_mobile: string;
+  start_date: string;
+  end_date: string;
+  category_id?: string;
+  status?: string;
+}
+
+// Hàm Helper map dữ liệu từ BE sang FE
+const mapBannerToFE = (beBanner: BEBannerResponse): BannerRecord => {
+  let mappedStatus: BannerStatus = "Inactive";
+  if (beBanner.status === "ACTIVE") mappedStatus = "Active";
+  if (beBanner.status === "WAITING") mappedStatus = "Pending";
+  if (beBanner.status === "HIDDEN") mappedStatus = "Inactive";
+
+  // Đảm bảo domain nối vào ảnh nếu BE chỉ trả relative path
+  const processImageUrl = (url?: string) => {
+    if (!url) return "";
+    return url.startsWith("http")
+      ? url
+      : `${import.meta.env.VITE_API_URL || ""}${url}`;
+  };
+
+  return {
+    id: beBanner._id,
+    name: beBanner.title || "Untitled",
+    imageDesktopUrl: processImageUrl(beBanner.image_pc),
+    imageMobileUrl: processImageUrl(beBanner.image_mobile),
+    position: (beBanner.position as BannerPosition) || "Homepage Slider",
+    categoryId: beBanner.category_id || "",
+    startDate: beBanner.start_date ? beBanner.start_date.split("T")[0] : "",
+    endDate: beBanner.end_date ? beBanner.end_date.split("T")[0] : "",
+    status: mappedStatus,
+    createdBy: beBanner.created_by || "Admin",
+    lastUpdated: beBanner.updated_at
+      ? new Date(beBanner.updated_at).toLocaleDateString()
+      : "",
+    targetUrl: beBanner.link || "",
+  };
+};
 
 export function useBannerManagement() {
-  const [records, setRecords] = useState<BannerRecord[]>(MOCK_BANNERS);
+  const [records, setRecords] = useState<BannerRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<BannerStatus | "All">("All");
@@ -79,6 +113,9 @@ export function useBannerManagement() {
     "All",
   );
   const [pagination, setPagination] = useState({ page: 1, limit: 10 });
+  const [totalPagesBE, setTotalPagesBE] = useState(1);
+  const [totalFilteredBE, setTotalFilteredBE] = useState(0);
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const [drawerConfig, setDrawerConfig] = useState<{
@@ -99,35 +136,87 @@ export function useBannerManagement() {
     idsToDelete: [],
   });
 
-  // Lấy ngày hiện tại chuẩn ISO (YYYY-MM-DD)
   const getTodayString = () => new Date().toISOString().split("T")[0];
 
-  // Lọc dữ liệu hiển thị trên bảng
-  const filteredRecords = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-    return records.filter((record) => {
-      const matchSearch =
-        !normalizedSearch ||
-        record.name.toLowerCase().includes(normalizedSearch);
-      const matchStatus =
-        statusFilter === "All" || record.status === statusFilter;
-      const matchPosition =
-        positionFilter === "All" || record.position === positionFilter;
-      return matchSearch && matchStatus && matchPosition;
-    });
-  }, [records, search, statusFilter, positionFilter]);
+  const fetchBanners = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const params: FetchBannersParams = {
+        page: pagination.page,
+        limit: pagination.limit,
+      };
 
-  const totalPages = Math.ceil(filteredRecords.length / pagination.limit);
+      if (positionFilter !== "All") params.position = positionFilter;
+      if (statusFilter !== "All") {
+        params.status =
+          statusFilter === "Active"
+            ? "ACTIVE"
+            : statusFilter === "Pending"
+              ? "WAITING"
+              : "HIDDEN";
+      }
+
+      const res = await axiosClient.get("/marketing/content/banners", {
+        params,
+      });
+
+      if (res.data?.success) {
+        const mappedData = res.data.data.data.map(mapBannerToFE);
+        setRecords(mappedData);
+        setTotalPagesBE(res.data.data.meta.totalPages);
+        setTotalFilteredBE(res.data.data.meta.totalItems);
+      }
+    } catch (error: unknown) {
+      console.error("Fetch banners error:", error);
+
+      // Ép kiểu error để lấy thông tin mã lỗi từ axiosClient interceptor
+      const err = error as {
+        status?: number;
+        message?: string;
+        data?: { message?: string };
+      };
+
+      if (err?.status === 401) {
+        toast.error(
+          "Bạn chưa đăng nhập hoặc phiên làm việc đã hết hạn (401 Unauthorized).",
+        );
+      } else if (err?.status === 403) {
+        toast.error(
+          "Bạn không có quyền truy cập danh sách Banner (403 Forbidden).",
+        );
+      } else {
+        const errorMsg =
+          err?.data?.message ||
+          err?.message ||
+          "Không thể tải danh sách Banner!";
+        toast.error(
+          typeof errorMsg === "string"
+            ? errorMsg
+            : "Có lỗi xảy ra khi tải dữ liệu!",
+        );
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [pagination.page, pagination.limit, positionFilter, statusFilter]);
+
+  useEffect(() => {
+    fetchBanners();
+  }, [fetchBanners]);
+
+  const currentRecords = useMemo(() => {
+    if (!search.trim()) return records;
+    const normalizedSearch = search.trim().toLowerCase();
+    return records.filter((r) =>
+      r.name.toLowerCase().includes(normalizedSearch),
+    );
+  }, [records, search]);
+
   const startIndex = (pagination.page - 1) * pagination.limit;
-  const currentRecords = filteredRecords.slice(
-    startIndex,
-    startIndex + pagination.limit,
-  );
 
   const actions = {
     changeSearch: (val: string) => {
       setSearch(val);
-      setPagination((p) => ({ ...p, page: 1 }));
     },
     changeStatusFilter: (status: BannerStatus | "All") => {
       setStatusFilter(status);
@@ -163,59 +252,69 @@ export function useBannerManagement() {
     closeDrawer: () =>
       setDrawerConfig({ isOpen: false, mode: "create", record: null }),
 
-    // Đảo trạng thái với điều kiện bảo vệ 2 tầng thời gian
-    toggleBannerStatus: (id: string) => {
+    toggleBannerStatus: async (id: string) => {
+      const banner = records.find((r) => r.id === id);
+      if (!banner) return;
       const today = getTodayString();
-      setRecords((prev) =>
-        prev.map((r) => {
-          if (r.id === id) {
-            if (r.startDate && r.startDate > today) {
-              toast.error("Không thể thao tác. Banner chưa đến ngày bắt đầu!");
-              return r;
-            }
-            if (r.endDate && r.endDate < today) {
-              toast.error(
-                "Không thể kích hoạt banner đã hết hạn. Vui lòng gia hạn!",
-              );
-              return r;
-            }
-            const newStatus = r.status === "Active" ? "Inactive" : "Active";
-            return { ...r, status: newStatus };
-          }
-          return r;
-        }),
-      );
+      if (banner.startDate && banner.startDate > today) {
+        toast.error("Không thể thao tác. Banner chưa đến ngày bắt đầu!");
+        return;
+      }
+      if (banner.endDate && banner.endDate < today) {
+        toast.error("Không thể kích hoạt banner đã hết hạn. Vui lòng gia hạn!");
+        return;
+      }
+      const newStatusBE = banner.status === "Active" ? "HIDDEN" : "ACTIVE";
+      try {
+        await axiosClient.patch(`/marketing/content/banners/${id}`, {
+          status: newStatusBE,
+        });
+        toast.success("Đã cập nhật trạng thái banner!");
+        fetchBanners();
+      } catch (error) {
+        console.error("Toggle status error:", error); // Xử lý lỗi dòng 210
+        toast.error("Cập nhật trạng thái thất bại!");
+      }
     },
-    bulkActivate: () => {
+    bulkActivate: async () => {
       if (selectedIds.length === 0) return;
-      const today = getTodayString();
-      setRecords((prev) =>
-        prev.map((r) => {
-          if (selectedIds.includes(r.id)) {
-            // Bỏ qua không kích hoạt các banner vi phạm thời gian
-            if (
-              (r.startDate && r.startDate > today) ||
-              (r.endDate && r.endDate < today)
-            ) {
-              return r;
-            }
-            return { ...r, status: "Active" };
-          }
-          return r;
-        }),
-      );
-      setSelectedIds([]);
-      toast.success("Đã kích hoạt các banner hợp lệ!");
+      try {
+        setIsLoading(true);
+        // CHUẨN CLEAN CODE: Gọi ĐÚNG 1 Request duy nhất
+        await axiosClient.patch(`/marketing/content/banners/bulk/status`, {
+          ids: selectedIds,
+          status: "ACTIVE",
+        });
+
+        toast.success(`Đã kích hoạt thành công!`);
+        setSelectedIds([]);
+        fetchBanners();
+      } catch (error) {
+        console.error("Bulk activate error:", error);
+        toast.error("Có lỗi xảy ra khi kích hoạt hàng loạt!");
+      } finally {
+        setIsLoading(false);
+      }
     },
-    bulkDeactivate: () => {
+    bulkDeactivate: async () => {
       if (selectedIds.length === 0) return;
-      setRecords((prev) =>
-        prev.map((r) =>
-          selectedIds.includes(r.id) ? { ...r, status: "Inactive" } : r,
-        ),
-      );
-      setSelectedIds([]);
-      toast.success("Đã vô hiệu hóa các banner được chọn!");
+      try {
+        setIsLoading(true);
+        // Gọi ĐÚNG 1 Request duy nhất lên API Bulk của BE với status là HIDDEN
+        await axiosClient.patch(`/marketing/content/banners/bulk/status`, {
+          ids: selectedIds,
+          status: "HIDDEN",
+        });
+
+        toast.success(`Đã vô hiệu hóa thành công banner!`);
+        setSelectedIds([]);
+        fetchBanners(); // Tải lại danh sách
+      } catch (error) {
+        console.error("Bulk deactivate error:", error);
+        toast.error("Có lỗi xảy ra khi vô hiệu hóa hàng loạt!");
+      } finally {
+        setIsLoading(false);
+      }
     },
     requestDelete: (id: string) =>
       setDeleteModalConfig({ isOpen: true, idsToDelete: [id] }),
@@ -225,54 +324,121 @@ export function useBannerManagement() {
     },
     closeDeleteModal: () =>
       setDeleteModalConfig({ isOpen: false, idsToDelete: [] }),
-    confirmDelete: () => {
+    confirmDelete: async () => {
       const ids = deleteModalConfig.idsToDelete;
-      setRecords((prev) => prev.filter((r) => !ids.includes(r.id)));
-      setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
-      setDeleteModalConfig({ isOpen: false, idsToDelete: [] });
-      toast.success(`Đã xóa thành công ${ids.length} banner!`);
+      try {
+        await Promise.all(
+          ids.map((id) =>
+            axiosClient.delete(`/marketing/content/banners/${id}`),
+          ),
+        );
+        toast.success(`Đã xóa thành công ${ids.length} banner!`);
+        setSelectedIds([]);
+        setDeleteModalConfig({ isOpen: false, idsToDelete: [] });
+        fetchBanners();
+      } catch (error) {
+        console.error("Delete error:", error); // Xử lý lỗi dòng 236
+        toast.error("Có lỗi xảy ra khi xóa banner!");
+      }
     },
   };
 
-  const handleDrawerSubmit = (data: BannerFormData) => {
-    if (drawerConfig.mode === "create") {
-      const newRecord: BannerRecord = {
-        id: `bn-${Date.now()}`,
-        name: data.title,
+  // --- HÀM TRÍCH XUẤT BLOB VÀ UPLOAD ẢNH ---
+  const uploadImageToBE = async (imageUrl: string): Promise<string> => {
+    if (!imageUrl.startsWith("blob:")) {
+      if (imageUrl.includes("/uploads/")) {
+        return "/uploads/" + imageUrl.split("/uploads/")[1];
+      }
+      return imageUrl;
+    }
+
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+
+      const ext = blob.type.split("/")[1] || "jpg";
+      const file = new File([blob], `banner_${Date.now()}.${ext}`, {
+        type: blob.type,
+      });
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const uploadRes = await axiosClient.post("/upload/single", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      return uploadRes.data.path;
+    } catch (error) {
+      console.error("Upload error:", error);
+      throw new Error("Không thể tải hình ảnh lên hệ thống.");
+    }
+  };
+
+  const handleDrawerSubmit = async (data: BannerFormData) => {
+    try {
+      setIsLoading(true);
+
+      let desktopImagePath = data.imageDesktopUrl;
+      let mobileImagePath = data.imageMobileUrl;
+
+      toast.info("Đang xử lý hình ảnh...");
+
+      desktopImagePath = await uploadImageToBE(data.imageDesktopUrl);
+      if (data.imageMobileUrl) {
+        mobileImagePath = await uploadImageToBE(data.imageMobileUrl);
+      }
+
+      const payload: BannerPayload = {
+        title: data.title,
+        link: data.targetUrl,
         position: data.position,
-        categoryId: data.categoryId,
-        imageDesktopUrl: data.imageDesktopUrl,
-        imageMobileUrl: data.imageMobileUrl,
-        targetUrl: data.targetUrl,
-        startDate: data.startDate,
-        endDate: data.endDate,
-        status: data.status,
-        createdBy: "Admin User",
-        lastUpdated: "Just now",
+        image_pc: desktopImagePath,
+        image_mobile: mobileImagePath || desktopImagePath,
+        start_date: data.startDate
+          ? new Date(data.startDate).toISOString()
+          : new Date().toISOString(),
+        end_date: data.endDate
+          ? new Date(data.endDate).toISOString()
+          : new Date().toISOString(),
       };
-      setRecords((prev) => [newRecord, ...prev]);
-      toast.success("Tạo banner thành công!");
-    } else if (drawerConfig.mode === "edit" && drawerConfig.record) {
-      setRecords((prev) =>
-        prev.map((r) =>
-          r.id === drawerConfig.record!.id
-            ? {
-                ...r,
-                name: data.title,
-                position: data.position,
-                categoryId: data.categoryId,
-                imageDesktopUrl: data.imageDesktopUrl,
-                imageMobileUrl: data.imageMobileUrl,
-                targetUrl: data.targetUrl,
-                startDate: data.startDate,
-                endDate: data.endDate,
-                status: data.status,
-                lastUpdated: "Just now",
-              }
-            : r,
-        ),
+
+      if (data.categoryId) {
+        payload.category_id = data.categoryId;
+      }
+
+      if (drawerConfig.mode === "create") {
+        await axiosClient.post("/marketing/content/banners", payload);
+        toast.success("Tạo banner thành công!");
+      } else if (drawerConfig.mode === "edit" && drawerConfig.record) {
+        if (data.status) {
+          payload.status =
+            data.status === "Active"
+              ? "ACTIVE"
+              : data.status === "Pending"
+                ? "WAITING"
+                : "HIDDEN";
+        }
+        await axiosClient.patch(
+          `/marketing/content/banners/${drawerConfig.record.id}`,
+          payload,
+        );
+        toast.success("Cập nhật banner thành công!");
+      }
+
+      actions.closeDrawer();
+      fetchBanners();
+    } catch (error: unknown) {
+      // Xử lý lỗi ép kiểu `any` dòng 335
+      console.error("Submit error:", error);
+      const err = error as { message?: string; data?: { message?: string } };
+      const errorMsg =
+        err?.data?.message || err?.message || "Có lỗi xảy ra khi lưu banner!";
+      toast.error(
+        typeof errorMsg === "string" ? errorMsg : "Dữ liệu không hợp lệ!",
       );
-      toast.success("Cập nhật banner thành công!");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -281,8 +447,8 @@ export function useBannerManagement() {
     selectedIds,
     pagination: {
       ...pagination,
-      totalPages,
-      totalFiltered: filteredRecords.length,
+      totalPages: totalPagesBE,
+      totalFiltered: totalFilteredBE,
       startIndex,
     },
     search,
@@ -292,5 +458,6 @@ export function useBannerManagement() {
     deleteModalConfig,
     actions,
     handleDrawerSubmit,
+    isLoading, // Trả ra isLoading để xóa cảnh báo biến không được sử dụng dòng 71
   };
 }

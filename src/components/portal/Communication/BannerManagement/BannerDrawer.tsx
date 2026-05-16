@@ -11,6 +11,14 @@ import type {
   BannerFormData,
   BannerPosition,
 } from "../../../../hooks/portal/Communication/BannerManagement/useBannerManagement";
+import axiosClient from "../../../../api/axiosClient"; // Bổ sung để gọi API
+
+type ApiCategory = {
+  _id: string;
+  name?: string;
+  title?: string;
+  children?: ApiCategory[];
+};
 
 export interface BannerDrawerProps {
   isOpen: boolean;
@@ -49,6 +57,11 @@ function BannerDrawerContent({
   const [isCatOpen, setIsCatOpen] = useState(false);
   const [hasCatOpened, setHasCatOpened] = useState(false);
 
+  // State lưu danh mục thật từ API
+  const [categoryOptions, setCategoryOptions] = useState<
+    { id: string; name: string }[]
+  >([]);
+
   const posRef = useRef<HTMLDivElement>(null);
   const catRef = useRef<HTMLDivElement>(null);
   const desktopInputRef = useRef<HTMLInputElement>(null);
@@ -69,6 +82,52 @@ function BannerDrawerContent({
     formData.targetUrl.trim() &&
     formData.imageDesktopUrl
   );
+
+  // Gọi API lấy danh sách Danh mục thật
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        // 1. Sửa endpoint gọi đúng API tree-view của BE
+        const res = await axiosClient.get("/categories/tree-view");
+
+        // 2. CategoriesController trả thẳng mảng, nên data nằm ở res.data
+        const categoryData = res.data?.data || res.data;
+
+        if (Array.isArray(categoryData)) {
+          // 3. Hàm đệ quy làm phẳng cây (Tree -> Flat Array) để hiển thị dropdown đẹp mắt
+          const flattenCategories = (
+            cats: ApiCategory[],
+            prefix = "",
+          ): { id: string; name: string }[] => {
+            let result: { id: string; name: string }[] = [];
+            cats.forEach((cat) => {
+              const catName = cat.name || cat.title || "Unnamed Category";
+              const displayName = prefix ? `${prefix} ${catName}` : catName;
+
+              result.push({ id: cat._id, name: displayName });
+
+              // Nếu danh mục có chứa children (cấp con), đệ quy nối thêm " > "
+              if (
+                cat.children &&
+                Array.isArray(cat.children) &&
+                cat.children.length > 0
+              ) {
+                result = result.concat(
+                  flattenCategories(cat.children, `${displayName} > `),
+                );
+              }
+            });
+            return result;
+          };
+
+          setCategoryOptions(flattenCategories(categoryData));
+        }
+      } catch (error) {
+        console.error("Lỗi tải danh mục:", error);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -118,14 +177,7 @@ function BannerDrawerContent({
     }
   };
 
-  const CATEGORY_OPTIONS = [
-    { id: "cat-fashion", name: "Fashion & Clothing" },
-    { id: "cat-electronics", name: "Electronics" },
-    { id: "cat-home", name: "Home & Living" },
-  ];
-  const selectedCat = CATEGORY_OPTIONS.find(
-    (c) => c.id === formData.categoryId,
-  );
+  const selectedCat = categoryOptions.find((c) => c.id === formData.categoryId);
 
   return (
     <div
@@ -277,7 +329,7 @@ function BannerDrawerContent({
                 <div
                   className={`bm-select-options ${isCatOpen ? "open" : hasCatOpened ? "closed" : ""}`}
                 >
-                  {CATEGORY_OPTIONS.map((cat) => (
+                  {categoryOptions.map((cat) => (
                     <div
                       key={cat.id}
                       className={`bm-option ${formData.categoryId === cat.id ? "active" : ""}`}

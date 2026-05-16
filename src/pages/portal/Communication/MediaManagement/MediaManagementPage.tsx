@@ -17,6 +17,8 @@ export default function MediaManagementPage() {
     cropModalConfig,
     actions,
     handleDrawerSubmit,
+    searchTargets,
+    resolveTargetName,
   } = useMediaManagement();
 
   return (
@@ -41,6 +43,8 @@ export default function MediaManagementPage() {
         isSubmitting={drawerConfig.isSubmitting}
         onClose={actions.closeDrawer}
         onSubmit={handleDrawerSubmit}
+        searchTargets={searchTargets}
+        resolveTargetName={resolveTargetName}
       />
 
       {/* Render modal xác nhận xóa chuẩn */}
