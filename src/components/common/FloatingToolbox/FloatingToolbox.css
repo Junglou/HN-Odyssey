@@ -1,0 +1,99 @@
+/* wrapper */
+.ft-wrapper {
+  position: fixed;
+  bottom: 24px;
+  right: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: flex-end;
+  pointer-events: none;
+  font-family: "Lexend", sans-serif;
+}
+
+.ft-wrapper * {
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+
+/* drawer zone */
+.ft-drawer-zone {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+/* toggle btn */
+.ft-toggle-btn {
+  background-color: #00acd2;
+  color: #ffffff;
+  border: none;
+  border-radius: 12px 0 0 12px;
+  padding: 16px 8px 16px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: -2px 4px 10px rgba(0, 0, 0, 0.15);
+  transition: background-color 0.2s;
+  z-index: 2;
+}
+
+.ft-toggle-btn:hover {
+  background-color: #008ba8;
+}
+
+/* drawer panel */
+.ft-drawer-panel {
+  position: absolute;
+  right: 100%;
+  background-color: #ffffff;
+  border-radius: 24px 0 0 24px;
+  padding: 8px 16px 8px 24px;
+  box-shadow: -4px 4px 15px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transform: translateX(110%);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    transform 0.4s cubic-bezier(0.25, 1, 0.5, 1),
+    opacity 0.3s,
+    visibility 0.4s;
+  z-index: 1;
+}
+
+.ft-drawer-panel.open {
+  transform: translateX(10px);
+  opacity: 1;
+  visibility: visible;
+}
+
+/* active view */
+.ft-active-view {
+  position: absolute;
+  bottom: 0;
+  right: 24px;
+  transform: translateY(20px);
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease-out;
+}
+
+.ft-active-view.open {
+  transform: translateY(0);
+  opacity: 1;
+  visibility: visible;
+}
+
+/* responsive */
+@media screen and (max-width: 768px) {
+  .ft-active-view.open {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    width: 100vw;
+    height: 100dvh;
+    z-index: 10000;
+  }
+}
