@@ -81,12 +81,12 @@ export class OrdersCronService {
             `Lỗi hủy đơn hết hạn ${order.order_code}: ${errorMessage}`,
           );
 
-          this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
-            severity: 'HIGH',
-            error_code: 'CRON_EXPIRED_ORDERS_FAILED',
-            message: `Lỗi khi chạy Job hủy đơn tự động (Đơn: ${order.order_code}): ${errorMessage}`,
-            stack_trace: e instanceof Error ? e.stack : undefined,
-          });
+          // this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
+          //   severity: 'HIGH',
+          //   error_code: 'CRON_EXPIRED_ORDERS_FAILED',
+          //   message: `Lỗi khi chạy Job hủy đơn tự động (Đơn: ${order.order_code}): ${errorMessage}`,
+          //   stack_trace: e instanceof Error ? e.stack : undefined,
+          // });
 
           break; // Thoát vòng while, tiếp tục với đơn hàng tiếp theo (order)
         }
@@ -133,12 +133,12 @@ export class OrdersCronService {
           `Lỗi auto-complete đơn ${order.order_code}: ${errorMessage}`,
         );
 
-        this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
-          severity: 'HIGH',
-          error_code: 'CRON_AUTO_COMPLETE_FAILED',
-          message: `Lỗi khi chạy Job hoàn thành đơn tự động (Đơn: ${order.order_code}): ${errorMessage}`,
-          stack_trace: error instanceof Error ? error.stack : undefined,
-        });
+        // this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
+        //   severity: 'HIGH',
+        //   error_code: 'CRON_AUTO_COMPLETE_FAILED',
+        //   message: `Lỗi khi chạy Job hoàn thành đơn tự động (Đơn: ${order.order_code}): ${errorMessage}`,
+        //   stack_trace: error instanceof Error ? error.stack : undefined,
+        // });
       }
     }
   }

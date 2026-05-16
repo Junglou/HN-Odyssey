@@ -51,6 +51,10 @@ export class Banner extends Document {
   @Prop({ default: 0 })
   impressions: number;
 
+  // AC9: Lưu người tạo
+  @Prop({ default: 'Admin' })
+  created_by: string;
+
   // AC6: Soft Delete
   @Prop({ default: false, index: true })
   is_deleted: boolean;

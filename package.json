@@ -80,6 +80,7 @@
     "swagger-ui-express": "^5.0.1",
     "twilio": "^4.23.0",
     "typeorm": "^0.3.28",
+    "xss": "^1.0.15",
     "yargs": "^17.7.2"
   },
   "devDependencies": {

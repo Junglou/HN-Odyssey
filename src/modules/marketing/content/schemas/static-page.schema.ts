@@ -19,6 +19,10 @@ export class StaticPage extends Document {
   @Prop({ required: true })
   content: string;
 
+  // Bổ sung dưới trường content:
+  @Prop({ default: 'About Us' })
+  type: string;
+
   // AC3: Tối ưu SEO
   @Prop({ trim: true, default: '' })
   meta_title: string;

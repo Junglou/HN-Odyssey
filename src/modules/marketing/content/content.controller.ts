@@ -8,10 +8,13 @@ import {
   Post,
   Query,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ContentService,
+  type QueryPageDto,
   type QueryBannerDto,
   type QueryPostDto,
 } from './content.service';
@@ -31,6 +34,10 @@ import {
   UpdateStaticPageDto,
 } from './dto/update-content.dto';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { BannerStatus } from './schemas/banner.schema';
+import { PostStatus } from './schemas/blog-post.schema';
+import { UpdatePageConfigDto } from './dto/page-config.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 interface RequestWithUser extends Request {
   user: {
@@ -93,6 +100,15 @@ export class ContentController {
       req.user.email,
     );
     return new BaseResponse(true, 'Tạo trang tĩnh thành công', data);
+  }
+
+  @Get('pages')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Resource.BLOG, Action.READ)
+  async getAllPages(@Query() query: QueryPageDto) {
+    // Đã sửa 'any' thành 'QueryPageDto'
+    const data = await this.contentService.findAllPages(query);
+    return new BaseResponse(true, 'Lấy danh sách trang tĩnh thành công', data);
   }
 
   @Delete('pages/:id')
@@ -263,5 +279,102 @@ export class ContentController {
   async trackBannerClick(@Param('id') id: string) {
     await this.contentService.trackClick(id);
     return new BaseResponse(true, 'Ghi nhận click thành công');
+  }
+
+  @Patch('banners/bulk/status')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Resource.BLOG, Action.UPDATE)
+  async bulkUpdateBannersStatus(
+    @Body() dto: { ids: string[]; status: BannerStatus },
+    @Req() req: RequestWithUser,
+  ) {
+    const result = await this.contentService.bulkUpdateBannerStatus(
+      dto.ids,
+      dto.status,
+      req.user.userId,
+      req.user.email,
+    );
+    return new BaseResponse(true, result.message);
+  }
+
+  // BỔ SUNG: API BULK ACTION CHO POSTS
+  @Patch('posts/bulk/status')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Resource.BLOG, Action.UPDATE)
+  async bulkUpdatePostsStatus(
+    @Body() dto: { ids: string[]; status: PostStatus },
+    @Req() req: RequestWithUser,
+  ) {
+    const result = await this.contentService.bulkUpdatePostStatus(
+      dto.ids,
+      dto.status,
+      req.user.userId,
+      req.user.email,
+    );
+    return new BaseResponse(true, result.message);
+  }
+
+  @Patch('posts/bulk/delete')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Resource.BLOG, Action.DELETE)
+  async bulkDeletePosts(
+    @Body() dto: { ids: string[] },
+    @Req() req: RequestWithUser,
+  ) {
+    const result = await this.contentService.bulkDeletePosts(
+      dto.ids,
+      req.user.userId,
+      req.user.email,
+    );
+    return new BaseResponse(true, result.message);
+  }
+
+  // Lấy cấu hình trang (Admin hoặc Public đều có thể gọi)
+  @Get('page-configs/:pageId')
+  async getPageConfig(@Param('pageId') pageId: string) {
+    const data = await this.contentService.getPageConfig(pageId);
+    return new BaseResponse(true, 'Lấy cấu hình giao diện thành công', data);
+  }
+
+  // Cập nhật cấu hình trang (Chỉ Admin)
+  @Patch('page-configs/:pageId')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Resource.SYSTEM, Action.UPDATE)
+  async updatePageConfig(
+    @Param('pageId') pageId: string,
+    @Body() dto: UpdatePageConfigDto,
+    @Req() req: RequestWithUser,
+  ) {
+    const data = await this.contentService.updatePageConfig(
+      pageId,
+      dto,
+      req.user.userId,
+      req.user.email,
+    );
+    return new BaseResponse(
+      true,
+      'Cập nhật cấu hình giao diện thành công',
+      data,
+    );
+  }
+
+  // Upload Media riêng cho Page Builder
+  @Post('page-configs/upload')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Resource.SYSTEM, Action.UPDATE)
+  @UseInterceptors(FileInterceptor('file')) // Nhận 1 file từ form-data field 'file'
+  async uploadBuilderMedia(@UploadedFile() file: Express.Multer.File) {
+    // Tận dụng hàm processAndSaveFiles đã viết sẵn trong ContentService
+    const result = await this.contentService.processAndSaveFiles([file], {
+      subFolder: 'builder',
+      generateThumbnail: false,
+      generateMedium: false,
+    });
+
+    // Trả về url của file vừa upload để FE chèn vào content
+    return new BaseResponse(true, 'Upload thành công', {
+      url: result.data[0].path,
+      type: result.data[0].type,
+    });
   }
 }

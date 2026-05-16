@@ -29,6 +29,8 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 import sharp from 'sharp';
+import { UpdatePageConfigDto } from './dto/page-config.dto';
+import { PageConfig } from './schemas/page-config.schema';
 
 export interface UploadOptions {
   subFolder: string; // Tên thư mục con (VD: 'products', 'users')
@@ -45,6 +47,17 @@ export interface QueryBannerDto {
   status?: BannerStatus;
 }
 
+export interface ProcessedFileResult {
+  originalName: string;
+  filename: string;
+  path: string;
+  thumbnail: string;
+  medium: string;
+  mimetype: string;
+  size: number;
+  type: string;
+}
+
 export interface QueryPostDto {
   page?: number | string;
   limit?: number | string;
@@ -57,6 +70,8 @@ export interface QueryPageDto {
   page?: number | string;
   limit?: number | string;
   status?: PageStatus;
+  search?: string;
+  type?: string;
 }
 
 @Injectable()
@@ -69,6 +84,7 @@ export class ContentService {
     @InjectModel(StaticPage.name) private pageModel: Model<StaticPage>,
     @InjectModel(MenuConfig.name) private menuModel: Model<MenuConfig>,
     private readonly auditLogsService: AuditLogsService,
+    @InjectModel(PageConfig.name) private pageConfigModel: Model<PageConfig>,
   ) {}
 
   async findAllPages(query: QueryPageDto) {
@@ -78,6 +94,12 @@ export class ContentService {
 
     const filter: FilterQuery<StaticPage> = { is_deleted: false };
     if (query.status) filter.status = query.status;
+
+    if (query.type) filter.type = query.type;
+
+    if (query.search) {
+      filter.title = { $regex: String(query.search), $options: 'i' };
+    }
 
     const [data, total] = await Promise.all([
       this.pageModel
@@ -132,6 +154,11 @@ export class ContentService {
   async createPost(dto: CreatePostDto, userId: string, email: string) {
     await this.checkSlugExist(dto.slug);
 
+    if (!dto.meta_title && dto.title) {
+      // Nếu người dùng không nhập meta_title, tự động lấy title làm meta_title
+      dto.meta_title = dto.title;
+    }
+
     // AC6: Tự động trích xuất meta_description từ content nếu bị trống
     if (!dto.meta_description && dto.content) {
       const plainText = dto.content.replace(/<[^>]*>?/gm, '').trim();
@@ -185,6 +212,8 @@ export class ContentService {
       this.postModel
         .find(filter)
         .populate('embedded_product_ids', 'name price thumbnail')
+        .populate('author_id', 'email full_name name') // Kéo info user
+        .populate('category_id', 'name')
         .sort({ created_at: -1 })
         .skip(skip)
         .limit(limit)
@@ -253,6 +282,11 @@ export class ContentService {
 
   async createPage(dto: CreateStaticPageDto, userId: string, email: string) {
     await this.checkSlugExist(String(dto.slug));
+
+    // ĐÃ THÊM: Fallback cho meta_title nếu bị trống
+    if (!dto.meta_title && dto.title) {
+      dto.meta_title = dto.title;
+    }
 
     if (!dto.meta_description && dto.content) {
       // Loại bỏ HTML tags
@@ -324,6 +358,7 @@ export class ContentService {
 
     const newBanner = new this.bannerModel({
       ...dto,
+      created_by: email,
       status:
         start <= now && now <= end ? BannerStatus.ACTIVE : BannerStatus.WAITING,
     });
@@ -529,6 +564,11 @@ export class ContentService {
       post.status = PostStatus.SCHEDULED;
     }
 
+    if (!dto.meta_title && dto.title) {
+      // Nếu người dùng không nhập meta_title, tự động lấy title làm meta_title
+      dto.meta_title = dto.title;
+    }
+
     // AC6: Tự động trích xuất meta_description từ content nếu bị trống
     if (!dto.meta_description && dto.content) {
       const plainText = dto.content.replace(/<[^>]*>?/gm, '').trim();
@@ -565,6 +605,11 @@ export class ContentService {
 
     if (dto.slug && dto.slug !== page.slug) {
       await this.checkSlugExist(dto.slug, page._id);
+    }
+
+    // ĐÃ THÊM: Fallback cho meta_title nếu bị trống trước khi assign
+    if (!dto.meta_title && dto.title) {
+      dto.meta_title = dto.title;
     }
 
     Object.assign(page, dto);
@@ -642,6 +687,7 @@ export class ContentService {
   }
 
   // 1. Logic xử lý và lưu file
+  // 1. Logic xử lý và lưu file
   async processAndSaveFiles(
     files: Array<Express.Multer.File>,
     options: UploadOptions,
@@ -650,61 +696,56 @@ export class ContentService {
       throw new BadRequestException('Không có file nào được tải lên');
     }
 
-    const processedFiles: any[] = [];
-    // Lưu vào thư mục tương ứng dựa trên options.subFolder
+    // Đã thay thế any[] bằng mảng chứa Interface cụ thể
+    const processedFiles: ProcessedFileResult[] = [];
     const uploadDir = path.join(process.cwd(), `uploads/${options.subFolder}`);
 
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
 
-    // Default limits nếu không truyền vào
-    const maxImageSize = options.maxImageSize || 50 * 1024 * 1024; // 50MB default
-    const maxVideoSize = options.maxVideoSize || 200 * 1024 * 1024; // 200MB default
+    const maxImageSize = options.maxImageSize || 50 * 1024 * 1024;
+    const maxVideoSize = options.maxVideoSize || 200 * 1024 * 1024;
 
     for (const file of files) {
       const isVideo = file.mimetype.startsWith('video/');
-      const allowedImageMimeTypes = ['image/jpeg', 'image/png', 'image/webp']; // AC3: Chỉ cho phép định dạng ảnh phổ biến
+      const allowedImageMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
 
       if (!isVideo && !allowedImageMimeTypes.includes(file.mimetype)) {
         throw new BadRequestException(
-          `Định dạng file "${file.originalname}" không được hỗ trợ. Chỉ cho phép JPG, PNG, WEBP.`,
+          `Định dạng file "${file.originalname}" không hỗ trợ.`,
         );
       }
 
-      // Kiểm tra dung lượng
       if (!isVideo && file.size > maxImageSize) {
         throw new BadRequestException(
-          `Ảnh "${file.originalname}" vượt quá giới hạn dung lượng`,
+          `Ảnh "${file.originalname}" vượt quá giới hạn.`,
         );
       }
       if (isVideo && file.size > maxVideoSize) {
         throw new BadRequestException(
-          `Video "${file.originalname}" vượt quá giới hạn dung lượng`,
+          `Video "${file.originalname}" vượt giới hạn.`,
         );
       }
 
-      // Tạo tên file
       const filename = `${options.subFolder}-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
       const ext = path.extname(file.originalname).toLowerCase();
       const originalPath = path.join(uploadDir, `${filename}${ext}`);
       const relativePath = `/uploads/${options.subFolder}/${filename}${ext}`;
 
       if (isVideo) {
-        // XỬ LÝ VIDEO
         fs.writeFileSync(originalPath, file.buffer);
         processedFiles.push({
           originalName: file.originalname,
           filename: `${filename}${ext}`,
           path: relativePath,
-          thumbnail: relativePath, // Video dùng link gốc
+          thumbnail: relativePath,
           medium: relativePath,
           mimetype: file.mimetype,
           size: file.size,
           type: 'VIDEO',
         });
       } else {
-        // XỬ LÝ ẢNH
         await sharp(file.buffer).toFile(originalPath);
 
         let thumbPathRelative = relativePath;
@@ -759,5 +800,139 @@ export class ContentService {
     } catch (error) {
       console.error(`[FILE] Error deleting file: ${relativePath}`, error);
     }
+  }
+
+  async bulkUpdateBannerStatus(
+    ids: string[],
+    status: BannerStatus,
+    userId: string,
+    email: string,
+  ) {
+    // Dùng toán tử $in để update 1 lần duy nhất trên MongoDB
+    const result = await this.bannerModel.updateMany(
+      {
+        _id: { $in: ids.map((id) => new Types.ObjectId(id)) },
+        is_deleted: false,
+      },
+      { $set: { status: status } },
+    );
+
+    // Lưu Audit Log 1 lần cho cả cụm
+    await this.auditLogsService.log({
+      action: 'UPDATE',
+      collection_name: 'banners',
+      actor_id: userId,
+      actor_email: email,
+      target_id: 'BULK_UPDATE',
+      department: Department.MARKETING,
+      detail: {
+        reason: `Bulk change status to ${status} for ${ids.length} banners`,
+      },
+    });
+
+    return {
+      message: `Đã cập nhật thành công ${result.modifiedCount} banners`,
+    };
+  }
+
+  // --- BỔ SUNG BULK ACTIONS CHO BLOG POSTS (US.125) ---
+
+  async bulkUpdatePostStatus(
+    ids: string[],
+    status: PostStatus,
+    userId: string,
+    email: string,
+  ) {
+    const result = await this.postModel.updateMany(
+      {
+        _id: { $in: ids.map((id) => new Types.ObjectId(id)) },
+        is_deleted: false,
+      },
+      { $set: { status: status } },
+    );
+
+    await this.auditLogsService.log({
+      action: 'UPDATE',
+      collection_name: Resource.BLOG,
+      actor_id: userId,
+      actor_email: email,
+      target_id: 'BULK_UPDATE_POSTS',
+      department: Department.MARKETING,
+      detail: {
+        reason: `Bulk change status to ${status} for ${ids.length} posts`,
+      },
+    });
+
+    return {
+      message: `Đã cập nhật trạng thái thành công ${result.modifiedCount} bài viết`,
+    };
+  }
+
+  async bulkDeletePosts(ids: string[], userId: string, email: string) {
+    const result = await this.postModel.updateMany(
+      {
+        _id: { $in: ids.map((id) => new Types.ObjectId(id)) },
+        is_deleted: false,
+      },
+      {
+        $set: {
+          is_deleted: true,
+          deleted_at: new Date(),
+          status: PostStatus.HIDDEN,
+        },
+      },
+    );
+
+    await this.auditLogsService.log({
+      action: 'DELETE',
+      collection_name: Resource.BLOG,
+      actor_id: userId,
+      actor_email: email,
+      target_id: 'BULK_DELETE_POSTS',
+      department: Department.MARKETING,
+      detail: { reason: `Soft delete ${ids.length} posts` },
+    });
+
+    return {
+      message: `Đã xóa mềm ${result.modifiedCount} bài viết thành công`,
+    };
+  }
+
+  // --- BỔ SUNG LOGIC PAGE BUILDER CONFIG ---
+
+  async getPageConfig(pageId: string) {
+    const config = await this.pageConfigModel.findOne({ pageId }).lean();
+    if (!config) {
+      // Nếu chưa có, trả về mảng rỗng để FE xử lý
+      return { pageId, sections: [] };
+    }
+    return config;
+  }
+
+  async updatePageConfig(
+    pageId: string,
+    dto: UpdatePageConfigDto,
+    userId: string,
+    email: string,
+  ) {
+    // Dùng kỹ thuật Upsert: Update nếu tồn tại, Create nếu chưa có
+    const updatedConfig = await this.pageConfigModel.findOneAndUpdate(
+      { pageId },
+      { $set: { sections: dto.sections } },
+      { new: true, upsert: true }, // upsert: true là chìa khóa ở đây
+    );
+
+    // Ghi Audit Log cho hệ thống
+    await this.auditLogsService.log({
+      action: 'UPDATE',
+      collection_name: Resource.SYSTEM,
+      actor_id: userId,
+      actor_email: email,
+      target_id: updatedConfig._id,
+      department: Department.MARKETING,
+      detail: { reason: `Cập nhật cấu hình giao diện trang: ${pageId}` },
+    });
+
+    return updatedConfig;
   }
 }

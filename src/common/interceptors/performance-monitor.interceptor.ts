@@ -69,16 +69,16 @@ export class PerformanceMonitorInterceptor implements NestInterceptor {
     const cpuUsagePercent = (cpuLoad / os.cpus().length) * 100;
 
     // [BỔ SUNG 4]: LOGIC CẢNH BÁO TÀI NGUYÊN (US2 - AC4)
-    if (ramUsagePercent > 90 || cpuUsagePercent > 90) {
-      this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
-        severity: 'CRITICAL',
-        error_code: 'SYS_RESOURCE_OVERLOAD',
-        message: `Máy chủ đang quá tải! CPU: ${cpuUsagePercent.toFixed(1)}%, RAM: ${ramUsagePercent.toFixed(1)}%. Có nguy cơ sập hệ thống.`,
-      });
-      this.logger.error(
-        `[CẢNH BÁO] Tài nguyên cạn kiệt! CPU: ${cpuUsagePercent.toFixed(1)}%, RAM: ${ramUsagePercent.toFixed(1)}%`,
-      );
-    }
+    // if (ramUsagePercent > 90 || cpuUsagePercent > 90) {
+    //   this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
+    //     severity: 'CRITICAL',
+    //     error_code: 'SYS_RESOURCE_OVERLOAD',
+    //     message: `Máy chủ đang quá tải! CPU: ${cpuUsagePercent.toFixed(1)}%, RAM: ${ramUsagePercent.toFixed(1)}%. Có nguy cơ sập hệ thống.`,
+    //   });
+    //   this.logger.error(
+    //     `[CẢNH BÁO] Tài nguyên cạn kiệt! CPU: ${cpuUsagePercent.toFixed(1)}%, RAM: ${ramUsagePercent.toFixed(1)}%`,
+    //   );
+    // }
 
     const metric = new this.metricModel({
       path: req.url, // Không còn lỗi unsafe-member-access

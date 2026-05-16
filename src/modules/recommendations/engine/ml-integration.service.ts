@@ -16,7 +16,7 @@ export class MlIntegrationService {
   constructor(private readonly configService: ConfigService) {
     this.mlApiUrl =
       this.configService.get<string>('ML_ENGINE_URL') ||
-      'http://localhost:8000';
+      'http://localhost:8080/api';
   }
 
   // AC1 & AC8: Gọi API suy luận nhanh (<200ms)
@@ -30,7 +30,12 @@ export class MlIntegrationService {
       );
       return response.data.recommended_product_ids || [];
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
+      let msg = 'Lỗi không xác định';
+      if (error instanceof Error) {
+        msg = error.message;
+      } else {
+        msg = String(error);
+      }
       this.logger.warn(
         `Lỗi gọi ML Engine: ${msg}. Fallback về MongoDB Aggregation.`,
       );
@@ -44,9 +49,29 @@ export class MlIntegrationService {
     this.logger.log('Bắt đầu trigger Re-train ML Model...');
     try {
       await axios.post(`${this.mlApiUrl}/train`, {}, { timeout: 300000 }); // Timeout 5 phút
-      this.logger.log('Lệnh Re-train ML Model đã hoàn tất.');
+      this.logger.log('Lệnh Re-train ML Model đã gửi thành công.');
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
+      let msg = 'Lỗi không xác định';
+
+      if (error instanceof Error) {
+        msg = error.message;
+
+        // Xử lý Axios Error bằng TypeScript thuần (Record & in operator)
+        // Triệt tiêu hoàn toàn sự xuất hiện của Type Axios bị lỗi trong NodeNext
+        if ('isAxiosError' in error && 'response' in error) {
+          const axiosErr = error as Record<string, unknown>;
+          const response = axiosErr.response as
+            | Record<string, unknown>
+            | undefined;
+
+          if (response && response.data !== undefined) {
+            msg = JSON.stringify(response.data);
+          }
+        }
+      } else {
+        msg = String(error);
+      }
+
       this.logger.error(`Lỗi khi Re-train: ${msg}`);
     }
   }

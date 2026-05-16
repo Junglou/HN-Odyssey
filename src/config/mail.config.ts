@@ -11,6 +11,11 @@ export const getMailConfig = async (
       host: configService.get<string>('MAIL_HOST'),
       port: configService.get<number>('MAIL_PORT'),
       secure: configService.get<string>('MAIL_SECURE') === 'true', // false cho port 587
+      pool: true,
+      maxConnections: 5, // Giới hạn 5 luồng kết nối cùng lúc
+      maxMessages: 100, // Tối đa 100 email trên mỗi luồng
+      rateDelta: 1000, // Giới hạn tốc độ gửi (ví dụ cùng rateLimit)
+      rateLimit: 5, // Tối đa 5 email mỗi giây
       auth: {
         user: configService.get<string>('MAIL_USER'),
         pass: configService.get<string>('MAIL_PASSWORD'),

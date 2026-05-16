@@ -12,6 +12,10 @@ import { MenuConfig, MenuConfigSchema } from './schemas/menu-config.schema';
 
 import { RolesModule } from 'src/modules/users/roles/roles.module';
 import { AuditLogsModule } from 'src/modules/system/audit-logs/audit-logs.module';
+import { PageConfig, PageConfigSchema } from './schemas/page-config.schema';
+import { Media, MediaSchema } from './schemas/media-record.schema';
+import { MediaController } from './media.controller';
+import { MediaService } from './media.service';
 
 @Module({
   imports: [
@@ -20,13 +24,15 @@ import { AuditLogsModule } from 'src/modules/system/audit-logs/audit-logs.module
       { name: BlogPost.name, schema: BlogPostSchema },
       { name: StaticPage.name, schema: StaticPageSchema },
       { name: MenuConfig.name, schema: MenuConfigSchema },
+      { name: PageConfig.name, schema: PageConfigSchema },
+      { name: Media.name, schema: MediaSchema },
     ]),
     RolesModule,
     AuditLogsModule,
     ScheduleModule.forRoot(),
   ],
-  controllers: [ContentController],
-  providers: [ContentService],
-  exports: [ContentService],
+  controllers: [ContentController, MediaController],
+  providers: [ContentService, MediaService],
+  exports: [ContentService, MediaService],
 })
 export class ContentModule {}

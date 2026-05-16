@@ -61,6 +61,7 @@ import {
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ContentService } from 'src/modules/marketing/content/content.service';
 import { AlgoliaService } from 'src/modules/search/algolia.service';
+import { MediaService } from 'src/modules/marketing/content/media.service';
 
 interface PopulatedCategory {
   _id: Types.ObjectId;
@@ -84,6 +85,7 @@ export class ProductsService {
     @InjectModel(MemberTier.name) private tierModel: Model<MemberTierDocument>,
     private readonly contentService: ContentService,
     private readonly algoliaService: AlgoliaService,
+    private readonly mediaService: MediaService,
   ) {}
 
   async syncToSearchEngine(product: ProductDocument) {
@@ -432,7 +434,7 @@ export class ProductsService {
     if (sort === 'price_desc') sortOption = { price: -1 };
 
     const selectFields =
-      'name sku price sale_price thumbnail slug categories status stock rating_average created_at';
+      'name sku price sale_price thumbnail slug categories status stock rating_average created_at has_variants variants';
 
     const [products, total] = await Promise.all([
       this.productModel
@@ -844,6 +846,13 @@ export class ProductsService {
       this.algoliaService.removeProduct(product._id.toString()).catch((err) => {
         console.error('Lỗi xóa Algolia:', err);
       });
+
+      // THÊM ĐOẠN NÀY: Tự động chuyển toàn bộ ảnh gán với sản phẩm này sang trạng thái Hidden
+      this.mediaService
+        .bulkUpdateStatusByTarget(product._id.toString(), 'Hidden')
+        .catch((err) => {
+          console.error('Lỗi tự động ẩn media:', err);
+        });
     }
 
     // 4. Ghi Audit Log
@@ -1113,6 +1122,11 @@ export class ProductsService {
     product.is_deleted = true;
     product.status = ProductStatus.DRAFT; // Reset về Draft hoặc Archived
     await product.save();
+
+    // THÊM ĐOẠN NÀY: Khi xóa mềm sản phẩm, lập tức đưa toàn bộ ảnh của nó vào bộ kho Hidden
+    this.mediaService.bulkUpdateStatusByTarget(id, 'Hidden').catch((err) => {
+      console.error('Lỗi tự động ẩn media khi soft delete:', err);
+    });
 
     try {
       await this.algoliaService.removeProduct(id);

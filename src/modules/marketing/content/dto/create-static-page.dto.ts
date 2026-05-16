@@ -27,6 +27,10 @@ export class CreateStaticPageDto {
 
   @IsOptional()
   @IsString()
+  type: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(100)
   meta_title?: string;
 
