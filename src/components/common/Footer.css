@@ -8,7 +8,7 @@
   box-sizing: border-box;
 }
 
-/* --- TOP SECTION --- */
+/* top section */
 .footer-top {
   display: flex;
   justify-content: space-between;
@@ -17,13 +17,12 @@
   width: 100%;
 }
 
-/* 1. KHỐI LOGO */
+/* logo */
 .footer-logo-col {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  /* ĐÃ THÊM: Đẩy Logo lùi sang phải 3rem để cách xa đường kẻ ngang */
   padding-right: 2rem;
 }
 
@@ -36,7 +35,7 @@
   transform-origin: left center;
 }
 
-/* 2. KHỐI CONTACT */
+/* contact */
 .footer-contact-col {
   flex: 1.1;
   border-left: 1px solid #fff;
@@ -78,7 +77,7 @@
   color: #000000;
 }
 
-/* 3. KHỐI NEWSLETTER */
+/* newsletter */
 .footer-newsletter-col {
   flex: 1.7;
   padding-left: 4%;
@@ -150,7 +149,7 @@
   color: #000;
 }
 
-/* --- HORIZONTAL DIVIDER --- */
+/* horizontal divider */
 .footer-divider {
   width: 100%;
   height: 1px;
@@ -158,7 +157,7 @@
   margin-bottom: 3.5rem;
 }
 
-/* --- BOTTOM SECTION --- */
+/* BOTTOM SECTION */
 .footer-bottom {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -170,23 +169,19 @@
   flex-direction: column;
   padding-left: 3rem;
   padding-right: 1rem;
-
-  /* BƯỚC 1: Bỏ border-right cứng nhắc đi và thêm position: relative */
   position: relative;
 }
 
-/* BƯỚC 2: Vẽ một vạch kẻ tùy chỉnh bằng ::after */
 .footer-nav-col::after {
   content: "";
   position: absolute;
   right: 0;
-  top: 2.8rem; /* THỦ THUẬT Ở ĐÂY: Đẩy đỉnh của vạch kẻ tụt xuống 2.8rem để Title nhô lên */
-  bottom: 0; /* Đáy vạch kẻ vẫn chạm tột cùng */
+  top: 2.8rem;
+  bottom: 0;
   width: 1px;
   background-color: #fff;
 }
 
-/* BƯỚC 3: Giấu vạch kẻ của cột cuối cùng đi */
 .footer-nav-col:last-child::after {
   display: none;
 }
@@ -217,9 +212,7 @@
   opacity: 0.6;
 }
 
-/* =========================================
-   RESPONSIVE - FOOTER
-========================================= */
+/* responsive */
 /* Dành cho Tablet (Màn hình vừa) */
 @media screen and (max-width: 1024px) {
   .hn-footer-wrapper {
@@ -231,19 +224,17 @@
     gap: 3rem;
   }
 
-  /* Cụm Top: Thêm đường kẻ ngang mờ để phân chia Logo, Contact và Form */
   .footer-logo-col,
   .footer-contact-col,
   .footer-newsletter-col {
     padding: 0;
     border: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2); /* Đường phân chia ngang */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
     padding-bottom: 2rem;
     align-items: center;
     text-align: center;
   }
 
-  /* Xóa đường kẻ ngang ở phần tử cuối cùng của cụm Top */
   .footer-newsletter-col {
     border-bottom: none;
     padding-bottom: 0;
@@ -253,32 +244,27 @@
     max-width: 250px;
   }
 
-  /* Cụm Bottom: Chuyển về 1 cột trên Tablet để các đường kẻ ngang đẹp hơn */
   .footer-bottom {
     grid-template-columns: 1fr;
-    gap: 0; /* Bỏ gap để dùng padding và border */
+    gap: 0;
   }
 
-  /* Chuyển vạch kẻ dọc thành vạch kẻ ngang */
   .footer-nav-col {
-    padding: 1.5rem 0; /* Khoảng cách trên dưới cho dễ bấm trên điện thoại */
-    border: none; /* Bỏ vạch dọc cứng */
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2); /* Thêm vạch ngang mờ */
+    padding: 1.5rem 0;
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
     align-items: center;
     text-align: center;
   }
 
-  /* Ẩn vạch kẻ ảo ::after của giao diện PC */
   .footer-nav-col::after {
     display: none;
   }
 
-  /* Bỏ vạch kẻ ngang ở cột cuối cùng */
   .footer-nav-col:last-child {
     border-bottom: none;
   }
 
-  /* Căn giữa lại các tiêu đề và link */
   .nav-col-title {
     margin-bottom: 1rem;
   }

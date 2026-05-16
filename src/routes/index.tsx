@@ -3,6 +3,8 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import MainLayout from "../layouts/MainLayout";
 import PortalLayout from "../layouts/PortalLayout";
 
+import HomePage from "../pages/home/HomePage";
+
 import LoginPage from "../pages/auth/LoginPage";
 import RegisterPage from "../pages/auth/RegisterPage";
 import ProductListPage from "../pages/products/ProductListPage";
@@ -90,6 +92,10 @@ export const router = createBrowserRouter([
     element: <MainLayout />,
     children: [
       {
+        index: true,
+        element: <HomePage />,
+      },
+      {
         path: "/profile",
         element: <MyProfilePage />,
       },
@@ -126,8 +132,8 @@ export const router = createBrowserRouter([
         element: <LoyaltyPage />,
       },
       {
-        index: true, // Route mặc định của path: "/"
-        element: <Navigate to="/login" replace />, // Redirect về login
+        path: "/login",
+        element: <LoginPage />,
       },
       {
         path: "products",
