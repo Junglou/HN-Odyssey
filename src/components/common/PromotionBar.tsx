@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   ChevronDownIcon,
@@ -13,6 +13,7 @@ const PromotionBar = () => {
   // hook
   const { t, i18n } = useTranslation();
   const barRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   // state
   const [isVisible, setIsVisible] = useState(true);
@@ -53,6 +54,14 @@ const PromotionBar = () => {
     setActiveMenu(null);
   };
 
+  // xử lý chuyển trang an toàn trong dropdown
+  const handleNavigate = (e: React.MouseEvent, path: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(path);
+    setActiveMenu(null);
+  };
+
   // render
   return (
     <div
@@ -71,12 +80,12 @@ const PromotionBar = () => {
           <div
             className={`promo-dropdown ${activeMenu === "featured" ? "open" : ""}`}
           >
-            <Link to="/blog-news" onClick={() => setActiveMenu(null)}>
+            <a href="#!" onClick={(e) => handleNavigate(e, "/blog-news")}>
               {t("blog_news")}
-            </Link>
-            <Link to="/loyalty" onClick={() => setActiveMenu(null)}>
+            </a>
+            <a href="#!" onClick={(e) => handleNavigate(e, "/loyalty")}>
               {t("loyalty_rewards")}
-            </Link>
+            </a>
           </div>
         </div>
 
@@ -87,13 +96,12 @@ const PromotionBar = () => {
               className={activeMenu === "odysseys" ? "rotate" : ""}
             />
           </div>
-          {/* Thêm dropdown-center */}
           <div
             className={`promo-dropdown dropdown-center ${activeMenu === "odysseys" ? "open" : ""}`}
           >
-            <Link to="/odysseys" onClick={() => setActiveMenu(null)}>
+            <a href="#!" onClick={(e) => handleNavigate(e, "/odysseys")}>
               {t("explore_odysseys")}
-            </Link>
+            </a>
           </div>
         </div>
 
@@ -104,13 +112,15 @@ const PromotionBar = () => {
               className={activeMenu === "charm" ? "rotate" : ""}
             />
           </div>
-          {/* Thêm dropdown-center */}
           <div
             className={`promo-dropdown dropdown-center ${activeMenu === "charm" ? "open" : ""}`}
           >
-            <Link to="/second-charm-form" onClick={() => setActiveMenu(null)}>
+            <a
+              href="#!"
+              onClick={(e) => handleNavigate(e, "/second-charm-form")}
+            >
               {t("go_to_form")}
-            </Link>
+            </a>
           </div>
         </div>
       </div>
@@ -147,7 +157,6 @@ const PromotionBar = () => {
               className={activeMenu === "lang" ? "rotate" : ""}
             />
           </div>
-          {/* Thêm dropdown-right */}
           <div
             className={`promo-dropdown dropdown-right ${activeMenu === "lang" ? "open" : ""}`}
           >

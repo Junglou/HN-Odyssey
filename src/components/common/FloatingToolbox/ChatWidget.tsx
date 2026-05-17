@@ -88,11 +88,11 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
             </div>
           </div>
         ))}
-        {/* mỏ neo để scroll */}
+        {/* scroll anchor */}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* input area */}
+      {/* footer */}
       <div className="cw-footer">
         <button className="cw-icon-btn">
           <PaperClipIcon />

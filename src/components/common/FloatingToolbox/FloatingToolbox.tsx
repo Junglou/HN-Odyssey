@@ -27,18 +27,20 @@ export default function FloatingToolbox() {
   // render
   return (
     <div className="ft-wrapper">
-      {/* drawer & toggle btn */}
-      {!activeTool && (
-        <div className="ft-drawer-zone">
-          <div className={`ft-drawer-panel ${isDrawerOpen ? "open" : ""}`}>
-            <ToolDrawer onSelectTool={openTool} />
-          </div>
+      {/* unified drawer block */}
+      <div
+        className={`ft-drawer-container ${isDrawerOpen ? "open" : "closed"} ${activeTool ? "hidden" : ""}`}
+      >
+        {/* drawer tab (ear) */}
+        <button className="ft-drawer-tab" onClick={toggleDrawer}>
+          {isDrawerOpen ? <ArrowRightIcon /> : <ArrowLeftIcon />}
+        </button>
 
-          <button className="ft-toggle-btn" onClick={toggleDrawer}>
-            {isDrawerOpen ? <ArrowRightIcon /> : <ArrowLeftIcon />}
-          </button>
+        {/* drawer content */}
+        <div className="ft-drawer-content">
+          <ToolDrawer onSelectTool={openTool} />
         </div>
-      )}
+      </div>
 
       {/* active tool view */}
       <div className={`ft-active-view ${activeTool === "CHAT" ? "open" : ""}`}>

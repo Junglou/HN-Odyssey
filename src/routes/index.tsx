@@ -4,6 +4,7 @@ import MainLayout from "../layouts/MainLayout";
 import PortalLayout from "../layouts/PortalLayout";
 
 import HomePage from "../pages/home/HomePage";
+import LoyaltyLandingPage from "../pages/loytalty/LoyaltyLandingPage";
 
 import LoginPage from "../pages/auth/LoginPage";
 import RegisterPage from "../pages/auth/RegisterPage";
@@ -138,6 +139,10 @@ export const router = createBrowserRouter([
       {
         path: "products",
         element: <ProductListPage />,
+      },
+      {
+        path: "/loyalty",
+        element: <LoyaltyLandingPage />,
       },
     ],
   },

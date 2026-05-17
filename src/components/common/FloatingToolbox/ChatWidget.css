@@ -8,7 +8,7 @@
   flex-direction: column;
   overflow: hidden;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-  font-family: "Lexend", sans-serif;
+  font-family: "Lexend Exa", sans-serif;
 }
 
 /* header */
@@ -48,7 +48,7 @@
   display: flex;
 }
 
-/* body - scrollable */
+/* body */
 .cw-body {
   flex: 1;
   padding: 16px;
@@ -97,7 +97,7 @@
   margin: 0;
 }
 
-/* attachments inside bubble */
+/* attachments */
 .cw-img-attach {
   width: 100%;
   border-radius: 8px;
@@ -165,7 +165,7 @@
   color: #308aff;
 }
 
-/* responsive mobile */
+/* mobile */
 @media screen and (max-width: 768px) {
   .cw-container {
     width: 100%;

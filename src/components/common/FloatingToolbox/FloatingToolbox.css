@@ -7,69 +7,74 @@
   display: flex;
   align-items: flex-end;
   pointer-events: none;
-  font-family: "Lexend", sans-serif;
+  font-family: "Lexend Exa", sans-serif;
 }
 
 .ft-wrapper * {
   box-sizing: border-box;
-  pointer-events: auto;
 }
 
-/* drawer zone */
-.ft-drawer-zone {
+/* drawer block */
+.ft-drawer-container {
   display: flex;
   align-items: center;
-  position: relative;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  pointer-events: auto;
+  filter: drop-shadow(-2px 4px 10px rgba(0, 0, 0, 0.15));
+  transition:
+    transform 0.4s cubic-bezier(0.25, 1, 0.5, 1),
+    opacity 0.3s,
+    visibility 0.3s;
 }
 
-/* toggle btn */
-.ft-toggle-btn {
-  background-color: #00acd2;
-  color: #ffffff;
+.ft-drawer-container.closed {
+  transform: translateX(calc(100% - 44px));
+}
+
+.ft-drawer-container.open {
+  transform: translateX(0);
+}
+
+.ft-drawer-container.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(100%);
+}
+
+/* drawer tab (ear) */
+.ft-drawer-tab {
+  width: 54px;
+  height: 72px;
+  background-color: #666666;
   border: none;
-  border-radius: 12px 0 0 12px;
-  padding: 16px 8px 16px 12px;
+  border-radius: 16px 0 0 16px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: -2px 4px 10px rgba(0, 0, 0, 0.15);
+  color: #ffffff;
   transition: background-color 0.2s;
-  z-index: 2;
+  flex-shrink: 0;
+  padding: 0;
 }
 
-.ft-toggle-btn:hover {
-  background-color: #008ba8;
+.ft-drawer-tab:hover {
+  background-color: #444444;
 }
 
-/* drawer panel */
-.ft-drawer-panel {
-  position: absolute;
-  right: 100%;
+/* drawer content */
+.ft-drawer-content {
   background-color: #ffffff;
-  border-radius: 24px 0 0 24px;
-  padding: 8px 16px 8px 24px;
-  box-shadow: -4px 4px 15px rgba(0, 0, 0, 0.1);
+  padding: 12px 16px 12px 12px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  transform: translateX(110%);
-  opacity: 0;
-  visibility: hidden;
-  transition:
-    transform 0.4s cubic-bezier(0.25, 1, 0.5, 1),
-    opacity 0.3s,
-    visibility 0.4s;
-  z-index: 1;
+  border-radius: 0;
 }
 
-.ft-drawer-panel.open {
-  transform: translateX(10px);
-  opacity: 1;
-  visibility: visible;
-}
-
-/* active view */
+/* active tool view */
 .ft-active-view {
   position: absolute;
   bottom: 0;
@@ -78,12 +83,18 @@
   opacity: 0;
   visibility: hidden;
   transition: all 0.3s ease-out;
+  pointer-events: auto;
 }
 
 .ft-active-view.open {
   transform: translateY(0);
   opacity: 1;
   visibility: visible;
+}
+
+.ft-drawer-tab svg {
+  width: 32px;
+  height: 32px;
 }
 
 /* responsive */

@@ -1,12 +1,16 @@
 // imports
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import Header from "../components/common/Header";
 import PromotionBar from "../components/common/PromotionBar";
 import Footer from "../components/common/Footer";
 import FloatingToolbox from "../components/common/FloatingToolbox/FloatingToolbox";
+import "./MainLayout.css";
 
 // layout
 const MainLayout = () => {
+  // hook
+  const location = useLocation();
+
   // render
   return (
     <div
@@ -19,7 +23,11 @@ const MainLayout = () => {
       <Header />
 
       {/* page content */}
-      <main style={{ flex: 1 }}>
+      <main
+        key={location.pathname}
+        className="main-content-area"
+        style={{ flex: 1 }}
+      >
         <Outlet />
       </main>
 

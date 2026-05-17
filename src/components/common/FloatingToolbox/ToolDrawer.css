@@ -1,0 +1,33 @@
+/* menu container */
+.ft-drawer-menu {
+  display: flex;
+  gap: 12px;
+}
+
+/* tool btn */
+.ft-tool-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background-color: #efdcc8;
+  color: #000000;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background-color 0.2s,
+    transform 0.2s;
+  padding: 0;
+}
+
+.ft-tool-btn:hover {
+  background-color: #e3ccb5;
+  transform: scale(1.05);
+}
+
+.ft-tool-btn svg {
+  width: 32px;
+  height: 32px;
+}
