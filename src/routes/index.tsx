@@ -5,6 +5,7 @@ import PortalLayout from "../layouts/PortalLayout";
 
 import HomePage from "../pages/home/HomePage";
 import LoyaltyLandingPage from "../pages/loytalty/LoyaltyLandingPage";
+import SecondCharmPage from "../pages/secondCharm/SecondCharmPage";
 
 import LoginPage from "../pages/auth/LoginPage";
 import RegisterPage from "../pages/auth/RegisterPage";
@@ -97,6 +98,19 @@ export const router = createBrowserRouter([
         element: <HomePage />,
       },
       {
+        path: "products",
+        element: <ProductListPage />,
+      },
+      {
+        path: "/loyalty",
+        element: <LoyaltyLandingPage />,
+      },
+      {
+        path: "/second-charm-form",
+        element: <SecondCharmPage />,
+      },
+      // todo: cum route profile nay can duoc boc bang auth guard de kiem tra token khi chay thuc te, hien tai de day de tien hanh thu nghiem
+      {
         path: "/profile",
         element: <MyProfilePage />,
       },
@@ -131,18 +145,6 @@ export const router = createBrowserRouter([
       {
         path: "/profile/loyalty",
         element: <LoyaltyPage />,
-      },
-      {
-        path: "/login",
-        element: <LoginPage />,
-      },
-      {
-        path: "products",
-        element: <ProductListPage />,
-      },
-      {
-        path: "/loyalty",
-        element: <LoyaltyLandingPage />,
       },
     ],
   },

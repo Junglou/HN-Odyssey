@@ -1,8 +1,11 @@
 // imports
+import { useNavigate } from "react-router-dom";
 import "./LoyaltyHero.css";
 
 // component
 export default function LoyaltyHero() {
+  const navigate = useNavigate();
+
   // render
   return (
     <section className="loyalty-hero-section">
@@ -13,7 +16,12 @@ export default function LoyaltyHero() {
           purchase. Get exclusive access to new products, special discounts, and
           expert survival tips.
         </p>
-        <button className="loyalty-hero-btn">Join Now - It's Free</button>
+        <button
+          className="loyalty-hero-btn"
+          onClick={() => navigate("/profile/loyalty")}
+        >
+          Join Now - It's Free
+        </button>
       </div>
     </section>
   );

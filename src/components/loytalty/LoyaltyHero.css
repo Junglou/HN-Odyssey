@@ -10,7 +10,7 @@
 /* inner container */
 .loyalty-hero-container {
   width: 100%;
-  max-width: 1200px;
+  max-width: none;
   display: flex;
   flex-direction: column;
   gap: 24px;
