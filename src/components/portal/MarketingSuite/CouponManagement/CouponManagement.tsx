@@ -1,4 +1,3 @@
-// imports
 import { useState, useRef } from "react";
 import "./CouponManagement.css";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
@@ -111,20 +110,19 @@ function CustomDropdown({
   );
 }
 
-// constants
+// constants - Map đúng chuỗi BE cần để gọi API Filter
 const STATUS_OPTIONS: DropdownOption[] = [
   { label: "All", value: "All" },
-  { label: "Active", value: "Active" },
-  { label: "Inactive", value: "Inactive" },
-  { label: "Scheduled", value: "Scheduled" },
-  { label: "Expired", value: "Expired" },
-  { label: "Draft", value: "Draft" },
+  { label: "Active", value: "ACTIVE" },
+  { label: "Draft", value: "DRAFT" },
+  { label: "Inactive", value: "INACTIVE" },
+  { label: "Cancelled", value: "CANCELLED" },
 ];
 
 const TYPE_OPTIONS: DropdownOption[] = [
   { label: "All", value: "All" },
-  { label: "Percentage", value: "Percentage" },
-  { label: "Fixed Amount", value: "Fixed Amount" },
+  { label: "Percentage", value: "PERCENTAGE" },
+  { label: "Fixed Amount", value: "FIXED_AMOUNT" },
 ];
 
 // component
@@ -149,27 +147,35 @@ export default function CouponManagement({
   const isPartiallySelected =
     data.some((r) => selectedIds.has(r.id)) && !isAllSelected;
 
-  // render helpers
-  const renderStatusBadge = (status: CouponStatus) => {
-    switch (status) {
-      case "Active":
+  // render helpers - Chuẩn hóa uppercase để khớp với BE
+  const renderStatusBadge = (status: string) => {
+    const normalizedStatus = status?.toUpperCase();
+
+    switch (normalizedStatus) {
+      case "ACTIVE":
         return <span className="coupon-badge coupon-badge-active">Active</span>;
-      case "Inactive":
+      case "INACTIVE":
         return (
           <span className="coupon-badge coupon-badge-inactive">Inactive</span>
         );
-      case "Scheduled":
+      case "SCHEDULED":
         return (
           <span className="coupon-badge coupon-badge-scheduled">Scheduled</span>
         );
-      case "Expired":
+      case "EXPIRED":
+      case "CANCELLED":
         return (
-          <span className="coupon-badge coupon-badge-expired">Expired</span>
+          <span className="coupon-badge coupon-badge-expired">
+            {normalizedStatus === "CANCELLED" ? "Cancelled" : "Expired"}
+          </span>
         );
-      case "Draft":
+      case "DRAFT":
         return <span className="coupon-badge coupon-badge-draft">Draft</span>;
       default:
-        return null;
+        // Đề phòng BE trả về status lạ, vẫn hiển thị chữ thay vì null (tàng hình)
+        return (
+          <span className="coupon-badge coupon-badge-inactive">{status}</span>
+        );
     }
   };
 

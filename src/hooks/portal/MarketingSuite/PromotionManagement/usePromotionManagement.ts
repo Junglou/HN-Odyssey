@@ -1,7 +1,7 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "react-toastify";
+import axiosClient from "../../../../api/axiosClient";
 
-// prop and types
 export type PromotionStatus =
   | "Active"
   | "Inactive"
@@ -19,6 +19,7 @@ export interface PromotionRecord {
   discountValue: string;
   applicableScopeType: ApplicableScope;
   applicableScopeValues: string[];
+  applicableScopeNames?: string[];
   status: PromotionStatus;
   startDate: string;
   endDate: string;
@@ -38,68 +39,112 @@ export interface PromotionFormData {
   description: string;
 }
 
-// mock data
-const INITIAL_PROMOTIONS: PromotionRecord[] = [
-  {
-    id: "1",
-    name: "Summer Sale 2024",
-    type: "Flash Sale",
-    discountValue: "25% OFF",
-    applicableScopeType: "Category",
-    applicableScopeValues: ["Summer Collection"],
-    status: "Active",
-    startDate: "2024-06-01",
-    endDate: "2024-07-31",
-  },
-  {
-    id: "2",
-    name: "New User Discount",
-    type: "Discount",
-    discountValue: "$10 Fixed",
-    applicableScopeType: "Tag",
-    applicableScopeValues: ["New Arrival"],
-    status: "Active",
-    startDate: "2024-01-01",
-    endDate: "2024-12-31",
-  },
-  {
-    id: "3",
-    name: "Black Friday Preview",
-    type: "Flash Sale",
-    discountValue: "40% OFF",
-    applicableScopeType: "Product",
-    applicableScopeValues: ["Selected Items"],
-    status: "Scheduled",
-    startDate: "2024-11-15",
-    endDate: "2024-11-17",
-  },
-  {
-    id: "4",
-    name: "Spring Clearance",
-    type: "Discount",
-    discountValue: "50% OFF",
-    applicableScopeType: "Category",
-    applicableScopeValues: ["Winter Clearance"],
-    status: "Expired",
-    startDate: "2024-03-01",
-    endDate: "2024-04-30",
-  },
-  {
-    id: "5",
-    name: "Back to School",
-    type: "Discount",
-    discountValue: "15% OFF",
-    applicableScopeType: "Tag",
-    applicableScopeValues: ["School Supplies"],
-    status: "Draft",
-    startDate: "2024-08-01",
-    endDate: "2024-09-15",
-  },
-];
+interface BEFlashSale {
+  _id: string;
+  name: string;
+  discount_type: string;
+  discount_value: number;
+  applicable_scope_type: ApplicableScope;
+  applicable_scope_values: string[];
+  status: string;
+  start_time: string;
+  end_time: string;
+  description?: string;
+}
+
+interface BECombo {
+  _id: string;
+  name: string;
+  is_percent: boolean;
+  discount_value: number;
+  applicable_scope_type: ApplicableScope;
+  applicable_scope_values: string[];
+  status: string;
+  start_date: string;
+  end_date: string;
+  description?: string;
+}
+
+interface BEProduct {
+  _id: string;
+  name: string;
+}
+
+interface BECategory {
+  _id: string;
+  name: string;
+  children?: BECategory[];
+}
+
+interface BETag {
+  _id: string;
+  name: string;
+}
+
+interface ScopeOption {
+  id: string;
+  name: string;
+}
+
+// Khai báo Interface chuẩn cho Error của Axios từ Backend trả về
+interface APIErrorResponse {
+  response?: {
+    data?: {
+      message?: string | string[];
+    };
+  };
+}
+
+// ĐÃ FIX LỖI "ANY" TẠI ĐÂY BẰNG CÁCH DÙNG APIErrorResponse
+const extractErrorMessage = (error: unknown, defaultMsg: string): string => {
+  try {
+    const err = error as APIErrorResponse;
+    const beMessage = err?.response?.data?.message;
+    if (Array.isArray(beMessage) && beMessage.length > 0) {
+      return beMessage[0];
+    }
+    if (typeof beMessage === "string") {
+      return beMessage;
+    }
+    return defaultMsg;
+  } catch {
+    return defaultMsg;
+  }
+};
+
+const mapStatusToFE = (status: string): PromotionStatus => {
+  if (status === "PENDING") return "Scheduled";
+  if (status === "ACTIVE") return "Active";
+  if (status === "EXPIRED") return "Expired";
+  if (status === "DRAFT") return "Draft";
+  return "Inactive";
+};
+
+const mapStatusToBE = (status: PromotionStatus) => {
+  if (status === "Scheduled") return "PENDING";
+  if (status === "Active") return "ACTIVE";
+  if (status === "Expired") return "EXPIRED";
+  if (status === "Draft") return "DRAFT";
+  return "INACTIVE";
+};
+
+const flattenCategories = (
+  nodes: BECategory[],
+  parentPath = "",
+): ScopeOption[] => {
+  let result: ScopeOption[] = [];
+  for (const node of nodes) {
+    const currentPath = parentPath ? `${parentPath} > ${node.name}` : node.name;
+    result.push({ id: node._id, name: currentPath });
+    if (node.children && node.children.length > 0) {
+      result = result.concat(flattenCategories(node.children, currentPath));
+    }
+  }
+  return result;
+};
 
 export function usePromotionManagement() {
-  const [records, setRecords] = useState<PromotionRecord[]>(INITIAL_PROMOTIONS);
-  const nextIdCounter = useRef<number>(6);
+  const [records, setRecords] = useState<PromotionRecord[]>([]);
   const [search, setSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<PromotionStatus | "All">(
     "All",
@@ -108,7 +153,6 @@ export function usePromotionManagement() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pagination, setPagination] = useState({ page: 1, limit: 10 });
 
-  // quản lý đóng mở modal
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
     mode: "add" | "edit" | "view" | "delete";
@@ -116,9 +160,111 @@ export function usePromotionManagement() {
     isSubmitting: boolean;
   }>({ isOpen: false, mode: "add", editingRecord: null, isSubmitting: false });
 
+  const fetchPromotions = useCallback(async () => {
+    try {
+      const [fsRes, cbRes, prodRes, catRes, tagRes] = await Promise.all([
+        axiosClient.get("/promotions/flash-sales?limit=1000"),
+        axiosClient.get("/promotions/combos"),
+        axiosClient.get("/products?limit=1000"),
+        axiosClient.get("/categories/admin/tree-view"),
+        axiosClient.get("/tags?limit=1000"),
+      ]);
+
+      const productsList: BEProduct[] =
+        prodRes.data?.data?.data || prodRes.data?.data || [];
+      const categoriesList: BECategory[] =
+        catRes.data?.data || catRes.data || [];
+      const tagsList: BETag[] = tagRes.data?.data || tagRes.data || [];
+
+      const productMap = new Map(productsList.map((p) => [p._id, p.name]));
+      const tagMap = new Map(tagsList.map((t) => [t._id, t.name]));
+      const flatCategories = flattenCategories(categoriesList);
+      const categoryMap = new Map(flatCategories.map((c) => [c.id, c.name]));
+
+      const resolveNames = (
+        type: ApplicableScope,
+        values: string[],
+      ): string[] => {
+        return values.map((id) => {
+          if (type === "Product") return productMap.get(id) || id;
+          if (type === "Category") return categoryMap.get(id) || id;
+          if (type === "Tag") return tagMap.get(id) || id;
+          return id;
+        });
+      };
+
+      const fsData: BEFlashSale[] =
+        fsRes.data?.data?.data || fsRes.data?.data || [];
+      const rawCbData = cbRes.data?.data || cbRes.data;
+      const cbData: BECombo[] = Array.isArray(rawCbData) ? rawCbData : [];
+
+      const mappedFs: PromotionRecord[] = fsData.map((item) => ({
+        id: item._id,
+        name: item.name,
+        type: "Flash Sale",
+        discountValue:
+          item.discount_type === "PERCENTAGE"
+            ? `${item.discount_value}% OFF`
+            : `$${item.discount_value} Fixed`,
+        applicableScopeType: item.applicable_scope_type,
+        applicableScopeValues: item.applicable_scope_values || [],
+        applicableScopeNames: resolveNames(
+          item.applicable_scope_type,
+          item.applicable_scope_values || [],
+        ),
+        status: mapStatusToFE(item.status),
+        startDate: item.start_time
+          ? new Date(item.start_time).toISOString().split("T")[0]
+          : "",
+        endDate: item.end_time
+          ? new Date(item.end_time).toISOString().split("T")[0]
+          : "",
+        description: item.description || "",
+      }));
+
+      const mappedCb: PromotionRecord[] = cbData.map((item) => ({
+        id: item._id,
+        name: item.name,
+        type: "Discount",
+        discountValue: item.is_percent
+          ? `${item.discount_value}% OFF`
+          : `$${item.discount_value} Fixed`,
+        applicableScopeType: item.applicable_scope_type,
+        applicableScopeValues: item.applicable_scope_values || [],
+        applicableScopeNames: resolveNames(
+          item.applicable_scope_type,
+          item.applicable_scope_values || [],
+        ),
+        status: mapStatusToFE(item.status),
+        startDate: item.start_date
+          ? new Date(item.start_date).toISOString().split("T")[0]
+          : "",
+        endDate: item.end_date
+          ? new Date(item.end_date).toISOString().split("T")[0]
+          : "",
+        description: item.description || "",
+      }));
+
+      setRecords(
+        [...mappedFs, ...mappedCb].sort(
+          (a, b) =>
+            new Date(b.startDate).getTime() - new Date(a.startDate).getTime(),
+        ),
+      );
+    } catch (error) {
+      console.error("Fetch Promotions Error:", error);
+      toast.error(
+        extractErrorMessage(error, "Không thể tải danh sách khuyến mãi!"),
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPromotions();
+  }, [fetchPromotions]);
+
   const filteredRecords = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
-
     return records.filter((record) => {
       const matchStatus =
         statusFilter === "All" || record.status === statusFilter;
@@ -126,7 +272,6 @@ export function usePromotionManagement() {
       const matchSearch =
         !normalizedSearch ||
         record.name.toLowerCase().includes(normalizedSearch);
-
       return matchStatus && matchType && matchSearch;
     });
   }, [records, search, statusFilter, typeFilter]);
@@ -161,7 +306,6 @@ export function usePromotionManagement() {
       setSelectedIds(new Set());
       setPagination((p) => ({ ...p, page: 1 }));
     },
-
     toggleSelection: (id: string) => {
       setSelectedIds((prev) => {
         const next = new Set(prev);
@@ -170,7 +314,6 @@ export function usePromotionManagement() {
         return next;
       });
     },
-
     toggleSelectAll: (isSelectAll: boolean) => {
       setSelectedIds((prev) => {
         const next = new Set(prev);
@@ -181,13 +324,11 @@ export function usePromotionManagement() {
         return next;
       });
     },
-
     changePage: (page: number) => {
       const safePage = Math.max(1, Math.min(page, totalPages));
       setPagination((p) => ({ ...p, page: safePage }));
     },
     changeLimit: (limit: number) => setPagination({ page: 1, limit }),
-
     openAddModal: () =>
       setModalConfig({
         isOpen: true,
@@ -209,15 +350,13 @@ export function usePromotionManagement() {
         editingRecord: record,
         isSubmitting: false,
       }),
-    openDeleteModal: (record?: PromotionRecord) => {
+    openDeleteModal: (record?: PromotionRecord) =>
       setModalConfig({
         isOpen: true,
         mode: "delete",
         editingRecord: record || null,
         isSubmitting: false,
-      });
-    },
-
+      }),
     closeModal: () =>
       setModalConfig({
         isOpen: false,
@@ -226,201 +365,232 @@ export function usePromotionManagement() {
         isSubmitting: false,
       }),
 
-    // xác nhận xóa
-    handleConfirmDelete: () => {
-      if (modalConfig.editingRecord) {
-        const id = modalConfig.editingRecord.id;
-        setRecords((prev) => prev.filter((r) => r.id !== id));
-        setSelectedIds((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-        toast.success("Đã xóa khuyến mãi thành công!");
-      } else {
-        const deletedCount = selectedIds.size;
-        setRecords((prev) => prev.filter((r) => !selectedIds.has(r.id)));
-        toast.success(`Đã xóa ${deletedCount} khuyến mãi thành công!`);
+    handleConfirmDelete: async () => {
+      try {
+        if (modalConfig.editingRecord) {
+          const { id, type } = modalConfig.editingRecord;
+          const endpoint =
+            type === "Flash Sale"
+              ? `/promotions/flash-sales/${id}`
+              : `/promotions/combos/${id}`;
+          const res = await axiosClient.delete(endpoint);
+          toast.success(res.data?.message || "Đã xóa khuyến mãi thành công!");
+        } else {
+          const fsIds = Array.from(selectedIds).filter(
+            (id) => records.find((r) => r.id === id)?.type === "Flash Sale",
+          );
+          const cbIds = Array.from(selectedIds).filter(
+            (id) => records.find((r) => r.id === id)?.type === "Discount",
+          );
+          const res = await axiosClient.post("/promotions/bulk/delete", {
+            flashSaleIds: fsIds,
+            comboIds: cbIds,
+          });
+
+          const msg = res.data?.message || `Đã xóa thành công!`;
+          if (msg.includes("bị bỏ qua")) {
+            toast.warning(msg);
+          } else {
+            toast.success(msg);
+          }
+        }
         setSelectedIds(new Set());
+        fetchPromotions();
+        setModalConfig((prev) => ({ ...prev, isOpen: false }));
+      } catch (error: unknown) {
+        console.error("Delete Promotions Error:", error);
+        toast.error(extractErrorMessage(error, "Lỗi khi xóa dữ liệu!"));
       }
-      setModalConfig((prev) => ({ ...prev, isOpen: false }));
     },
   };
 
-  const toggleRowStatus = (id: string, currentStatus: PromotionStatus) => {
+  const toggleRowStatus = async (
+    id: string,
+    currentStatus: PromotionStatus,
+  ) => {
     if (currentStatus === "Expired") {
       toast.warning("Khuyến mãi đã hết hạn, không thể thay đổi trạng thái!");
       return;
     }
-    setRecords((prev) =>
-      prev.map((r) =>
-        r.id === id
-          ? { ...r, status: currentStatus === "Active" ? "Inactive" : "Active" }
-          : r,
-      ),
-    );
-    toast.success("Đã thay đổi trạng thái khuyến mãi!");
+    const record = records.find((r) => r.id === id);
+    if (!record) return;
+
+    const newStatusFE = currentStatus === "Active" ? "Inactive" : "Active";
+    const beStatus = mapStatusToBE(newStatusFE);
+    const endpoint =
+      record.type === "Flash Sale"
+        ? `/promotions/flash-sales/${id}`
+        : `/promotions/combos/${id}`;
+
+    try {
+      const res = await axiosClient.patch(endpoint, { status: beStatus });
+      fetchPromotions();
+      toast.success(res.data?.message || "Đã thay đổi trạng thái khuyến mãi!");
+    } catch (error: unknown) {
+      console.error("Toggle Status Error:", error);
+      toast.error(extractErrorMessage(error, "Lỗi khi cập nhật trạng thái!"));
+    }
   };
 
-  const handleModalSubmit = (data: PromotionFormData) => {
+  const handleModalSubmit = async (data: PromotionFormData) => {
     const { mode, editingRecord } = modalConfig;
 
-    if (!data.name.trim() || !data.startDate || !data.endDate) {
-      toast.error("Vui lòng điền đầy đủ tên và thời gian khuyến mãi.");
-      return;
-    }
+    if (!data.name.trim() || !data.startDate || !data.endDate)
+      return toast.error("Vui lòng điền đầy đủ tên và thời gian.");
+    if (
+      !data.discountValueNum.trim() ||
+      isNaN(Number(data.discountValueNum)) ||
+      Number(data.discountValueNum) <= 0
+    )
+      return toast.error("Giá trị không hợp lệ.");
+    if (data.discountType === "%" && Number(data.discountValueNum) > 100)
+      return toast.error("Phần trăm không được vượt 100%.");
+    if (data.applicableScopeValues.length === 0)
+      return toast.error("Vui lòng chọn phạm vi áp dụng.");
 
-    if (!data.discountValueNum.trim()) {
-      toast.error("Vui lòng nhập giá trị khuyến mãi.");
-      return;
-    }
-
-    const discountValue = Number(data.discountValueNum);
-
-    if (isNaN(discountValue)) {
-      toast.error("Giá trị khuyến mãi không hợp lệ (chỉ chấp nhận số).");
-      return;
-    }
-
-    if (discountValue <= 0) {
-      toast.error("Giá trị khuyến mãi phải lớn hơn 0.");
-      return;
-    }
-
-    if (data.discountType === "%" && discountValue > 100) {
-      toast.error("Khuyến mãi theo phần trăm không được vượt quá 100%.");
-      return;
-    }
-
-    if (data.applicableScopeValues.length === 0) {
-      toast.error(
-        `Vui lòng chọn ít nhất một ${data.applicableScopeType} để áp dụng khuyến mãi.`,
-      );
-      return;
-    }
-
-    const startDateObj = new Date(data.startDate);
-    const endDateObj = new Date(data.endDate);
-    const today = new Date();
-
-    today.setHours(0, 0, 0, 0);
-    startDateObj.setHours(0, 0, 0, 0);
-    endDateObj.setHours(23, 59, 59, 999);
-
-    if (endDateObj < startDateObj) {
-      toast.error("Ngày kết thúc không được nhỏ hơn ngày bắt đầu.");
-      return;
-    }
-
-    const computeStatus = (statusIntent: PromotionStatus): PromotionStatus => {
-      if (statusIntent === "Draft" || statusIntent === "Inactive")
-        return statusIntent;
-      if (today > endDateObj) return "Expired";
-      if (today < startDateObj) return "Scheduled";
-      return "Active";
-    };
+    const sDate = new Date(data.startDate);
+    sDate.setHours(0, 0, 0, 0);
+    const eDate = new Date(data.endDate);
+    eDate.setHours(23, 59, 59, 999);
+    if (eDate < sDate)
+      return toast.error("Ngày kết thúc phải lớn hơn ngày bắt đầu.");
 
     setModalConfig((prev) => ({ ...prev, isSubmitting: true }));
 
-    // giả lập xử lý lưu dữ liệu
-    setTimeout(() => {
-      try {
-        const formattedDiscountValue =
-          data.discountType === "%"
-            ? `${data.discountValueNum}% OFF`
-            : `$${data.discountValueNum} Fixed`;
+    try {
+      const isDraft = data.status === "Draft";
+      const statusBE = isDraft
+        ? "DRAFT"
+        : new Date() < sDate
+          ? "PENDING"
+          : "ACTIVE";
 
-        const finalStatus = computeStatus(data.status);
+      const payload: Record<
+        string,
+        string | number | boolean | string[] | undefined
+      > = {
+        name: data.name.trim(),
+        description: data.description,
+        applicable_scope_type: data.applicableScopeType,
+        applicable_scope_values: data.applicableScopeValues,
+        status: statusBE,
+      };
+
+      let responseMsg = "";
+
+      if (data.type === "Flash Sale") {
+        payload.discount_type =
+          data.discountType === "%" ? "PERCENTAGE" : "FIXED_PRICE";
+        payload.discount_value = Number(data.discountValueNum);
+        payload.start_time = sDate.toISOString();
+        payload.end_time = eDate.toISOString();
 
         if (mode === "add") {
-          const newRecord: PromotionRecord = {
-            id: nextIdCounter.current.toString(),
-            name: data.name.trim(),
-            type: data.type,
-            discountValue: formattedDiscountValue,
-            applicableScopeType: data.applicableScopeType,
-            applicableScopeValues: data.applicableScopeValues,
-            status: finalStatus,
-            startDate: data.startDate,
-            endDate: data.endDate,
-            description: data.description,
-          };
-          nextIdCounter.current += 1;
-          setRecords((prev) => [newRecord, ...prev]);
-          setPagination((p) => ({ ...p, page: 1 }));
-          toast.success("Thêm khuyến mãi thành công!");
-        } else if (mode === "edit" && editingRecord) {
-          setRecords((prev) =>
-            prev.map((r) =>
-              r.id === editingRecord.id
-                ? {
-                    ...r,
-                    name: data.name.trim(),
-                    type: data.type,
-                    discountValue: formattedDiscountValue,
-                    applicableScopeType: data.applicableScopeType,
-                    applicableScopeValues: data.applicableScopeValues,
-                    status: finalStatus,
-                    startDate: data.startDate,
-                    endDate: data.endDate,
-                    description: data.description,
-                  }
-                : r,
-            ),
+          const res = await axiosClient.post(
+            "/promotions/flash-sales",
+            payload,
           );
-          toast.success("Cập nhật khuyến mãi thành công!");
+          responseMsg = res.data?.message;
+        } else {
+          const res = await axiosClient.patch(
+            `/promotions/flash-sales/${editingRecord!.id}`,
+            payload,
+          );
+          responseMsg = res.data?.message;
         }
-        actions.closeModal();
-      } catch {
-        toast.error("Đã xảy ra lỗi trong quá trình lưu dữ liệu.");
-        setModalConfig((prev) => ({ ...prev, isSubmitting: false }));
+      } else {
+        payload.type = "DIRECT_DISCOUNT";
+        payload.is_percent = data.discountType === "%";
+        payload.discount_value = Number(data.discountValueNum);
+        payload.start_date = sDate.toISOString();
+        payload.end_date = eDate.toISOString();
+        payload.min_quantity = 1;
+
+        if (mode === "add") {
+          const res = await axiosClient.post("/promotions/combos", payload);
+          responseMsg = res.data?.message;
+        } else {
+          const res = await axiosClient.patch(
+            `/promotions/combos/${editingRecord!.id}`,
+            payload,
+          );
+          responseMsg = res.data?.message;
+        }
       }
-    }, 400);
+
+      toast.success(
+        responseMsg ||
+          (mode === "add"
+            ? "Thêm khuyến mãi thành công!"
+            : "Cập nhật thành công!"),
+      );
+      fetchPromotions();
+      actions.closeModal();
+    } catch (error: unknown) {
+      console.error("Submit Promotion Error:", error);
+      toast.error(
+        extractErrorMessage(error, "Lỗi khi lưu dữ liệu vào hệ thống!"),
+      );
+    } finally {
+      setModalConfig((prev) => ({ ...prev, isSubmitting: false }));
+    }
   };
 
-  // nút bulk
   const bulkActions = {
-    bulkActivate: () => {
-      const targets = records.filter(
-        (r) => selectedIds.has(r.id) && r.status !== "Expired",
-      );
-      if (targets.length === 0) return;
+    bulkActivate: async () => {
+      try {
+        const fsIds = Array.from(selectedIds).filter(
+          (id) => records.find((r) => r.id === id)?.type === "Flash Sale",
+        );
+        const cbIds = Array.from(selectedIds).filter(
+          (id) => records.find((r) => r.id === id)?.type === "Discount",
+        );
 
-      setRecords((prev) =>
-        prev.map((r) => {
-          if (selectedIds.has(r.id) && r.status !== "Expired") {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const sDate = new Date(r.startDate);
-            sDate.setHours(0, 0, 0, 0);
+        const res = await axiosClient.patch("/promotions/bulk/status", {
+          flashSaleIds: fsIds,
+          comboIds: cbIds,
+          action: "ACTIVATE",
+        });
+        toast.success(
+          res.data?.message || `Đã kích hoạt các khuyến mãi được chọn!`,
+        );
 
-            const newStatus = today < sDate ? "Scheduled" : "Active";
-            return { ...r, status: newStatus };
-          }
-          return r;
-        }),
-      );
-      toast.success(`Đã kích hoạt ${targets.length} khuyến mãi!`);
-      setSelectedIds(new Set());
+        setSelectedIds(new Set());
+        fetchPromotions();
+      } catch (error: unknown) {
+        console.error("Bulk Activate Error:", error);
+        toast.error(
+          extractErrorMessage(error, "Có lỗi xảy ra khi kích hoạt bulk"),
+        );
+      }
     },
+    bulkDeactivate: async () => {
+      try {
+        const fsIds = Array.from(selectedIds).filter(
+          (id) => records.find((r) => r.id === id)?.type === "Flash Sale",
+        );
+        const cbIds = Array.from(selectedIds).filter(
+          (id) => records.find((r) => r.id === id)?.type === "Discount",
+        );
 
-    bulkDeactivate: () => {
-      const targets = records.filter(
-        (r) => selectedIds.has(r.id) && r.status !== "Expired",
-      );
-      if (targets.length === 0) return;
+        const res = await axiosClient.patch("/promotions/bulk/status", {
+          flashSaleIds: fsIds,
+          comboIds: cbIds,
+          action: "DEACTIVATE",
+        });
+        toast.success(
+          res.data?.message || `Đã vô hiệu hóa khuyến mãi được chọn!`,
+        );
 
-      setRecords((prev) =>
-        prev.map((r) =>
-          selectedIds.has(r.id) && r.status !== "Expired"
-            ? { ...r, status: "Inactive" }
-            : r,
-        ),
-      );
-      toast.warning(`Đã vô hiệu hóa ${targets.length} khuyến mãi!`);
-      setSelectedIds(new Set());
+        setSelectedIds(new Set());
+        fetchPromotions();
+      } catch (error: unknown) {
+        console.error("Bulk Deactivate Error:", error);
+        toast.error(
+          extractErrorMessage(error, "Có lỗi xảy ra khi vô hiệu hóa bulk"),
+        );
+      }
     },
-
     bulkDelete: () => {
       if (selectedIds.size === 0) return;
       actions.openDeleteModal();
