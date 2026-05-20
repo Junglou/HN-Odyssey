@@ -301,7 +301,11 @@ export default function PromotionManagement({
                     <td data-label="Discount Value">{record.discountValue}</td>
                     <td data-label="Applicable Scope">
                       {record.applicableScopeType}:{" "}
-                      {record.applicableScopeValues.join(", ")}
+                      {(record.applicableScopeNames &&
+                      record.applicableScopeNames.length > 0
+                        ? record.applicableScopeNames
+                        : record.applicableScopeValues
+                      ).join(", ")}
                     </td>
                     <td data-label="Status">
                       {renderStatusBadge(record.status)}

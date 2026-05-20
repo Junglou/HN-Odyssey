@@ -8,6 +8,8 @@ import type {
   PromotionRecord,
   PromotionFormData,
 } from "../../../../hooks/portal/MarketingSuite/PromotionManagement/usePromotionManagement";
+import axiosClient from "../../../../api/axiosClient";
+import { toast } from "react-toastify";
 
 interface PromotionModalProps {
   isOpen: boolean;
@@ -17,81 +19,60 @@ interface PromotionModalProps {
   onSubmit?: (data: PromotionFormData) => void;
 }
 
-interface CategoryNode {
+interface ScopeOption {
   id: string;
   name: string;
-  children?: CategoryNode[];
 }
 
-// mock data
-const MOCK_PRODUCTS = [
-  { id: "p1", name: "Classic White Shirt" },
-  { id: "p2", name: "Grey Slim Jacket" },
-  { id: "p3", name: "Denim Jeans" },
-  { id: "p4", name: "Running Sneakers" },
-];
+// Bổ sung Interface để giải quyết triệt để lỗi ESLint "Unexpected any"
+interface BEProduct {
+  _id: string;
+  name: string;
+}
 
-const MOCK_CATEGORIES_TREE: CategoryNode[] = [
-  {
-    id: "c1",
-    name: "Home Goods",
-    children: [
-      {
-        id: "c1-1",
-        name: "Kitchenware",
-        children: [{ id: "c1-1-1", name: "Pots & Pans" }],
-      },
-      { id: "c1-2", name: "Furniture" },
-    ],
-  },
-  { id: "c2", name: "Electronics" },
-  {
-    id: "c3",
-    name: "Fashion",
-    children: [
-      { id: "c3-1", name: "Men's Clothing" },
-      { id: "c3-2", name: "Women's Clothing" },
-    ],
-  },
-];
+interface BECategory {
+  _id: string;
+  name: string;
+  children?: BECategory[];
+}
 
+interface BETag {
+  _id: string;
+  name: string;
+}
+
+// Hàm đệ quy làm phẳng cây Danh mục từ BE
 const flattenCategories = (
-  nodes: CategoryNode[],
+  nodes: BECategory[],
   parentPath = "",
-): { id: string; name: string }[] => {
-  let result: { id: string; name: string }[] = [];
+): ScopeOption[] => {
+  let result: ScopeOption[] = [];
   for (const node of nodes) {
     const currentPath = parentPath ? `${parentPath} > ${node.name}` : node.name;
-    result.push({ id: node.id, name: currentPath });
-    if (node.children) {
+    // Chú ý: Backend mongoose trả về _id
+    result.push({ id: node._id, name: currentPath });
+    if (node.children && node.children.length > 0) {
       result = result.concat(flattenCategories(node.children, currentPath));
     }
   }
   return result;
 };
 
-const MOCK_CATEGORIES = flattenCategories(MOCK_CATEGORIES_TREE);
-
-const MOCK_TAGS = [
-  { id: "t1", name: "Summer Collection" },
-  { id: "t2", name: "New Arrival" },
-  { id: "t3", name: "Winter Clearance" },
-  { id: "t4", name: "Bestseller" },
-];
-
-// multi select dropdown
+// Component MultiSelectDropdown đã được cấu trúc lại để lưu ID nhưng hiển thị Name
 function MultiSelectDropdown({
   options,
-  selectedValues,
+  selectedValues, // Chứa mảng ID
   onChange,
   placeholder,
   disabled,
+  isLoading,
 }: {
-  options: { id: string; name: string }[];
+  options: ScopeOption[];
   selectedValues: string[];
   onChange: (values: string[]) => void;
   placeholder: string;
   disabled?: boolean;
+  isLoading?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -110,20 +91,21 @@ function MultiSelectDropdown({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Ẩn đi những lựa chọn đã có ID trong danh sách selectedValues
   const filteredOptions = options.filter(
     (opt) =>
       opt.name.toLowerCase().includes(search.toLowerCase()) &&
-      !selectedValues.includes(opt.name),
+      !selectedValues.includes(opt.id),
   );
 
-  const handleSelect = (name: string) => {
-    onChange([...selectedValues, name]);
+  const handleSelect = (id: string) => {
+    onChange([...selectedValues, id]);
     setSearch("");
     setIsOpen(false);
   };
 
-  const handleRemove = (name: string) => {
-    onChange(selectedValues.filter((v) => v !== name));
+  const handleRemove = (id: string) => {
+    onChange(selectedValues.filter((v) => v !== id));
   };
 
   return (
@@ -134,58 +116,69 @@ function MultiSelectDropdown({
             type="text"
             className="promo-form-input promo-select-search"
             placeholder={
-              selectedValues.length === 0
-                ? placeholder
-                : "Search to add more..."
+              isLoading
+                ? "Đang tải dữ liệu..."
+                : selectedValues.length === 0
+                  ? placeholder
+                  : "Tìm kiếm để thêm..."
             }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            onFocus={() => setIsOpen(true)}
+            onFocus={() => {
+              if (!isLoading) setIsOpen(true);
+            }}
+            disabled={isLoading}
           />
-          {isOpen && (
+          {isOpen && !isLoading && (
             <div className="promo-select-dropdown">
               {filteredOptions.length > 0 ? (
                 filteredOptions.map((opt) => (
                   <div
                     key={opt.id}
                     className="promo-select-option"
-                    onClick={() => handleSelect(opt.name)}
+                    onClick={() => handleSelect(opt.id)}
                   >
                     {opt.name}
                   </div>
                 ))
               ) : (
-                <div className="promo-select-empty">No matching results</div>
+                <div className="promo-select-empty">Không tìm thấy kết quả</div>
               )}
             </div>
           )}
         </div>
       )}
 
+      {/* Đã xóa style inline, sử dụng className has-items thay thế */}
       <div
-        className="promo-selected-chips"
-        style={{ marginTop: selectedValues.length > 0 ? "12px" : "0" }}
+        className={`promo-selected-chips ${selectedValues.length > 0 ? "has-items" : ""}`}
       >
-        {selectedValues.map((val) => (
-          <div key={val} className="promo-chip">
-            {val}
-            {!disabled && (
-              <button
-                type="button"
-                className="promo-chip-remove"
-                onClick={() => handleRemove(val)}
-              >
-                <CloseIcon />
-              </button>
-            )}
-          </div>
-        ))}
+        {selectedValues.map((idVal) => {
+          // Ánh xạ ID ngược lại thành Name để hiển thị cho UI đẹp
+          const matchedOpt = options.find((o) => o.id === idVal);
+          const displayName = matchedOpt ? matchedOpt.name : idVal;
+
+          return (
+            <div key={idVal} className="promo-chip">
+              {displayName}
+              {!disabled && (
+                <button
+                  type="button"
+                  className="promo-chip-remove"
+                  onClick={() => handleRemove(idVal)}
+                >
+                  <CloseIcon />
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-// modal wrapper
+// Modal Wrapper
 export default function PromotionModal(props: PromotionModalProps) {
   const [shouldRender, setShouldRender] = useState(props.isOpen);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -219,7 +212,7 @@ export default function PromotionModal(props: PromotionModalProps) {
   );
 }
 
-// modal content
+// Modal Content chính
 function PromotionModalContent({
   mode,
   initialData,
@@ -228,6 +221,47 @@ function PromotionModalContent({
   isAnimating,
 }: PromotionModalProps & { isAnimating?: boolean }) {
   const isViewMode = mode === "view";
+
+  const [products, setProducts] = useState<ScopeOption[]>([]);
+  const [categories, setCategories] = useState<ScopeOption[]>([]);
+  const [tags, setTags] = useState<ScopeOption[]>([]);
+  const [isLoadingScopes, setIsLoadingScopes] = useState(false);
+
+  // Fetch dữ liệu thật từ DB cho Dropdown
+  useEffect(() => {
+    if (mode === "add" || mode === "edit") {
+      const fetchScopeData = async () => {
+        setIsLoadingScopes(true);
+        try {
+          const [prodRes, catRes, tagRes] = await Promise.all([
+            axiosClient.get("/products?limit=1000"),
+            axiosClient.get("/categories/admin/tree-view"),
+            axiosClient.get("/tags?limit=1000"),
+          ]);
+
+          // Ép kiểu chuẩn để loại bỏ lỗi ESLint
+          const fetchedProducts: BEProduct[] =
+            prodRes.data?.data?.data || prodRes.data?.data || [];
+          const fetchedCategories: BECategory[] =
+            catRes.data?.data || catRes.data || [];
+          const fetchedTags: BETag[] = tagRes.data?.data || tagRes.data || [];
+
+          setProducts(
+            fetchedProducts.map((p) => ({ id: p._id, name: p.name })),
+          );
+          setCategories(flattenCategories(fetchedCategories));
+          setTags(fetchedTags.map((t) => ({ id: t._id, name: t.name })));
+        } catch (error) {
+          console.error("Lỗi khi tải dữ liệu Scope:", error);
+          toast.error("Lỗi khi tải danh sách Sản phẩm / Danh mục.");
+        } finally {
+          setIsLoadingScopes(false);
+        }
+      };
+
+      fetchScopeData();
+    }
+  }, [mode]);
 
   const [formData, setFormData] = useState<PromotionFormData>(() => {
     if ((mode === "edit" || mode === "view") && initialData) {
@@ -269,9 +303,9 @@ function PromotionModalContent({
   );
 
   const getTitle = () => {
-    if (mode === "add") return "Create Promotion";
-    if (mode === "edit") return "Edit Promotion";
-    if (mode === "view") return "Promotion Details";
+    if (mode === "add") return "Tạo Khuyến mãi";
+    if (mode === "edit") return "Chỉnh sửa Khuyến mãi";
+    if (mode === "view") return "Chi tiết Khuyến mãi";
     return "";
   };
 
@@ -281,6 +315,14 @@ function PromotionModalContent({
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
+
+  // Xác định options nào sẽ được truyền vào Dropdown dựa trên loại Scope đang chọn
+  const currentScopeOptions =
+    formData.applicableScopeType === "Product"
+      ? products
+      : formData.applicableScopeType === "Category"
+        ? categories
+        : tags;
 
   return (
     <div
@@ -301,13 +343,13 @@ function PromotionModalContent({
         <div className="promo-modal-body">
           <div className="promo-form-group">
             <label className="promo-form-label">
-              Promotion Name{" "}
+              Tên chương trình{" "}
               {!isViewMode && <span className="promo-required">*</span>}
             </label>
             <input
               type="text"
               className="promo-form-input"
-              placeholder="Enter promotion name"
+              placeholder="Nhập tên chương trình"
               disabled={isViewMode}
               value={formData.name}
               onChange={(e) => handleChange("name", e.target.value)}
@@ -315,7 +357,7 @@ function PromotionModalContent({
           </div>
 
           <div className="promo-form-group">
-            <label className="promo-form-label">Promotion Type</label>
+            <label className="promo-form-label">Loại khuyến mãi</label>
             <div className="promo-radio-group">
               <label className="promo-radio-label">
                 <input
@@ -342,14 +384,14 @@ function PromotionModalContent({
 
           <div className="promo-form-group">
             <label className="promo-form-label">
-              Promotion Value{" "}
+              Mức giảm{" "}
               {!isViewMode && <span className="promo-required">*</span>}
             </label>
             <div className="promo-value-input-group">
               <input
                 type="text"
                 className="promo-form-input promo-value-number"
-                placeholder="Value..."
+                placeholder="Giá trị giảm..."
                 disabled={isViewMode}
                 value={formData.discountValueNum}
                 onChange={(e) => {
@@ -375,7 +417,7 @@ function PromotionModalContent({
           </div>
 
           <div className="promo-form-group">
-            <label className="promo-form-label">Applicable Scope</label>
+            <label className="promo-form-label">Phạm vi áp dụng</label>
             <div className="promo-scope-tabs">
               {(["Product", "Category", "Tag"] as const).map((tab) => (
                 <button
@@ -397,24 +439,19 @@ function PromotionModalContent({
             </div>
 
             <MultiSelectDropdown
-              options={
-                formData.applicableScopeType === "Product"
-                  ? MOCK_PRODUCTS
-                  : formData.applicableScopeType === "Category"
-                    ? MOCK_CATEGORIES
-                    : MOCK_TAGS
-              }
+              options={currentScopeOptions}
               selectedValues={formData.applicableScopeValues}
               onChange={(vals) => handleChange("applicableScopeValues", vals)}
-              placeholder={`Search ${formData.applicableScopeType}...`}
+              placeholder={`Tìm kiếm ${formData.applicableScopeType}...`}
               disabled={isViewMode}
+              isLoading={isLoadingScopes}
             />
           </div>
 
           <div className="promo-date-picker-row">
             <div className="promo-date-picker-col">
               <label className="promo-form-label">
-                Start Date{" "}
+                Ngày bắt đầu{" "}
                 {!isViewMode && <span className="promo-required">*</span>}
               </label>
               <input
@@ -428,7 +465,7 @@ function PromotionModalContent({
             </div>
             <div className="promo-date-picker-col">
               <label className="promo-form-label">
-                End Date{" "}
+                Ngày kết thúc{" "}
                 {!isViewMode && <span className="promo-required">*</span>}
               </label>
               <input
@@ -443,7 +480,7 @@ function PromotionModalContent({
           </div>
 
           <div className="promo-form-group">
-            <label className="promo-form-label">Status</label>
+            <label className="promo-form-label">Trạng thái</label>
             <div className="promo-radio-group">
               <label className="promo-radio-label">
                 <input
@@ -453,7 +490,7 @@ function PromotionModalContent({
                   onChange={() => handleChange("status", "Draft")}
                   disabled={isViewMode}
                 />
-                Draft
+                Bản nháp (Draft)
               </label>
               <label className="promo-radio-label">
                 <input
@@ -463,7 +500,7 @@ function PromotionModalContent({
                   onChange={() => handleChange("status", "Active")}
                   disabled={isViewMode}
                 />
-                Active
+                Công bố (Active/Scheduled)
               </label>
             </div>
           </div>
@@ -472,7 +509,7 @@ function PromotionModalContent({
             <label className="promo-form-label">Description</label>
             <textarea
               className="promo-form-textarea"
-              placeholder="Enter Description"
+              placeholder="Nhập mô tả..."
               rows={4}
               disabled={isViewMode}
               value={formData.description}

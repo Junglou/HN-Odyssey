@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, type FormEvent } from "react";
 import "./CouponModal.css";
+import axiosClient from "../../../../api/axiosClient";
 import {
   ArrowLeftIcon,
   CloseIcon,
@@ -20,28 +21,33 @@ interface CouponModalProps {
   onSubmit: (data: CouponFormData) => void;
 }
 
-const MOCK_PRODUCTS = [
-  { id: "p1", name: "Classic White Shirt" },
-  { id: "p2", name: "Grey Slim Jacket" },
-  { id: "p3", name: "Denim Jeans" },
-  { id: "p4", name: "Running Sneakers" },
-];
-const MOCK_CATEGORIES = [
-  { id: "c1", name: "Home Goods" },
-  { id: "c1-1", name: "Kitchenware" },
-  { id: "c2", name: "Electronics" },
-  { id: "c3", name: "Fashion" },
-];
-const MOCK_TAGS = [
-  { id: "t1", name: "Summer Collection" },
-  { id: "t2", name: "New Arrival" },
-  { id: "t3", name: "Winter Clearance" },
-  { id: "t4", name: "Bestseller" },
-];
+interface OptionData {
+  id: string;
+  name: string;
+}
+
+interface ProductItem {
+  _id: string;
+  name: string;
+}
+
+interface ProductResponse {
+  data: ProductItem[];
+}
+
+interface CategoryItem {
+  _id: string;
+  name: string;
+}
+
+interface TagItem {
+  _id: string;
+  name: string;
+}
 
 const defaultFormData: CouponFormData = {
   code: "",
-  discountType: "Percentage",
+  discountType: "PERCENTAGE",
   discountValueNum: "",
   minimumOrderValueNum: "",
   maximumDiscountAmountNum: "",
@@ -59,8 +65,8 @@ const defaultFormData: CouponFormData = {
 };
 
 const DISCOUNT_OPTIONS = [
-  { label: "Percentage - %", value: "Percentage" },
-  { label: "Fixed Amount - $", value: "Fixed Amount" },
+  { label: "Percentage - %", value: "PERCENTAGE" },
+  { label: "Fixed Amount - $", value: "FIXED_AMOUNT" },
 ];
 
 function CustomSelect({
@@ -127,19 +133,22 @@ function CustomSelect({
   );
 }
 
-// Component dropdown
 function MultiSelectDropdown({
   options,
   selectedValues,
   onChange,
   placeholder,
   disabled,
+  onSearchChange,
+  isLoading,
 }: {
-  options: { id: string; name: string }[];
+  options: OptionData[];
   selectedValues: string[];
   onChange: (values: string[]) => void;
   placeholder: string;
   disabled?: boolean;
+  onSearchChange?: (val: string) => void;
+  isLoading?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -158,15 +167,28 @@ function MultiSelectDropdown({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filteredOptions = options.filter(
-    (opt) =>
-      opt.name.toLowerCase().includes(search.toLowerCase()) &&
-      !selectedValues.includes(opt.name),
-  );
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSearch(val);
+    if (onSearchChange) {
+      onSearchChange(val);
+    }
+  };
+
+  // Nếu dùng server-side search (onSearchChange), ta bỏ qua việc filter chuỗi local, chỉ bỏ đi các item đã chọn.
+  // Nếu local, ta filter theo string bao gồm.
+  const filteredOptions = onSearchChange
+    ? options.filter((opt) => !selectedValues.includes(opt.name))
+    : options.filter(
+        (opt) =>
+          opt.name.toLowerCase().includes(search.toLowerCase()) &&
+          !selectedValues.includes(opt.name),
+      );
 
   const handleSelect = (name: string) => {
     onChange([...selectedValues, name]);
     setSearch("");
+    if (onSearchChange) onSearchChange("");
     setIsOpen(false);
   };
 
@@ -187,12 +209,14 @@ function MultiSelectDropdown({
                 : "Search to add more..."
             }
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={handleSearch}
             onFocus={() => setIsOpen(true)}
           />
           {isOpen && (
             <div className="coupon-select-dropdown">
-              {filteredOptions.length > 0 ? (
+              {isLoading ? (
+                <div className="coupon-select-empty">Loading...</div>
+              ) : filteredOptions.length > 0 ? (
                 filteredOptions.map((opt) => (
                   <div
                     key={opt.id}
@@ -233,7 +257,6 @@ function MultiSelectDropdown({
   );
 }
 
-// Component chính
 export default function CouponModal(props: CouponModalProps) {
   const [shouldRender, setShouldRender] = useState(props.isOpen);
   const [isClosing, setIsClosing] = useState(false);
@@ -274,7 +297,76 @@ function ModalContent({
   onSubmit,
   isClosing,
 }: Omit<CouponModalProps, "isOpen"> & { isClosing?: boolean }) {
-  // Khởi tạo state
+  const [productsData, setProductsData] = useState<OptionData[]>([]);
+  const [categoriesData, setCategoriesData] = useState<OptionData[]>([]);
+  const [tagsData, setTagsData] = useState<OptionData[]>([]);
+
+  // State xử lý call API động cho Products
+  const [productSearchTerm, setProductSearchTerm] = useState("");
+  const [isSearchingProducts, setIsSearchingProducts] = useState(false);
+
+  // Fetch dữ liệu tĩnh (Category, Tag) lúc mới mở Modal
+  useEffect(() => {
+    const fetchStaticData = async () => {
+      try {
+        const [catRes, tagRes] = await Promise.all([
+          axiosClient.get<CategoryItem[]>("/categories/tree-view"),
+          axiosClient.get<TagItem[]>("/tags"),
+        ]);
+
+        if (catRes.data) {
+          setCategoriesData(
+            catRes.data.map((c) => ({ id: c._id, name: c.name })),
+          );
+        }
+        if (tagRes.data) {
+          setTagsData(tagRes.data.map((t) => ({ id: t._id, name: t.name })));
+        }
+      } catch (error) {
+        console.error("Failed to fetch categories and tags", error);
+      }
+    };
+    fetchStaticData();
+  }, []);
+
+  // Fetch dữ liệu động cho Products (Có áp dụng Debounce)
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setIsSearchingProducts(true);
+        // Mặc định gọi 20 item, có keyword sẽ truyền param search
+        const params: { limit: number; search?: string } = { limit: 20 };
+        if (productSearchTerm) {
+          params.search = productSearchTerm;
+        }
+
+        const prodRes = await axiosClient.get<ProductResponse>(
+          "/products/store/list",
+          {
+            params,
+          },
+        );
+
+        if (prodRes.data?.data) {
+          setProductsData(
+            prodRes.data.data.map((p) => ({ id: p._id, name: p.name })),
+          );
+        }
+      } catch (error) {
+        console.error("Failed to fetch products", error);
+      } finally {
+        setIsSearchingProducts(false);
+      }
+    };
+
+    // Delay request 500ms sau khi người dùng ngừng gõ
+    const delayDebounceFn = setTimeout(() => {
+      fetchProducts();
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [productSearchTerm]);
+
   const [formData, setFormData] = useState<CouponFormData>(() => {
     if ((mode === "edit" || mode === "view") && initialData) {
       const rawValue = initialData.discountValue.replace(/[^0-9.]/g, "");
@@ -290,7 +382,7 @@ function ModalContent({
         startDate: initialData.startDate.split("/").reverse().join("-"),
         endDate: initialData.endDate.split("/").reverse().join("-"),
         applicableScope: initialData.applicableScope,
-        isDraft: initialData.status === "Draft",
+        isDraft: initialData.status === "DRAFT",
       };
     }
     return defaultFormData;
@@ -323,7 +415,6 @@ function ModalContent({
       ? todayStr
       : initialData?.startDate.split("/").reverse().join("-") || todayStr;
 
-  // Submit form
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (isViewMode) {
@@ -349,7 +440,6 @@ function ModalContent({
     onSubmit(formattedData);
   };
 
-  // Cập nhật field
   const handleChange = (
     field: keyof CouponFormData,
     value: string | boolean | ApplicableScopeObj,
@@ -357,7 +447,6 @@ function ModalContent({
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Cập nhật scope
   const handleScopeChange = (
     field: keyof ApplicableScopeObj,
     value: boolean | string[],
@@ -384,14 +473,12 @@ function ModalContent({
 
   return (
     <>
-      {/* Overlay */}
       <div
         className={`coupon-modal-overlay ${isClosing ? "closing" : ""}`}
         onClick={onClose}
       ></div>
       <div className={`coupon-modal-container ${isClosing ? "closing" : ""}`}>
         <form onSubmit={handleSubmit} className="coupon-modal-form">
-          {/* Header */}
           <div className="coupon-modal-header">
             <button
               type="button"
@@ -403,7 +490,6 @@ function ModalContent({
             <h2 className="coupon-modal-title">{title}</h2>
           </div>
 
-          {/* Nội dung form */}
           <div className="coupon-modal-body">
             <div className="coupon-form-group">
               <label className="coupon-form-label">
@@ -442,7 +528,7 @@ function ModalContent({
                   type="number"
                   className="coupon-form-input"
                   placeholder={
-                    formData.discountType === "Percentage"
+                    formData.discountType === "PERCENTAGE"
                       ? "e.g. 20"
                       : "e.g. 10"
                   }
@@ -452,7 +538,7 @@ function ModalContent({
                   }
                   disabled={isViewMode}
                   min="0"
-                  step={formData.discountType === "Percentage" ? "1" : "0.01"}
+                  step={formData.discountType === "PERCENTAGE" ? "1" : "0.01"}
                 />
               </div>
               <div className="coupon-form-col">
@@ -471,7 +557,7 @@ function ModalContent({
               </div>
             </div>
 
-            {formData.discountType === "Percentage" && (
+            {formData.discountType === "PERCENTAGE" && (
               <div className="coupon-form-group">
                 <label className="coupon-form-label">
                   Maximum Discount Amount
@@ -547,7 +633,6 @@ function ModalContent({
               </div>
             </div>
 
-            {/* Phạm vi áp dụng */}
             <div className="coupon-form-group" style={{ marginTop: "8px" }}>
               <label className="coupon-form-label">Applicable Scope</label>
 
@@ -581,7 +666,7 @@ function ModalContent({
               <div className="coupon-dynamic-dropdowns">
                 {activeToggles.categories && (
                   <MultiSelectDropdown
-                    options={MOCK_CATEGORIES}
+                    options={categoriesData}
                     selectedValues={formData.applicableScope.categories}
                     onChange={(vals) => handleScopeChange("categories", vals)}
                     placeholder="Select Category..."
@@ -591,17 +676,19 @@ function ModalContent({
 
                 {activeToggles.products && (
                   <MultiSelectDropdown
-                    options={MOCK_PRODUCTS}
+                    options={productsData}
                     selectedValues={formData.applicableScope.products}
                     onChange={(vals) => handleScopeChange("products", vals)}
-                    placeholder="Select Product..."
+                    placeholder="Type to search Products..."
                     disabled={isViewMode}
+                    onSearchChange={setProductSearchTerm} // Gắn hàm Search API động
+                    isLoading={isSearchingProducts} // Gắn loading state
                   />
                 )}
 
                 {activeToggles.tags && (
                   <MultiSelectDropdown
-                    options={MOCK_TAGS}
+                    options={tagsData}
                     selectedValues={formData.applicableScope.tags}
                     onChange={(vals) => handleScopeChange("tags", vals)}
                     placeholder="Select Tag..."
@@ -611,7 +698,6 @@ function ModalContent({
               </div>
             </div>
 
-            {/* Trạng thái */}
             <div className="coupon-status-section">
               <label className="coupon-status-label">Status</label>
               <div className="coupon-toggle-wrapper">
@@ -632,7 +718,6 @@ function ModalContent({
             </div>
           </div>
 
-          {/* Footer form */}
           <div className="coupon-modal-footer">
             <div className="coupon-footer-buttons">
               {!isViewMode && (

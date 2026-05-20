@@ -403,3 +403,7 @@
   background-color: #111;
   border-color: #111;
 }
+
+.promo-selected-chips.has-items {
+  margin-top: 12px;
+}
