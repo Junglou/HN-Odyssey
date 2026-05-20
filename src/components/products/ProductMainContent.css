@@ -1,0 +1,215 @@
+/* main area */
+.pl-main-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 24px;
+}
+
+/* header bar */
+.pl-header-bar {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #dbdbdb;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+/* quick filters */
+.pl-quick-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pl-filter-label {
+  font-weight: 400;
+  font-size: 20px;
+  color: #000000;
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+@media screen and (min-width: 769px) {
+  .pl-filter-label {
+    display: none;
+  }
+}
+
+.pl-chip {
+  padding: 8px 20px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  border-radius: 30px;
+  font-weight: 300;
+  font-size: 16px;
+  color: #000000;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pl-chip:hover {
+  background: #000000;
+  color: #ffffff;
+  border-color: #000000;
+}
+
+.pl-chip.active {
+  background: #000000;
+  color: #ffffff;
+  border-color: #000000;
+}
+
+/* custom dropdown sort (Đồng bộ cấu trúc BannerManagement) */
+.pl-sort-wrapper {
+  position: relative;
+  min-width: 160px;
+}
+
+.pl-sort-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  border-radius: 30px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  white-space: nowrap;
+}
+
+.pl-sort-trigger:hover {
+  border-color: #000000;
+}
+
+.pl-sort-trigger.active {
+  border-color: #000000;
+}
+
+.pl-sort-trigger span {
+  font-weight: 300;
+  font-size: 16px;
+  color: #000000;
+}
+
+.pl-sort-icon {
+  display: flex;
+  align-items: center;
+  transition: transform 0.2s ease-in-out;
+}
+
+.pl-sort-icon.rotated {
+  transform: rotate(180deg);
+}
+
+.pl-sort-options {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 100%;
+  min-width: 200px;
+  background-color: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  pointer-events: none;
+}
+
+.pl-sort-options.open {
+  animation: pl-fadeInDown 0.2s ease-out forwards;
+  pointer-events: auto;
+}
+
+.pl-sort-options.closed {
+  animation: pl-fadeOutUp 0.2s ease-in forwards;
+  pointer-events: none;
+}
+
+.pl-sort-option {
+  padding: 10px 16px;
+  font-size: 16px;
+  font-weight: 300;
+  color: #374151;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+
+.pl-sort-option:hover {
+  background-color: #f3f4f6;
+}
+
+.pl-sort-option.active {
+  font-weight: 500;
+  color: #000000;
+  background-color: #f3f4f6;
+}
+
+@keyframes pl-fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+    visibility: hidden;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+  }
+}
+
+@keyframes pl-fadeOutUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+    visibility: hidden;
+  }
+}
+
+/* grid (Responsive tự động bung cột) */
+.pl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 24px;
+  width: 100%;
+}
+
+.pl-grid .span-2 {
+  grid-column: span 2;
+}
+
+/* responsive */
+@media screen and (max-width: 768px) {
+  .pl-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+  .pl-grid .span-2 {
+    grid-column: span 1;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .pl-grid {
+    grid-template-columns: 1fr;
+  }
+}

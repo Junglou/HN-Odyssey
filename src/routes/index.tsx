@@ -109,6 +109,10 @@ export const router = createBrowserRouter([
         path: "/second-charm-form",
         element: <SecondCharmPage />,
       },
+      {
+        path: "products",
+        element: <ProductListPage />,
+      },
       // todo: cum route profile nay can duoc boc bang auth guard de kiem tra token khi chay thuc te, hien tai de day de tien hanh thu nghiem
       {
         path: "/profile",

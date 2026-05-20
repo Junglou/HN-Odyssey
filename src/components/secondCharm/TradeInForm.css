@@ -110,17 +110,87 @@
   width: 100%;
 }
 
-.sc-select-wrapper select {
-  appearance: none;
-  padding-right: 40px;
+.sc-custom-select {
+  position: relative;
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #ffffff;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+  font-family: "Inter", sans-serif;
+  font-size: 16px;
+  user-select: none;
+}
+
+.sc-custom-select.open {
+  border-color: #2563eb;
+}
+
+.sc-select-value {
+  color: #000000;
+}
+
+.sc-placeholder {
+  color: #9ca3af;
 }
 
 .sc-select-icon {
-  position: absolute;
-  right: 16px;
-  pointer-events: none;
   color: #000000;
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.sc-select-icon.rotate {
+  transform: rotate(180deg);
+}
+
+.sc-select-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  z-index: 20;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  pointer-events: none;
+  transition:
+    opacity 0.3s cubic-bezier(0.25, 1, 0.5, 1),
+    transform 0.3s cubic-bezier(0.25, 1, 0.5, 1),
+    visibility 0.3s;
+  overflow: hidden;
+}
+
+.sc-select-dropdown.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.sc-select-option {
+  padding: 12px 16px;
+  color: #374151;
+  transition: background-color 0.2s;
+}
+
+.sc-select-option:hover {
+  background-color: #f3f4f6;
+}
+
+.sc-select-option.selected {
+  background-color: #eff6ff;
+  color: #2563eb;
+  font-weight: 500;
 }
 
 /* Dropzone (Upload) */
@@ -177,11 +247,55 @@
   justify-content: center;
   align-items: center;
   box-sizing: border-box;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.sc-upload-box:hover {
+  border-color: #d1d5db;
+}
+
+.sc-upload-box.has-image {
+  border-color: transparent;
+  padding: 0;
+  cursor: default;
+}
+
+.sc-upload-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .sc-upload-box .plus {
   font-size: 24px;
   color: #9ca3af;
+}
+
+.sc-remove-photo-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: #ffffff;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  padding: 0;
+  z-index: 2;
+}
+
+.sc-remove-photo-btn:hover {
+  background-color: rgba(220, 38, 38, 0.9);
 }
 
 /* Evaluation Methods */

@@ -15,6 +15,7 @@ export function useTradeInForm() {
     state: "",
     zipCode: "",
     agreeTerms: false,
+    photos: [] as File[],
   });
 
   // Hàm xử lý khi người dùng nhập liệu vào input/textarea
@@ -38,9 +39,33 @@ export function useTradeInForm() {
     setFormData((prev) => ({ ...prev, evaluationMethod: method }));
   };
 
+  const setCategory = (category: string) => {
+    setFormData((prev) => ({ ...prev, category }));
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      setFormData((prev) => ({
+        ...prev,
+        photos: [...prev.photos, ...newFiles],
+      }));
+    }
+  };
+
+  const removePhoto = (indexToRemove: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      photos: prev.photos.filter((_, index) => index !== indexToRemove),
+    }));
+  };
+
   return {
     formData,
     handleInputChange,
     setEvaluationMethod,
+    setCategory,
+    handleFileChange,
+    removePhoto,
   };
 }

@@ -1,0 +1,45 @@
+/* wrapper */
+.pl-promo-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  background-color: #f3f4f6;
+  border-radius: 10px;
+  overflow: hidden;
+  min-height: 400px;
+}
+
+.pl-promo-content {
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.pl-promo-title {
+  margin: 0;
+  font-weight: 400;
+  font-size: 40px;
+  color: #000000;
+}
+
+.pl-promo-subtitle {
+  margin: 0;
+  font-weight: 400;
+  font-size: 24px;
+  color: #000000;
+  max-width: 340px;
+  line-height: 1.4;
+}
+
+.pl-promo-btn {
+  padding: 10px 40px;
+  background: #000000;
+  color: #ffffff;
+  border-radius: 50px;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  margin-top: 20px;
+}

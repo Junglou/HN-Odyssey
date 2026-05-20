@@ -1,17 +1,89 @@
-// imports
+import { useState, useRef, useEffect } from "react";
 import { useTradeInForm } from "../../hooks/secondCharm/useTradeInForm";
 import {
   ChevronDownSolidIcon,
   UploadDropzoneIcon,
   ArrowRightIcon,
+  RemovePhotoIcon,
 } from "../../assets/icons/SecondCharmIcons";
 import "./TradeInForm.css";
 
 // component
 export default function TradeInForm() {
-  const { formData, handleInputChange, setEvaluationMethod } = useTradeInForm();
+  const {
+    formData,
+    handleInputChange,
+    setEvaluationMethod,
+    setCategory,
+    handleFileChange,
+    removePhoto,
+  } = useTradeInForm();
 
-  // render
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const categories = [
+    { value: "equipment", label: "Equipment" },
+    { value: "apparel", label: "Apparel" },
+    { value: "footwear", label: "Footwear" },
+  ];
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsCategoryOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleCategorySelect = (value: string) => {
+    setCategory(value);
+    setIsCategoryOpen(false);
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
+  const renderPhotoBoxes = () => {
+    const boxes = [];
+    const totalBoxes = Math.max(3, formData.photos.length + 1);
+
+    for (let i = 0; i < totalBoxes; i++) {
+      if (i < formData.photos.length) {
+        const fileUrl = URL.createObjectURL(formData.photos[i]);
+        boxes.push(
+          <div key={i} className="sc-upload-box has-image">
+            <img src={fileUrl} alt={`preview ${i}`} />
+            <button
+              type="button"
+              className="sc-remove-photo-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                removePhoto(i);
+              }}
+            >
+              <RemovePhotoIcon />
+            </button>
+          </div>,
+        );
+      } else {
+        boxes.push(
+          <div key={i} className="sc-upload-box" onClick={triggerFileInput}>
+            <span className="plus">+</span>
+          </div>,
+        );
+      }
+    }
+    return boxes;
+  };
+
   return (
     <section className="sc-form-section">
       <div className="sc-form-container">
@@ -57,22 +129,41 @@ export default function TradeInForm() {
                 onChange={handleInputChange}
               />
             </div>
-            <div className="sc-input-group">
+
+            {/* custom dropdown thay cho select */}
+            <div className="sc-input-group" ref={dropdownRef}>
               <label>Product Category *</label>
-              <div className="sc-select-wrapper">
-                <select
-                  name="category"
-                  value={formData.category}
-                  onChange={handleInputChange}
+              <div
+                className={`sc-custom-select ${isCategoryOpen ? "open" : ""}`}
+                onClick={() => setIsCategoryOpen(!isCategoryOpen)}
+              >
+                <div className="sc-select-value">
+                  {formData.category ? (
+                    categories.find((c) => c.value === formData.category)?.label
+                  ) : (
+                    <span className="sc-placeholder">Select category</span>
+                  )}
+                </div>
+                <ChevronDownSolidIcon
+                  className={`sc-select-icon ${isCategoryOpen ? "rotate" : ""}`}
+                />
+
+                <div
+                  className={`sc-select-dropdown ${isCategoryOpen ? "show" : ""}`}
                 >
-                  <option value="" disabled>
-                    Select category
-                  </option>
-                  <option value="equipment">Equipment</option>
-                  <option value="apparel">Apparel</option>
-                  <option value="footwear">Footwear</option>
-                </select>
-                <ChevronDownSolidIcon className="sc-select-icon" />
+                  {categories.map((cat) => (
+                    <div
+                      key={cat.value}
+                      className={`sc-select-option ${formData.category === cat.value ? "selected" : ""}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCategorySelect(cat.value);
+                      }}
+                    >
+                      {cat.label}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -91,7 +182,18 @@ export default function TradeInForm() {
             {/* Row 4 - Full Width Upload */}
             <div className="sc-input-group sc-col-span-2">
               <label>Upload Photos * (Min 3 photos)</label>
-              <div className="sc-upload-dropzone">
+
+              {/* the input an chua file he thong */}
+              <input
+                type="file"
+                multiple
+                accept="image/png, image/jpeg, image/jpg"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                style={{ display: "none" }}
+              />
+
+              <div className="sc-upload-dropzone" onClick={triggerFileInput}>
                 <div className="sc-upload-icon-large">
                   {/* Sử dụng component Icon ở đây */}
                   <UploadDropzoneIcon />
@@ -103,17 +205,7 @@ export default function TradeInForm() {
                   PNG, JPG up to 10MB (3-6 photos recommended)
                 </p>
               </div>
-              <div className="sc-upload-placeholders">
-                <div className="sc-upload-box">
-                  <span className="plus">+</span>
-                </div>
-                <div className="sc-upload-box">
-                  <span className="plus">+</span>
-                </div>
-                <div className="sc-upload-box">
-                  <span className="plus">+</span>
-                </div>
-              </div>
+              <div className="sc-upload-placeholders">{renderPhotoBoxes()}</div>
             </div>
 
             {/* Row 5 - Evaluation Method Selection */}
@@ -240,7 +332,6 @@ export default function TradeInForm() {
 
           <button className="sc-submit-btn" type="submit">
             Submit Buy-Back Request
-            {/* Sử dụng component Icon ở đây */}
             <ArrowRightIcon />
           </button>
         </form>

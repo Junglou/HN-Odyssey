@@ -1,0 +1,193 @@
+/* container */
+.pl-sidebar-container {
+  width: 250px;
+  flex-shrink: 0;
+  border-right: 1px solid #e5e7eb;
+  padding-right: 24px;
+  box-sizing: border-box;
+}
+
+/* header */
+.pl-sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 24px;
+}
+
+.pl-sidebar-title {
+  margin: 0;
+  font-weight: 400;
+  font-size: 20px;
+  color: #000000;
+}
+
+.pl-sidebar-close {
+  display: none;
+  cursor: pointer;
+  font-size: 20px;
+  color: #6b7280;
+}
+
+/* list */
+.pl-filter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+/* item — 1 khung duy nhất bao cả trigger + options */
+.pl-filter-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.pl-filter-item:hover {
+  border-color: #d1d5db;
+}
+
+.pl-filter-item.active {
+  border-color: #000000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* trigger */
+.pl-filter-trigger {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #ffffff;
+  cursor: pointer;
+  user-select: none;
+}
+
+.pl-filter-trigger span {
+  font-weight: 400;
+  font-size: 15px;
+  color: #111827;
+}
+
+.pl-filter-icon {
+  display: flex;
+  align-items: center;
+  color: #6b7280;
+  transition: transform 0.25s ease-in-out;
+}
+
+.pl-filter-icon.rotated {
+  transform: rotate(180deg);
+}
+
+/* divider — chỉ hiện khi mở */
+.pl-filter-divider {
+  height: 1px;
+  background: #f3f4f6;
+  margin: 0 16px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.pl-filter-item.active .pl-filter-divider {
+  opacity: 1;
+}
+
+/* options box — CSS Grid accordion */
+.pl-filter-options-box {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s ease-in-out;
+}
+
+.pl-filter-options-box.open {
+  grid-template-rows: 1fr;
+}
+
+.pl-filter-options-inner {
+  overflow: hidden;
+}
+
+.pl-filter-options-content {
+  padding: 12px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* checkbox items */
+.pl-filter-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.pl-filter-checkbox-label:hover .pl-filter-checkbox-text {
+  color: #111827;
+}
+
+.pl-filter-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: #000000;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pl-filter-checkbox-text {
+  font-size: 14px;
+  font-weight: 300;
+  color: #6b7280;
+  transition: color 0.15s ease;
+}
+
+/* mobile layer */
+.pl-sidebar-overlay {
+  display: none;
+}
+
+@media screen and (max-width: 768px) {
+  .pl-sidebar-container {
+    position: fixed;
+    top: 0;
+    left: -100%;
+    width: 280px;
+    height: 100vh;
+    background-color: #ffffff;
+    z-index: 100;
+    transition: left 0.3s ease;
+    padding: 24px;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+    border-right: none;
+    overflow-y: auto;
+  }
+
+  .pl-sidebar-container.open {
+    left: 0;
+  }
+
+  .pl-sidebar-close {
+    display: block;
+  }
+
+  .pl-sidebar-overlay {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.4);
+    z-index: 99;
+  }
+}
