@@ -2,50 +2,57 @@ import {
   IsBoolean,
   IsDateString,
   IsEnum,
-  IsMongoId,
   IsNotEmpty,
   IsNumber,
+  IsOptional,
   IsString,
   Min,
+  IsArray,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
-import { ComboType } from '../schemas/combo.schema';
+import { ComboType, ComboStatus } from '../schemas/combo.schema';
+import { ApplicableScope } from '../schemas/flash-sale.schema';
 
 export class CreateComboDto {
-  @ApiProperty({ description: 'Tên chương trình khuyến mãi' })
   @IsString()
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ enum: ComboType, example: ComboType.BUY_X_GET_Y })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
   @IsEnum(ComboType)
   @IsNotEmpty()
   type: ComboType;
 
-  @ApiProperty({ description: 'Danh sách ID sản phẩm áp dụng' })
-  @IsMongoId({ each: true })
+  @IsEnum(ApplicableScope)
   @IsNotEmpty()
-  product_ids: string[];
+  applicable_scope_type: string;
 
-  @ApiProperty({ description: 'Số lượng mua tối thiểu', example: 2 })
+  @IsArray()
+  @IsString({ each: true })
+  @IsNotEmpty()
+  applicable_scope_values: string[];
+
+  @IsOptional()
   @IsNumber()
   @Min(1)
-  min_quantity: number;
+  min_quantity?: number;
 
-  @ApiProperty({ description: 'Giá trị giảm', example: 10 })
   @IsNumber()
   @Min(0)
   discount_value: number;
 
-  @ApiProperty({ description: 'Giảm theo % hay tiền mặt', example: true })
   @IsBoolean()
   is_percent: boolean;
 
-  @ApiProperty({ example: '2024-01-01' })
-  @IsDateString()
-  start_date: Date;
+  @IsOptional()
+  @IsEnum(ComboStatus)
+  status?: ComboStatus;
 
-  @ApiProperty({ example: '2030-12-31' })
   @IsDateString()
-  end_date: Date;
+  start_date: string;
+
+  @IsDateString()
+  end_date: string;
 }

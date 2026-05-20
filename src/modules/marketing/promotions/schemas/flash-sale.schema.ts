@@ -1,16 +1,24 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Schema as MongooseSchema, Types } from 'mongoose';
+import { Document } from 'mongoose';
 
 export enum FlashSaleStatus {
-  PENDING = 'PENDING', // Sắp diễn ra
-  ACTIVE = 'ACTIVE', // Đang diễn ra
-  EXPIRED = 'EXPIRED', // Đã kết thúc
-  CANCELLED = 'CANCELLED', // Đã hủy
+  DRAFT = 'DRAFT',
+  PENDING = 'PENDING',
+  ACTIVE = 'ACTIVE',
+  EXPIRED = 'EXPIRED',
+  CANCELLED = 'CANCELLED',
+  INACTIVE = 'INACTIVE',
 }
 
 export enum FlashSaleDiscountType {
   PERCENTAGE = 'PERCENTAGE',
-  FIXED_PRICE = 'FIXED_PRICE', // Đồng giá
+  FIXED_PRICE = 'FIXED_PRICE',
+}
+
+export enum ApplicableScope {
+  PRODUCT = 'Product',
+  CATEGORY = 'Category',
+  TAG = 'Tag',
 }
 
 @Schema({ timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } })
@@ -36,21 +44,24 @@ export class FlashSale extends Document {
   @Prop({
     required: true,
     enum: FlashSaleStatus,
-    default: FlashSaleStatus.PENDING,
+    default: FlashSaleStatus.DRAFT,
   })
   status: FlashSaleStatus;
 
-  // AC2: Gán danh sách sản phẩm
-  @Prop({ type: [{ type: MongooseSchema.Types.ObjectId, ref: 'Product' }] })
-  product_ids: Types.ObjectId[];
+  // Hỗ trợ linh hoạt cho cả Product, Category, Tag từ FE
+  @Prop({
+    required: true,
+    enum: ApplicableScope,
+    default: ApplicableScope.PRODUCT,
+  })
+  applicable_scope_type: string;
 
-  // AC3: Cá nhân hóa AI
+  @Prop({ type: [String], required: true, default: [] })
+  applicable_scope_values: string[];
+
   @Prop({ default: false })
   ai_personalization: boolean;
 }
 
 export const FlashSaleSchema = SchemaFactory.createForClass(FlashSale);
-
-// Tối ưu Query kiểm tra xung đột thời gian và lấy dữ liệu đang chạy
 FlashSaleSchema.index({ status: 1, start_time: 1, end_time: 1 });
-FlashSaleSchema.index({ product_ids: 1 });

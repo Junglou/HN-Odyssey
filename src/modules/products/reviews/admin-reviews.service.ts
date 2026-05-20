@@ -50,22 +50,67 @@ export class AdminReviewsService {
     const skip = (page - 1) * limit;
 
     const filter: FilterQuery<Review> = {};
-    if (query.status) filter.status = query.status;
-    if (query.rating) filter.rating = Number(query.rating);
 
-    if (query.keyword) {
-      filter.content = { $regex: query.keyword, $options: 'i' };
+    // 1. Lọc theo trạng thái (Gom NEW và APPROVED)
+    if (query.status) {
+      if (query.status === ReviewStatus.NEW) {
+        filter.status = { $in: [ReviewStatus.NEW, ReviewStatus.APPROVED] };
+      } else {
+        filter.status = query.status;
+      }
     }
 
+    // 2. Lọc theo số sao
+    if (query.rating) filter.rating = Number(query.rating);
+
+    // 3. FIX LỖI TÌM KIẾM CHÉO (Tên SP, Tên Khách, Nội dung)
+    if (query.keyword) {
+      const keywordRegex = { $regex: query.keyword, $options: 'i' }; // Không phân biệt hoa/thường
+
+      // Tìm các Sản phẩm (Products) có Tên khớp với Keyword
+      // Ép kiểu mảng trả về để ESLint hiểu rõ cấu trúc
+      const matchingProducts = (await this.connection
+        .collection('products')
+        .find({ name: keywordRegex })
+        .project({ _id: 1 })
+        .toArray()) as Array<{ _id: Types.ObjectId }>;
+
+      const productIds = matchingProducts.map((p) => p._id);
+
+      // Tìm các Khách hàng (Customers) có Họ, Tên hoặc Email khớp với Keyword
+      const matchingUsers = (await this.customerModel
+        .find({
+          $or: [
+            { first_Name: keywordRegex },
+            { last_Name: keywordRegex },
+            { email: keywordRegex },
+          ],
+        })
+        .select('_id')
+        .lean()
+        .exec()) as Array<{ _id: Types.ObjectId }>;
+
+      const userIds = matchingUsers.map((u) => u._id);
+
+      // Gom toàn bộ điều kiện: Tìm trong "Nội dung" HOẶC "Tên SP" HOẶC "Tên Khách"
+      filter.$or = [
+        { content: keywordRegex },
+        { product_id: { $in: productIds } },
+        { user_id: { $in: userIds } },
+      ];
+    }
+
+    // 4. Thực thi truy vấn
     const [items, total] = await Promise.all([
       this.reviewModel
         .find(filter)
-        .populate('user_id', 'full_name email is_active')
-        .sort({ createdAt: -1 })
+        .populate('user_id', 'first_Name last_Name email is_active')
+        .populate('product_id', 'name price base_price') // Lấy Tên và Giá sản phẩm
+        .sort({ is_pinned: -1, pinned_at: -1, createdAt: -1 }) // Ưu tiên bài ghim
         .skip(skip)
         .limit(limit)
         .lean()
-        .exec(),
+        .exec() as unknown as Promise<Review[]>, // <--- FIX LỖI Ở ĐÂY: Ép kiểu an toàn báo cho ESLint biết
       this.reviewModel.countDocuments(filter),
     ]);
 
@@ -180,13 +225,16 @@ export class AdminReviewsService {
     const review = await this.reviewModel
       .findById(reviewId)
       .populate<{ user_id: CustomerDocument }>('user_id');
+
     if (!review) throw new BadRequestException('Đánh giá không tồn tại');
+
+    // Ép kiểu có thêm | null để an toàn
     const customer = review.user_id as unknown as {
       _id: Types.ObjectId;
       is_active?: boolean;
-    };
+    } | null;
 
-    // Chặn unhide nếu tài khoản bị khóa
+    // Chặn unhide nếu tài khoản bị khóa (chỉ check khi customer tồn tại)
     if (
       customer &&
       customer.is_active === false &&
@@ -210,10 +258,11 @@ export class AdminReviewsService {
       review.is_pinned = false; // Auto unpin
       review.pinned_at = null;
 
+      // FIX LỖI 500 TẠI ĐÂY: Dùng Optional Chaining (?.) và Fallback
       this.eventEmitter.emit('review.deleted_or_hidden', {
-        userId: customer._id.toString(),
+        userId: customer?._id?.toString() || 'unknown_user',
         reviewId: review._id.toString(),
-        orderId: review.order_id.toString(),
+        orderId: review.order_id?.toString() || 'unknown_order',
         reason: 'ADMIN_HIDDEN',
       });
     }

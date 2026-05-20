@@ -5,11 +5,12 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, FilterQuery } from 'mongoose';
+import { Model, FilterQuery, Types, Document } from 'mongoose';
 import {
   FlashSale,
   FlashSaleStatus,
   FlashSaleDiscountType,
+  ApplicableScope,
 } from './schemas/flash-sale.schema';
 import { CreateFlashSaleDto } from './dto/create-flash-sale.dto';
 import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
@@ -23,14 +24,26 @@ export interface QueryFlashSaleDto {
   status?: FlashSaleStatus;
 }
 
-// 2. Interface định nghĩa kiểu khi populate mảng product_ids để tránh lỗi 'any'
-export interface PopulatedProduct {
+// 2. Định nghĩa Interface Product chuẩn để xóa bỏ hoàn toàn Model<any>
+export interface ProductDocument extends Document {
+  _id: Types.ObjectId;
+  name: string;
+  price: number;
+  thumbnail: string;
+  slug: string;
+  badges: string[];
+  status: string;
+  is_deleted: boolean;
+}
+
+export interface ProcessedProduct {
   _id: string;
   name: string;
   price: number;
   thumbnail: string;
   slug: string;
-  badges: any[];
+  badges: string[];
+  flash_sale_price: number;
 }
 
 @Injectable()
@@ -39,7 +52,7 @@ export class FlashSalesService {
 
   constructor(
     @InjectModel(FlashSale.name) private flashSaleModel: Model<FlashSale>,
-    @InjectModel('Product') private productModel: Model<any>,
+    @InjectModel('Product') private productModel: Model<ProductDocument>,
     private readonly auditLogsService: AuditLogsService,
   ) {}
 
@@ -54,43 +67,55 @@ export class FlashSalesService {
       );
     }
 
-    if (dto.product_ids && dto.product_ids.length > 0) {
-      // 1. Loại bỏ các ID trùng lặp do người dùng gửi lên
-      const uniqueProductIds = [
-        ...new Set(dto.product_ids.map((id) => id.toString())),
-      ];
+    // Xử lý loại bỏ trùng lặp ID an toàn với Type String
+    const uniqueScopeValues = dto.applicable_scope_values
+      ? [
+          ...new Set(
+            dto.applicable_scope_values.map((id: string) => id.toString()),
+          ),
+        ]
+      : [];
 
+    // Chỉ validate tồn tại trong DB nếu Scope là PRODUCT
+    if (
+      dto.applicable_scope_type === (ApplicableScope.PRODUCT as string) &&
+      uniqueScopeValues.length > 0
+    ) {
       const validProducts = await this.productModel
         .find({
-          _id: { $in: uniqueProductIds },
+          _id: { $in: uniqueScopeValues },
           status: 'ACTIVE',
           is_deleted: false,
         })
         .select('_id')
         .lean();
 
-      // 2. So sánh với mảng đã lọc trùng lặp
-      if (validProducts.length !== uniqueProductIds.length) {
+      if (validProducts.length !== uniqueScopeValues.length) {
         throw new BadRequestException(
           'Một hoặc nhiều sản phẩm trong danh sách không tồn tại, đang bị ẩn hoặc đã bị xóa.',
         );
       }
     }
 
-    const conflictingSales = await this.flashSaleModel.find({
-      status: { $in: [FlashSaleStatus.PENDING, FlashSaleStatus.ACTIVE] },
-      product_ids: { $in: dto.product_ids },
-      $or: [{ start_time: { $lt: end }, end_time: { $gt: start } }],
-    });
+    // Kiểm tra trùng lặp thời gian cho Scope
+    if (uniqueScopeValues.length > 0) {
+      const conflictingSales = await this.flashSaleModel.find({
+        status: { $in: [FlashSaleStatus.PENDING, FlashSaleStatus.ACTIVE] },
+        applicable_scope_type: dto.applicable_scope_type,
+        applicable_scope_values: { $in: uniqueScopeValues },
+        $or: [{ start_time: { $lt: end }, end_time: { $gt: start } }],
+      });
 
-    if (conflictingSales.length > 0) {
-      throw new BadRequestException(
-        'Một hoặc nhiều sản phẩm đã tồn tại trong Flash Sale khác trùng thời gian.',
-      );
+      if (conflictingSales.length > 0) {
+        throw new BadRequestException(
+          `Một hoặc nhiều ${dto.applicable_scope_type} đã tồn tại trong Flash Sale khác trùng thời gian.`,
+        );
+      }
     }
 
     const newFlashSale = new this.flashSaleModel({
       ...dto,
+      applicable_scope_values: uniqueScopeValues,
       status:
         start <= new Date() ? FlashSaleStatus.ACTIVE : FlashSaleStatus.PENDING,
     });
@@ -101,7 +126,7 @@ export class FlashSalesService {
       action: 'CREATE_FLASH_SALE',
       collection_name: 'flash_sales',
       actor_id: userId,
-      target_id: savedSale._id,
+      target_id: savedSale._id as unknown as string,
       department: Department.MARKETING,
       detail: {
         name: savedSale.name,
@@ -119,7 +144,6 @@ export class FlashSalesService {
     const limit = Number(query.limit || 10);
     const skip = (page - 1) * limit;
 
-    // 4. Khai báo kiểu FilterQuery chuẩn của Mongoose
     const filter: FilterQuery<FlashSale> = {};
     if (query.status) {
       filter.status = query.status;
@@ -150,7 +174,7 @@ export class FlashSalesService {
   // Cập nhật Flash Sale
   async updateFlashSale(
     id: string,
-    dto: Partial<CreateFlashSaleDto>, // 5. Ép kiểu DTO
+    dto: Partial<CreateFlashSaleDto>,
     userId?: string,
   ) {
     const flashSale = await this.flashSaleModel.findById(id);
@@ -166,26 +190,32 @@ export class FlashSalesService {
       );
     }
 
-    if (dto.product_ids && dto.product_ids.length > 0) {
-      // 1. Loại bỏ các ID trùng lặp do người dùng gửi lên
-      const uniqueProductIds = [
-        ...new Set(dto.product_ids.map((id) => id.toString())),
+    let uniqueScopeValues = flashSale.applicable_scope_values;
+
+    if (dto.applicable_scope_values && dto.applicable_scope_values.length > 0) {
+      uniqueScopeValues = [
+        ...new Set(
+          dto.applicable_scope_values.map((val: string) => val.toString()),
+        ),
       ];
+      const checkScopeType =
+        dto.applicable_scope_type || flashSale.applicable_scope_type;
 
-      const validProducts = await this.productModel
-        .find({
-          _id: { $in: uniqueProductIds },
-          status: 'PUBLISHED',
-          is_deleted: false,
-        })
-        .select('_id')
-        .lean();
+      if (checkScopeType === (ApplicableScope.PRODUCT as string)) {
+        const validProducts = await this.productModel
+          .find({
+            _id: { $in: uniqueScopeValues },
+            status: 'ACTIVE',
+            is_deleted: false,
+          })
+          .select('_id')
+          .lean();
 
-      // 2. So sánh với mảng đã lọc trùng lặp
-      if (validProducts.length !== uniqueProductIds.length) {
-        throw new BadRequestException(
-          'Một hoặc nhiều sản phẩm trong danh sách không tồn tại, đang bị ẩn hoặc đã bị xóa.',
-        );
+        if (validProducts.length !== uniqueScopeValues.length) {
+          throw new BadRequestException(
+            'Một hoặc nhiều sản phẩm trong danh sách không tồn tại, đang bị ẩn hoặc đã bị xóa.',
+          );
+        }
       }
 
       const start = dto.start_time
@@ -202,25 +232,29 @@ export class FlashSalesService {
       const conflictingSales = await this.flashSaleModel.find({
         _id: { $ne: id },
         status: { $in: [FlashSaleStatus.PENDING, FlashSaleStatus.ACTIVE] },
-        product_ids: { $in: dto.product_ids },
+        applicable_scope_type: checkScopeType,
+        applicable_scope_values: { $in: uniqueScopeValues },
         $or: [{ start_time: { $lt: end }, end_time: { $gt: start } }],
       });
 
       if (conflictingSales.length > 0) {
         throw new BadRequestException(
-          'Sản phẩm trùng lặp với Flash Sale khác trong cùng khung giờ.',
+          `Danh sách áp dụng bị trùng lặp với Flash Sale khác trong cùng khung giờ.`,
         );
       }
     }
 
-    Object.assign(flashSale, dto);
+    Object.assign(flashSale, {
+      ...dto,
+      applicable_scope_values: uniqueScopeValues,
+    });
     const updated = await flashSale.save();
 
     await this.auditLogsService.log({
       action: 'UPDATE_FLASH_SALE',
       collection_name: 'flash_sales',
       actor_id: userId,
-      target_id: updated._id,
+      target_id: updated._id as unknown as string,
       department: Department.MARKETING,
       is_success: true,
     });
@@ -230,20 +264,26 @@ export class FlashSalesService {
 
   // (AC7): API Trả về cho Frontend xem Flash Sale đang diễn ra kèm thời gian đếm ngược
   async getActiveFlashSales() {
-    // 6. Cấu trúc lại kiểu trả về để .lean() không xuất ra kiểu 'any'
-    type ActiveSalePopulated = Omit<FlashSale, 'product_ids'> & {
-      product_ids: PopulatedProduct[];
-    };
-
     const activeSale = await this.flashSaleModel
       .findOne({ status: FlashSaleStatus.ACTIVE })
-      .populate('product_ids', 'name price thumbnail slug badges')
-      .lean<ActiveSalePopulated>();
+      .lean();
 
     if (!activeSale) return null;
 
-    const processedProducts = activeSale.product_ids.map(
-      (prod: PopulatedProduct) => {
+    let processedProducts: ProcessedProduct[] = [];
+
+    // Nếu Scope là Product, tìm và map data Product trực tiếp trả về cho Client
+    if (
+      activeSale.applicable_scope_type ===
+        (ApplicableScope.PRODUCT as string) &&
+      activeSale.applicable_scope_values.length > 0
+    ) {
+      const products = await this.productModel
+        .find({ _id: { $in: activeSale.applicable_scope_values } })
+        .select('name price thumbnail slug badges')
+        .lean<ProductDocument[]>();
+
+      processedProducts = products.map((prod) => {
         let flashPrice = prod.price;
         if (activeSale.discount_type === FlashSaleDiscountType.PERCENTAGE) {
           flashPrice =
@@ -252,11 +292,16 @@ export class FlashSalesService {
           flashPrice = activeSale.discount_value;
         }
         return {
-          ...prod,
+          _id: prod._id.toString(),
+          name: prod.name,
+          price: prod.price,
+          thumbnail: prod.thumbnail,
+          slug: prod.slug,
+          badges: prod.badges || [],
           flash_sale_price: flashPrice > 0 ? flashPrice : 0,
         };
-      },
-    );
+      });
+    }
 
     return {
       name: activeSale.name,
@@ -289,7 +334,7 @@ export class FlashSalesService {
       action: 'HARD_DELETE_FLASH_SALE',
       collection_name: 'flash_sales',
       actor_id: userId,
-      target_id: flashSale._id,
+      target_id: flashSale._id as unknown as string,
       department: Department.MARKETING,
       detail: { name: flashSale.name },
       is_success: true,
@@ -312,5 +357,73 @@ export class FlashSalesService {
       { status: FlashSaleStatus.ACTIVE, end_time: { $lte: now } },
       { $set: { status: FlashSaleStatus.EXPIRED } },
     );
+  }
+
+  // THÊM MỚI 2 HÀM BULK Ở CUỐI CLASS FlashSalesService
+  async bulkUpdateStatus(
+    ids: string[],
+    action: 'ACTIVATE' | 'DEACTIVATE',
+    userId?: string,
+  ) {
+    const sales = await this.flashSaleModel.find({ _id: { $in: ids } });
+    const now = new Date();
+    for (const sale of sales) {
+      if (sale.status === FlashSaleStatus.EXPIRED) continue;
+      if (action === 'ACTIVATE') {
+        sale.status =
+          now >= sale.start_time
+            ? FlashSaleStatus.ACTIVE
+            : FlashSaleStatus.PENDING;
+      } else {
+        sale.status = FlashSaleStatus.INACTIVE;
+      }
+      await sale.save();
+    }
+
+    // SỬ DỤNG userId ĐỂ GHI AUDIT LOG
+    if (userId) {
+      await this.auditLogsService.log({
+        action: 'BULK_UPDATE_FLASH_SALE_STATUS',
+        collection_name: 'flash_sales',
+        actor_id: userId,
+        target_id: 'BULK_ACTION',
+        department: Department.MARKETING,
+        detail: { updated_ids: ids, action },
+        is_success: true,
+      });
+    }
+
+    return { success: true };
+  }
+
+  async bulkDelete(ids: string[], userId?: string) {
+    const sales = await this.flashSaleModel.find({ _id: { $in: ids } });
+    const deletableIds = sales
+      .filter((s) => s.status !== FlashSaleStatus.ACTIVE)
+      .map((s) => s._id);
+
+    if (deletableIds.length > 0) {
+      await this.flashSaleModel.deleteMany({ _id: { $in: deletableIds } });
+
+      // SỬ DỤNG userId ĐỂ GHI AUDIT LOG
+      if (userId) {
+        await this.auditLogsService.log({
+          action: 'BULK_DELETE_FLASH_SALE',
+          collection_name: 'flash_sales',
+          actor_id: userId,
+          target_id: 'BULK_ACTION',
+          department: Department.MARKETING,
+          detail: { deleted_ids: deletableIds },
+          is_success: true,
+        });
+      }
+    }
+
+    if (deletableIds.length < ids.length) {
+      throw new BadRequestException(
+        'Đã xóa, nhưng một số chương trình đang diễn ra bị bỏ qua do hệ thống cấm xóa.',
+      );
+    }
+    return { success: true };
   }
 }

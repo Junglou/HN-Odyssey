@@ -29,7 +29,6 @@ export class CouponsService {
 
   // AC1, AC2, AC3, AC4: Tạo mã giảm giá mới
   async createCoupon(dto: CreateCouponDto, userId?: string) {
-    // Kiểm tra trùng lặp mã (AC2) - Bất kể is_deleted
     const existingCoupon = await this.couponModel.findOne({
       code: dto.code.toUpperCase(),
     });
@@ -47,7 +46,8 @@ export class CouponsService {
     const newCoupon = new this.couponModel({
       ...dto,
       code: dto.code.toUpperCase(),
-      status: CouponStatus.DRAFT,
+      // FIX TẠI ĐÂY: Ưu tiên lấy status do FE truyền lên
+      status: dto.status || CouponStatus.DRAFT,
     });
 
     const savedCoupon = await newCoupon.save();
@@ -70,20 +70,41 @@ export class CouponsService {
     const page = Number(query.page || 1);
     const limit = Number(query.limit || 10);
     const skip = (page - 1) * limit;
+    const now = new Date(); // Lấy mốc thời gian hiện tại lúc gọi API
 
-    // Khai báo kiểu FilterQuery chuẩn của Mongoose
-    const filter: FilterQuery<Coupon> = { is_deleted: false };
+    // Khởi tạo filter rỗng
+    const filter: FilterQuery<Coupon> = {};
 
-    if (query.status) {
-      filter.status = query.status;
+    // XỬ LÝ LỌC TRẠNG THÁI THÔNG MINH
+    if (query.status === CouponStatus.CANCELLED) {
+      filter.status = CouponStatus.CANCELLED;
+      // Lọc Cancelled thì hiện cả mã đã xóa mềm
+    } else {
+      filter.is_deleted = false; // Mặc định giấu mã đã xóa
+
+      if (query.status === CouponStatus.ACTIVE) {
+        // ACTIVE thực sự = Trạng thái ACTIVE + Chưa hết hạn
+        filter.status = CouponStatus.ACTIVE;
+        filter.end_date = { $gte: now };
+      } else if (query.status === CouponStatus.INACTIVE) {
+        // INACTIVE = Trạng thái INACTIVE HOẶC (Trạng thái ACTIVE nhưng đã quá hạn)
+        filter.$or = [
+          { status: CouponStatus.INACTIVE },
+          { status: CouponStatus.ACTIVE, end_date: { $lt: now } },
+        ];
+      } else if (query.status) {
+        // Lọc Draft
+        filter.status = query.status;
+      }
     }
 
-    // Kiểm tra an toàn trước khi gọi toUpperCase
+    // Lọc theo từ khóa (Tìm chuỗi con, Regex)
     if (query.search && typeof query.search === 'string') {
-      filter.code = query.search.toUpperCase().trim();
+      const searchRegex = new RegExp(query.search.trim(), 'i');
+      filter.code = { $regex: searchRegex };
     }
 
-    const [data, total] = await Promise.all([
+    const [rawData, total] = await Promise.all([
       this.couponModel
         .find(filter)
         .sort({ created_at: -1 })
@@ -93,11 +114,23 @@ export class CouponsService {
       this.couponModel.countDocuments(filter),
     ]);
 
+    // COMPUTED DATA: Biến đổi dữ liệu trước khi trả về FE
+    const formattedData = rawData.map((coupon) => {
+      // Nếu Database báo là ACTIVE nhưng thực tế đã hết hạn -> Trả về FE là INACTIVE
+      if (
+        coupon.status === CouponStatus.ACTIVE &&
+        new Date(coupon.end_date) < now
+      ) {
+        coupon.status = CouponStatus.INACTIVE;
+      }
+      return coupon;
+    });
+
     return {
-      data,
+      data: formattedData,
       meta: {
         totalItems: total,
-        itemCount: data.length,
+        itemCount: formattedData.length,
         itemsPerPage: limit,
         totalPages: Math.ceil(total / limit),
         currentPage: page,
@@ -150,8 +183,8 @@ export class CouponsService {
 
     const userUsedCount = await this.orderModel.countDocuments({
       user_id: userId,
-      voucher_code: code.toUpperCase(), // Sửa thành voucher_code và cho UpperCase để chuẩn xác
-      status: { $nin: ['CANCELLED', 'TEMPORARY'] }, // Phải loại trừ đơn hủy và đơn tạm (chưa thanh toán)
+      voucher_code: code.toUpperCase(),
+      status: { $nin: ['CANCELLED', 'TEMPORARY'] },
     });
     if (userUsedCount >= coupon.user_usage_limit)
       throw new BadRequestException('Bạn đã hết lượt sử dụng mã này.');
@@ -184,7 +217,6 @@ export class CouponsService {
       throw new NotFoundException('Không tìm thấy mã giảm giá');
     }
 
-    // Nếu đang chạy (ACTIVE), cấm sửa giá trị và điều kiện (AC7)
     if (coupon.status === CouponStatus.ACTIVE && coupon.usage_count > 0) {
       const forbiddenFields = [
         'discount_type',
@@ -246,7 +278,7 @@ export class CouponsService {
 
     coupon.is_deleted = true;
     coupon.deleted_at = new Date();
-    coupon.status = CouponStatus.CANCELLED; // Chuyển sang đã hủy
+    coupon.status = CouponStatus.CANCELLED;
     await coupon.save();
 
     await this.auditLogsService.log({
@@ -262,7 +294,6 @@ export class CouponsService {
     return { message: 'Xóa mã giảm giá thành công' };
   }
 
-  // Hàm Utils kiểm tra Logic (AC3)
   private validateCouponLogic(
     type: DiscountType,
     value: number,
@@ -280,10 +311,58 @@ export class CouponsService {
     }
   }
 
-  // Hàm Utils kiểm tra Thời gian (AC4)
   private validateDates(start: string, end: string) {
     if (new Date(end) <= new Date(start)) {
       throw new BadRequestException('Ngày kết thúc phải lớn hơn ngày bắt đầu');
     }
+  }
+
+  // Bổ sung: Bulk update status
+  async bulkUpdateStatus(
+    ids: string[],
+    action: 'ACTIVATE' | 'DEACTIVATE',
+    userId?: string,
+  ) {
+    const status =
+      action === 'ACTIVATE' ? CouponStatus.ACTIVE : CouponStatus.INACTIVE;
+
+    await this.couponModel.updateMany(
+      { _id: { $in: ids }, is_deleted: false },
+      { $set: { status } },
+    );
+
+    await this.auditLogsService.log({
+      action: 'BULK_UPDATE_COUPON_STATUS',
+      collection_name: 'coupons',
+      actor_id: userId,
+      target_id: 'BULK',
+      department: Department.MARKETING,
+      detail: { ids, new_status: status },
+      is_success: true,
+    });
+  }
+
+  // Bổ sung: Bulk delete
+  async bulkDelete(ids: string[], userId?: string) {
+    await this.couponModel.updateMany(
+      { _id: { $in: ids } },
+      {
+        $set: {
+          is_deleted: true,
+          deleted_at: new Date(),
+          status: CouponStatus.CANCELLED,
+        },
+      },
+    );
+
+    await this.auditLogsService.log({
+      action: 'BULK_DELETE_COUPONS',
+      collection_name: 'coupons',
+      actor_id: userId,
+      target_id: 'BULK',
+      department: Department.MARKETING,
+      detail: { deleted_ids: ids },
+      is_success: true,
+    });
   }
 }

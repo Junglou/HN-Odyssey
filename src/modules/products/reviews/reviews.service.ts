@@ -48,7 +48,9 @@ export interface RatingAggregationResult {
 // 3. Định nghĩa Type an toàn cho Aggregation Danh sách
 export interface AggregatedUser {
   _id: Types.ObjectId;
-  full_name: string;
+  first_Name?: string;
+  last_Name?: string;
+  full_name?: string;
   avatar: string | null;
 }
 
@@ -416,7 +418,9 @@ export class ReviewsService {
                   localField: 'user_id',
                   foreignField: '_id',
                   as: 'user',
-                  pipeline: [{ $project: { full_name: 1, avatar: 1 } }],
+                  pipeline: [
+                    { $project: { first_Name: 1, last_Name: 1, avatar: 1 } },
+                  ],
                 },
               },
               { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
@@ -431,13 +435,18 @@ export class ReviewsService {
     const total = result?.totalCount?.[0]?.count || 0;
 
     const finalReviews = reviewsDocs.map((doc: AggregatedReview) => {
-      if (doc.is_anonymous && doc.user) {
-        const nameParts = (doc.user.full_name || 'User').split(' ');
-        const firstName = nameParts[0];
-        const lastName =
-          nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
-        doc.user.full_name = `${firstName[0]}*** ${lastName}`;
-        doc.user.avatar = null;
+      if (doc.user) {
+        const firstName = doc.user.first_Name || 'User';
+        const lastName = doc.user.last_Name || '';
+
+        if (doc.is_anonymous) {
+          // Khách hàng chọn ẩn danh -> Che tên thành "V*** Hùng"
+          doc.user.full_name = `${firstName.charAt(0)}*** ${lastName}`;
+          doc.user.avatar = null;
+        } else {
+          // Ghép tên đầy đủ để FE client sử dụng
+          doc.user.full_name = `${firstName} ${lastName}`.trim();
+        }
       }
       return doc;
     });

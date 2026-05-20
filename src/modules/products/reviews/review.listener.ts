@@ -104,6 +104,18 @@ export class ReviewEventListener {
   @OnEvent('review.deleted_or_hidden', { async: true })
   async handleReviewDeleted(payload: ReviewDeletedPayload) {
     try {
+      // FIX: KIỂM TRA ID HỢP LỆ TRƯỚC KHI THAO TÁC DB
+      if (
+        !payload.userId ||
+        payload.userId === 'unknown_user' ||
+        !Types.ObjectId.isValid(payload.userId)
+      ) {
+        this.logger.warn(
+          `[REVIEW EVENT] Bỏ qua thu hồi điểm cho User không hợp lệ: ${payload.userId}`,
+        );
+        return; // Dừng lại ở đây, không gọi DB nữa
+      }
+
       // Tìm xem trước đó có được cộng điểm chưa
       const earnedHistory = await this.connection
         .collection('loyalty_histories')
@@ -116,10 +128,12 @@ export class ReviewEventListener {
 
       // Nếu trước đó đã cộng tiền, giờ phải trừ đi
       if (earnedHistory) {
-        await this.connection.collection('users').updateOne(
-          { _id: new Types.ObjectId(payload.userId) },
-          { $inc: { 'loyalty.point': -this.REVIEW_REWARD_POINTS } }, // Trừ điểm
-        );
+        await this.connection
+          .collection('users')
+          .updateOne(
+            { _id: new Types.ObjectId(payload.userId) },
+            { $inc: { 'loyalty.point': -this.REVIEW_REWARD_POINTS } },
+          );
 
         await this.connection.collection('loyalty_histories').insertOne({
           user_id: new Types.ObjectId(payload.userId),

@@ -158,17 +158,102 @@ export class PromotionsController {
     return new BaseResponse(true, result.message);
   }
 
-  //TẠO COMBO
+  // TẠO COMBO
   @Post('combos')
   @RequirePermissions(Resource.PROMOTIONS, Action.CREATE)
   async createCombo(@Body() dto: CreateComboDto) {
-    return this.promotionService.createCombo(dto);
+    const data = await this.promotionService.createCombo(dto);
+    return new BaseResponse(true, 'Tạo Combo/Discount thành công', data);
   }
 
-  //LẤY DANH SÁCH
+  // LẤY DANH SÁCH
   @Get('combos')
   @RequirePermissions(Resource.PROMOTIONS, Action.READ)
   async getAllCombos() {
-    return this.promotionService.findAllCombos();
+    const data = await this.promotionService.findAllCombos();
+    return new BaseResponse(
+      true,
+      'Lấy danh sách Combo/Discount thành công',
+      data,
+    );
+  }
+
+  // CẬP NHẬT COMBO
+  @Patch('combos/:id')
+  @RequirePermissions(Resource.PROMOTIONS, Action.UPDATE)
+  async updateCombo(
+    @Param('id') id: string,
+    @Body() dto: Partial<CreateComboDto>,
+  ) {
+    const data = await this.promotionService.updateCombo(id, dto);
+    return new BaseResponse(true, 'Cập nhật Combo/Discount thành công', data);
+  }
+
+  // XÓA COMBO
+  @Delete('combos/:id')
+  @RequirePermissions(Resource.PROMOTIONS, Action.DELETE)
+  async deleteCombo(@Param('id') id: string) {
+    const result = await this.promotionService.deleteCombo(id);
+    return new BaseResponse(true, result.message);
+  }
+
+  // API BULK ACTION CHUNG
+  @Patch('bulk/status')
+  @RequirePermissions(Resource.PROMOTIONS, Action.UPDATE)
+  async bulkUpdateStatus(
+    @Body()
+    body: {
+      flashSaleIds?: string[];
+      comboIds?: string[];
+      couponIds?: string[]; // Thêm line này
+      action: 'ACTIVATE' | 'DEACTIVATE';
+    },
+    @Req() req: RequestWithUser,
+  ) {
+    if (body.flashSaleIds && body.flashSaleIds.length > 0) {
+      await this.flashSalesService.bulkUpdateStatus(
+        body.flashSaleIds,
+        body.action,
+        req.user?._id,
+      );
+    }
+    if (body.comboIds && body.comboIds.length > 0) {
+      await this.promotionService.bulkUpdateStatus(
+        body.comboIds,
+        body.action,
+        req.user?._id,
+      );
+    }
+    if (body.couponIds && body.couponIds.length > 0) {
+      await this.couponsService.bulkUpdateStatus(
+        body.couponIds,
+        body.action,
+        req.user?._id,
+      );
+    }
+    return new BaseResponse(true, 'Cập nhật trạng thái hàng loạt thành công');
+  }
+
+  @Post('bulk/delete')
+  @RequirePermissions(Resource.PROMOTIONS, Action.DELETE)
+  async bulkDelete(
+    @Body()
+    body: {
+      flashSaleIds?: string[];
+      comboIds?: string[];
+      couponIds?: string[];
+    },
+    @Req() req: RequestWithUser,
+  ) {
+    if (body.flashSaleIds && body.flashSaleIds.length > 0) {
+      await this.flashSalesService.bulkDelete(body.flashSaleIds, req.user?._id);
+    }
+    if (body.comboIds && body.comboIds.length > 0) {
+      await this.promotionService.bulkDelete(body.comboIds, req.user?._id);
+    }
+    if (body.couponIds && body.couponIds.length > 0) {
+      await this.couponsService.bulkDelete(body.couponIds, req.user?._id);
+    }
+    return new BaseResponse(true, 'Xóa hàng loạt thành công');
   }
 }

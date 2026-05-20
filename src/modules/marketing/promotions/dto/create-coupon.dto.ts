@@ -8,8 +8,10 @@ import {
   Min,
   IsDateString,
   Matches,
+  IsObject,
 } from 'class-validator';
-import { DiscountType } from '../schemas/coupon.schema';
+// Thêm import CouponStatus
+import { DiscountType, CouponStatus } from '../schemas/coupon.schema';
 
 export class CreateCouponDto {
   @IsString()
@@ -57,4 +59,18 @@ export class CreateCouponDto {
   @IsInt()
   @Min(1)
   user_usage_limit?: number;
+
+  // BỔ SUNG FIELD NÀY ĐỂ NESTJS KHÔNG DROP DỮ LIỆU TỪ FE
+  @IsOptional()
+  @IsEnum(CouponStatus)
+  status?: CouponStatus;
+
+  @IsOptional()
+  @IsObject()
+  applicable_scope?: {
+    isAllProducts: boolean;
+    categories: string[];
+    tags: string[];
+    products: string[];
+  };
 }

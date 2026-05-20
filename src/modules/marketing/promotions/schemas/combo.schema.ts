@@ -1,33 +1,53 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document } from 'mongoose';
+import { ApplicableScope } from './flash-sale.schema';
 
 export enum ComboType {
-  BUNDLE_FIXED_PRICE = 'BUNDLE_FIXED_PRICE', // Mua A+B giá 100k
-  BUY_X_GET_Y = 'BUY_X_GET_Y', // Mua 2 giảm 10%
+  BUNDLE_FIXED_PRICE = 'BUNDLE_FIXED_PRICE',
+  BUY_X_GET_Y = 'BUY_X_GET_Y',
+  DIRECT_DISCOUNT = 'DIRECT_DISCOUNT', // Thêm loại giảm giá trực tiếp
+}
+
+export enum ComboStatus {
+  DRAFT = 'DRAFT',
+  PENDING = 'PENDING',
+  ACTIVE = 'ACTIVE',
+  EXPIRED = 'EXPIRED',
+  INACTIVE = 'INACTIVE',
 }
 
 @Schema({ timestamps: true })
 export class Combo extends Document {
   @Prop({ required: true })
-  name: string; // Ví dụ: "Combo Mùa Hè"
+  name: string;
+
+  @Prop()
+  description: string;
 
   @Prop({ required: true, enum: ComboType })
   type: ComboType;
 
-  @Prop({ type: [{ type: Types.ObjectId, ref: 'Product' }] })
-  product_ids: Types.ObjectId[]; // Danh sách SP áp dụng
+  @Prop({
+    required: true,
+    enum: ApplicableScope,
+    default: ApplicableScope.PRODUCT,
+  })
+  applicable_scope_type: string;
 
-  @Prop()
-  min_quantity: number; // Mua tối thiểu bao nhiêu cái (AC10: Mua 2)
+  @Prop({ type: [String], required: true, default: [] })
+  applicable_scope_values: string[];
 
-  @Prop()
-  discount_value: number; // Giá trị giảm (10 hoặc 10000)
+  @Prop({ default: 1 })
+  min_quantity: number;
 
-  @Prop({ default: false }) // false: giảm tiền, true: giảm %
+  @Prop({ required: true, min: 0 })
+  discount_value: number;
+
+  @Prop({ default: false })
   is_percent: boolean;
 
-  @Prop({ default: true })
-  active: boolean;
+  @Prop({ required: true, enum: ComboStatus, default: ComboStatus.DRAFT })
+  status: ComboStatus;
 
   @Prop()
   start_date: Date;

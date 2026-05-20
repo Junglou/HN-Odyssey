@@ -9,7 +9,7 @@ export enum DiscountType {
 export enum CouponStatus {
   DRAFT = 'DRAFT',
   ACTIVE = 'ACTIVE',
-  PAUSED = 'PAUSED',
+  INACTIVE = 'INACTIVE',
   CANCELLED = 'CANCELLED',
 }
 
@@ -65,6 +65,17 @@ export class Coupon extends Document {
 
   @Prop({ type: Types.ObjectId, ref: 'User' })
   owner_id: Types.ObjectId;
+
+  @Prop({
+    type: Object,
+    default: { isAllProducts: true, categories: [], tags: [], products: [] },
+  })
+  applicable_scope: {
+    isAllProducts: boolean;
+    categories: string[];
+    tags: string[];
+    products: string[];
+  };
 
   // AC8: Soft Delete
   @Prop({ default: false, index: true })
