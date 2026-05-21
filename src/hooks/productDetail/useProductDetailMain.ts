@@ -1,8 +1,6 @@
 import { useState } from "react";
 
-// hooks
 export function useProductDetailMain() {
-  // states
   const [isWishlisted, setIsWishlisted] = useState(false);
 
   // handlers
@@ -10,8 +8,18 @@ export function useProductDetailMain() {
     setIsWishlisted((prev) => !prev);
   };
 
+  const handleAddToCart = () => {
+    // TODO: logic thêm vào giỏ hàng
+  };
+
+  const handleProcessToCheckout = () => {
+    // TODO: logic chuyển hướng thanh toán
+  };
+
   return {
     isWishlisted,
     handleWishlistToggle,
+    handleAddToCart,
+    handleProcessToCheckout,
   };
 }

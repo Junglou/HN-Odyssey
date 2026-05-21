@@ -3,14 +3,15 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  gap: clamp(16px, 2.5vw, 36px);
   box-sizing: border-box;
+  padding: clamp(24px, 4vw, 64px) clamp(16px, 6vw, 120px);
 }
 
 /* title */
 .pdp-reviews-heading {
   margin: 0;
-  font-size: clamp(24px, 2.5vw, 32px);
+  font-size: clamp(20px, 2.5vw, 36px);
   font-weight: 700;
   color: #000000;
   text-decoration: underline;
@@ -22,7 +23,7 @@
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: clamp(12px, 2vw, 24px);
 }
 
 .pdp-rating-score-box {
@@ -30,13 +31,13 @@
   flex-direction: column;
   gap: 8px;
   background: rgba(217, 217, 217, 0.5);
-  padding: 20px;
+  padding: clamp(12px, 1.5vw, 24px);
   border-radius: 5px;
-  min-width: 200px;
+  min-width: clamp(140px, 14vw, 220px);
 }
 
 .pdp-rating-big {
-  font-size: 32px;
+  font-size: clamp(22px, 2.5vw, 36px);
   font-weight: 400;
 }
 
@@ -45,8 +46,14 @@
   gap: 4px;
 }
 
+.pdp-stars-row svg,
+.pdp-review-stars svg {
+  width: clamp(16px, 1.6vw, 24px);
+  height: clamp(16px, 1.6vw, 24px);
+}
+
 .pdp-review-count {
-  font-size: 16px;
+  font-size: clamp(12px, 1vw, 16px);
   font-weight: 300;
 }
 
@@ -59,19 +66,79 @@
   color: #ffffff;
   border: none;
   border-radius: 10px;
-  padding: 15px 30px;
-  font-size: 20px;
+  padding: clamp(8px, 1vw, 14px) clamp(16px, 1.5vw, 24px);
+  font-size: clamp(14px, 1.2vw, 18px);
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
+}
+
+.pdp-review-form {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: clamp(16px, 2vw, 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pdp-form-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.pdp-form-stars {
+  display: flex;
+  gap: 8px;
+}
+
+.pdp-review-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.pdp-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.pdp-form-cancel,
+.pdp-form-submit {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pdp-form-cancel {
+  background: transparent;
+  border: 1px solid #000000;
+  color: #000000;
+}
+
+.pdp-form-submit {
+  background: #000000;
+  border: 1px solid #000000;
+  color: #ffffff;
 }
 
 /* toolbar */
 .pdp-reviews-toolbar {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding: 20px 0;
+  gap: clamp(12px, 1.5vw, 24px);
+  padding: clamp(12px, 1.5vw, 24px) 0;
   border-top: 1px solid rgba(0, 0, 0, 0.3);
   border-bottom: 1px solid rgba(0, 0, 0, 0.3);
 }
@@ -80,38 +147,124 @@
 .pdp-filter-box {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: clamp(8px, 1vw, 16px);
   flex-wrap: wrap;
 }
 
 .pdp-toolbar-label {
-  font-size: 16px;
+  font-size: clamp(13px, 1vw, 18px);
   font-weight: 300;
-  min-width: 80px;
+  min-width: clamp(60px, 5vw, 90px);
 }
 
-.pdp-sort-select {
-  padding: 8px 16px;
+.pdp-custom-dropdown {
+  position: relative;
+  font-family: inherit;
+  font-size: clamp(13px, 1vw, 18px);
+  user-select: none;
+  min-width: 150px;
+}
+
+.pdp-custom-dropdown.is-open {
+  z-index: 101;
+}
+
+.pdp-dropdown-trigger {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: clamp(6px, 0.6vw, 10px) clamp(10px, 1vw, 18px);
   border: 1px solid #000000;
   border-radius: 10px;
-  font-family: inherit;
-  font-size: 16px;
-  background: #ffffff;
+  background-color: #ffffff;
+  cursor: pointer;
 }
 
+.pdp-dropdown-arrow {
+  transition: transform 0.3s ease;
+  margin-left: 8px;
+}
+
+.pdp-dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.pdp-dropdown-options {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+}
+
+.pdp-dropdown-options.open {
+  pointer-events: auto;
+  animation: pdp-slideFadeDown 0.2s ease-out forwards;
+}
+
+.pdp-dropdown-options.closed {
+  pointer-events: none;
+  animation: pdp-slideFadeUp 0.2s ease-out forwards;
+}
+
+.pdp-dropdown-option {
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.pdp-dropdown-option:hover {
+  background-color: #f3f4f6;
+}
+
+.pdp-dropdown-option.selected {
+  background-color: #e9e9e9;
+  font-weight: 600;
+}
+
+@keyframes pdp-slideFadeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pdp-slideFadeUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+/* filter chips */
 .pdp-filter-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: clamp(6px, 0.8vw, 12px);
 }
 
 .pdp-filter-chip {
-  padding: 8px 16px;
+  padding: clamp(6px, 0.6vw, 10px) clamp(10px, 1vw, 18px);
   border: 1px solid rgba(0, 0, 0, 0.5);
   border-radius: 30px;
   background: #ffffff;
   font-family: inherit;
-  font-size: 16px;
+  font-size: clamp(13px, 1vw, 18px);
   font-weight: 300;
   cursor: pointer;
   transition: all 0.2s;
@@ -127,17 +280,17 @@
 .pdp-reviews-list {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: clamp(12px, 1.5vw, 24px);
 }
 
 .pdp-review-card {
   border: 1px solid rgba(0, 0, 0, 0.5);
   border-radius: 10px;
-  padding: 20px;
+  padding: clamp(14px, 1.5vw, 24px);
   background: rgba(255, 255, 255, 0.5);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: clamp(8px, 1vw, 14px);
 }
 
 .pdp-review-header {
@@ -151,12 +304,12 @@
 .pdp-reviewer-info {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: clamp(8px, 1vw, 16px);
   flex-wrap: wrap;
 }
 
 .pdp-reviewer-name {
-  font-size: 16px;
+  font-size: clamp(13px, 1.1vw, 18px);
   font-weight: 500;
 }
 
@@ -165,15 +318,20 @@
   align-items: center;
   gap: 6px;
   background: rgba(74, 146, 96, 0.3);
-  padding: 4px 12px;
+  padding: clamp(3px, 0.3vw, 6px) clamp(8px, 0.8vw, 14px);
   border-radius: 3px;
   color: #02542d;
-  font-size: 14px;
+  font-size: clamp(12px, 0.9vw, 15px);
   font-weight: 300;
 }
 
+.pdp-verified-badge svg {
+  width: clamp(14px, 1.2vw, 20px);
+  height: clamp(14px, 1.2vw, 20px);
+}
+
 .pdp-review-date {
-  font-size: 16px;
+  font-size: clamp(12px, 1vw, 17px);
   font-weight: 500;
   color: rgba(0, 0, 0, 0.5);
 }
@@ -186,15 +344,15 @@
 .pdp-review-content {
   margin: 0;
   font-family: "Lexend", sans-serif;
-  font-size: 16px;
+  font-size: clamp(13px, 1.1vw, 17px);
   font-weight: 500;
-  line-height: 1.3;
+  line-height: 1.4;
   color: #000000;
 }
 
 .pdp-review-actions {
   display: flex;
-  gap: 15px;
+  gap: clamp(8px, 1vw, 16px);
   justify-content: flex-end;
 }
 
@@ -202,12 +360,86 @@
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 18px;
+  padding: 4px;
+  border-radius: 5px;
+  transition: background 0.2s;
+}
+
+.pdp-feedback-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.pdp-feedback-btn.active svg path {
+  fill: rgba(0, 0, 0, 0.2);
+}
+
+.pdp-feedback-btn svg {
+  width: clamp(16px, 1.4vw, 22px);
+  height: clamp(16px, 1.4vw, 22px);
 }
 
 /* pagination */
 .pdp-reviews-pagination {
   display: flex;
   justify-content: flex-end;
-  margin-top: 10px;
+  margin-top: clamp(4px, 0.8vw, 14px);
+}
+
+/* tablet */
+@media screen and (max-width: 1024px) {
+  .pdp-reviews-heading {
+    font-size: clamp(18px, 3.5vw, 26px);
+  }
+
+  .pdp-custom-dropdown,
+  .pdp-filter-chip {
+    font-size: clamp(13px, 1.8vw, 16px);
+  }
+
+  .pdp-reviewer-name,
+  .pdp-review-content {
+    font-size: clamp(13px, 1.8vw, 16px);
+  }
+
+  .pdp-review-date {
+    font-size: clamp(12px, 1.6vw, 15px);
+  }
+}
+
+/* mobile */
+@media screen and (max-width: 600px) {
+  .pdp-reviews-section {
+    gap: 16px;
+  }
+
+  .pdp-reviews-heading {
+    font-size: clamp(17px, 5vw, 22px);
+  }
+
+  .pdp-rating-big {
+    font-size: 22px;
+  }
+
+  .pdp-toolbar-label {
+    min-width: 52px;
+    font-size: 13px;
+  }
+
+  .pdp-custom-dropdown,
+  .pdp-filter-chip {
+    font-size: 13px;
+  }
+
+  .pdp-review-card {
+    padding: 12px;
+  }
+
+  .pdp-reviewer-name,
+  .pdp-review-content {
+    font-size: 13px;
+  }
+
+  .pdp-review-date {
+    font-size: 12px;
+  }
 }

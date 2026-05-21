@@ -1,6 +1,9 @@
 // imports
 import { useProductDetailMain } from "../../hooks/productDetail/useProductDetailMain";
-import { HeartEmptyIcon } from "../../assets/icons/ProductDetailIcons";
+import {
+  HeartEmptyIcon,
+  HeartFilledIcon,
+} from "../../assets/icons/ProductDetailIcons";
 import "./ProductDetailMain.css";
 
 // types
@@ -39,7 +42,12 @@ export default function ProductDetailMain({
   onImageChange,
 }: ProductDetailMainProps) {
   // hooks
-  const { isWishlisted, handleWishlistToggle } = useProductDetailMain();
+  const {
+    isWishlisted,
+    handleWishlistToggle,
+    handleAddToCart,
+    handleProcessToCheckout,
+  } = useProductDetailMain();
 
   // render
   return (
@@ -56,7 +64,7 @@ export default function ProductDetailMain({
             className={`pdp-heart-btn ${isWishlisted ? "active" : ""}`}
             onClick={handleWishlistToggle}
           >
-            <HeartEmptyIcon />
+            {isWishlisted ? <HeartFilledIcon /> : <HeartEmptyIcon />}
           </button>
         </div>
 
@@ -125,8 +133,15 @@ export default function ProductDetailMain({
         </div>
 
         <div className="pdp-action-group">
-          <button className="pdp-btn-add">Add to Cart</button>
-          <button className="pdp-btn-checkout">Process to Checkout</button>
+          <button className="pdp-btn-add" onClick={handleAddToCart}>
+            Add to Cart
+          </button>
+          <button
+            className="pdp-btn-checkout"
+            onClick={handleProcessToCheckout}
+          >
+            Process to Checkout
+          </button>
         </div>
       </div>
     </div>

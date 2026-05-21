@@ -1,30 +1,110 @@
-// imports
+import { useState, useRef, useEffect } from "react";
 import { useProductReviews } from "../../hooks/productDetail/useProductReviews";
 import {
   StarFilledIcon,
+  StarEmptyIcon,
   CheckCircleIcon,
+  LikeIcon,
+  DislikeIcon,
+  DropdownArrowIcon,
 } from "../../assets/icons/ProductDetailIcons";
 import ProductPagination from "../products/ProductPagination";
 import "./ProductReviews.css";
 
-// component
+// custom dropdown component
+function CustomDropdown({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (val: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [hasOpened, setHasOpened] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedLabel =
+    options.find((opt) => opt.value === value)?.label || options[0]?.label;
+
+  return (
+    <div
+      className={`pdp-custom-dropdown ${isOpen ? "is-open" : ""}`}
+      ref={dropdownRef}
+    >
+      <div
+        className={`pdp-dropdown-trigger ${isOpen ? "active" : ""}`}
+        onClick={() => {
+          setIsOpen(!isOpen);
+          if (!hasOpened) setHasOpened(true);
+        }}
+      >
+        <span>{selectedLabel}</span>
+        <DropdownArrowIcon
+          className={`pdp-dropdown-arrow ${isOpen ? "open" : ""}`}
+        />
+      </div>
+
+      <div
+        className={`pdp-dropdown-options ${isOpen ? "open" : hasOpened ? "closed" : ""}`}
+      >
+        {options.map((opt) => (
+          <div
+            key={opt.value}
+            className={`pdp-dropdown-option ${value === opt.value ? "selected" : ""}`}
+            onClick={() => {
+              onChange(opt.value);
+              setIsOpen(false);
+            }}
+          >
+            {opt.label}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// reviews component
 export default function ProductReviews() {
-  // hooks
   const {
+    filters,
+    sortOptions,
     reviews,
     activeFilter,
     sortBy,
     currentPage,
     totalPages,
+    isWritingReview,
+    userFeedback,
+    newRating,
+    reviewText,
     handleFilterChange,
     handleSortChange,
     handlePageChange,
+    setIsWritingReview,
+    handleFeedback,
+    setNewRating,
+    setReviewText,
+    handleCancelReview,
+    handleSubmitReview,
   } = useProductReviews();
 
-  // config
-  const filters = ["All", "5 Stars", "4 Stars", "3 Stars", "Comfort", "Value"];
-
-  // render
   return (
     <div className="pdp-reviews-section">
       <h2 className="pdp-reviews-heading">Reviews & Ratings</h2>
@@ -43,22 +123,58 @@ export default function ProductReviews() {
         </div>
 
         <div className="pdp-write-review-box">
-          <button className="pdp-write-btn">Write a review</button>
+          {!isWritingReview && (
+            <button
+              className="pdp-write-btn"
+              onClick={() => setIsWritingReview(true)}
+            >
+              Write a review
+            </button>
+          )}
         </div>
       </div>
+
+      {/* form viết đánh giá */}
+      {isWritingReview && (
+        <div className="pdp-review-form">
+          <h3 className="pdp-form-title">Your Rating</h3>
+          <div className="pdp-form-stars">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <span
+                key={star}
+                onClick={() => setNewRating(star)}
+                style={{ cursor: "pointer" }}
+              >
+                {star <= newRating ? <StarFilledIcon /> : <StarEmptyIcon />}
+              </span>
+            ))}
+          </div>
+          <textarea
+            className="pdp-review-textarea"
+            placeholder="What did you like or dislike? How did it fit?"
+            rows={4}
+            value={reviewText}
+            onChange={(e) => setReviewText(e.target.value)}
+          ></textarea>
+          <div className="pdp-form-actions">
+            <button className="pdp-form-cancel" onClick={handleCancelReview}>
+              Cancel
+            </button>
+            <button className="pdp-form-submit" onClick={handleSubmitReview}>
+              Submit Review
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="pdp-reviews-toolbar">
         <div className="pdp-sort-box">
           <span className="pdp-toolbar-label">Sort by:</span>
-          <select
-            className="pdp-sort-select"
+          <CustomDropdown
             value={sortBy}
-            onChange={(e) => handleSortChange(e.target.value)}
-          >
-            <option value="Most recent">Most recent</option>
-            <option value="Highest Rating">Highest Rating</option>
-            <option value="Lowest Rating">Lowest Rating</option>
-          </select>
+            options={sortOptions}
+            onChange={handleSortChange}
+          />
         </div>
 
         <div className="pdp-filter-box">
@@ -78,44 +194,62 @@ export default function ProductReviews() {
       </div>
 
       <div className="pdp-reviews-list">
-        {reviews.map((review) => (
-          <div key={review.id} className="pdp-review-card">
-            <div className="pdp-review-header">
-              <div className="pdp-reviewer-info">
-                <span className="pdp-reviewer-name">{review.author}</span>
-                {review.isVerified && (
-                  <div className="pdp-verified-badge">
-                    <CheckCircleIcon />
-                    <span>Verified Buyer</span>
-                  </div>
-                )}
+        {reviews.length > 0 ? (
+          reviews.map((review) => (
+            <div key={review.id} className="pdp-review-card">
+              <div className="pdp-review-header">
+                <div className="pdp-reviewer-info">
+                  <span className="pdp-reviewer-name">{review.author}</span>
+                  {review.isVerified && (
+                    <div className="pdp-verified-badge">
+                      <CheckCircleIcon />
+                      <span>Verified Buyer</span>
+                    </div>
+                  )}
+                </div>
+                <span className="pdp-review-date">{review.date}</span>
               </div>
-              <span className="pdp-review-date">{review.date}</span>
-            </div>
 
-            <div className="pdp-review-stars">
-              {Array.from({ length: review.rating }).map((_, i) => (
-                <StarFilledIcon key={i} />
-              ))}
-            </div>
+              <div className="pdp-review-stars">
+                {Array.from({ length: review.rating }).map((_, i) => (
+                  <StarFilledIcon key={i} />
+                ))}
+              </div>
 
-            <p className="pdp-review-content">{review.content}</p>
+              <p className="pdp-review-content">{review.content}</p>
 
-            <div className="pdp-review-actions">
-              <button className="pdp-feedback-btn">👍</button>
-              <button className="pdp-feedback-btn">👎</button>
+              <div className="pdp-review-actions">
+                <button
+                  className={`pdp-feedback-btn ${userFeedback[review.id] === "like" ? "active" : ""}`}
+                  onClick={() => handleFeedback(review.id, "like")}
+                >
+                  <LikeIcon />
+                </button>
+                <button
+                  className={`pdp-feedback-btn ${userFeedback[review.id] === "dislike" ? "active" : ""}`}
+                  onClick={() => handleFeedback(review.id, "dislike")}
+                >
+                  <DislikeIcon />
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        ) : (
+          <p style={{ textAlign: "center", color: "#666" }}>
+            No reviews found for this filter.
+          </p>
+        )}
       </div>
 
-      <div className="pdp-reviews-pagination">
-        <ProductPagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={handlePageChange}
-        />
-      </div>
+      {totalPages > 0 && (
+        <div className="pdp-reviews-pagination">
+          <ProductPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
+        </div>
+      )}
     </div>
   );
 }
