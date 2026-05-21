@@ -1,17 +1,12 @@
 // imports
-import { useNavigate } from "react-router-dom";
 import type { BannerItem } from "../../hooks/products/useProductList";
+import { usePromoCard } from "../../hooks/products/usePromoCard";
 import "./PromoCard.css";
 
 // component
 export default function PromoCard({ banner }: { banner: BannerItem }) {
-  const navigate = useNavigate();
-
-  const handleBannerClick = () => {
-    if (banner.targetUrl) {
-      navigate(banner.targetUrl);
-    }
-  };
+  // Nhận hàm xử lý
+  const { handleBannerClick } = usePromoCard(banner.targetUrl);
 
   // render
   return (

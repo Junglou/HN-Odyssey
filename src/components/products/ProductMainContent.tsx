@@ -1,10 +1,11 @@
 // imports
 import { useState, useRef, useEffect } from "react";
 import type { GridItem } from "../../hooks/products/useProductList";
-import { ArrowDownIcon } from "../../assets/icons/ProductIcons";
+import { ArrowDownIcon, FilterIcon } from "../../assets/icons/ProductIcons";
 import ProductCard from "./ProductCard";
 import PromoCard from "./PromoCard";
 import ProductPagination from "./ProductPagination";
+import { useProductMain } from "../../hooks/products/useProductMain";
 import "./ProductMainContent.css";
 
 // component
@@ -34,8 +35,7 @@ export default function ProductMainContent({
   const [hasSortOpened, setHasSortOpened] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const tabs = ["All", "New arrivals", "Best sellers", "Tops", "Bottoms"];
-  const sortOptions = ["Price: Low to High", "Price: High to Low", "Newest"];
+  const { tabs, sortOptions } = useProductMain();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -55,11 +55,8 @@ export default function ProductMainContent({
     <div className="pl-main-container">
       <div className="pl-header-bar">
         <div className="pl-quick-filters">
-          <span
-            className="pl-filter-label"
-            onClick={onOpenFilter}
-            style={{ cursor: "pointer" }}
-          >
+          <span className="pl-filter-label" onClick={onOpenFilter}>
+            <FilterIcon />
             Filter
           </span>
           {tabs.map((tab, idx) => (

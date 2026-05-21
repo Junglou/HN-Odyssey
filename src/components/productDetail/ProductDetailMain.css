@@ -1,0 +1,263 @@
+/* layout */
+.pdp-main-section {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 55% 40%;
+  justify-content: space-between;
+  gap: 4vw;
+  padding: 2vw 6vw 4vw;
+  box-sizing: border-box;
+}
+
+/* gallery */
+.pdp-gallery-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2vw;
+  width: 100%;
+}
+
+.pdp-main-image-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border: 1px solid #000000;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0px 0px 4px rgba(0, 0, 0, 0.25);
+}
+
+.pdp-main-image {
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+}
+
+.pdp-heart-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid #1e1e1e;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pdp-heart-btn:hover {
+  background: #ffffff;
+  transform: scale(1.05);
+}
+
+.pdp-heart-btn.active svg path {
+  fill: #000000;
+}
+
+.pdp-thumbnail-list {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  gap: 15px;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.pdp-thumbnail-wrap {
+  flex: 1;
+  aspect-ratio: 320 / 211;
+  border: 1px solid #000000;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 0px 0px 4px rgba(0, 0, 0, 0.25);
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.pdp-thumbnail-wrap:hover {
+  opacity: 0.8;
+}
+
+.pdp-thumbnail-wrap.active {
+  opacity: 1;
+  border: 2px solid #000000;
+}
+
+.pdp-thumbnail {
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+}
+
+/* info */
+.pdp-info-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2vw;
+  width: 100%;
+}
+
+.pdp-title {
+  margin: 0;
+  font-size: clamp(24px, 2.5vw, 32px);
+  font-weight: 700;
+  color: #000000;
+}
+
+.pdp-desc {
+  margin: 0;
+  font-family: "Lexend Deca", sans-serif;
+  font-size: clamp(16px, 1.2vw, 20px);
+  font-weight: 200;
+  line-height: 1.4;
+  color: #000000;
+}
+
+.pdp-option-group {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.pdp-option-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pdp-option-label {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.pdp-option-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: #666666;
+}
+
+.pdp-color-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.pdp-color-btn {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  border: 1px solid #000000;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.pdp-color-btn:hover {
+  transform: scale(1.1);
+}
+
+.pdp-color-btn.active {
+  width: 43px;
+  height: 43px;
+  border: 2px solid #000000;
+  box-shadow: 0 0 0 2px #ffffff inset;
+}
+
+.pdp-size-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.pdp-size-btn {
+  width: 80px;
+  height: 40px;
+  background: #d9d9d9;
+  border-radius: 20px;
+  border: none;
+  font-size: 20px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.pdp-size-btn:hover {
+  background: #c0c0c0;
+}
+
+.pdp-size-btn.active {
+  background: #000000;
+  color: #ffffff;
+}
+
+.pdp-details-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 1vw;
+}
+
+.pdp-details-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.pdp-details-content {
+  font-family: "Lexend Deca", sans-serif;
+  font-size: clamp(16px, 1.2vw, 20px);
+  line-height: 1.5;
+}
+
+.pdp-action-group {
+  display: flex;
+  flex-direction: row;
+  gap: 20px;
+  margin-top: 1vw;
+}
+
+.pdp-btn-add,
+.pdp-btn-checkout {
+  flex: 1;
+  height: 50px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: opacity 0.2s;
+}
+
+.pdp-btn-add:hover,
+.pdp-btn-checkout:hover {
+  opacity: 0.8;
+}
+
+.pdp-btn-add {
+  background: #ffffff;
+  border: 1px solid #000000;
+  color: #000000;
+}
+
+.pdp-btn-checkout {
+  background: #000000;
+  border: 1px solid #000000;
+  color: #ffffff;
+}
+
+/* responsive */
+@media screen and (max-width: 1024px) {
+  .pdp-main-section {
+    display: flex;
+    flex-direction: column;
+    padding: 24px 4vw;
+  }
+}

@@ -15,8 +15,8 @@
   align-items: center;
   padding-bottom: 16px;
   border-bottom: 1px solid #dbdbdb;
-  flex-wrap: wrap;
   gap: 16px;
+  min-width: 0;
 }
 
 /* quick filters */
@@ -24,20 +24,44 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.pl-quick-filters::-webkit-scrollbar {
+  display: none;
 }
 
 .pl-filter-label {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
   font-weight: 400;
-  font-size: 20px;
+  font-size: 16px;
   color: #000000;
-  margin-right: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  border-radius: 30px;
+  background: #ffffff;
   cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s;
+  user-select: none;
 }
 
-@media screen and (min-width: 769px) {
+.pl-filter-label:hover {
+  background: #000000;
+  color: #ffffff;
+  border-color: #000000;
+}
+
+@media screen and (max-width: 768px) {
   .pl-filter-label {
-    display: none;
+    display: flex;
   }
 }
 
@@ -51,6 +75,8 @@
   color: #000000;
   cursor: pointer;
   transition: all 0.2s;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .pl-chip:hover {
@@ -65,10 +91,11 @@
   border-color: #000000;
 }
 
-/* custom dropdown sort (Đồng bộ cấu trúc BannerManagement) */
+/* custom dropdown sort */
 .pl-sort-wrapper {
   position: relative;
-  min-width: 160px;
+  min-width: 140px;
+  flex-shrink: 0;
 }
 
 .pl-sort-trigger {
@@ -185,10 +212,10 @@
   }
 }
 
-/* grid (Responsive tự động bung cột) */
+/* grid */
 .pl-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 24px;
   width: 100%;
 }
@@ -198,18 +225,31 @@
 }
 
 /* responsive */
-@media screen and (max-width: 768px) {
+@media screen and (max-width: 900px) {
   .pl-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 16px;
   }
   .pl-grid .span-2 {
-    grid-column: span 1;
+    grid-column: span 2;
   }
 }
 
-@media screen and (max-width: 480px) {
+@media screen and (max-width: 600px) {
+  .pl-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  .pl-grid .span-2 {
+    grid-column: span 2;
+  }
+}
+
+@media screen and (max-width: 400px) {
   .pl-grid {
     grid-template-columns: 1fr;
+  }
+  .pl-grid .span-2 {
+    grid-column: span 1;
   }
 }

@@ -1,32 +1,18 @@
 // imports
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   HeartIcon,
   HeartFilledIcon,
   CartIcon,
 } from "../../assets/icons/ProductIcons";
 import type { ProductItem } from "../../hooks/products/useProductList";
+import { useProductCard } from "../../hooks/products/useProductCard";
 import "./ProductCard.css";
 
 // component
 export default function ProductCard({ product }: { product: ProductItem }) {
-  const navigate = useNavigate();
-  const [isWishlisted, setIsWishlisted] = useState(false);
-
-  const handleCardClick = () => {
-    navigate(`/products/${product.id}`);
-  };
-
-  const handleHeartClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsWishlisted((prev) => !prev);
-  };
-
-  const handleAddToCart = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    // TODO: add to cart logic
-  };
+  // Nhận toàn bộ state và handlers từ hook, truyền id vào để hook sử dụng
+  const { isWishlisted, handleCardClick, handleHeartClick, handleAddToCart } =
+    useProductCard(product.id);
 
   // render
   return (
@@ -42,6 +28,12 @@ export default function ProductCard({ product }: { product: ProductItem }) {
           className="pl-card-image-bg"
           style={{ backgroundImage: `url(${product.imageUrl})` }}
         ></div>
+
+        {/* hiển thị nhãn phần trăm giảm giá nếu có */}
+        {product.discountBadge && (
+          <div className="pl-card-discount-badge">{product.discountBadge}</div>
+        )}
+
         <button
           className={`pl-card-heart ${isWishlisted ? "wishlisted" : ""}`}
           onClick={handleHeartClick}
@@ -57,7 +49,20 @@ export default function ProductCard({ product }: { product: ProductItem }) {
         <div className="pl-card-line"></div>
 
         <div className="pl-card-footer">
-          <span className="pl-card-price">${product.price}</span>
+          {/* khu vực hiển thị giá có xét điều kiện khuyến mãi */}
+          <div className="pl-card-price-container">
+            {product.originalPrice && product.originalPrice > product.price ? (
+              <>
+                <span className="pl-card-price-old">
+                  ${product.originalPrice}
+                </span>
+                <span className="pl-card-price-new">${product.price}</span>
+              </>
+            ) : (
+              <span className="pl-card-price">${product.price}</span>
+            )}
+          </div>
+
           <button className="pl-card-add-btn" onClick={handleAddToCart}>
             <span>Add to Cart</span>
             <CartIcon />

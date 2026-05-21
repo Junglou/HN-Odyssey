@@ -1,0 +1,213 @@
+/* wrapper */
+.pdp-reviews-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  box-sizing: border-box;
+}
+
+/* title */
+.pdp-reviews-heading {
+  margin: 0;
+  font-size: clamp(24px, 2.5vw, 32px);
+  font-weight: 700;
+  color: #000000;
+  text-decoration: underline;
+}
+
+/* overview */
+.pdp-reviews-overview {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.pdp-rating-score-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(217, 217, 217, 0.5);
+  padding: 20px;
+  border-radius: 5px;
+  min-width: 200px;
+}
+
+.pdp-rating-big {
+  font-size: 32px;
+  font-weight: 400;
+}
+
+.pdp-stars-row {
+  display: flex;
+  gap: 4px;
+}
+
+.pdp-review-count {
+  font-size: 16px;
+  font-weight: 300;
+}
+
+.pdp-write-review-box {
+  display: flex;
+}
+
+.pdp-write-btn {
+  background: #000000;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  padding: 15px 30px;
+  font-size: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* toolbar */
+.pdp-reviews-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.pdp-sort-box,
+.pdp-filter-box {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.pdp-toolbar-label {
+  font-size: 16px;
+  font-weight: 300;
+  min-width: 80px;
+}
+
+.pdp-sort-select {
+  padding: 8px 16px;
+  border: 1px solid #000000;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 16px;
+  background: #ffffff;
+}
+
+.pdp-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pdp-filter-chip {
+  padding: 8px 16px;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  border-radius: 30px;
+  background: #ffffff;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 300;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pdp-filter-chip.active {
+  background: #000000;
+  color: #ffffff;
+  border-color: #000000;
+}
+
+/* review cards */
+.pdp-reviews-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.pdp-review-card {
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  border-radius: 10px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pdp-review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pdp-reviewer-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.pdp-reviewer-name {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.pdp-verified-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(74, 146, 96, 0.3);
+  padding: 4px 12px;
+  border-radius: 3px;
+  color: #02542d;
+  font-size: 14px;
+  font-weight: 300;
+}
+
+.pdp-review-date {
+  font-size: 16px;
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.pdp-review-stars {
+  display: flex;
+  gap: 2px;
+}
+
+.pdp-review-content {
+  margin: 0;
+  font-family: "Lexend", sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: #000000;
+}
+
+.pdp-review-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: flex-end;
+}
+
+.pdp-feedback-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+/* pagination */
+.pdp-reviews-pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}

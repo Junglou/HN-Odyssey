@@ -9,6 +9,8 @@ export type ProductItem = {
   name: string;
   desc: string;
   price: number;
+  originalPrice?: number; // giá gốc trước khi giảm
+  discountBadge?: string; // nhãn hiển thị mức giảm (VD: -20%)
   imageUrl: string;
   tags: string[];
 };
@@ -28,7 +30,7 @@ export type BannerItem = {
 
 export type GridItem = ProductItem | BannerItem;
 
-// mock data
+// mock data có chứa sản phẩm được khuyến mãi
 const MOCK_PRODUCTS: ProductItem[] = [
   {
     id: "p1",
@@ -37,6 +39,8 @@ const MOCK_PRODUCTS: ProductItem[] = [
     name: "Summit Softshell Jacket",
     desc: "Grey-blue softshell",
     price: 35.99,
+    originalPrice: 45.0,
+    discountBadge: "-20%",
     imageUrl: "https://via.placeholder.com/400x383/94a3b8/fff?text=Product+1",
     tags: ["New Arrival"],
   },
@@ -66,7 +70,9 @@ const MOCK_PRODUCTS: ProductItem[] = [
     type: "product",
     name: "Expedition Shell Jacket",
     desc: "Orange shell jacket",
-    price: 35.99,
+    price: 25.0,
+    originalPrice: 35.99,
+    discountBadge: "Sale",
     imageUrl: "https://via.placeholder.com/400x383/ea580c/fff?text=Product+4",
     tags: ["Sale"],
   },
@@ -160,26 +166,7 @@ export function useProductList() {
     const fetchListings = async () => {
       setIsLoading(true);
       try {
-        // TODO: Mở comment và gắn API thật khi BE hoàn thiện
-        // const [productRes, bannerRes] = await Promise.all([
-        //   axiosClient.get("/products", {
-        //     params: {
-        //       page: currentPage,
-        //       limit: itemsPerPage,
-        //       tabs: activeTabs.join(","),
-        //       filters: selectedFilters.join(","),
-        //       sort: sortValue,
-        //     },
-        //   }),
-        //   axiosClient.get("/marketing/content/banners?status=ACTIVE&position=Category"),
-        // ]);
-
-        // TODO: mapping data
-        // setProducts(productRes.data.items);
-        // setTotalItems(productRes.data.total);
-        // setBanners(bannerRes.data.items);
-
-        // fallback mock data (Xóa phần này khi nối API)
+        // TODO: nối API danh sách sản phẩm và banner sau khi hoàn thiện BE
         setProducts(MOCK_PRODUCTS);
         setBanners(MOCK_BANNERS);
         setTotalItems(MOCK_PRODUCTS.length);
@@ -200,7 +187,7 @@ export function useProductList() {
     const activeBanners = banners.filter((b) => b.status === "ACTIVE");
 
     let bannerIndex = 0;
-    let insertPos = 4; // chèn sau mỗi 4 sản phẩm
+    let insertPos = 4;
 
     while (bannerIndex < activeBanners.length && insertPos <= mixed.length) {
       mixed.splice(insertPos, 0, activeBanners[bannerIndex]);
@@ -253,13 +240,13 @@ export function useProductList() {
   };
 
   return {
-    gridItems: mixedItems, // xuất thẳng mảng đã mix, API lo việc giới hạn (limit)
+    gridItems: mixedItems,
     currentPage,
     totalPages,
     activeTabs,
     selectedFilters,
     sortValue,
-    isLoading, // TODO: Truyền trạng thái này xuống Component để hiển thị Skeleton/Spinner
+    isLoading,
     handlePageChange,
     handleTabChange,
     handleFilterToggle,

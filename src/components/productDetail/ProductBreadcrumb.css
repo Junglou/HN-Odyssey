@@ -1,0 +1,22 @@
+/* wrapper */
+.pdp-breadcrumb {
+  display: flex;
+  align-items: center;
+  padding: 2vw 6vw 0;
+  font-size: clamp(14px, 1.2vw, 16px);
+  font-weight: 700;
+  color: #000000;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* separator */
+.pdp-breadcrumb-separator {
+  font-weight: 400;
+  color: #666666;
+}
+
+/* active */
+.pdp-breadcrumb .active {
+  color: #000000;
+}

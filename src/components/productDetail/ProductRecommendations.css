@@ -1,0 +1,41 @@
+/* layout */
+.pdp-recommend-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 6vw;
+  box-sizing: border-box;
+  gap: 30px;
+  border-top: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+/* title */
+.pdp-recommend-title {
+  margin: 0;
+  font-size: clamp(24px, 2.5vw, 32px);
+  font-weight: 700;
+  color: #000000;
+  text-align: center;
+}
+
+/* grid */
+.pdp-recommend-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+/* responsive */
+@media screen and (max-width: 1024px) {
+  .pdp-recommend-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media screen and (max-width: 600px) {
+  .pdp-recommend-grid {
+    grid-template-columns: 1fr;
+  }
+}

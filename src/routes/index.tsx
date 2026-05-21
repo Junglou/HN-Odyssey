@@ -10,6 +10,7 @@ import SecondCharmPage from "../pages/secondCharm/SecondCharmPage";
 import LoginPage from "../pages/auth/LoginPage";
 import RegisterPage from "../pages/auth/RegisterPage";
 import ProductListPage from "../pages/products/ProductListPage";
+import ProductDetailPage from "../pages/productDetail/ProductDetailPage";
 import VerifyOtpPage from "../pages/auth/VerifyOtpPage";
 import ResetPasswordPage from "../pages/auth/ResetPasswordPage";
 import AccountRecoveryPage from "../pages/auth/AccountRecoveryPage";
@@ -102,16 +103,16 @@ export const router = createBrowserRouter([
         element: <ProductListPage />,
       },
       {
+        path: "products/:id",
+        element: <ProductDetailPage />,
+      },
+      {
         path: "/loyalty",
         element: <LoyaltyLandingPage />,
       },
       {
         path: "/second-charm-form",
         element: <SecondCharmPage />,
-      },
-      {
-        path: "products",
-        element: <ProductListPage />,
       },
       // todo: cum route profile nay can duoc boc bang auth guard de kiem tra token khi chay thuc te, hien tai de day de tien hanh thu nghiem
       {

@@ -17,6 +17,8 @@ export default function TradeInForm() {
     setCategory,
     handleFileChange,
     removePhoto,
+    submitTradeInRequest, // Lấy hàm submit ra
+    isSubmitting, // Lấy trạng thái loading ra
   } = useTradeInForm();
 
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
@@ -94,7 +96,13 @@ export default function TradeInForm() {
           </p>
         </div>
 
-        <form className="sc-trade-in-form" onSubmit={(e) => e.preventDefault()}>
+        <form
+          className="sc-trade-in-form"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            await submitTradeInRequest();
+          }}
+        >
           <div className="sc-form-grid">
             {/* Row 1 */}
             <div className="sc-input-group">
@@ -330,9 +338,17 @@ export default function TradeInForm() {
             </div>
           </div>
 
-          <button className="sc-submit-btn" type="submit">
-            Submit Buy-Back Request
-            <ArrowRightIcon />
+          <button
+            className="sc-submit-btn"
+            type="submit"
+            disabled={isSubmitting}
+            style={{
+              opacity: isSubmitting ? 0.7 : 1,
+              cursor: isSubmitting ? "not-allowed" : "pointer",
+            }}
+          >
+            {isSubmitting ? "Submitting..." : "Submit Buy-Back Request"}
+            {!isSubmitting && <ArrowRightIcon />}
           </button>
         </form>
       </div>
