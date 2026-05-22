@@ -1,0 +1,93 @@
+/* wrapper */
+.blog-grid-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(20px, 4vw, 40px) clamp(16px, 6vw, 120px);
+  box-sizing: border-box;
+}
+
+/* header */
+.blog-grid-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: clamp(16px, 2vw, 24px);
+}
+
+.blog-grid-title {
+  font-family: "Lexend Deca", sans-serif;
+  font-size: clamp(20px, 2.5vw, 28px);
+  font-weight: 500;
+  color: #000000;
+  margin: 0;
+}
+
+.blog-grid-read-more {
+  background: transparent;
+  border: none;
+  font-family: "Lexend Deca", sans-serif;
+  font-size: clamp(13px, 1.2vw, 16px);
+  font-weight: 500;
+  color: #000000;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  padding: 0;
+}
+
+.blog-grid-read-more:hover {
+  opacity: 0.6;
+}
+
+/* grid variant layout */
+.blog-grid-section.grid .blog-grid-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(16px, 2vw, 24px);
+  width: 100%;
+}
+
+/* scroll variant layout */
+.blog-grid-section.scroll .blog-grid-container {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: clamp(16px, 2vw, 24px);
+  width: 100%;
+  padding-bottom: 12px;
+  scroll-behavior: smooth;
+}
+
+.blog-grid-section.scroll .blog-grid-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.blog-grid-section.scroll .blog-grid-container::-webkit-scrollbar-thumb {
+  background: #eee3d7;
+  border-radius: 10px;
+}
+
+.blog-grid-section.scroll .blog-grid-item-wrap {
+  flex: 0 0 calc(33.333% - 16px);
+  min-width: 285px;
+}
+
+/* tablet layout */
+@media screen and (max-width: 1024px) {
+  .blog-grid-section.grid .blog-grid-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .blog-grid-section.scroll .blog-grid-item-wrap {
+    flex: 0 0 calc(50% - 12px);
+  }
+}
+
+/* mobile layout */
+@media screen and (max-width: 600px) {
+  .blog-grid-section.grid .blog-grid-container {
+    grid-template-columns: 1fr;
+  }
+  .blog-grid-section.scroll .blog-grid-item-wrap {
+    flex: 0 0 100%;
+  }
+}

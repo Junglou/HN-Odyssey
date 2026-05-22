@@ -1,0 +1,23 @@
+/* wrapper */
+.blog-news-page-wrapper {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #fafafa;
+  overflow-x: hidden;
+  font-family: "Lexend Exa", sans-serif;
+}
+
+/* empty state */
+.blog-news-empty {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: clamp(40px, 8vw, 100px) 20px;
+  font-family: "Ledger", serif;
+  font-size: clamp(16px, 1.5vw, 20px);
+  color: rgba(0, 0, 0, 0.5);
+  text-align: center;
+  flex-grow: 1;
+}

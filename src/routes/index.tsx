@@ -6,11 +6,12 @@ import PortalLayout from "../layouts/PortalLayout";
 import HomePage from "../pages/home/HomePage";
 import LoyaltyLandingPage from "../pages/loytalty/LoyaltyLandingPage";
 import SecondCharmPage from "../pages/secondCharm/SecondCharmPage";
+import BlogNewsPage from "../pages/blogNews/BlogNewsPage";
+import ProductListPage from "../pages/products/ProductListPage";
+import ProductDetailPage from "../pages/productDetail/ProductDetailPage";
 
 import LoginPage from "../pages/auth/LoginPage";
 import RegisterPage from "../pages/auth/RegisterPage";
-import ProductListPage from "../pages/products/ProductListPage";
-import ProductDetailPage from "../pages/productDetail/ProductDetailPage";
 import VerifyOtpPage from "../pages/auth/VerifyOtpPage";
 import ResetPasswordPage from "../pages/auth/ResetPasswordPage";
 import AccountRecoveryPage from "../pages/auth/AccountRecoveryPage";
@@ -113,6 +114,10 @@ export const router = createBrowserRouter([
       {
         path: "/second-charm-form",
         element: <SecondCharmPage />,
+      },
+      {
+        path: "blog",
+        element: <BlogNewsPage />,
       },
       // todo: cum route profile nay can duoc boc bang auth guard de kiem tra token khi chay thuc te, hien tai de day de tien hanh thu nghiem
       {

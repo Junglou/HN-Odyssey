@@ -1,0 +1,132 @@
+/* wrapper */
+.blog-card {
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+  height: 100%;
+}
+
+.blog-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* image wrap */
+.blog-card-img-wrap {
+  width: 100%;
+  overflow: hidden;
+}
+
+.blog-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.blog-card:hover .blog-card-img {
+  transform: scale(1.05);
+}
+
+/* content box */
+.blog-card-content {
+  display: flex;
+  flex-direction: column;
+  padding: clamp(16px, 2vw, 24px);
+  flex-grow: 1;
+}
+
+/* title - responsive typography */
+.blog-card-title {
+  font-family: "Lexend Exa", sans-serif;
+  font-size: clamp(16px, 1.5vw, 18px);
+  font-weight: 700;
+  line-height: 1.4;
+  color: #111827;
+  margin: 0 0 8px 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* summary - responsive typography */
+.blog-card-summary {
+  font-family: "Ledger", serif;
+  font-size: clamp(13px, 1.2vw, 15px);
+  line-height: 1.6;
+  color: #4b5563;
+  margin: 0 0 16px 0;
+  flex-grow: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.blog-card-meta {
+  font-family: "Ledger", serif;
+  font-size: clamp(12px, 1vw, 14px);
+  color: #6b7280;
+  margin-bottom: clamp(16px, 2vw, 24px);
+}
+
+/* footer action */
+.blog-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+}
+
+.blog-card-read-more {
+  background: #f3f4f6;
+  color: #374151;
+  font-family: "Lexend Deca", sans-serif;
+  font-size: clamp(13px, 1.1vw, 14px);
+  font-weight: 500;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.blog-card-read-more:hover {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.blog-card-badge {
+  font-family: "Lexend Deca", sans-serif;
+  font-size: clamp(12px, 1vw, 14px);
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 20px;
+  text-align: center;
+}
+
+/* variant overrides */
+.blog-card.standard .blog-card-img-wrap {
+  aspect-ratio: 4 / 3;
+}
+
+.blog-card.featured .blog-card-img-wrap {
+  aspect-ratio: 16 / 9;
+}
+
+.blog-card.featured .blog-card-title {
+  font-size: clamp(20px, 2vw, 28px);
+}
+
+.blog-card.featured .blog-card-summary {
+  font-size: clamp(15px, 1.3vw, 17px);
+}
