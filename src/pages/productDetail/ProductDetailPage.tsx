@@ -14,9 +14,13 @@ export default function ProductDetailPage() {
     selectedColor,
     selectedSize,
     activeImageIndex,
+    quantity,
     handleColorChange,
     handleSizeChange,
     handleImageChange,
+    handleQuantityChange,
+    handleQuantityInput,
+    handleQuantityBlur,
   } = useProductDetail();
 
   // render
@@ -31,6 +35,10 @@ export default function ProductDetailPage() {
         onColorChange={handleColorChange}
         onSizeChange={handleSizeChange}
         onImageChange={handleImageChange}
+        quantity={quantity}
+        onQuantityChange={handleQuantityChange}
+        onQuantityInput={handleQuantityInput}
+        onQuantityBlur={handleQuantityBlur}
       />
       <ProductRecommendations />
       <ProductReviews />

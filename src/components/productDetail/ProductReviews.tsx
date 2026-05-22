@@ -1,3 +1,4 @@
+// imports
 import { useState, useRef, useEffect } from "react";
 import { useProductReviews } from "../../hooks/productDetail/useProductReviews";
 import {
@@ -11,7 +12,7 @@ import {
 import ProductPagination from "../products/ProductPagination";
 import "./ProductReviews.css";
 
-// custom dropdown component
+// components
 function CustomDropdown({
   value,
   options,
@@ -21,11 +22,12 @@ function CustomDropdown({
   options: { value: string; label: string }[];
   onChange: (val: string) => void;
 }) {
+  // states
   const [isOpen, setIsOpen] = useState(false);
   const [hasOpened, setHasOpened] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // click outside
+  // hooks
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -42,6 +44,7 @@ function CustomDropdown({
   const selectedLabel =
     options.find((opt) => opt.value === value)?.label || options[0]?.label;
 
+  // render
   return (
     <div
       className={`pdp-custom-dropdown ${isOpen ? "is-open" : ""}`}
@@ -80,8 +83,9 @@ function CustomDropdown({
   );
 }
 
-// reviews component
+// render
 export default function ProductReviews() {
+  // hooks
   const {
     filters,
     sortOptions,
@@ -134,7 +138,6 @@ export default function ProductReviews() {
         </div>
       </div>
 
-      {/* form viết đánh giá */}
       {isWritingReview && (
         <div className="pdp-review-form">
           <h3 className="pdp-form-title">Your Rating</h3>
@@ -211,8 +214,14 @@ export default function ProductReviews() {
               </div>
 
               <div className="pdp-review-stars">
-                {Array.from({ length: review.rating }).map((_, i) => (
-                  <StarFilledIcon key={i} />
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <span key={star}>
+                    {star <= review.rating ? (
+                      <StarFilledIcon />
+                    ) : (
+                      <StarEmptyIcon />
+                    )}
+                  </span>
                 ))}
               </div>
 
