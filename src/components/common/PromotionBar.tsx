@@ -80,7 +80,7 @@ const PromotionBar = () => {
           <div
             className={`promo-dropdown ${activeMenu === "featured" ? "open" : ""}`}
           >
-            <a href="#!" onClick={(e) => handleNavigate(e, "/blog-news")}>
+            <a href="#!" onClick={(e) => handleNavigate(e, "/blog")}>
               {t("blog_news")}
             </a>
             <a href="#!" onClick={(e) => handleNavigate(e, "/loyalty")}>
