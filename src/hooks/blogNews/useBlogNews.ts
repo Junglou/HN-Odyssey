@@ -12,7 +12,7 @@ export interface BlogNewsPost {
   published_at: string;
 }
 
-// mock data (map chuẩn từ portal)
+// mock data
 const MOCK_POSTS: BlogNewsPost[] = [
   {
     id: "1",
@@ -82,6 +82,7 @@ export function useBlogNews() {
   const [sortBy, setSortBy] = useState("Latest");
   const [currentPage, setCurrentPage] = useState(1);
 
+  // lấy danh mục
   const categories = useMemo(() => {
     const uniqueCats = Array.from(
       new Set(MOCK_POSTS.map((p) => p.category_id.name)),
@@ -89,6 +90,7 @@ export function useBlogNews() {
     return ["All articles", ...uniqueCats];
   }, []);
 
+  // lọc
   const filteredPosts = useMemo(() => {
     let result = [...MOCK_POSTS];
     if (search) {
@@ -115,7 +117,7 @@ export function useBlogNews() {
     return result;
   }, [search, activeCategory, sortBy]);
 
-  // phân cụm bài viết theo category
+  // nhóm danh mục
   const allCategorySections = useMemo(() => {
     if (activeCategory !== "All articles") return [];
     const targetCats = categories.filter((c) => c !== "All articles");
@@ -142,14 +144,9 @@ export function useBlogNews() {
   }, [activeCategory, filteredPosts.length, allCategorySections.length]);
 
   const featuredPost = useMemo(() => {
-    if (
-      activeCategory !== "All articles" ||
-      currentPage !== 1 ||
-      filteredPosts.length === 0
-    )
-      return null;
+    if (currentPage !== 1 || filteredPosts.length === 0) return null;
     return filteredPosts[0];
-  }, [activeCategory, currentPage, filteredPosts]);
+  }, [currentPage, filteredPosts]);
 
   const featuredGridPosts = useMemo(() => {
     if (activeCategory !== "All articles" || currentPage !== 1) return [];
@@ -165,7 +162,9 @@ export function useBlogNews() {
 
   const specificCategoryPosts = useMemo(() => {
     if (activeCategory === "All articles") return [];
-    return filteredPosts.slice((currentPage - 1) * 9, currentPage * 9);
+    const startIndex = currentPage === 1 ? 1 : (currentPage - 1) * 9;
+    const endIndex = currentPage === 1 ? 9 : currentPage * 9;
+    return filteredPosts.slice(startIndex, endIndex);
   }, [activeCategory, currentPage, filteredPosts]);
 
   // handlers

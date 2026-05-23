@@ -5,6 +5,7 @@ import BlogToolbar from "../../components/blogNews/BlogToolbar";
 import BlogFeaturedSection from "../../components/blogNews/BlogFeaturedSection";
 import BlogGridSection from "../../components/blogNews/BlogGridSection";
 import BlogPagination from "../../components/blogNews/BlogPagination";
+import BlogCard from "../../components/blogNews/BlogCard";
 import "./BlogNewsPage.css";
 
 // component
@@ -44,6 +45,8 @@ export default function BlogNewsPage() {
         onSortChange={handleSortChange}
       />
 
+      <h2 className="blog-category-main-title">{activeCategory}</h2>
+
       {activeCategory === "All articles" ? (
         <>
           {currentPage === 1 && featuredPost && (
@@ -64,11 +67,15 @@ export default function BlogNewsPage() {
           ))}
         </>
       ) : (
-        <BlogGridSection
-          title={activeCategory}
-          posts={specificCategoryPosts}
-          variant="grid"
-        />
+        <>
+          {currentPage === 1 && featuredPost && (
+            <div className="blog-single-featured">
+              <BlogCard post={featuredPost} variant="featured" />
+            </div>
+          )}
+
+          <BlogGridSection posts={specificCategoryPosts} variant="grid" />
+        </>
       )}
 
       {activeCategory === "All articles" &&
@@ -80,7 +87,8 @@ export default function BlogNewsPage() {
         )}
 
       {activeCategory !== "All articles" &&
-        specificCategoryPosts.length === 0 && (
+        specificCategoryPosts.length === 0 &&
+        !featuredPost && (
           <div className="blog-news-empty">
             <p>No articles found matching your criteria.</p>
           </div>

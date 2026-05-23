@@ -6,7 +6,7 @@ import "./BlogGridSection.css";
 
 // types
 interface BlogGridSectionProps {
-  title: string;
+  title?: string;
   posts: BlogNewsPost[];
   variant?: "grid" | "scroll";
   onReadMore?: () => void;
@@ -27,14 +27,16 @@ export default function BlogGridSection({
   // render
   return (
     <div className={`blog-grid-section ${variant}`}>
-      <div className="blog-grid-header">
-        <h2 className="blog-grid-title">{title}</h2>
-        {onReadMore && (
-          <button className="blog-grid-read-more" onClick={onReadMore}>
-            Read more &rarr;
-          </button>
-        )}
-      </div>
+      {title && (
+        <div className="blog-grid-header">
+          <h2 className="blog-grid-title">{title}</h2>
+          {onReadMore && (
+            <button className="blog-grid-read-more" onClick={onReadMore}>
+              Read more &rarr;
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="blog-grid-container" ref={containerRef}>
         {posts.map((post) => (
