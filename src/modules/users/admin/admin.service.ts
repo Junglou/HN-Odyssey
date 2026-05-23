@@ -190,8 +190,11 @@ export class AdminService {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(dto.password, salt);
 
+    const generatedUsername = `${dto.email.split('@')[0]}_${Date.now().toString().slice(-4)}`;
+
     const newStaff = new this.staffModel({
       employee_code: finalEmployeeCode,
+      username: generatedUsername,
       email: dto.email,
       phone: dto.phone,
       first_Name: dto.firstName,

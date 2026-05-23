@@ -24,6 +24,11 @@ import { AdminUpdateCustomerDto } from './dto/admin-update-customer.dto';
 import { UpdateCustomerStatusDto } from './dto/update-status.dto';
 import { AdminCustomerQueryDto } from './dto/admin-customer-query.dto';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import {
+  BulkDeleteDto,
+  BulkUpdateStatusDto,
+} from './dto/admin-bulk-customer.dto';
+import { AdminUpdatePasswordDto } from './dto/admin-update-password.dto';
 
 interface IAdminUser {
   _id: string;
@@ -36,6 +41,35 @@ interface IAdminUser {
 export class CustomersAdminController {
   constructor(private readonly customersService: CustomersAdminService) {}
 
+  // US.120 - Bulk Action: Cập nhật trạng thái hàng loạt
+  @Patch('bulk/status')
+  @RequirePermissions(Resource.CUSTOMERS, Action.MANAGE)
+  async bulkUpdateStatus(
+    @Body() dto: BulkUpdateStatusDto,
+    @CurrentUser() user: IAdminUser,
+  ) {
+    return this.customersService.bulkUpdateStatus(
+      dto.customerIds,
+      dto.status,
+      dto.reason || 'Cập nhật trạng thái hàng loạt',
+      { id: user._id, email: user.email, roles: user.roles },
+    );
+  }
+
+  // US.117 - Bulk Action: Vô hiệu hóa/Xóa mềm hàng loạt
+  @Delete('bulk/delete')
+  @RequirePermissions(Resource.CUSTOMERS, Action.DELETE)
+  async bulkSoftDelete(
+    @Body() dto: BulkDeleteDto,
+    @CurrentUser() user: IAdminUser,
+  ) {
+    return this.customersService.bulkSoftDelete(
+      dto.customerIds,
+      user._id,
+      dto.reason || 'Xóa mềm hàng loạt',
+    );
+  }
+
   // AC1 -> AC7: Lấy danh sách khách hàng (Phân trang, Tìm kiếm, Lọc)
   @Get()
   @RequirePermissions(Resource.CUSTOMERS, Action.READ)
@@ -44,11 +78,14 @@ export class CustomersAdminController {
   }
 
   // AC9: Xuất danh sách khách hàng ra Excel
-  // LƯU Ý: Route tĩnh này phải nằm TRƯỚC các route có tham số :id
   @Get('export/excel')
   @RequirePermissions(Resource.CUSTOMERS, Action.EXPORT)
-  async exportExcel(@Res() res: Response) {
-    return this.customersService.exportToExcel(res);
+  async exportExcel(
+    @Query() query: AdminCustomerQueryDto, // Bổ sung nhận query
+    @Res() res: Response,
+  ) {
+    // Truyền query xuống service
+    return this.customersService.exportToExcel(query, res);
   }
 
   // US.117 - AC1: Thêm mới hồ sơ khách hàng thủ công
@@ -85,17 +122,19 @@ export class CustomersAdminController {
     return this.customersService.getCustomerDetail(id);
   }
 
-  // US.117 - AC7: Đặt lại mật khẩu thủ công
-  @Post(':id/reset-password')
+  // US.117 - AC7: Đặt lại mật khẩu thủ công bởi Staff
+  @Patch(':id/password')
   @RequirePermissions(Resource.CUSTOMERS, Action.MANAGE)
-  async resetPassword(
+  async updatePassword(
     @Param('id') id: string,
+    @Body() dto: AdminUpdatePasswordDto, // Sử dụng DTO ở đây
     @CurrentUser() user: IAdminUser,
   ) {
-    return this.customersService.manualResetPassword(id, {
-      id: user._id,
-      email: user.email,
-    });
+    return this.customersService.updatePasswordByAdmin(
+      id,
+      dto.newPassword.trim(),
+      { id: user._id, email: user.email },
+    );
   }
 
   // US.120 - AC1, AC2, AC3: Cập nhật trạng thái (Khóa/Mở/Ban)
@@ -158,7 +197,11 @@ export class CustomersAdminController {
   // US.117: Vô hiệu hóa tài khoản (Soft delete)
   @Delete(':id')
   @RequirePermissions(Resource.CUSTOMERS, Action.DELETE)
-  async softDelete(@Param('id') id: string, @CurrentUser() user: IAdminUser) {
-    return this.customersService.softDelete(id, user._id);
+  async softDelete(
+    @Param('id') id: string,
+    @CurrentUser() user: IAdminUser,
+    @Body('reason') reason: string,
+  ) {
+    return this.customersService.softDelete(id, reason, user._id);
   }
 }

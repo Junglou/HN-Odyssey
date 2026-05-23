@@ -20,6 +20,9 @@ export class User {
 
   readonly fullName: string; // Sẽ được xử lý qua Virtual ở cuối file
 
+  @Prop({ unique: true, required: true })
+  username: string;
+
   @Prop({ required: true, unique: true, index: true })
   email: string;
 
@@ -78,6 +81,9 @@ export class User {
 
   @Prop({ enum: UserStatus, default: UserStatus.ACTIVE })
   status: UserStatus;
+
+  @Prop({ default: false })
+  is_deleted: boolean;
 
   // AC10: Dùng trường này để Revoke sessions khi đổi mật khẩu!
   @Prop({ default: 0 })

@@ -137,6 +137,11 @@ export class OrdersService {
     const matchStage: Record<string, any> = { status: { $ne: 'TEMPORARY' } };
 
     if (status) matchStage['status'] = status;
+
+    if (query.user_id) {
+      matchStage['user_id'] = new Types.ObjectId(query.user_id);
+    }
+
     if (fromDate || toDate) {
       matchStage.createdAt = {};
       if (fromDate)

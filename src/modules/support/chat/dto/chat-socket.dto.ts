@@ -1,6 +1,9 @@
 export class SendMessageDto {
   conversationId: string;
   content: string;
+  sender_type?: 'USER' | 'AGENT';
+  message_type?: 'TEXT' | 'IMAGE' | 'PRODUCT_CARD' | 'FILE';
+  metadata?: Record<string, unknown>;
 }
 
 export class TypingDto {

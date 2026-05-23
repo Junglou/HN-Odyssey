@@ -26,7 +26,6 @@ import { AdminCreateCustomerDto } from './dto/admin-create-customer.dto';
 import * as ExcelJS from 'exceljs';
 import { Response } from 'express';
 import * as bcrypt from 'bcryptjs';
-import { randomBytes } from 'crypto';
 import { Action, Resource } from 'src/common/enums/resource.enum';
 import { AdminUpdateCustomerDto } from './dto/admin-update-customer.dto';
 import { ReviewStatus } from 'src/common/enums/review.enum';
@@ -72,6 +71,7 @@ export interface ICustomerQuery {
   limit?: number | string;
   keyword?: string;
   status?: UserStatus;
+  tier?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
@@ -103,10 +103,27 @@ export class CustomersAdminService {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 20;
     const skip = (page - 1) * limit;
-    const { keyword, status, sortBy = 'createdAt', sortOrder = 'desc' } = query;
+    const {
+      keyword,
+      status,
+      tier,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = query;
 
     const filter: FilterQuery<CustomerDocument> = { type: 'Customer' };
-    if (status) filter.status = status;
+    if (status === UserStatus.DELETED) {
+      // Nếu bộ lọc trên UI chọn là "Deleted" -> Chỉ lấy những người đã xóa
+      filter.is_deleted = true;
+      filter.status = status;
+    } else {
+      // Mặc định: Luôn ẩn những người đã xóa mềm
+      filter.is_deleted = { $ne: true };
+
+      // Nếu có filter status khác (ACTIVE, INACTIVE...) thì thêm vào
+      if (status) filter.status = status;
+    }
+    if (tier) filter['loyalty.tier'] = tier;
     if (keyword) {
       const searchRegex = { $regex: keyword, $options: 'i' };
       filter.$or = [
@@ -137,12 +154,15 @@ export class CustomersAdminService {
 
   // US.117 - AC1, AC3: Thêm mới thủ công hồ sơ khách hàng
   async createCustomer(dto: AdminCreateCustomerDto, actorId: string) {
+    const generatedUsername =
+      dto.username ||
+      `${dto.email.split('@')[0]}_${Date.now().toString().slice(-4)}`;
     // Kiểm tra duy nhất chủ động
     const exist = await this.customerModel.findOne({
       $or: [
         { email: dto.email },
         { phone: dto.phone },
-        { username: dto.username },
+        { username: generatedUsername },
       ],
     });
 
@@ -157,7 +177,7 @@ export class CustomersAdminService {
       const hashedPassword = await bcrypt.hash(dto.tempPassword, salt);
 
       const newCustomer = await this.customerModel.create({
-        username: dto.username,
+        username: generatedUsername,
         email: dto.email,
         phone: dto.phone,
         password: hashedPassword,
@@ -220,8 +240,8 @@ export class CustomersAdminService {
       );
     }
 
-    // Bổ sung: Phân quyền - Chỉ Admin mới được BANNED
-    if (targetStatus.toString() === 'BANNED') {
+    // Bổ sung: Phân quyền - Chỉ Admin mới được SUSPENDED
+    if (targetStatus.toString() === 'SUSPENDED') {
       if (
         !actor.roles.includes('SUPER_ADMIN') &&
         !actor.roles.includes('ADMIN')
@@ -235,7 +255,7 @@ export class CustomersAdminService {
     // Bổ sung: Chặn Khóa/Đình chỉ nếu có đơn hàng đang hoạt động
     if (
       targetStatus === UserStatus.INACTIVE ||
-      targetStatus.toString() === 'BANNED'
+      targetStatus.toString() === 'SUSPENDED'
     ) {
       const hasActiveOrders = await this.orderModel.findOne({
         user_id: new Types.ObjectId(customerId),
@@ -254,7 +274,7 @@ export class CustomersAdminService {
 
     if (
       targetStatus === UserStatus.INACTIVE ||
-      targetStatus.toString() === 'BANNED'
+      targetStatus.toString() === 'SUSPENDED'
     ) {
       customer.token_version += 1;
     }
@@ -277,37 +297,6 @@ export class CustomersAdminService {
     });
 
     return { message: 'Cập nhật trạng thái thành công' };
-  }
-
-  // US.117 - AC7: Đặt lại mật khẩu thủ công và gửi Email
-  async manualResetPassword(
-    customerId: string,
-    actor: { id: string; email: string },
-  ) {
-    const customer = await this.customerModel.findById(customerId);
-    if (!customer) throw new NotFoundException('Khách hàng không tồn tại');
-
-    const tempPassword = randomBytes(4).toString('hex');
-    const salt = await bcrypt.genSalt(10);
-    customer.password = await bcrypt.hash(tempPassword, salt);
-    await customer.save();
-
-    await this.emailService.sendRaw(
-      customer.email,
-      '[H&N Odyssey] Mật khẩu đã được cấp lại',
-      `<p>Mật khẩu tạm thời của bạn là: <b>${tempPassword}</b></p>`,
-    );
-
-    await this.auditLogsService.log({
-      action: 'ADMIN_RESET_PASSWORD',
-      collection_name: 'customers',
-      actor_id: actor.id,
-      target_id: customerId,
-      department: Department.SUPPORT,
-      detail: { message: 'Admin reset password manually' },
-    });
-
-    return { message: 'Đã gửi mật khẩu mới cho khách' };
   }
 
   // US.120 - AC5, AC8, AC9: Quản lý quyền đánh giá
@@ -374,7 +363,7 @@ export class CustomersAdminService {
     return { message: 'Đã xóa hoàn toàn dữ liệu khách hàng' };
   }
 
-  async softDelete(customerId: string, actorId: string) {
+  async softDelete(customerId: string, reason: string, actorId: string) {
     const hasActiveOrders = await this.orderModel.findOne({
       user_id: new Types.ObjectId(customerId),
       status: { $in: ['PENDING', 'PROCESSING', 'DELIVERING'] }, // Chặn thao tác nếu đơn đang chạy
@@ -391,11 +380,12 @@ export class CustomersAdminService {
       customerId,
       {
         $set: {
-          status: UserStatus.INACTIVE,
+          status: UserStatus.DELETED, // Đổi từ INACTIVE -> DELETED
           is_active: false,
+          is_deleted: true, // Bật cờ xóa mềm
         },
         $inc: {
-          token_version: 1, // Ép văng tất cả các phiên đăng nhập (Force Logout)
+          token_version: 1,
         },
       },
       { new: true },
@@ -411,7 +401,10 @@ export class CustomersAdminService {
       actor_id: actorId,
       target_id: customerId,
       department: Department.MANAGEMENT,
-      detail: { message: 'Đã vô hiệu hóa tài khoản (Khóa mềm)' },
+      detail: {
+        message: 'Đã vô hiệu hóa tài khoản (Khóa mềm)',
+        reason: reason || 'Không có lý do', // <-- Thêm lý do vào log
+      },
     });
 
     return { message: 'Đã vô hiệu hóa tài khoản khách hàng thành công' };
@@ -446,6 +439,8 @@ export class CustomersAdminService {
 
     if (dto.first_Name) customer.first_Name = dto.first_Name;
     if (dto.last_Name) customer.last_Name = dto.last_Name;
+    if (dto.email) customer.email = dto.email;
+    if (dto.username) customer.username = dto.username;
     if (dto.phone) customer.phone = dto.phone;
     if (dto.gender) customer.gender = dto.gender;
     if (dto.internal_note !== undefined)
@@ -460,6 +455,12 @@ export class CustomersAdminService {
         ward_code: addr.ward_code,
         is_default: addr.is_default ?? false,
       })) as unknown as Address[];
+    }
+    if (dto.loyaltyTier) {
+      customer.loyalty = {
+        ...customer.loyalty,
+        tier: dto.loyaltyTier,
+      };
     }
 
     await customer.save();
@@ -549,10 +550,28 @@ export class CustomersAdminService {
   }
 
   private parseUserAgent(ua: string): string {
+    if (!ua || ua.trim() === '') return 'Không xác định';
+
+    // Máy tính (Desktop/Laptop)
     if (ua.includes('Windows')) return 'Máy tính (Windows)';
+    if (ua.includes('Macintosh') || ua.includes('Mac OS'))
+      return 'Máy tính (macOS)';
+    if (ua.includes('Linux') && !ua.includes('Android'))
+      return 'Máy tính (Linux)';
+
+    // Thiết bị di động (Mobile/Tablet)
     if (ua.includes('iPhone')) return 'Điện thoại (iOS)';
-    if (ua.includes('Android')) return 'Điện thoại (Android)';
-    return 'Thiết bị khác';
+    if (ua.includes('iPad')) return 'Máy tính bảng (iPad)';
+    if (ua.includes('Android')) return 'Điện thoại/Tablet (Android)';
+    if (ua.includes('Postman')) return 'Postman Client';
+    if (ua.includes('axios')) return 'Hệ thống gọi ngầm (Axios)';
+    if (ua.includes('insomnia')) return 'Insomnia Client';
+
+    if (ua.length > 30) {
+      return ua.substring(0, 30) + '...';
+    }
+
+    return ua || 'Thiết bị khác';
   }
 
   // US.119 - AC6: Xuất báo cáo lịch sử hoạt động (Bản nâng cấp Tuyệt đối)
@@ -713,29 +732,75 @@ export class CustomersAdminService {
     res.end();
   }
 
-  // US.113 - AC9: Xuất Excel danh sách khách hàng (Bản nâng cấp Pro)
-  async exportToExcel(res: Response): Promise<void> {
-    // 1. Lấy toàn bộ dữ liệu (Bao gồm cả Loyalty và Address)
+  // US.113 - AC9: Xuất Excel danh sách khách hàng (Bản nâng cấp Pro - Áp dụng bộ lọc)
+  async exportToExcel(query: ICustomerQuery, res: Response): Promise<void> {
+    // 1. Xử lý bộ lọc và phân trang từ Query (Giống hàm findAll)
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const {
+      keyword,
+      status,
+      tier,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = query;
+
+    const filter: FilterQuery<CustomerDocument> = { type: 'Customer' };
+
+    if (status === UserStatus.DELETED) {
+      filter.is_deleted = true;
+      filter.status = status;
+    } else {
+      filter.is_deleted = { $ne: true };
+      if (status) filter.status = status;
+    }
+
+    if (tier) filter['loyalty.tier'] = tier;
+
+    if (keyword) {
+      const searchRegex = { $regex: keyword, $options: 'i' };
+      filter.$or = [
+        { first_Name: searchRegex },
+        { last_Name: searchRegex },
+        { email: searchRegex },
+        { phone: searchRegex },
+      ];
+    }
+
+    const direction = sortOrder === 'desc' ? -1 : 1;
+
+    // 2. Query Data theo đúng những gì đang hiển thị trên FE
     const customers = (await this.customerModel
-      .find({ type: 'Customer' })
-      .sort({ createdAt: -1 }) // Khách hàng mới nhất lên đầu
-      .lean() // Ép kiểu any hoặc update interface ILeanCustomer tùy bạn
+      .find(filter)
+      .sort({ [sortBy]: direction })
+      .skip(skip)
+      .limit(limit)
+      .lean()
       .exec()) as unknown as ILeanCustomer[];
 
+    // Chặn xuất file nếu màn hình không có dữ liệu
+    if (customers.length === 0) {
+      throw new BadRequestException(
+        'Không có dữ liệu khách hàng nào khớp với bộ lọc hiện tại để xuất.',
+      );
+    }
+
+    // 3. Khởi tạo Excel
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Danh Sách Khách Hàng', {
       views: [{ state: 'frozen', ySplit: 3 }], // Đóng băng 3 dòng đầu (Header) khi cuộn
     });
 
-    // 2. TẠO TIÊU ĐỀ LỚN (Dòng 1 & Dòng 2)
-    // Phải gộp từ cột A đến tận cột K (Vì bảng có 11 cột)
+    // 4. TẠO TIÊU ĐỀ LỚN (Dòng 1 & Dòng 2)
     worksheet.mergeCells('A1:K1');
     worksheet.mergeCells('A2:K2');
 
     // Set giá trị và chiều cao cho dòng 1
     const titleRow = worksheet.getRow(1);
-    titleRow.height = 40; // Tăng chiều cao cho rộng rãi
-    const titleCell = worksheet.getCell('A1'); // Phải style trực tiếp vào ô A1 (ô gốc sau khi merge)
+    titleRow.height = 40;
+    const titleCell = worksheet.getCell('A1');
     titleCell.value = 'BÁO CÁO TỔNG HỢP DANH SÁCH KHÁCH HÀNG';
     titleCell.font = {
       name: 'Arial',
@@ -745,18 +810,18 @@ export class CustomersAdminService {
     };
     titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
 
-    // Set giá trị và chiều cao cho dòng 2 (Sub-title)
+    // Set giá trị và chiều cao cho dòng 2 (Sub-title hiển thị thêm Page hiện tại)
     const subTitleRow = worksheet.getRow(2);
     subTitleRow.height = 25;
     const subTitleCell = worksheet.getCell('A2');
-    subTitleCell.value = `Ngày xuất báo cáo: ${new Date().toLocaleString('vi-VN')} | Tổng số: ${customers.length} khách hàng`;
+    subTitleCell.value = `Ngày xuất báo cáo: ${new Date().toLocaleString('vi-VN')} | Trang: ${page} | Số lượng xuất: ${customers.length} khách hàng`;
     subTitleCell.font = { italic: true, color: { argb: 'FF666666' } };
     subTitleCell.alignment = { vertical: 'middle', horizontal: 'center' };
 
     // Thêm một dòng trống ở dòng 3 để tạo khoảng cách giữa Tiêu đề và Bảng data cho đẹp
     worksheet.getRow(3).height = 10;
 
-    // 3. ĐỊNH NGHĨA CỘT VÀ HEADER (Dòng 3)
+    // 5. ĐỊNH NGHĨA CỘT VÀ HEADER (Dòng 4)
     worksheet.columns = [
       { key: 'stt', width: 6 },
       { key: 'name', width: 25 },
@@ -771,7 +836,7 @@ export class CustomersAdminService {
       { key: 'status', width: 15 },
     ];
 
-    worksheet.getRow(3).values = [
+    worksheet.getRow(4).values = [
       'STT',
       'Họ và tên',
       'Số điện thoại',
@@ -785,16 +850,16 @@ export class CustomersAdminService {
       'Trạng thái',
     ];
 
-    // 4. TRANG TRÍ HEADER
-    const headerRow = worksheet.getRow(3);
+    // 6. TRANG TRÍ HEADER
+    const headerRow = worksheet.getRow(4);
     headerRow.height = 25;
     headerRow.eachCell((cell) => {
       cell.fill = {
         type: 'pattern',
         pattern: 'solid',
         fgColor: { argb: 'FF1F4E78' },
-      }; // Nền xanh dương đậm
-      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }; // Chữ trắng
+      };
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
       cell.alignment = { vertical: 'middle', horizontal: 'center' };
       cell.border = {
         top: { style: 'thin' },
@@ -804,9 +869,8 @@ export class CustomersAdminService {
       };
     });
 
-    // 5. ĐỔ DỮ LIỆU & FORMAT TỪNG DÒNG
+    // 7. ĐỔ DỮ LIỆU & FORMAT TỪNG DÒNG
     customers.forEach((c: ILeanCustomer, index: number) => {
-      // Xử lý Địa chỉ (Xóa bỏ chữ a: any)
       const defaultAddr =
         c.addresses?.find((a) => a.is_default) || c.addresses?.[0];
       const addrStr = defaultAddr
@@ -819,12 +883,15 @@ export class CustomersAdminService {
           ? 'Hoạt động'
           : c.status === 'INACTIVE'
             ? 'Đã khóa'
-            : 'Cấm';
+            : c.status === 'DELETED'
+              ? 'Đã xóa'
+              : 'Cấm';
+
       const genderStr =
         c.gender === 'MALE' ? 'Nam' : c.gender === 'FEMALE' ? 'Nữ' : 'Khác';
 
       const row = worksheet.addRow({
-        stt: index + 1,
+        stt: index + 1, // STT bắt đầu lại từ 1 cho trang xuất ra
         name: `${c.last_Name || ''} ${c.first_Name || ''}`.trim(),
         phone: c.phone || 'Chưa có',
         email: c.email || 'Chưa có',
@@ -847,7 +914,6 @@ export class CustomersAdminService {
           bottom: { style: 'thin' },
           right: { style: 'thin' },
         };
-        // Căn giữa cho STT, Phone, Giới tính, Hạng TV, Điểm, Ngày tạo, Trạng thái
         if ([1, 3, 5, 6, 8, 10, 11].includes(colNumber)) {
           cell.alignment = { vertical: 'middle', horizontal: 'center' };
         } else {
@@ -855,15 +921,19 @@ export class CustomersAdminService {
         }
       });
 
-      // Format đặc biệt cho cột Tiền tệ (Tổng chi tiêu)
+      // Format Tiền tệ (Tổng chi tiêu)
       row.getCell('total_spent').numFmt = '#,##0" ₫"';
       row.getCell('total_spent').alignment = {
         vertical: 'middle',
         horizontal: 'right',
       };
 
-      // Bôi đỏ những tài khoản bị khóa/cấm
-      if (c.status === 'INACTIVE' || c.status === 'BANNED') {
+      // Bôi đỏ trạng thái bất thường
+      if (
+        c.status === 'INACTIVE' ||
+        c.status === 'SUSPENDED' ||
+        c.status === 'DELETED'
+      ) {
         row.getCell('status').font = {
           color: { argb: 'FFFF0000' },
           bold: true,
@@ -871,7 +941,7 @@ export class CustomersAdminService {
       }
     });
 
-    // 6. TRẢ FILE VỀ CHO CLIENT
+    // 8. TRẢ FILE VỀ CHO CLIENT
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -897,5 +967,186 @@ export class CustomersAdminService {
     }
 
     return customer;
+  }
+
+  // Cập nhật trạng thái hàng loạt (Bulk Status)
+  async bulkUpdateStatus(
+    customerIds: string[],
+    targetStatus: UserStatus,
+    reason: string,
+    actor: { id: string; email: string; roles: string[] },
+  ) {
+    if (
+      targetStatus.toString() === 'SUSPENDED' &&
+      !actor.roles.includes('SUPER_ADMIN') &&
+      !actor.roles.includes('ADMIN')
+    ) {
+      throw new ForbiddenException(
+        'Chỉ Quản trị viên mới có quyền Đình chỉ tài khoản hàng loạt.',
+      );
+    }
+
+    const objectIds = customerIds.map((id) => new Types.ObjectId(id));
+
+    // Lọc ra những khách hàng đang có đơn hàng để KHÔNG khóa
+    let unprocessableIds: Types.ObjectId[] = [];
+    if (
+      targetStatus === UserStatus.INACTIVE ||
+      targetStatus.toString() === 'SUSPENDED'
+    ) {
+      const activeOrders = await this.orderModel
+        .find({
+          user_id: { $in: objectIds },
+          status: { $in: ['PENDING', 'PROCESSING', 'DELIVERING'] },
+        })
+        .select('user_id')
+        .lean()
+        .exec();
+
+      unprocessableIds = activeOrders.map(
+        (order) => order.user_id as unknown as Types.ObjectId,
+      );
+    }
+
+    // Danh sách ID an toàn có thể cập nhật
+    const safeIds = objectIds.filter(
+      (id) => !unprocessableIds.some((unprocId) => unprocId.equals(id)),
+    );
+
+    if (safeIds.length === 0) {
+      throw new BadRequestException(
+        'Không thể thực hiện. Tất cả tài khoản chọn đều đang có đơn hàng hoạt động.',
+      );
+    }
+
+    const updatePayload: Record<string, unknown> = {
+      $set: { status: targetStatus, status_reason: reason },
+    };
+
+    if (
+      targetStatus === UserStatus.INACTIVE ||
+      targetStatus.toString() === 'SUSPENDED'
+    ) {
+      updatePayload.$inc = { token_version: 1 }; // Force logout
+    }
+
+    await this.customerModel.updateMany(
+      { _id: { $in: safeIds } },
+      updatePayload,
+    );
+
+    // Ghi log Bulk
+    await this.auditLogsService.log({
+      action: `BULK_CHANGE_STATUS_${targetStatus}`,
+      collection_name: 'customers',
+      actor_id: actor.id,
+      target_id: 'BULK_ACTION',
+      department: Department.SUPPORT,
+      detail: { count: safeIds.length, targetStatus, reason },
+    });
+
+    return {
+      message: `Đã cập nhật trạng thái cho ${safeIds.length} tài khoản thành công.`,
+      skipped: unprocessableIds.length,
+    };
+  }
+
+  // Xóa mềm hàng loạt (Bulk Soft Delete)
+  async bulkSoftDelete(customerIds: string[], actorId: string, reason: string) {
+    const objectIds = customerIds.map((id) => new Types.ObjectId(id));
+
+    const activeOrders = await this.orderModel
+      .find({
+        user_id: { $in: objectIds },
+        status: { $in: ['PENDING', 'PROCESSING', 'DELIVERING'] },
+      })
+      .select('user_id')
+      .lean()
+      .exec();
+
+    const unprocessableIds = activeOrders.map(
+      (order) => order.user_id as unknown as Types.ObjectId,
+    );
+    const safeIds = objectIds.filter(
+      (id) => !unprocessableIds.some((unprocId) => unprocId.equals(id)),
+    );
+
+    if (safeIds.length === 0) {
+      throw new BadRequestException(
+        'Không thể xóa. Tất cả tài khoản chọn đều đang có đơn hàng hoạt động.',
+      );
+    }
+
+    await this.customerModel.updateMany(
+      { _id: { $in: safeIds } },
+      {
+        $set: {
+          status: UserStatus.DELETED, // Đổi từ INACTIVE -> DELETED
+          is_active: false,
+          is_deleted: true, // Bật cờ xóa mềm
+        },
+        $inc: { token_version: 1 },
+      },
+    );
+
+    await this.auditLogsService.log({
+      action: 'BULK_SOFT_DELETE',
+      collection_name: 'customers',
+      actor_id: actorId,
+      target_id: 'BULK_ACTION',
+      department: Department.MANAGEMENT,
+      detail: {
+        count: safeIds.length,
+        message: 'Đã vô hiệu hóa tài khoản hàng loạt',
+        reason: reason || 'Không có lý do',
+      },
+    });
+
+    return {
+      message: `Đã vô hiệu hóa ${safeIds.length} tài khoản thành công.`,
+      skipped: unprocessableIds.length,
+    };
+  }
+
+  // US.117: Staff chủ động đặt password mới và gửi qua email khách
+  async updatePasswordByAdmin(
+    customerId: string,
+    newPassword: string,
+    actor: { id: string; email: string },
+  ) {
+    const customer = await this.customerModel.findById(customerId);
+    if (!customer) throw new NotFoundException('Khách hàng không tồn tại');
+
+    const salt = await bcrypt.genSalt(10);
+    customer.password = await bcrypt.hash(newPassword, salt);
+    // Invalidate tất cả session cũ (bảo mật)
+    customer.token_version += 1;
+    await customer.save();
+
+    // Gửi email đến địa chỉ email MỚI NHẤT của khách (đã được cập nhật trước đó trong cùng request)
+    await this.emailService.sendRaw(
+      customer.email,
+      '[H&N Odyssey] Mật khẩu tài khoản đã được cập nhật',
+      `<p>Xin chào <b>${customer.first_Name} ${customer.last_Name}</b>,</p>
+     <p>Mật khẩu tài khoản của bạn vừa được cập nhật bởi bộ phận hỗ trợ.</p>
+     <p>Mật khẩu mới: <b>${newPassword}</b></p>
+     <p>Vui lòng đăng nhập và đổi mật khẩu ngay sau khi nhận được email này.</p>
+     <p>Nếu bạn không yêu cầu thao tác này, hãy liên hệ ngay với chúng tôi.</p>`,
+    );
+
+    await this.auditLogsService.log({
+      action: 'ADMIN_SET_PASSWORD',
+      collection_name: 'customers',
+      actor_id: actor.id,
+      target_id: customerId,
+      department: Department.SUPPORT,
+      detail: {
+        message: 'Admin đặt mật khẩu mới cho khách, đã gửi email thông báo',
+      },
+    });
+
+    return {
+      message: 'Đã cập nhật mật khẩu và gửi email thông báo cho khách.',
+    };
   }
 }

@@ -7,6 +7,7 @@ import {
   IsBoolean,
   ValidateNested,
   IsArray,
+  IsEmail,
 } from 'class-validator';
 import { Gender } from '../../schemas/user.schema';
 
@@ -23,6 +24,10 @@ export class AddressDto {
 export class AdminUpdateCustomerDto {
   @IsOptional() @IsString() first_Name?: string;
   @IsOptional() @IsString() last_Name?: string;
+  @IsOptional() @IsString() loyaltyTier?: string;
+
+  @IsOptional() @IsEmail() email?: string;
+  @IsOptional() @IsString() username?: string;
 
   @IsOptional()
   @Matches(/^(0[3|5|7|8|9])+([0-9]{8})$/, {

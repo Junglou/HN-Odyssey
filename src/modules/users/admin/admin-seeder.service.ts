@@ -165,6 +165,7 @@ export class AdminSeederService implements OnModuleInit {
     const staffs = [
       {
         email: 'admin@hnodyssey.com',
+        username: 'admin',
         firstName: 'Admin',
         lastName: 'System',
         phone: '0909000001',
@@ -174,6 +175,7 @@ export class AdminSeederService implements OnModuleInit {
       },
       {
         email: 'kho.truong@hnodyssey.com',
+        username: 'kho_truong',
         firstName: 'Văn Kho',
         lastName: 'Nguyễn',
         phone: '0909000003',
@@ -183,6 +185,7 @@ export class AdminSeederService implements OnModuleInit {
       },
       {
         email: 'sales.lead@hnodyssey.com',
+        username: 'sales_lead',
         firstName: 'Doanh Số',
         lastName: 'Phạm',
         phone: '0909000005',
@@ -192,6 +195,7 @@ export class AdminSeederService implements OnModuleInit {
       },
       {
         email: 'mkt.lead@hnodyssey.com',
+        username: 'mkt_lead',
         firstName: 'Sáng Tạo',
         lastName: 'Vũ',
         phone: '0909000007',
@@ -201,6 +205,7 @@ export class AdminSeederService implements OnModuleInit {
       },
       {
         email: 'support.01@hnodyssey.com',
+        username: 'support_01',
         firstName: 'Thân Thiện',
         lastName: 'Hoàng',
         phone: '0909000008',
@@ -210,6 +215,7 @@ export class AdminSeederService implements OnModuleInit {
       },
       {
         email: 'ketoan@hnodyssey.com',
+        username: 'ketoan',
         firstName: 'Thủ Quỹ',
         lastName: 'Trịnh',
         phone: '0909000009',
@@ -223,7 +229,7 @@ export class AdminSeederService implements OnModuleInit {
       const exists = await this.staffModel.findOne({ email: s.email });
       if (!exists) {
         await this.staffModel.create({
-          ...s,
+          ...s, // Object spread này sẽ tự động map 'username' xuống DB
           first_Name: s.firstName,
           last_Name: s.lastName,
           password: passwordHash,

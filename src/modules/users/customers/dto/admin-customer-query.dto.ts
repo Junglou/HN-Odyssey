@@ -13,6 +13,10 @@ export class AdminCustomerQueryDto extends PaginationQueryDto {
 
   @IsOptional()
   @IsString()
+  tier?: string;
+
+  @IsOptional()
+  @IsString()
   sortBy?: string = 'createdAt'; // AC4: Sắp xếp
 
   @IsOptional()

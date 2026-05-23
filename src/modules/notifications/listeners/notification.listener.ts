@@ -34,6 +34,12 @@ interface TradeInAcceptedPayload {
   rma_order_code: string;
 }
 
+interface TicketCreatedPayload {
+  email: string;
+  ticketId: string;
+  content: string;
+}
+
 interface TradeInCompletedPayload {
   request_id: string;
   customer_id: string;
@@ -384,5 +390,33 @@ export class NotificationListener {
       priority: NotificationPriority.HIGH,
       metadata: { target_url: `/trade-in/history/${data.request_id}` },
     });
+  }
+
+  @OnEvent('support.ticket_created')
+  async handleTicketCreated(data: TicketCreatedPayload) {
+    this.logger.log(
+      `[Support] Bắt đầu xử lý thông báo cho Ticket mới từ: ${data.email}`,
+    );
+
+    // 1. Bắn thông báo In-app (Qua Socket/DB) cho nhân viên CSKH hoặc Admin
+    await this.notificationsService.createAndSend({
+      recipient_role: 'SUPPORT_STAFF', // Hoặc 'SUPER_ADMIN' tùy thuộc vào logic phân quyền của bạn
+      title: 'Có yêu cầu hỗ trợ mới (Offline Ticket)',
+      message: `Khách hàng (${data.email}) vừa gửi lời nhắn: "${data.content.substring(0, 50)}..."`,
+      type: NotificationType.SYSTEM, // Nếu bạn có NotificationType.SUPPORT trong enum thì thay vào nhé
+      priority: NotificationPriority.HIGH,
+      metadata: { target_url: `/crm/support/chats/${data.ticketId}` }, // Dẫn link trực tiếp tới Portal
+    });
+
+    // 2. (Tùy chọn) Gửi Email thông báo cho Trưởng bộ phận CSKH / Email dùng chung
+    const supportEmail =
+      this.configService.get<string>('MAIL_SUPPORT_RECEIVER') ||
+      'support@hn-odyssey.com';
+
+    await this.emailService.sendRaw(
+      supportEmail,
+      `[H&N Odyssey - CSKH] Ticket hỗ trợ mới từ ${data.email}`,
+      `Hệ thống vừa ghi nhận một Ticket hỗ trợ Offline.\n\n- Khách hàng: ${data.email}\n- Nội dung: ${data.content}\n- Link xử lý: /crm/support/chats/${data.ticketId}`,
+    );
   }
 }

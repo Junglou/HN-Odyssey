@@ -4,10 +4,13 @@ import {
   IsDateString,
   IsInt,
   Min,
+  IsMongoId,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class FilterOrderDto {
+  @IsOptional() @IsMongoId() user_id?: string;
+
   @IsOptional()
   @IsString()
   search?: string;

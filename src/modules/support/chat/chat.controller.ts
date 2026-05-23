@@ -17,8 +17,11 @@ import { Public } from 'src/common/decorators/public.decorator';
 
 export class FilterConversationDto {
   status?: string;
+  agent_id?: string;
+  unassigned?: string; // Nhận 'true' hoặc 'false' từ query params
   limit?: number;
   page?: number;
+  search?: string;
 }
 
 export class InitChatDto {
@@ -106,5 +109,19 @@ export class ChatController {
     @Body() dto: { rating: number; comment?: string },
   ) {
     return this.chatService.updateCsat(id, dto);
+  }
+
+  // Lấy tin nhắn theo ID của hội thoại (Admin CRM gọi)
+  @Get(':id/messages')
+  @RequirePermissions(Resource.SUPPORT, Action.READ)
+  async getMessagesByConvId(@Param('id') id: string) {
+    return this.chatService.getMessagesByConvId(id);
+  }
+
+  // Nhân viên xác nhận hoàn thành phiên tư vấn
+  @Patch(':id/close')
+  @RequirePermissions(Resource.SUPPORT, Action.UPDATE)
+  async closeConversation(@Param('id') id: string) {
+    return this.chatService.closeConversation(id);
   }
 }

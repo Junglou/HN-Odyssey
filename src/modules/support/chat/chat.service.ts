@@ -25,6 +25,8 @@ interface ChatContext {
 }
 
 interface ChatResponse {
+  _id?: string;
+  createdAt?: string;
   conversation_id: string;
   sender_type: string;
   content: string;
@@ -35,6 +37,8 @@ interface SendMessageDto {
   conversationId: string;
   content: string;
   sender_type?: 'USER' | 'AGENT';
+  message_type?: 'TEXT' | 'IMAGE' | 'PRODUCT_CARD' | 'FILE';
+  metadata?: Record<string, unknown>;
 }
 
 interface AiEngineResponse {
@@ -42,11 +46,23 @@ interface AiEngineResponse {
   action?: string;
 }
 
-// Interface cho kết quả Aggregate
+// Định nghĩa kiểu dữ liệu con cho kết quả đếm
+interface AggregateCount {
+  count: number;
+}
+
+// Interface cho kết quả Aggregate mới, loại bỏ hoàn toàn "any"
 interface AggregateStats {
-  byStatus: Array<{ _id: string; count: number }>;
+  Waitlist: AggregateCount[];
+  Ongoing: AggregateCount[];
+  Complete: AggregateCount[];
   csatData: Array<{ _id: null; avgRating: number }>;
-  ahtData: Array<{ _id: null; avgAht: number }>;
+  byStatus: Array<{ _id: string; count: number }>;
+}
+
+interface LatestMessageAggregation {
+  _id: Types.ObjectId;
+  latest_message: Message;
 }
 
 @Injectable()
@@ -64,7 +80,7 @@ export class ChatService {
     private emailService: EmailService,
   ) {
     // THÊM DÒNG NÀY ĐỂ FAKE CÓ NGƯỜI ONLINE:
-    //this.onlineAgents.add('fake-agent-de-test');
+    // this.onlineAgents.add('fake-agent-de-test');
   }
 
   async initOrGetConversation(sessionId: string, customerId?: string) {
@@ -140,35 +156,75 @@ export class ChatService {
   // AC14: Fix lỗi "Unsafe argument" bằng cách dùng FilterQuery
   async findAllConversations(query: {
     status?: string;
+    agent_id?: string;
+    unassigned?: string;
     limit?: number;
     page?: number;
+    search?: string;
   }) {
-    const { status, limit = 10, page = 1 } = query;
+    const { status, limit = 20, page = 1, search } = query;
     const skip = (page - 1) * limit;
 
     const filter: FilterQuery<Conversation> = {};
     if (status) filter.status = status;
 
-    const [data, total] = await Promise.all([
-      this.convModel
-        .find(filter)
-        .populate('customer_id', 'fullName email avatar')
-        .populate('agent_id', 'fullName employee_code')
-        .sort({ updatedAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean()
-        .exec(),
-      this.convModel.countDocuments(filter).exec(),
-    ]);
+    // LOGIC CHUẨN: Lọc theo phân công
+    if (query.unassigned === 'true') {
+      filter.agent_id = { $exists: false }; // Chưa ai nhận (Waitlist)
+    } else if (query.agent_id) {
+      filter.agent_id = new Types.ObjectId(query.agent_id); // Của riêng nhân viên này (Ongoing)
+    }
+
+    if (search) {
+      const searchRegex = new RegExp(search, 'i');
+      filter.$or = [
+        { session_id: searchRegex },
+        { department_tag: searchRegex },
+        // Lưu ý: Nếu bạn muốn search theo tên user đã Login (customer_id),
+        // bạn cần tìm mảng userIds từ UserModel trước rồi nhét vào đây thông qua { customer_id: { $in: userIds } }
+      ];
+    }
+
+    const conversations = await this.convModel
+      .find(filter)
+      .populate('customer_id', 'first_Name last_Name username email avatar')
+      .populate('agent_id', 'first_Name last_Name employee_code')
+      .sort({ updatedAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean()
+      .exec();
+
+    const total = await this.convModel.countDocuments(filter).exec();
+
+    // (Giữ nguyên đoạn Bulk API lấy latestMessage của bạn ở đây...)
+    const convIds = conversations.map((c) => c._id);
+    const latestMessages = await this.msgModel
+      .aggregate<LatestMessageAggregation>([
+        { $match: { conversation_id: { $in: convIds } } },
+        { $sort: { createdAt: -1 } },
+        {
+          $group: {
+            _id: '$conversation_id',
+            latest_message: { $first: '$$ROOT' },
+          },
+        },
+      ])
+      .exec();
+
+    const data = conversations.map((conv) => {
+      const matchMsg = latestMessages.find(
+        (m) => m._id.toString() === conv._id.toString(),
+      );
+      return {
+        ...conv,
+        latest_message: matchMsg ? matchMsg.latest_message : null,
+      };
+    });
 
     return {
       data,
-      meta: {
-        total,
-        page,
-        last_page: Math.ceil(total / limit),
-      },
+      meta: { total, page, last_page: Math.ceil(total / limit) },
     };
   }
 
@@ -176,49 +232,40 @@ export class ChatService {
   async getChatStatistics() {
     const stats = await this.convModel
       .aggregate<AggregateStats>([
-        // Ép kiểu ngay tại đây để TS hiểu result
         {
           $facet: {
-            byStatus: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+            Waitlist: [
+              { $match: { status: 'OPEN', agent_id: { $exists: false } } },
+              { $count: 'count' },
+            ],
+            Ongoing: [
+              { $match: { status: 'OPEN', agent_id: { $exists: true } } },
+              { $count: 'count' },
+            ],
+            Complete: [{ $match: { status: 'CLOSED' } }, { $count: 'count' }],
+            // Phục vụ Analytics:
             csatData: [
               { $match: { 'csat.rating': { $exists: true } } },
               { $group: { _id: null, avgRating: { $avg: '$csat.rating' } } },
             ],
-            ahtData: [
-              {
-                $match: {
-                  opened_at: { $exists: true },
-                  closed_at: { $exists: true },
-                },
-              },
-              {
-                $project: {
-                  duration: { $subtract: ['$closed_at', '$opened_at'] },
-                },
-              },
-              { $group: { _id: null, avgAht: { $avg: '$duration' } } },
-            ],
+            byStatus: [{ $group: { _id: '$status', count: { $sum: 1 } } }], // Giữ lại để tính handoff_rate
           },
         },
       ])
       .exec();
 
-    // stats là mảng, lấy phần tử đầu tiên
+    // Do stats đã được định dạng kiểu, việc truy xuất sẽ được TypeScript bảo vệ
     const result = stats[0];
 
-    // Sử dụng optional chaining để tránh lỗi runtime nếu mảng rỗng
-    const avgAhtMs = result?.ahtData?.[0]?.avgAht ?? 0;
+    // Sử dụng Optional Chaining an toàn
     const avgCsat = result?.csatData?.[0]?.avgRating ?? 0;
     const statusDistribution = result?.byStatus ?? [];
 
-    // Convert ms sang định dạng phút:giây
-    const minutes = Math.floor(avgAhtMs / 60000);
-    const seconds = Math.floor((avgAhtMs % 60000) / 1000);
-
     return {
-      status_distribution: statusDistribution,
+      WaitlistCount: result?.Waitlist?.[0]?.count ?? 0,
+      OngoingCount: result?.Ongoing?.[0]?.count ?? 0,
+      CompleteCount: result?.Complete?.[0]?.count ?? 0,
       average_csat: avgCsat.toFixed(1),
-      aht: `${minutes}m ${seconds}s`,
       handoff_rate: this.calculateHandoffRate(statusDistribution),
     };
   }
@@ -390,23 +437,27 @@ export class ChatService {
     const status = conv?.status || ConversationStatus.BOT;
 
     const cleanContent = this.filterProfanity(data.content);
-
-    // Xác định người gửi (mặc định là USER nếu không truyền)
     const senderType = data.sender_type || 'USER';
 
-    // Lưu tin nhắn vào DB
-    await this.msgModel.create({
+    const savedMsg = await this.msgModel.create({
       conversation_id: new Types.ObjectId(data.conversationId),
-      sender_type: senderType, // Truyền biến động vào đây
+      sender_type: senderType,
       content: cleanContent,
+      message_type: data.message_type || 'TEXT',
+      metadata: data.metadata || {},
     });
 
+    // Lấy trường createdAt thông qua hàm .get() của Mongoose và ép kiểu về Date
+    const createdAt = savedMsg.get('createdAt') as Date;
+
     return {
+      _id: savedMsg._id.toString(),
+      createdAt: createdAt.toISOString(),
       conversation_id: data.conversationId,
       sender_type: senderType,
       content: cleanContent,
       conversation_status: status as string,
-    };
+    }; // Đã gỡ bỏ hoàn toàn "as any"
   }
 
   async getBotResponse(data: SendMessageDto): Promise<ChatResponse> {
@@ -552,5 +603,28 @@ export class ChatService {
       },
       { new: true },
     );
+  }
+
+  // BỔ SUNG: API Lấy danh sách tin nhắn bằng Conversation ID cho Admin (Portal CRM)
+  async getMessagesByConvId(convId: string) {
+    return this.msgModel
+      .find({ conversation_id: new Types.ObjectId(convId) })
+      .sort({ createdAt: 1 })
+      .lean()
+      .exec();
+  }
+
+  // BỔ SUNG: API để Nhân viên tự đóng phiên chat
+  async closeConversation(conversationId: string) {
+    return this.convModel
+      .findByIdAndUpdate(
+        conversationId,
+        {
+          status: ConversationStatus.CLOSED,
+          closed_at: new Date(),
+        },
+        { new: true },
+      )
+      .exec();
   }
 }
