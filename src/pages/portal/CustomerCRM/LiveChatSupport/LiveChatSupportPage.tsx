@@ -6,12 +6,15 @@ export default function LiveChatSupportPage() {
 
   return (
     <LiveChatSupport
-      filteredSessions={chatLogic.filteredSessions}
+      filteredSessions={chatLogic.sessions}
+      hasMore={chatLogic.hasMore}
       activeTab={chatLogic.activeTab}
       searchQuery={chatLogic.searchQuery}
       activeSessionId={chatLogic.activeSessionId}
       activeSession={chatLogic.activeSession}
+      tabCounts={chatLogic.tabCounts}
       actions={chatLogic.actions}
+      typingUsers={chatLogic.typingUsers}
     />
   );
 }

@@ -1,8 +1,9 @@
 import CustomerManagement from "../../../../components/portal/CustomerCRM/CustomerManagement/CustomerManagement";
 import CustomerModal from "../../../../components/portal/CustomerCRM/CustomerManagement/CustomerModal";
-import ConfirmDeleteModal from "../../../../components/portal/common/ConfirmDeleteModal";
-import { useCustomerManagement } from "../../../../hooks/portal/CustomerCRM/CustomerManagement/useCustomerManagement";
+import CustomerDetailModal from "../../../../components/portal/CustomerCRM/CustomerManagement/CustomerDetailModal";
+import StatusReasonModal from "../../../../components/portal/CustomerCRM/CustomerManagement/StatusReasonModal";
 import "./CustomerManagementPage.css";
+import { useCustomerManagement } from "../../../../hooks/portal/CustomerCRM/CustomerManagement/useCustomerManagement";
 
 export default function CustomerManagementPage() {
   const {
@@ -17,11 +18,13 @@ export default function CustomerManagementPage() {
     toggleRowStatus,
     handleModalSubmit,
     bulkActions,
+    reasonModal,
+    handleReasonSubmit,
+    closeReasonModal,
   } = useCustomerManagement();
 
   return (
     <div className="crm-page-container">
-      {/* component chính */}
       <CustomerManagement
         data={currentRecords}
         pagination={pagination}
@@ -34,13 +37,10 @@ export default function CustomerManagementPage() {
         bulkActions={bulkActions}
       />
 
-      {/* modal */}
-      {(modalConfig.mode === "add" ||
-        modalConfig.mode === "edit" ||
-        modalConfig.mode === "view") && (
+      {(modalConfig.mode === "add" || modalConfig.mode === "edit") && (
         <CustomerModal
           isOpen={modalConfig.isOpen}
-          mode={modalConfig.mode as "add" | "edit" | "view"}
+          mode={modalConfig.mode as "add" | "edit"}
           initialData={modalConfig.editingRecord}
           isSubmitting={modalConfig.isSubmitting}
           onClose={actions.closeModal}
@@ -48,19 +48,24 @@ export default function CustomerManagementPage() {
         />
       )}
 
-      {/* hiển thị modal xác nhận xóa khi mode được chuyển sang delete */}
-      {modalConfig.mode === "delete" && (
-        <ConfirmDeleteModal
+      {modalConfig.mode === "view" && (
+        <CustomerDetailModal
           isOpen={modalConfig.isOpen}
-          message={
-            modalConfig.editingRecord
-              ? `Are you sure you want to delete customer "${modalConfig.editingRecord.fullName}"?`
-              : `Are you sure you want to delete ${selectedIds.size} selected customers?`
-          }
+          customer={modalConfig.editingRecord}
           onClose={actions.closeModal}
-          onConfirm={actions.handleConfirmDelete}
         />
       )}
+
+      {/* XÓA PHẦN RENDER ConfirmDeleteModal Ở ĐÂY VÌ ĐÃ CÓ REASON MODAL LO */}
+
+      <StatusReasonModal
+        isOpen={reasonModal.isOpen}
+        title={reasonModal.title}
+        description={reasonModal.description}
+        isSubmitting={reasonModal.isSubmitting}
+        onClose={closeReasonModal}
+        onSubmit={handleReasonSubmit}
+      />
     </div>
   );
 }

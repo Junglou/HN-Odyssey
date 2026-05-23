@@ -4,6 +4,8 @@
   flex-direction: column;
   gap: clamp(16px, 2vw, 20px);
   font-family: "Lexend Exa", sans-serif;
+  letter-spacing: -0.04em;
+  line-height: 1.4;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -54,6 +56,44 @@
 }
 .crm-btn-add:hover {
   background-color: #2563eb;
+}
+
+/* nhóm nút header */
+.crm-header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* nút export excel */
+.crm-btn-export {
+  background-color: #10b981;
+}
+.crm-btn-export:hover {
+  background-color: #059669;
+}
+
+/* độ rộng cột bảng */
+.crm-col-select {
+  width: 5%;
+}
+.crm-col-name {
+  width: 20%;
+}
+.crm-col-email {
+  width: 20%;
+}
+.crm-col-type {
+  width: 15%;
+}
+.crm-col-status {
+  width: 10%;
+}
+.crm-col-login {
+  width: 15%;
+}
+.crm-col-actions {
+  width: 15%;
+  text-align: right;
 }
 
 .crm-filters-card {
@@ -805,4 +845,12 @@
     justify-content: center;
     width: 100%;
   }
+}
+
+/* Badge dành riêng cho trạng thái Deleted (Xóa mềm) */
+.crm-badge-deleted {
+  color: #4b5563; /* Màu xám đậm */
+}
+.crm-badge-deleted .crm-dot {
+  background-color: #6b7280; /* Dấu chấm màu xám */
 }
