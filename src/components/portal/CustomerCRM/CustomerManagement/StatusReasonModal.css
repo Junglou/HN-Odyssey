@@ -1,0 +1,187 @@
+/* Overlay — mirror rt-modal-overlay */
+.crm-reason-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Container — mirror rt-modal */
+.crm-reason-modal-container {
+  background: #ffffff;
+  width: 100%;
+  max-width: 480px;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Title — mirror rt-modal-title */
+.crm-reason-model-title {
+  margin: 0 0 8px 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+/* Close button */
+.crm-reason-close-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  color: #6b7280;
+  padding: 4px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.crm-reason-close-btn:hover:not(:disabled) {
+  color: #111827;
+}
+
+.crm-reason-close-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Header row (title + close btn) */
+.crm-reason-model-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+/* Khi có header thì title không cần margin-bottom riêng */
+.crm-reason-model-header .crm-reason-model-title {
+  margin: 0;
+}
+
+/* Description — mirror rt-modal-desc */
+.crm-reason-modal-desc {
+  margin: 0 0 20px 0;
+  font-size: 0.95rem;
+  color: #4b5563;
+}
+
+/* Label */
+.crm-reason-label {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.crm-reason-required {
+  color: #ef4444;
+}
+
+/* Textarea — mirror rt-modal-textarea */
+.crm-reason-textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 12px;
+  border: 1px solid #111827;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: #111827;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+  background: #ffffff;
+  display: block;
+  margin-bottom: 24px;
+  transition: box-shadow 0.2s;
+}
+
+.crm-reason-textarea:focus {
+  box-shadow: 0 0 0 1px #111827;
+}
+
+.crm-reason-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.crm-reason-textarea.error {
+  border-color: #ef4444;
+}
+
+/* Error text */
+.crm-reason-error-text {
+  display: block;
+  margin-top: -20px;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+  color: #ef4444;
+}
+
+/* Footer — mirror rt-modal-footer */
+.crm-reason-model-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* Cancel — mirror rt-btn-outline */
+.crm-reason-btn-cancel {
+  padding: 8px 16px;
+  background: #fff;
+  border: 1px solid #111827;
+  border-radius: 6px;
+  color: #111827;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.crm-reason-btn-cancel:hover:not(:disabled),
+.crm-reason-btn-cancel:focus:not(:disabled) {
+  background: #f3f4f6;
+  outline: none;
+  border-color: #000000;
+  color: #000000;
+  box-shadow: 0 0 0 1px #000000;
+}
+
+.crm-reason-btn-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Submit — mirror rt-btn-confirm-reject */
+.crm-btn-submit-danger {
+  padding: 8px 16px;
+  background: #dc2626;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.crm-btn-submit-danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.crm-btn-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Body wrapper — chỉ dùng để bọc desc + form-group */
+.crm-reason-model-body {
+  display: contents;
+}

@@ -42,6 +42,7 @@ interface CustomerManagementProps {
     changePage: (page: number) => void;
     changeLimit: (limit: number) => void;
     lockUnlockCustomer: (id: string, currentStatus: CustomerStatus) => void;
+    exportExcel: () => void;
   };
   toggleRowStatus: (id: string, currentStatus: CustomerStatus) => void;
   bulkActions: {
@@ -106,6 +107,12 @@ export default function CustomerManagement({
             <span className="crm-dot"></span> Locked
           </span>
         );
+      case "Deleted":
+        return (
+          <span className="crm-badge crm-badge-deleted">
+            <span className="crm-dot"></span> Deleted
+          </span>
+        );
       default:
         return null;
     }
@@ -118,20 +125,31 @@ export default function CustomerManagement({
           <h1 className="crm-title">Customer Management</h1>
           <p className="crm-breadcrumb">Customer CRM / Customer Management</p>
         </div>
-        <button
-          type="button"
-          className="crm-btn-add"
-          onClick={actions.openAddModal}
-        >
-          + Add New User
-        </button>
+        <div className="crm-header-actions">
+          <button
+            type="button"
+            className="crm-btn-add crm-btn-export"
+            onClick={actions.exportExcel}
+          >
+            Export Excel
+          </button>
+          <button
+            type="button"
+            className="crm-btn-add"
+            onClick={actions.openAddModal}
+          >
+            + Add New User
+          </button>
+        </div>
       </div>
 
       <div className="crm-filters-card">
         <div className="crm-toolbar">
           <div className="crm-filters-row">
             <input
-              type="text"
+              type="search"
+              autoComplete="new-password"
+              name="crmSearchBoxUser"
               className="crm-filter-input"
               placeholder="Search by name, email or username"
               value={search}
@@ -154,20 +172,20 @@ export default function CustomerManagement({
               <div
                 className={`crm-dropdown-options ${isStatusOpen ? "open" : hasStatusOpened ? "closed" : ""}`}
               >
-                {(["All", "Active", "Inactive", "Locked"] as const).map(
-                  (opt) => (
-                    <div
-                      key={opt}
-                      className={`crm-dropdown-option ${statusFilter === opt ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changeStatusFilter(opt);
-                        setIsStatusOpen(false);
-                      }}
-                    >
-                      {opt}
-                    </div>
-                  ),
-                )}
+                {(
+                  ["All", "Active", "Inactive", "Locked", "Deleted"] as const
+                ).map((opt) => (
+                  <div
+                    key={opt}
+                    className={`crm-dropdown-option ${statusFilter === opt ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changeStatusFilter(opt);
+                      setIsStatusOpen(false);
+                    }}
+                  >
+                    {opt}
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -254,7 +272,7 @@ export default function CustomerManagement({
           <table className="crm-table">
             <thead>
               <tr>
-                <th style={{ width: "5%" }}>
+                <th className="crm-col-select">
                   <input
                     type="checkbox"
                     className="crm-checkbox"
@@ -265,12 +283,12 @@ export default function CustomerManagement({
                     onChange={(e) => actions.toggleSelectAll(e.target.checked)}
                   />
                 </th>
-                <th style={{ width: "20%" }}>Customer Name</th>
-                <th style={{ width: "20%" }}>Email</th>
-                <th style={{ width: "15%" }}>Customer Type</th>
-                <th style={{ width: "10%" }}>Status</th>
-                <th style={{ width: "15%" }}>Last Login</th>
-                <th style={{ width: "15%", textAlign: "right" }}>Actions</th>
+                <th className="crm-col-name">Customer Name</th>
+                <th className="crm-col-email">Email</th>
+                <th className="crm-col-type">Customer Type</th>
+                <th className="crm-col-status">Status</th>
+                <th className="crm-col-login">Last Login</th>
+                <th className="crm-col-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -370,7 +388,6 @@ export default function CustomerManagement({
                             >
                               Delete User
                             </button>
-
                             {record.status === "Locked" ? (
                               <button
                                 type="button"
@@ -428,7 +445,6 @@ export default function CustomerManagement({
             of {pagination.totalFiltered} users
           </span>
           <div className="crm-page-numbers">
-            {/* Nút lùi trang */}
             <button
               className="crm-page-num"
               disabled={pagination.page === 1}
@@ -447,8 +463,6 @@ export default function CustomerManagement({
                 </button>
               ),
             )}
-
-            {/* Nút tiến trang */}
             <button
               className="crm-page-num"
               disabled={
@@ -460,7 +474,6 @@ export default function CustomerManagement({
               &gt;
             </button>
 
-            {/* dropdown vừa fix */}
             <div className="crm-limit-dropdown" ref={limitRef}>
               <div
                 className={`crm-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}

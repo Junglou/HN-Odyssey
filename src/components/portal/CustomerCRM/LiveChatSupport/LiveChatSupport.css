@@ -157,7 +157,7 @@
   background-color: #eff6ff;
 }
 
-/* avatar giả lập */
+/* avatar */
 .lcs-avatar-circle {
   width: 40px;
   height: 40px;
@@ -175,6 +175,7 @@
   flex: 1;
   min-width: 0;
 }
+
 .lcs-session-name-row {
   display: flex;
   justify-content: space-between;
@@ -221,24 +222,28 @@
   font-size: 0.9rem;
 }
 
-/* cột phải: chi tiết nội dung tin nhắn */
+/* cột phải: khu vực chat */
 .lcs-chat-area {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* FIX: ngăn children tràn ra ngoài */
   background-color: #f9fafb;
 }
 
 .lcs-no-chat-selected {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
+  gap: 12px;
+  color: #9ca3af;
   font-size: 1rem;
 }
 
-/* header khung chat / thông tin người dùng hiện tại */
+/* header khung chat */
 .lcs-chat-header {
   display: flex;
   justify-content: space-between;
@@ -246,6 +251,7 @@
   padding: 16px 24px;
   background-color: #ffffff;
   border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
 }
 
 .lcs-chat-header-user {
@@ -266,6 +272,12 @@
   color: #6b7280;
 }
 
+.lcs-chat-opened-at {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
 .lcs-action-btn {
   padding: 8px 16px;
   border-radius: 8px;
@@ -275,6 +287,9 @@
   border: none;
   font-family: inherit;
   transition: opacity 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .lcs-action-btn.dark {
@@ -286,10 +301,13 @@
   opacity: 0.9;
 }
 
+/* vùng tin nhắn — FIX: min-height: 0 ngăn tràn đè lên input */
 .lcs-chat-messages {
   flex: 1;
+  min-height: 0;
   padding: 24px;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -309,16 +327,14 @@
   flex: 1;
   border-bottom: 1px solid #e5e7eb;
 }
-
 .lcs-chat-date-divider::before {
   margin-right: 12px;
 }
-
 .lcs-chat-date-divider::after {
   margin-left: 12px;
 }
 
-/* định dạng chung cho tin nhắn */
+/* tin nhắn */
 .lcs-message-row {
   display: flex;
   align-items: flex-end;
@@ -354,7 +370,6 @@
   background-color: #ea580c;
 }
 
-/* định dạng khối tin nhắn */
 .lcs-message-content {
   padding: 12px 16px;
   border-radius: 20px;
@@ -376,7 +391,6 @@
   color: #ffffff;
 }
 
-/* định dạng cho tin nhắn chứa ảnh */
 .lcs-message-image {
   margin-top: 8px;
 }
@@ -386,7 +400,17 @@
   display: block;
 }
 
-/* định dạng hiển thị thông tin sản phẩm đính kèm */
+/* tin nhắn hệ thống */
+.lcs-message-system {
+  text-align: center;
+  margin: 16px 0;
+  font-size: 13px;
+  color: #6c757d;
+  font-style: italic;
+  width: 100%;
+}
+
+/* sản phẩm đính kèm */
 .lcs-product-card {
   margin-top: 10px;
   background-color: #ffffff;
@@ -429,13 +453,59 @@
   font-weight: 600;
 }
 
+/* file đính kèm */
+.lcs-message-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+}
+
+.lcs-message-file a {
+  font-weight: bold;
+  color: #333;
+  text-decoration: none;
+}
+
+.lcs-message-file p {
+  font-size: 11px;
+  margin: 0;
+  color: #666;
+}
+
+/* timestamp */
 .lcs-message-time {
   font-size: 0.7rem;
   color: #9ca3af;
   margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 0 !important;
 }
 
-/* thanh nhập tin nhắn */
+.lcs-message-time-customer {
+  justify-content: flex-start;
+}
+
+.lcs-message-time-consultant {
+  justify-content: flex-end;
+}
+
+/* double check icon */
+.lcs-double-check {
+  margin-left: 4px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* đang gõ */
+.lcs-typing {
+  font-style: italic;
+  color: #666;
+}
+
 .lcs-chat-input-area {
   padding: 16px 24px;
   background-color: #ffffff;
@@ -443,10 +513,13 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
+  position: relative;
 }
 
-.lcs-chat-input-area input {
+.lcs-chat-input-area > input[type="text"] {
   flex: 1;
+  min-width: 0;
   border: none;
   outline: none;
   padding: 10px 0;
@@ -459,6 +532,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .lcs-icon-btn {
@@ -492,17 +566,42 @@
   justify-content: center;
   cursor: pointer;
   transition: background-color 0.2s;
+  flex-shrink: 0;
 }
 
 .lcs-send-btn:hover {
   background-color: #2563eb;
 }
+
 .lcs-icon-btn:focus,
 .lcs-send-btn:focus,
 .lcs-icon-btn:active,
 .lcs-send-btn:active {
   outline: none;
   box-shadow: none;
+}
+
+.lcs-emoji-picker-wrapper {
+  position: absolute;
+  bottom: 75px;
+  right: 24px;
+  z-index: 50;
+}
+
+.lcs-emoji-picker-wrapper svg {
+  display: inline !important;
+  vertical-align: middle;
+}
+
+/* department tag */
+.lcs-department-tag {
+  font-size: 11px;
+  background-color: #007bff;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-top: 4px;
 }
 
 /* thanh chia cắt và hỗ trợ kéo thả */
@@ -520,7 +619,6 @@
   background-color: #3b82f6;
 }
 
-/* khi đang kéo thả, khóa việc bôi đen text để không làm khó chịu người dùng */
 .is-resizing-container {
   user-select: none;
 }
@@ -553,4 +651,61 @@
     flex: 1 1 auto;
     justify-content: center;
   }
+}
+
+/* avatar image */
+.lcs-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.lcs-emoji-picker-wrapper .EmojiPickerReact svg {
+  display: block; /* Trả về block thay vì inline */
+  vertical-align: baseline;
+}
+
+.lcs-emoji-picker-wrapper .EmojiPickerReact button {
+  padding: 0 !important;
+  border: none !important;
+  background-color: transparent !important;
+  border-radius: 0 !important;
+  min-width: auto;
+  min-height: auto;
+  line-height: normal;
+}
+
+.lcs-emoji-picker-wrapper .EmojiPickerReact .epr-icn-clear-search {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lcs-emoji-picker-wrapper .EmojiPickerReact button:focus,
+.lcs-emoji-picker-wrapper .EmojiPickerReact button:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.lcs-emoji-picker-wrapper .EmojiPickerReact button:hover {
+  border-color: transparent !important;
+}
+
+.lcs-message-avatar svg {
+  display: block;
+  margin: auto;
+}
+
+.lcs-message-row.consultant .lcs-message-time {
+  order: -1;
+  margin-right: 8px;
+}
+
+.lcs-message-row.customer .lcs-message-content {
+  border-bottom-left-radius: 4px;
+}
+
+.lcs-message-row.consultant .lcs-message-content {
+  border-bottom-right-radius: 4px;
 }
