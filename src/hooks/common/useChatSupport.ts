@@ -52,23 +52,25 @@ export function useChatSupport() {
   const [messages, setMessages] = useState<ChatMessage[]>(MOCK_MESSAGES);
 
   // TODO: Khởi tạo socket.io-client và API initChat ở đây trong useEffect
+  // ...
 
-  const sendMessage = (text: string) => {
-    // 1. Cập nhật UI ngay lập tức (Optimistic UI)
-    const newMsg: ChatMessage = {
+  // handlers
+  const sendMessage = (
+    content: string,
+    message_type: "TEXT" | "IMAGE" | "FILE" = "TEXT",
+    metadata?: { fileName?: string; fileSize?: string },
+  ) => {
+    const newMessage: ChatMessage = {
       id: Date.now().toString(),
       sender_type: "USER",
-      content: text,
-      message_type: "TEXT",
+      content,
+      message_type,
+      metadata,
     };
-    setMessages((prev) => [...prev, newMsg]);
+    setMessages((prev) => [...prev, newMessage]);
 
-    // TODO: 2. Emit sự kiện socket 'send_message' xuống Backend
-    // socket.emit('send_message', { conversationId: '...', content: text });
+    // TODO: Bắn socket emit("user_message", { ... }) lên server ở đây
   };
 
-  return {
-    messages,
-    sendMessage,
-  };
+  return { messages, sendMessage };
 }
