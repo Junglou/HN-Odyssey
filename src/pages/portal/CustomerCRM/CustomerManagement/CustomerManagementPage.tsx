@@ -56,8 +56,6 @@ export default function CustomerManagementPage() {
         />
       )}
 
-      {/* XÓA PHẦN RENDER ConfirmDeleteModal Ở ĐÂY VÌ ĐÃ CÓ REASON MODAL LO */}
-
       <StatusReasonModal
         isOpen={reasonModal.isOpen}
         title={reasonModal.title}
