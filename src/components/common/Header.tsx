@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
-import "./Header.css";
-
+import { useHeader } from "../../hooks/common/useHeader";
+import { useCart } from "../../hooks/common/cartDrop/useCart";
+import { useClickOutside } from "../../hooks/common/useClickOutside";
+import CartDropdown from "./cartDrop/CartDropdown";
 import logoImage from "../../assets/images/logo.png";
 import {
   HeartIcon,
@@ -9,52 +11,69 @@ import {
   CartIcon,
   SearchIconSmall,
 } from "../../assets/icons/HeaderIcons";
+import "./Header.css";
 
 const Header = () => {
-  const [isVisible, setIsVisible] = useState(true);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  // hooks
+  const {
+    isVisible,
+    isSearchOpen,
+    isMobileMenuOpen,
+    hasWishlistItems,
+    searchInputRef,
+    handleOpenSearch,
+    handleCloseSearch,
+    toggleMobileMenu,
+    closeMobileMenu,
+    handleAccountClick,
+    handleWishlistClick,
+  } = useHeader();
 
-  const lastScrollY = useRef(0);
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const {
+    isOpen: isCartOpen,
+    items: cartItems,
+    subtotal,
+    isDeleteModalOpen,
+    toggleCart,
+    closeCart,
+    increaseQuantity,
+    decreaseQuantity,
+    closeDeleteModal,
+    confirmDelete,
+  } = useCart();
+
+  const cartWrapperRef = useRef<HTMLDivElement>(null);
+
+  // đồng bộ trạng thái modal tránh lỗi closure
+  const isModalOpenRef = useRef(isDeleteModalOpen);
 
   useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
+    isModalOpenRef.current = isDeleteModalOpen;
+  }, [isDeleteModalOpen]);
 
-      if (currentScrollY <= 80) {
-        setIsVisible(true);
-      } else if (currentScrollY < lastScrollY.current - 2) {
-        setIsVisible(true);
-      } else if (currentScrollY > lastScrollY.current + 2) {
-        setIsVisible(false);
-        setIsSearchOpen(false);
-      }
-
-      lastScrollY.current = currentScrollY <= 0 ? 0 : currentScrollY;
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  const handleOpenSearch = () => {
-    setIsSearchOpen(true);
-    setTimeout(() => {
-      searchInputRef.current?.focus();
-    }, 100);
-  };
+  useClickOutside(cartWrapperRef, () => {
+    if (isCartOpen && !isModalOpenRef.current) {
+      closeCart();
+    }
+  });
 
   return (
     <div className={`hn-header-wrapper ${isVisible ? "visible" : "hidden"}`}>
       <div className="header-main-bar">
-        {/* KHỐI 1: BÊN TRÁI (LOGO) */}
+        {/* khối cấu trúc bên trái */}
         <div className="header-left">
+          <button className="mobile-menu-toggle" onClick={toggleMobileMenu}>
+            <span className={`bar ${isMobileMenuOpen ? "open" : ""}`}></span>
+            <span className={`bar ${isMobileMenuOpen ? "open" : ""}`}></span>
+            <span className={`bar ${isMobileMenuOpen ? "open" : ""}`}></span>
+          </button>
+
           <Link to="/" className="header-logo">
             <img src={logoImage} alt="H&N Odyssey" />
           </Link>
         </div>
 
-        {/* KHỐI 2: Ở GIỮA (MENU NGANG) */}
+        {/* khối cấu trúc điều hướng ở giữa */}
         <nav className="header-nav">
           <Link to="/featured" className="nav-link">
             Featured
@@ -76,12 +95,38 @@ const Header = () => {
           </Link>
         </nav>
 
-        {/* KHỐI 3: BÊN PHẢI (ICONS & SEARCH) */}
         <div className="header-actions">
-          <HeartIcon className="action-icon" />
-          <UserIcon className="action-icon" />
-          <CartIcon className="action-icon" />
+          {/* danh mục yêu thích */}
+          <div className="header-action-wrapper" onClick={handleWishlistClick}>
+            <HeartIcon className="action-icon" />
+            {hasWishlistItems && <span className="action-dot"></span>}
+          </div>
 
+          {/* tài khoản cá nhân */}
+          <div className="header-action-wrapper" onClick={handleAccountClick}>
+            <UserIcon className="action-icon" />
+          </div>
+
+          <div className="header-action-wrapper" ref={cartWrapperRef}>
+            <div className="cart-trigger-box" onClick={toggleCart}>
+              <CartIcon className="action-icon" />
+              {cartItems.length > 0 && (
+                <span className="action-badge">{cartItems.length}</span>
+              )}
+            </div>
+            <CartDropdown
+              isOpen={isCartOpen}
+              items={cartItems}
+              subtotal={subtotal}
+              isDeleteModalOpen={isDeleteModalOpen}
+              onIncrease={increaseQuantity}
+              onDecrease={decreaseQuantity}
+              onCloseDeleteModal={closeDeleteModal}
+              onConfirmDelete={confirmDelete}
+            />
+          </div>
+
+          {/* ô tìm kiếm mở rộng */}
           <div
             className={`header-search ${isSearchOpen ? "active" : ""}`}
             onClick={handleOpenSearch}
@@ -91,10 +136,50 @@ const Header = () => {
               ref={searchInputRef}
               type="text"
               placeholder="Search"
-              onBlur={() => setIsSearchOpen(false)}
+              onBlur={handleCloseSearch}
             />
           </div>
         </div>
+      </div>
+
+      {/* mobile drawer */}
+      <div className={`mobile-drawer ${isMobileMenuOpen ? "open" : ""}`}>
+        <nav className="mobile-nav">
+          <Link
+            to="/featured"
+            className="mobile-nav-link"
+            onClick={closeMobileMenu}
+          >
+            Featured
+          </Link>
+          <Link to="/men" className="mobile-nav-link" onClick={closeMobileMenu}>
+            Men
+          </Link>
+          <Link
+            to="/women"
+            className="mobile-nav-link"
+            onClick={closeMobileMenu}
+          >
+            Women
+          </Link>
+          <Link to="/kid" className="mobile-nav-link" onClick={closeMobileMenu}>
+            Kid
+          </Link>
+          <Link
+            to="/equipment"
+            className="mobile-nav-link"
+            onClick={closeMobileMenu}
+          >
+            Equipment
+          </Link>
+          <Link
+            to="/emergency"
+            className="mobile-nav-link"
+            onClick={closeMobileMenu}
+          >
+            Emergency Packs
+          </Link>
+        </nav>
       </div>
     </div>
   );

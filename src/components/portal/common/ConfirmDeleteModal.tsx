@@ -1,4 +1,3 @@
-import React from "react";
 import "./ConfirmDeleteModal.css";
 
 interface ConfirmDeleteModalProps {
@@ -8,14 +7,16 @@ interface ConfirmDeleteModalProps {
   onConfirm: () => void;
 }
 
-const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
+const ConfirmDeleteModal = ({
   isOpen,
   message,
   onClose,
   onConfirm,
-}) => {
+}: ConfirmDeleteModalProps) => {
+  // ẩn modal nếu không được kích hoạt
   if (!isOpen) return null;
 
+  // render
   return (
     <div className="cd-modal-overlay">
       <div className="cd-modal-box">
@@ -39,7 +40,7 @@ const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
           </button>
         </div>
 
-        {/* Nội dung câu hỏi */}
+        {/* nội dung xác nhận */}
         <p className="cd-modal-message">{message}</p>
 
         {/* Khu vực nút bấm */}
