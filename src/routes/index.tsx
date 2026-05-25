@@ -62,6 +62,7 @@ import StockManagementPage from "../pages/portal/Warehouse/StockManagementPage";
 
 import OrderManagementPage from "../pages/portal/OrderManagement/OrderManagement/OrderManagementPage";
 import TradeInManagementPage from "../pages/portal/OrderManagement/TradeInManagement/TradeInManagementPage";
+import ShoppingCartPage from "../pages/shoppingCart/ShoppingCartPage";
 
 export const router = createBrowserRouter([
   // route auth
@@ -118,6 +119,10 @@ export const router = createBrowserRouter([
       {
         path: "blog",
         element: <BlogNewsPage />,
+      },
+      {
+        path: "cart",
+        element: <ShoppingCartPage />,
       },
       // todo: cum route profile nay can duoc boc bang auth guard de kiem tra token khi chay thuc te, hien tai de day de tien hanh thu nghiem
       {

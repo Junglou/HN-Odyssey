@@ -13,8 +13,9 @@ import {
 } from "../../assets/icons/HeaderIcons";
 import "./Header.css";
 
+// component
 const Header = () => {
-  // hooks
+  // hook
   const {
     isVisible,
     isSearchOpen,
@@ -43,10 +44,9 @@ const Header = () => {
   } = useCart();
 
   const cartWrapperRef = useRef<HTMLDivElement>(null);
-
-  // đồng bộ trạng thái modal tránh lỗi closure
   const isModalOpenRef = useRef(isDeleteModalOpen);
 
+  // helper
   useEffect(() => {
     isModalOpenRef.current = isDeleteModalOpen;
   }, [isDeleteModalOpen]);
@@ -57,10 +57,10 @@ const Header = () => {
     }
   });
 
+  // render
   return (
     <div className={`hn-header-wrapper ${isVisible ? "visible" : "hidden"}`}>
       <div className="header-main-bar">
-        {/* khối cấu trúc bên trái */}
         <div className="header-left">
           <button className="mobile-menu-toggle" onClick={toggleMobileMenu}>
             <span className={`bar ${isMobileMenuOpen ? "open" : ""}`}></span>
@@ -73,7 +73,6 @@ const Header = () => {
           </Link>
         </div>
 
-        {/* khối cấu trúc điều hướng ở giữa */}
         <nav className="header-nav">
           <Link to="/featured" className="nav-link">
             Featured
@@ -96,13 +95,11 @@ const Header = () => {
         </nav>
 
         <div className="header-actions">
-          {/* danh mục yêu thích */}
           <div className="header-action-wrapper" onClick={handleWishlistClick}>
             <HeartIcon className="action-icon" />
             {hasWishlistItems && <span className="action-dot"></span>}
           </div>
 
-          {/* tài khoản cá nhân */}
           <div className="header-action-wrapper" onClick={handleAccountClick}>
             <UserIcon className="action-icon" />
           </div>
@@ -123,10 +120,10 @@ const Header = () => {
               onDecrease={decreaseQuantity}
               onCloseDeleteModal={closeDeleteModal}
               onConfirmDelete={confirmDelete}
+              onCloseCart={closeCart} // truyền handler dọn dẹp ui
             />
           </div>
 
-          {/* ô tìm kiếm mở rộng */}
           <div
             className={`header-search ${isSearchOpen ? "active" : ""}`}
             onClick={handleOpenSearch}
@@ -142,7 +139,6 @@ const Header = () => {
         </div>
       </div>
 
-      {/* mobile drawer */}
       <div className={`mobile-drawer ${isMobileMenuOpen ? "open" : ""}`}>
         <nav className="mobile-nav">
           <Link

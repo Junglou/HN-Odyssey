@@ -1,8 +1,10 @@
+import { Link } from "react-router-dom";
 import { MinusIcon, PlusIcon } from "../../../assets/icons/CartIcons";
 import type { CartItem } from "../../../hooks/common/cartDrop/useCart";
 import CartConfirmModal from "./CartConfirmModal";
 import "./CartDropdown.css";
 
+// interface
 interface CartDropdownProps {
   isOpen: boolean;
   items: CartItem[];
@@ -12,8 +14,10 @@ interface CartDropdownProps {
   onDecrease: (id: string) => void;
   onCloseDeleteModal: () => void;
   onConfirmDelete: () => void;
+  onCloseCart: () => void;
 }
 
+// component
 export default function CartDropdown({
   isOpen,
   items,
@@ -23,7 +27,9 @@ export default function CartDropdown({
   onDecrease,
   onCloseDeleteModal,
   onConfirmDelete,
+  onCloseCart,
 }: CartDropdownProps) {
+  // render
   return (
     <div className={`cart-dropdown-wrapper ${isOpen ? "open" : ""}`}>
       <div className="cart-dropdown-items">
@@ -61,11 +67,13 @@ export default function CartDropdown({
           <span>Subtotal:</span>
           <span>{subtotal}$</span>
         </div>
-        <button className="cart-btn-outline">GO TO SHOPPING CART</button>
+        {/* chuyển đổi sang link điều hướng */}
+        <Link to="/cart" className="cart-btn-outline" onClick={onCloseCart}>
+          GO TO SHOPPING CART
+        </Link>
         <button className="cart-btn-solid">PROCESS TO CHECKOUT</button>
       </div>
 
-      {/* component modal xác nhận xóa */}
       <CartConfirmModal
         isOpen={isDeleteModalOpen}
         message="Are you sure you want to remove this item from your cart?"

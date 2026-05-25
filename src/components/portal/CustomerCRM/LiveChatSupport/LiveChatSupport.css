@@ -482,7 +482,7 @@
   margin-bottom: 4px;
   display: flex;
   align-items: center;
-  margin-bottom: 0 !important;
+  margin-bottom: 0;
 }
 
 .lcs-message-time-customer {
@@ -589,7 +589,7 @@
 }
 
 .lcs-emoji-picker-wrapper svg {
-  display: inline !important;
+  display: inline;
   vertical-align: middle;
 }
 
@@ -667,10 +667,10 @@
 }
 
 .lcs-emoji-picker-wrapper .EmojiPickerReact button {
-  padding: 0 !important;
-  border: none !important;
-  background-color: transparent !important;
-  border-radius: 0 !important;
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  border-radius: 0;
   min-width: auto;
   min-height: auto;
   line-height: normal;
@@ -684,12 +684,12 @@
 
 .lcs-emoji-picker-wrapper .EmojiPickerReact button:focus,
 .lcs-emoji-picker-wrapper .EmojiPickerReact button:focus-visible {
-  outline: none !important;
-  box-shadow: none !important;
+  outline: none;
+  box-shadow: none;
 }
 
 .lcs-emoji-picker-wrapper .EmojiPickerReact button:hover {
-  border-color: transparent !important;
+  border-color: transparent;
 }
 
 .lcs-message-avatar svg {
