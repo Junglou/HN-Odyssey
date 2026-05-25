@@ -153,10 +153,10 @@
   transform: translate(-50%, -50%);
   box-shadow: 4px 0 15px rgba(0, 0, 0, 0.2);
 }
-.arrow-icon {
+.reco-verified-arrow-icon {
   transition: transform 1s ease;
 }
-.reco-verified-page-container.collapsed .arrow-icon {
+.reco-verified-page-container.collapsed .reco-verified-arrow-icon {
   transform: rotate(180deg);
 }
 

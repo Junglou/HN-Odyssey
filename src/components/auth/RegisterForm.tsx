@@ -10,14 +10,14 @@ interface RegisterFormProps {
   loading: boolean;
   error: string | null;
   onLoginClick: () => void;
-  onSupportClick: () => void; // <--- 1. THÊM PROP NÀY
+  onSupportClick: () => void;
 }
 
 const RegisterForm = ({
   onSubmit,
   loading,
   onLoginClick,
-  onSupportClick, // <--- 2. NHẬN PROP TẠI ĐÂY
+  onSupportClick,
 }: RegisterFormProps) => {
   const [formData, setFormData] = useState<RegisterPayload>({
     firstName: "",
@@ -56,7 +56,6 @@ const RegisterForm = ({
     onSubmit(formData);
   };
 
-  // THÊM LOGIC XỬ LÝ ĐĂNG NHẬP MẠNG XÃ HỘI
   const backendUrl =
     import.meta.env.VITE_API_URL || "http://localhost:8080/api";
 
@@ -76,7 +75,6 @@ const RegisterForm = ({
           disabled={loading}
           style={{ border: "none", padding: 0, margin: 0, minWidth: 0 }}
         >
-          {/* (Giữ nguyên các input FirstName, LastName...) */}
           <div className="register-input-group">
             <input
               type="text"
@@ -185,7 +183,6 @@ const RegisterForm = ({
           Already have one.
         </span>
 
-        {/* 3. GẮN SỰ KIỆN ONCLICK TẠI ĐÂY */}
         <span className="register-text-link" onClick={onSupportClick}>
           Need help accessing your account?
         </span>
@@ -193,8 +190,8 @@ const RegisterForm = ({
 
       <div className="register-social-login">
         <button
-          type="button" // Nhớ thêm type="button" để tránh nó submit form
-          className="social-icon-btn"
+          type="button"
+          className="register-social-icon-btn"
           disabled={loading}
           onClick={handleGoogleLogin}
         >
@@ -203,7 +200,7 @@ const RegisterForm = ({
 
         <button
           type="button"
-          className="social-icon-btn"
+          className="register-social-icon-btn"
           disabled={loading}
           onClick={handleFacebookLogin}
         >

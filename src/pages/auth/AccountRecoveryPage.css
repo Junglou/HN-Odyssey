@@ -151,10 +151,10 @@
   transform: translate(-50%, -50%);
   box-shadow: 4px 0 15px rgba(0, 0, 0, 0.2);
 }
-.arrow-icon {
+.recovery-arrow-icon {
   transition: transform 1s ease;
 }
-.recovery-page-container.collapsed .arrow-icon {
+.recovery-page-container.collapsed .recovery-arrow-icon {
   transform: rotate(180deg);
 }
 

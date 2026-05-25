@@ -3,6 +3,7 @@ import "./AccountRecoveryForm.css";
 import { toast } from "react-toastify";
 import type { AccountRecoveryPayload } from "../../types/auth";
 
+// interfaces
 interface AccountRecoveryFormProps {
   initialEmail?: string;
   timer: number;
@@ -22,20 +23,16 @@ const AccountRecoveryForm = ({
   onLoginClick,
   onRegisterClick,
 }: AccountRecoveryFormProps) => {
-  // Quản lý form
+  // hooks/states
   const [email, setEmail] = useState(initialEmail);
   const [otp, setOtp] = useState("");
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
 
-  // handler: xử lý chọn file
+  // handlers
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    // Kiểm tra xem người dùng có chọn file không
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
-
-      // Validate dung lượng (Ví dụ: Giới hạn 5MB)
-      // VD: 5 * 1024 * 1024 bytes = 5MB
       if (selectedFile.size > 10 * 1024 * 1024) {
         toast.warning("File quá lớn! Vui lòng chọn file dưới 10MB.");
         return;
@@ -44,17 +41,14 @@ const AccountRecoveryForm = ({
     }
   };
 
-  // Handler: gửi mã OTP
   const handleSendOtp = () => {
     if (!email) {
       toast.warning("Vui lòng nhập Email/SĐT trước.");
       return;
     }
-    // Gọi hàm từ Props để Page xử lý API
     onSendOtp(email);
   };
 
-  // Submit Form
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
 
@@ -66,15 +60,15 @@ const AccountRecoveryForm = ({
       return;
     }
 
-    // Đóng gói dữ liệu gửi lên Page
     onSubmit({
       email,
       otpCode: otp,
       description,
-      images: file, // Có thể null nếu người dùng không chọn
+      images: file,
     });
   };
 
+  // render
   return (
     <div className="recovery-form-wrapper">
       <h1 className="recovery-title">We need to confirm it’s really you.</h1>
@@ -140,7 +134,7 @@ const AccountRecoveryForm = ({
           </div>
 
           {/* File input */}
-          <div className="file-input-wrapper">
+          <div className="recovery-file-input-wrapper">
             {/* Input gốc bị ẩn đi */}
             <input
               type="file"
@@ -152,7 +146,7 @@ const AccountRecoveryForm = ({
             {/* Label tùy chỉnh đè lên để làm giao diện */}
             <label
               htmlFor="evidence-file"
-              className={`file-input-label ${file ? "has-file" : ""}`}
+              className={`recovery-file-input-label ${file ? "has-file" : ""}`}
             >
               {/* Hiển thị tên file hoặc placeholder */}
               <span
@@ -168,7 +162,7 @@ const AccountRecoveryForm = ({
 
               {/* Icon kẹp giấy SVG */}
               <svg
-                className="paperclip-icon"
+                className="recovery-paperclip-icon"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"

@@ -1,3 +1,4 @@
+// imports
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLogin } from "../../hooks/auth/useLogin";
@@ -14,16 +15,17 @@ import {
 } from "../../assets/icons/AuthIcons";
 import { useOAuthLogin } from "../../hooks/auth/useOAuthLogin";
 
+// component
 const LoginPage = () => {
+  // states
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // hooks
   const navigate = useNavigate();
   const { login, loading, error } = useLogin();
-
-  // GỌI HOOK OAUTH Ở ĐÂY
-  // Nó sẽ tự động chạy ngầm khi trang Login được render.
-  // Nếu trên URL có accessToken, nó sẽ tự động xử lý và chuyển hướng.
   useOAuthLogin();
 
+  // handlers
   const handleLogin = async (data: LoginPayload) => {
     try {
       await login(data);
@@ -35,6 +37,7 @@ const LoginPage = () => {
     }
   };
 
+  // render
   return (
     <div className={`login-page-container ${isCollapsed ? "collapsed" : ""}`}>
       <div className="login-left-section">
@@ -51,11 +54,11 @@ const LoginPage = () => {
       </div>
 
       <div
-        className="back-arrow-container"
+        className="login-back-arrow-container"
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
         <svg
-          className="arrow-icon"
+          className="login-arrow-icon"
           width="24"
           height="24"
           viewBox="0 0 24 24"
@@ -71,39 +74,38 @@ const LoginPage = () => {
       </div>
 
       <div className="login-right-section">
-        <div className="info-card">
-          <h2 className="info-title">No account? No problem.</h2>
-          <p className="info-quote">
+        <div className="login-info-card">
+          <h2 className="login-info-title">No account? No problem.</h2>
+          <p className="login-info-quote">
             “You don't need an account to get started...”
           </p>
-          <ul className="benefit-list">
-            {/* (Giữ nguyên list benefit) */}
-            <li className="benefit-item">
-              <span className="benefit-icon">
+          <ul className="login-benefit-list">
+            <li className="login-benefit-item">
+              <span className="login-benefit-icon">
                 <SearchIcon />
               </span>
               Search and filter products freely with full access.
             </li>
-            <li className="benefit-item">
-              <span className="benefit-icon">
+            <li className="login-benefit-item">
+              <span className="login-benefit-icon">
                 <FileIcon />
               </span>
               View complete product details, guides, and policies.
             </li>
-            <li className="benefit-item">
-              <span className="benefit-icon">
+            <li className="login-benefit-item">
+              <span className="login-benefit-icon">
                 <CartIcon />
               </span>
               Add items to your cart and manage them easily.
             </li>
-            <li className="benefit-item">
-              <span className="benefit-icon">
+            <li className="login-benefit-item">
+              <span className="login-benefit-icon">
                 <HeadsetIcon />
               </span>
               Reach out to support anytime for help or guidance.
             </li>
           </ul>
-          <button className="explore-btn" onClick={() => navigate("/")}>
+          <button className="login-explore-btn" onClick={() => navigate("/")}>
             Explore
           </button>
         </div>

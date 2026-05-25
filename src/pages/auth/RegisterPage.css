@@ -1,6 +1,4 @@
-/* src/pages/auth/RegisterPage.css */
-
-/* Style Layout trang đăng ký - Khớp 100% với LoginPage.css */
+/* layout */
 .register-page-container {
   top: 0;
   left: 0;
@@ -10,7 +8,6 @@
   height: 100dvh;
   min-height: 100vh;
   z-index: 1000;
-
   display: flex;
   font-family: "Lexend Exa", sans-serif;
   overflow: hidden;
@@ -19,29 +16,24 @@
   padding: 0;
 }
 
-/* Xử lý cột trái (Chứa form) */
+/* col */
 .register-left-section {
   flex: 0 0 50%;
   max-width: 50%;
-
   background-color: #ffffff;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   position: relative;
-
-  /* Form Register dài hơn nên cần padding ít hơn chút hoặc xử lý scroll */
   padding: 2rem;
   z-index: 20;
   border-right: 1px solid #eee;
-
-  /* Hiệu ứng trượt */
   transition: all 1s cubic-bezier(0.25, 1, 0.5, 1);
-  overflow: hidden; /* Sẽ xử lý scroll trong wrapper */
+  overflow: hidden;
 }
 
-/* Trạng thái đóng (Collapsed) - Giống hệt Login */
+/* collapsed */
 .register-page-container.collapsed .register-left-section {
   flex: 0 0 80px;
   max-width: 80px;
@@ -53,7 +45,7 @@
   z-index: 50;
 }
 
-/* Cột phải (Thông tin) - Màu be #eaddcd */
+/* col */
 .register-right-section {
   flex: 1;
   background-color: #eaddcd;
@@ -64,7 +56,7 @@
   transition: all 1s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-/* Các thành phần trong Info Card (Dùng chung style với Login) */
+/* card */
 .register-info-card {
   background: #ffffff;
   padding: 3.5rem;
@@ -72,13 +64,12 @@
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
   max-width: 500px;
   width: 90%;
-
-  /* Animation */
   opacity: 0;
   animation: registerFadeInUp 1s cubic-bezier(0.25, 1, 0.5, 1) forwards;
   animation-delay: 0.5s;
 }
 
+/* text */
 .register-info-title {
   font-size: 2rem;
   font-weight: 800;
@@ -97,6 +88,7 @@
   font-style: italic;
 }
 
+/* list */
 .register-benefit-list {
   list-style: none;
   padding: 0;
@@ -112,11 +104,13 @@
   line-height: 1.4;
 }
 
+/* icon */
 .register-benefit-icon {
   margin-right: 12px;
   margin-top: 2px;
 }
 
+/* button */
 .register-explore-btn {
   width: 160px;
   padding: 0.8rem 2rem;
@@ -137,7 +131,7 @@
   transform: translateY(-1px);
 }
 
-/* Nút mũi tên điều hướng */
+/* arrow */
 .register-back-arrow-container {
   position: absolute;
   top: 50%;
@@ -159,20 +153,19 @@
   transition: all 1s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-/* Vị trí mở */
 .register-page-container:not(.collapsed) .register-back-arrow-container {
   left: 50%;
   transform: translate(-50%, -50%);
   box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.3);
 }
 
-/* Vị trí đóng */
 .register-page-container.collapsed .register-back-arrow-container {
   left: 40px;
   transform: translate(-50%, -50%);
   box-shadow: 4px 0 15px rgba(0, 0, 0, 0.2);
 }
 
+/* arrow icon */
 .arrow-icon {
   transition: transform 1s ease;
 }
@@ -181,7 +174,7 @@
   transform: rotate(180deg);
 }
 
-/* Keyframes Animation (Copy từ Login) */
+/* animation */
 @keyframes registerFadeInUp {
   from {
     opacity: 0;
@@ -193,9 +186,7 @@
   }
 }
 
-/* Logic ẩn form (Collapse) */
-
-/* Mặc định: Hiện */
+/* form state */
 .register-form-wrapper,
 .register-input-group,
 .register-form-input {
@@ -213,7 +204,7 @@
     background-image 0.2s ease;
 }
 
-/* Khi đóng: Ẩn */
+/* form collapsed */
 .register-page-container.collapsed .register-form-wrapper,
 .register-page-container.collapsed .register-input-group {
   opacity: 0;
@@ -234,7 +225,7 @@
   opacity: 0;
 }
 
-/* Responsive */
+/* responsive */
 @media (max-width: 968px) {
   .register-page-container {
     flex-direction: column;
