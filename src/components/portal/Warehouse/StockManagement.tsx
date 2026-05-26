@@ -87,6 +87,7 @@ export default function StockManagement({
             filters={overview.filters}
             pagination={overview.pagination}
             actions={overview.actions}
+            categoriesOptions={overview.categoriesOptions}
           />
         )}
         {activeTab === "tickets" && (

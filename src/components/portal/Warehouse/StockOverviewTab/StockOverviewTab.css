@@ -282,7 +282,7 @@
 
 .status-low_stock {
   color: #f59e0b;
-}
+} /* Màu vàng cam cảnh báo */
 .status-low_stock .sot-dot {
   background-color: #f59e0b;
 }
@@ -577,4 +577,24 @@
     flex: 1 1 100%;
     justify-content: center;
   }
+}
+
+/* EXTRACTED INLINE CSS & NEW STYLES */
+.sot-col-5 {
+  width: 5%;
+}
+.sot-col-10 {
+  width: 10%;
+}
+.sot-col-15 {
+  width: 15%;
+}
+.sot-col-25 {
+  width: 25%;
+}
+.sot-d-flex {
+  display: flex;
+}
+.sot-text-center {
+  text-align: center;
 }

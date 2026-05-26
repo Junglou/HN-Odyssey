@@ -6,38 +6,29 @@ import {
   ExpandRowIcon,
   RefreshIcon,
 } from "../../../../assets/icons/StockManagementIcons";
-// import component Modal
 import "./StockOverviewTab.css";
 
-// options
-const CATEGORY_OPTIONS = [
-  { value: "all", label: "All Categories" },
-  { value: "Gaming Mouse", label: "Gaming Mouse" },
-  { value: "Mechanical Keyboard", label: "Mechanical Keyboard" },
-  { value: "Accessories", label: "Accessories" },
-];
-
+// Options lọc đã được khôi phục 3 trạng thái tốt nhất
 const STATUS_OPTIONS = [
   { value: "all", label: "All Status" },
-  { value: "in_stock", label: "In Stock" },
-  { value: "low_stock", label: "Low Stock" },
-  { value: "out_of_stock", label: "Out of Stock" },
+  { value: "IN_STOCK", label: "In Stock" },
+  { value: "LOW_STOCK", label: "Low Stock" },
+  { value: "OUT_OF_STOCK", label: "Out of Stock" },
 ];
 
-// dropdown
 function CustomDropdown({
   value,
-  options,
+  options = [],
   onChange,
   className = "",
 }: {
   value: string;
-  options: { value: string; label: string }[];
+  options?: { value: string; label: string }[];
   onChange: (val: string) => void;
   className?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [hasOpened, setHasOpened] = useState(false); // Thêm state
+  const [hasOpened, setHasOpened] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -54,7 +45,9 @@ function CustomDropdown({
   }, []);
 
   const selectedLabel =
-    options.find((opt) => opt.value === value)?.label || options[0].label;
+    options.find((opt) => opt.value === value)?.label ||
+    options[0]?.label ||
+    "Select";
 
   return (
     <div className={`sot-custom-dropdown ${className}`} ref={dropdownRef}>
@@ -90,12 +83,12 @@ function CustomDropdown({
   );
 }
 
-// props (đã bổ sung adjustModal)
 interface StockOverviewTabProps {
   data: ReturnType<typeof useStockOverview>["data"];
   filters: ReturnType<typeof useStockOverview>["filters"];
   pagination: ReturnType<typeof useStockOverview>["pagination"];
   actions: ReturnType<typeof useStockOverview>["actions"];
+  categoriesOptions: { value: string; label: string }[];
 }
 
 export default function StockOverviewTab({
@@ -103,8 +96,8 @@ export default function StockOverviewTab({
   filters,
   pagination,
   actions,
+  categoriesOptions,
 }: StockOverviewTabProps) {
-  // states
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [closingRows, setClosingRows] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -112,11 +105,9 @@ export default function StockOverviewTab({
   const [hasLimitOpened, setHasLimitOpened] = useState(false);
   const limitRef = useRef<HTMLDivElement>(null);
 
-  // handlers
   const toggleRow = (id: string) => {
     if (expandedRows.has(id)) {
       setClosingRows((prev) => new Set(prev).add(id));
-
       setTimeout(() => {
         setExpandedRows((prev) => {
           const newSet = new Set(prev);
@@ -140,6 +131,7 @@ export default function StockOverviewTab({
     actions.refreshData();
     setTimeout(() => setIsRefreshing(false), 500);
   };
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -155,7 +147,6 @@ export default function StockOverviewTab({
 
   return (
     <div className="sot-filters-card">
-      {/* filters */}
       <div className="sot-filters-row">
         <input
           type="text"
@@ -167,7 +158,7 @@ export default function StockOverviewTab({
 
         <CustomDropdown
           value={filters.category}
-          options={CATEGORY_OPTIONS}
+          options={categoriesOptions}
           onChange={(val) => actions.changeFilter("category", val)}
           className="sot-filter-dropdown"
         />
@@ -199,8 +190,7 @@ export default function StockOverviewTab({
           }}
         >
           <span
-            className={isRefreshing ? "spin-icon-active" : ""}
-            style={{ display: "flex" }}
+            className={`sot-d-flex ${isRefreshing ? "spin-icon-active" : ""}`}
           >
             <RefreshIcon />
           </span>
@@ -208,21 +198,18 @@ export default function StockOverviewTab({
         </button>
       </div>
 
-      {/* table */}
       <div className="sot-table-wrapper">
         <table className="sot-table">
           <thead>
             <tr>
-              <th className="sot-col-expand" style={{ width: "5%" }}></th>
-              <th style={{ width: "15%" }}>SKU</th>
-              <th style={{ width: "25%" }}>Product Name</th>
-              <th style={{ width: "15%" }}>Category</th>
-              <th style={{ width: "10%" }}>Location</th>
-              <th style={{ width: "15%" }}>Available / Total</th>
-              <th style={{ width: "10%" }}>Status</th>
-              <th className="sot-col-actions" style={{ width: "5%" }}>
-                Actions
-              </th>
+              <th className="sot-col-expand sot-col-5"></th>
+              <th className="sot-col-15">SKU</th>
+              <th className="sot-col-25">Product Name</th>
+              <th className="sot-col-15">Category</th>
+              <th className="sot-col-10">Location</th>
+              <th className="sot-col-15">Available / Total</th>
+              <th className="sot-col-10">Status</th>
+              <th className="sot-col-actions sot-col-5">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -234,47 +221,71 @@ export default function StockOverviewTab({
               </tr>
             ) : (
               data.map((item) => (
-                <React.Fragment key={item.id}>
+                <React.Fragment key={item._id}>
                   {/* main row */}
                   <tr className="sot-row-main">
                     <td className="sot-col-expand">
-                      {item.variants && item.variants.length > 0 && (
-                        <button
-                          type="button"
-                          className="sot-expand-btn"
-                          onClick={(e) => {
-                            toggleRow(item.id);
-                            e.currentTarget.blur();
-                          }}
-                        >
-                          <ExpandRowIcon isOpen={expandedRows.has(item.id)} />
-                        </button>
-                      )}
+                      {item.has_variants &&
+                        item.variants &&
+                        item.variants.length > 0 && (
+                          <button
+                            type="button"
+                            className="sot-expand-btn"
+                            onClick={(e) => {
+                              toggleRow(item._id);
+                              e.currentTarget.blur();
+                            }}
+                          >
+                            <ExpandRowIcon
+                              isOpen={expandedRows.has(item._id)}
+                            />
+                          </button>
+                        )}
                     </td>
                     <td className="sot-cell-sku">{item.sku}</td>
-                    <td className="sot-product-name">{item.productName}</td>
+                    <td>
+                      <div className="sot-product-info">
+                        {item.thumbnail && (
+                          <img
+                            src={item.thumbnail}
+                            alt=""
+                            className="sot-product-img"
+                          />
+                        )}
+                        <span className="sot-product-name">{item.name}</span>
+                      </div>
+                    </td>
                     <td>{item.category}</td>
                     <td>{item.location}</td>
                     <td className="sot-cell-qty">
                       <span className="sot-highlight-qty">
-                        {item.availableQuantity}
+                        {item.available_quantity}
                       </span>{" "}
-                      / {item.totalQuantity}
+                      / {item.total_quantity}
                     </td>
                     <td>
                       <span
-                        className={`sot-status-badge status-${item.status}`}
+                        className={`sot-status-badge status-${item.status_color.toLowerCase()}`}
                       >
                         <span className="sot-dot"></span>
-                        {item.status.replaceAll("_", " ")}
+                        {item.status_color.replaceAll("_", " ")}
                       </span>
                     </td>
                     <td className="sot-col-actions">
-                      {(!item.variants || item.variants.length === 0) && (
+                      {!item.has_variants && (
                         <button
                           type="button"
                           className="sot-icon-btn"
-                          onClick={() => actions.openAdjustModal(item.id)}
+                          onClick={() =>
+                            actions.openAdjustModal(
+                              item._id,
+                              item.sku,
+                              item.name,
+                              item.total_quantity, // Truyền đúng tên biến total_quantity
+                              item.min_stock,
+                              item.max_stock,
+                            )
+                          }
                           title="Quick Adjust"
                         >
                           <AdjustIcon />
@@ -284,19 +295,18 @@ export default function StockOverviewTab({
                   </tr>
 
                   {/* variants row */}
-                  {expandedRows.has(item.id) && item.variants && (
+                  {expandedRows.has(item._id) && item.variants && (
                     <tr className="sot-row-variants">
                       <td
                         colSpan={8}
-                        className={`sot-variants-container ${closingRows.has(item.id) ? "closing" : ""}`}
+                        className={`sot-variants-container ${closingRows.has(item._id) ? "closing" : ""}`}
                       >
                         <table className="sot-variants-table">
                           <thead>
                             <tr>
                               <th>Variant SKU</th>
-                              <th>Attributes</th>
-                              <th>Stock</th>
-                              <th>Min - Max</th>
+                              <th>Available / Total</th>
+                              <th>Status</th>
                               <th className="sot-col-actions">Action</th>
                             </tr>
                           </thead>
@@ -304,14 +314,19 @@ export default function StockOverviewTab({
                             {item.variants.map((variant) => (
                               <tr key={variant.sku}>
                                 <td>{variant.sku}</td>
-                                <td>{variant.attributes}</td>
                                 <td
-                                  className={`sot-var-qty ${variant.currentStock <= variant.minStock ? "sot-var-qty-low" : ""}`}
+                                  className={`sot-var-qty ${variant.total_stock <= (variant.min_stock || 0) ? "sot-var-qty-low" : ""}`}
                                 >
-                                  {variant.currentStock}
+                                  {variant.available_stock} /{" "}
+                                  {variant.total_stock}
                                 </td>
                                 <td>
-                                  {variant.minStock} - {variant.maxStock}
+                                  <span
+                                    className={`sot-status-badge status-${variant.statusColor.toLowerCase()}`}
+                                  >
+                                    <span className="sot-dot"></span>
+                                    {variant.statusColor.replaceAll("_", " ")}
+                                  </span>
                                 </td>
                                 <td className="sot-col-actions">
                                   <button
@@ -319,8 +334,12 @@ export default function StockOverviewTab({
                                     className="sot-icon-btn sot-icon-btn-sm"
                                     onClick={() =>
                                       actions.openAdjustModal(
-                                        item.id,
+                                        item._id,
                                         variant.sku,
+                                        item.name,
+                                        variant.total_stock, // Truyền đúng tên biến total_stock
+                                        variant.min_stock,
+                                        variant.max_stock,
                                       )
                                     }
                                     title="Adjust Variant"
@@ -342,28 +361,24 @@ export default function StockOverviewTab({
         </table>
       </div>
 
-      {/* pagination */}
       <div className="sot-pagination">
         <div>
           Showing{" "}
           {pagination.total === 0
             ? 0
             : (pagination.page - 1) * pagination.limit + 1}
-          -{Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
+          - {Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
           {pagination.total} items
         </div>
         <div className="sot-page-numbers">
           <button
             type="button"
             className="sot-page-num"
-            style={{
-              opacity: pagination.page === 1 ? 0.4 : 1,
-              pointerEvents: pagination.page === 1 ? "none" : "auto",
-            }}
             onClick={(e) => {
               actions.changePage(Math.max(pagination.page - 1, 1));
               e.currentTarget.blur();
             }}
+            disabled={pagination.page === 1}
           >
             &lt;
           </button>
@@ -387,29 +402,20 @@ export default function StockOverviewTab({
           <button
             type="button"
             className="sot-page-num"
-            style={{
-              opacity:
-                pagination.page === pagination.totalPages ||
-                pagination.totalPages === 0
-                  ? 0.4
-                  : 1,
-              pointerEvents:
-                pagination.page === pagination.totalPages ||
-                pagination.totalPages === 0
-                  ? "none"
-                  : "auto",
-            }}
             onClick={(e) => {
               actions.changePage(
                 Math.min(pagination.page + 1, pagination.totalPages),
               );
               e.currentTarget.blur();
             }}
+            disabled={
+              pagination.page === pagination.totalPages ||
+              pagination.totalPages === 0
+            }
           >
             &gt;
           </button>
 
-          {/* limit dropdown */}
           <div className="sot-limit-dropdown" ref={limitRef}>
             <div
               className={`sot-limit-trigger ${isLimitOpen ? "active" : ""}`}
@@ -423,7 +429,6 @@ export default function StockOverviewTab({
                 className={`sot-limit-icon ${isLimitOpen ? "open" : ""}`}
               />
             </div>
-
             <div
               className={`sot-limit-options ${isLimitOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
             >
@@ -432,7 +437,7 @@ export default function StockOverviewTab({
                   key={val}
                   className={`sot-limit-option ${pagination.limit === val ? "active" : ""}`}
                   onClick={() => {
-                    actions.changeLimit?.(val);
+                    actions.changeLimit(val);
                     setIsLimitOpen(false);
                   }}
                 >

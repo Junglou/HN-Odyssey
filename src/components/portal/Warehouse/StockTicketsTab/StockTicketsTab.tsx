@@ -1,5 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useStockTickets } from "../../../../hooks/portal/Warehouse/useStockTickets";
+import {
+  useStockTickets,
+  type StockTicketRow,
+} from "../../../../hooks/portal/Warehouse/useStockTickets";
 import { ChevronDownIcon } from "../../../../assets/icons/HeaderIcons";
 import ExcelJS from "exceljs";
 import {
@@ -29,7 +32,7 @@ function CustomDropdown({
   className?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [hasOpened, setHasOpened] = useState(false); // Thêm state
+  const [hasOpened, setHasOpened] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -91,21 +94,6 @@ interface StockTicketsTabProps {
   actions: ReturnType<typeof useStockTickets>["actions"];
 }
 
-interface TicketItem {
-  sku: string;
-  productName: string;
-  quantity: number;
-  unit: string;
-}
-
-interface TicketData {
-  ticketCode: string;
-  type: string;
-  status: string;
-  createdAt: string | Date;
-  items: TicketItem[];
-}
-
 export default function StockTicketsTab({
   data,
   filters,
@@ -165,6 +153,7 @@ export default function StockTicketsTab({
       setExpandedRows((prev) => new Set(prev).add(id));
     }
   };
+
   const handleRefresh = () => {
     if (isRefreshing) return;
     setIsRefreshing(true);
@@ -174,13 +163,13 @@ export default function StockTicketsTab({
 
   // helpers
   const renderStatus = (status: string) => {
-    if (status === "completed") {
+    if (status === "COMPLETED") {
       return (
         <span className="stt-status stt-status-done">
           <span className="stt-dot"></span> Completed
         </span>
       );
-    } else if (status === "processing") {
+    } else if (status === "PROCESSING") {
       return (
         <span className="stt-status stt-status-processing">
           <span className="stt-dot"></span> Processing
@@ -194,7 +183,8 @@ export default function StockTicketsTab({
       );
     }
   };
-  const handleExportExcel = async (ticket: TicketData) => {
+
+  const handleExportExcel = async (ticket: StockTicketRow) => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Ticket Detail");
 
@@ -209,17 +199,17 @@ export default function StockTicketsTab({
     };
     titleCell.alignment = { vertical: "middle", horizontal: "center" };
 
-    worksheet.addRow(["Ticket Code:", ticket.ticketCode]);
-    worksheet.addRow(["Type:", ticket.type.toUpperCase()]);
-    worksheet.addRow(["Status:", ticket.status.toUpperCase()]);
-    worksheet.addRow(["Date:", new Date(ticket.createdAt).toLocaleString()]);
+    worksheet.addRow(["Ticket Code:", ticket.ticketCode || "N/A"]);
+    worksheet.addRow(["Type:", String(ticket.type || "N/A").toUpperCase()]);
+    worksheet.addRow(["Status:", String(ticket.status || "N/A").toUpperCase()]);
+    worksheet.addRow(["Date:", new Date(ticket.createdDate).toLocaleString()]);
     worksheet.addRow([]);
 
     const headerRow = worksheet.addRow([
       "SKU",
       "Product Name",
       "Quantity",
-      "Unit",
+      "Reason",
     ]);
     headerRow.font = { bold: true };
     headerRow.eachCell((cell) => {
@@ -236,12 +226,12 @@ export default function StockTicketsTab({
       };
     });
 
-    ticket.items.forEach((item: TicketItem) => {
+    ticket.items.forEach((item) => {
       const row = worksheet.addRow([
         item.sku,
         item.productName,
         item.quantity,
-        item.unit,
+        item.reason || "-",
       ]);
       row.eachCell((cell) => {
         cell.border = {
@@ -257,7 +247,7 @@ export default function StockTicketsTab({
       { width: 15 },
       { width: 40 },
       { width: 15 },
-      { width: 10 },
+      { width: 25 },
     ];
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -267,7 +257,9 @@ export default function StockTicketsTab({
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${ticket.ticketCode}_Export.xlsx`;
+
+    const suffixName = ticket.type === "import" ? "Import" : "Export";
+    a.download = `${ticket.ticketCode}_${suffixName}.xlsx`;
     a.click();
     window.URL.revokeObjectURL(url);
   };
@@ -388,7 +380,11 @@ export default function StockTicketsTab({
                           onClick={(e) => {
                             e.stopPropagation();
                             e.currentTarget.blur();
-                            alert("Tính năng in PDF sẽ được tích hợp sau.");
+                            actions.exportPdf(
+                              item.id,
+                              item.type as "import" | "export",
+                              item.ticketCode,
+                            );
                           }}
                         >
                           <PrintIcon />
@@ -399,14 +395,14 @@ export default function StockTicketsTab({
                           onClick={(e) => {
                             e.stopPropagation();
                             e.currentTarget.blur();
-                            handleExportExcel(item as unknown as TicketData);
+                            handleExportExcel(item);
                           }}
                           title="Export to Excel"
                         >
                           Excel
                         </button>
 
-                        {item.status === "processing" && (
+                        {item.status === "PROCESSING" && (
                           <>
                             <button
                               className="stt-action-btn-text stt-btn-complete-text"

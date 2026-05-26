@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
-import ExcelJS from "exceljs";
 import type {
   TicketType,
   TicketItem,
   StockTicketRow,
+  TicketStatus,
 } from "../../../../hooks/portal/Warehouse/useStockTickets";
+import axiosClient from "../../../../api/axiosClient";
 import "./CreateTicketDrawer.css";
 
 // icons
@@ -14,14 +15,47 @@ import {
   ArrowLeftIcon,
 } from "../../../../assets/icons/StockManagementIcons";
 
-// mock data inventory
-const MOCK_INVENTORY = [
-  { sku: "LOGI-GPX-BLK", name: "Logitech G Pro X Superlight", available: 150 },
-  { sku: "KEYC-Q1P-ISO", name: "Keychron Q1 Pro", available: 50 },
-  { sku: "RAZ-V2-PRO", name: "Razer Viper V2 Pro", available: 120 },
-];
+// Khai báo kiểu dữ liệu trả về từ API để tránh dùng any
+interface BackendVariant {
+  sku: string;
+  stock?: number;
+}
 
-const MOCK_EXPORT_REASONS = [
+interface BackendProduct {
+  sku: string;
+  name: string;
+  stock?: number;
+  has_variants: boolean;
+  variants?: BackendVariant[];
+}
+
+interface PreviewItem {
+  row: number;
+  sku: string;
+  quantity: number;
+  note: string;
+  status: "VALID" | "INVALID";
+  errors: string[];
+  product_id?: string;
+}
+
+interface PreviewResponse {
+  data: PreviewItem[];
+  can_import?: boolean;
+  can_export?: boolean;
+}
+
+interface ErrorResponse {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+  message?: string;
+}
+
+// Hằng số tĩnh cho Lý do xuất (vẫn giữ vì đây là logic cố định của FE/BE)
+const EXPORT_REASON_OPTIONS = [
   { value: "XUAT_HUY", label: "Xuất hủy hàng hỏng" },
   { value: "XUAT_TRA_NCC", label: "Xuất trả Nhà cung cấp" },
   { value: "XUAT_NOI_BO", label: "Xuất dùng nội bộ" },
@@ -31,7 +65,7 @@ export interface NewTicketPayload extends Omit<
   StockTicketRow,
   "id" | "ticketCode" | "createdDate" | "createdBy" | "status"
 > {
-  status: "processing" | "completed" | "cancelled";
+  status: TicketStatus;
   supplier?: string;
   exportReason?: string;
 }
@@ -49,7 +83,7 @@ interface UITicketItem extends TicketItem {
   uiId: string;
 }
 
-// dropdown
+// dropdown component
 function CustomDrawerDropdown({
   value,
   options,
@@ -107,7 +141,6 @@ function CustomDrawerDropdown({
       <div
         className={`ctd-dropdown-options ${isOpen ? "open" : hasOpened ? "closed" : ""}`}
       >
-        {/* Ô nhập từ khóa tìm kiếm */}
         {showSearch && (
           <div className="ctd-dropdown-search">
             <input
@@ -121,7 +154,6 @@ function CustomDrawerDropdown({
           </div>
         )}
 
-        {/* Render danh sách đã lọc */}
         {filteredOptions.length > 0 ? (
           filteredOptions.map((opt) => (
             <div
@@ -168,6 +200,20 @@ function CreateTicketDrawerContent({
 
   const [supplier, setSupplier] = useState("");
   const [exportReason, setExportReason] = useState("");
+  const [warehouseOptions, setWarehouseOptions] = useState<
+    { value: string; label: string }[]
+  >([]);
+
+  useEffect(() => {
+    const mockWarehouses = [
+      { value: "WH-HCM-01", label: "Kho Tổng - TP.Hồ Chí Minh" },
+      { value: "WH-HN-01", label: "Kho Trung Chuyển - Hà Nội" },
+      { value: "WH-DN-01", label: "Kho Bán Lẻ - Đà Nẵng" },
+    ];
+
+    // Gán thẳng data giả vào state
+    setWarehouseOptions(mockWarehouses);
+  }, []);
 
   // form states (manual entry)
   const [formSku, setFormSku] = useState("");
@@ -184,6 +230,53 @@ function CreateTicketDrawerContent({
   const alreadyAddedQty = items
     .filter((item) => item.sku === formSku)
     .reduce((sum, item) => sum + item.quantity, 0);
+
+  // Hàm check SKU đơn lẻ
+  const handleCheckSku = async () => {
+    if (!formSku.trim()) return;
+
+    try {
+      // Truyền search (hoặc sku) vào query param để tìm kiếm
+      const res = await axiosClient.get("/products", {
+        params: { search: formSku.trim() },
+      });
+
+      // Lấy sản phẩm đầu tiên match với kết quả tìm kiếm
+      const productsList = res.data?.data || res.data;
+      const p: BackendProduct =
+        productsList.length > 0 ? productsList[0] : null;
+
+      if (p) {
+        setFormName(p.name);
+
+        // Xử lý lấy tồn kho
+        if (p.has_variants && p.variants) {
+          // Bắt buộc SKU nhập vào phải khớp chính xác với SKU của biến thể
+          const variant = p.variants.find(
+            (v: BackendVariant) => v.sku === formSku.trim(),
+          );
+
+          if (!variant) {
+            alert(
+              "Vui lòng nhập SKU của Biến thể (Size/Màu cụ thể), không nhập SKU Sản phẩm cha!",
+            );
+            setAvailableQty(null);
+            return;
+          }
+
+          setAvailableQty(Number(variant.stock) || 0);
+        } else {
+          setAvailableQty(Number(p.stock) || 0);
+        }
+      } else {
+        throw new Error("Không tìm thấy");
+      }
+    } catch {
+      alert("SKU không tồn tại hoặc đã bị xóa!");
+      setFormName("");
+      setAvailableQty(null);
+    }
+  };
 
   // validation
   const isOverQty =
@@ -228,49 +321,111 @@ function CreateTicketDrawerContent({
     if (!file) return;
 
     try {
-      const buffer = await file.arrayBuffer();
-      const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(buffer);
+      // 1. Tạo form data chứa file
+      const formData = new FormData();
+      formData.append("file", file);
 
-      const worksheet = workbook.worksheets[0];
-      if (!worksheet) {
-        alert("File Excel trống!");
+      // 2. Xác định endpoint dựa trên loại phiếu đang thao tác
+      const endpoint =
+        currentType === "import"
+          ? "/inventory/transactions/import/excel/preview"
+          : "/inventory/transactions/export/excel/preview";
+
+      // 3. Bắn file lên Backend để chạy validation nội bộ (tồn kho, SKU hợp lệ...)
+      const res = await axiosClient.post(endpoint, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      // NestJS BaseResponse thường bọc dữ liệu trong res.data.data
+      const responseData: PreviewResponse = res.data?.data || res.data;
+      const previewItems: PreviewItem[] = responseData.data || [];
+
+      if (!previewItems || previewItems.length === 0) {
+        alert("File Excel trống hoặc không đúng định dạng!");
         return;
       }
 
-      const newItems: UITicketItem[] = [];
+      // 4. Phân loại item hợp lệ và không hợp lệ
+      const validItems = previewItems.filter((item) => item.status === "VALID");
+      const invalidItems = previewItems.filter(
+        (item) => item.status === "INVALID",
+      );
 
-      worksheet.eachRow((row, rowNumber) => {
-        if (rowNumber === 1) return;
-
-        const sku = row.getCell(1).text?.trim();
-        const productName = row.getCell(2).text?.trim() || "Unknown Product";
-        const quantity = Number(row.getCell(3).value);
-        const reason = row.getCell(4).text?.trim() || "Excel Import";
-
-        if (sku && quantity > 0) {
-          newItems.push({
-            uiId: Date.now().toString() + "-" + rowNumber,
-            sku,
-            productName,
-            quantity,
-            reason,
-          });
-        }
-      });
-
-      if (newItems.length > 0) {
-        setItems((prev) => [...prev, ...newItems]);
-      } else {
+      // 5. Cảnh báo cho người dùng nếu có dòng lỗi
+      if (invalidItems.length > 0) {
+        const errorDetails = invalidItems
+          .map((i) => `Dòng ${i.row} (SKU: ${i.sku}): ${i.errors.join(", ")}`)
+          .join("\n");
         alert(
-          "Không tìm thấy dữ liệu hợp lệ! Định dạng chuẩn: Cột A (SKU), Cột C (Số lượng).",
+          `Phát hiện ${invalidItems.length} dòng lỗi, các dòng này sẽ bị bỏ qua:\n\n${errorDetails}`,
         );
       }
-    } catch (error) {
-      console.error("Lỗi đọc Excel:", error);
-      alert("File không đúng định dạng hoặc bị hỏng!");
+
+      // 6. Map các item hợp lệ vào mảng của form
+      if (validItems.length > 0) {
+        const newItems: UITicketItem[] = validItems.map((item) => ({
+          uiId: Date.now().toString() + "-" + item.row,
+          sku: item.sku,
+          productName: "Sản phẩm từ Excel", // Backend preview không trả về tên, dùng placeholder
+          quantity: item.quantity,
+          reason: item.note || "Excel Import",
+        }));
+
+        setItems((prev) => [...prev, ...newItems]);
+      }
+    } catch (error: unknown) {
+      console.error("Lỗi xác thực file Excel từ BE:", error);
+      const err = error as ErrorResponse;
+      const errorMessage =
+        err.response?.data?.message ||
+        err.message ||
+        "Lỗi khi tải file lên hệ thống!";
+      alert(errorMessage);
     } finally {
+      // Reset input để có thể up lại cùng 1 file nếu cần
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      // Xác định endpoint dựa trên loại phiếu import hay export
+      const endpoint =
+        currentType === "import"
+          ? "/inventory/transactions/import/excel/template"
+          : "/inventory/transactions/export/excel/template";
+
+      // Yêu cầu kiểu dữ liệu trả về là blob để xử lý file nhị phân
+      const response = await axiosClient.get(endpoint, {
+        responseType: "blob",
+      });
+
+      const blob = new Blob([response.data], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+      // Tạo url tạm thời và kích hoạt sự kiện tải file xuống trình duyệt
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+
+      const fileName =
+        currentType === "import"
+          ? "Template_NhapKho.xlsx"
+          : "Template_XuatKho.xlsx";
+      link.setAttribute("download", fileName);
+
+      document.body.appendChild(link);
+      link.click();
+
+      // Dọn dẹp thẻ a và url sau khi hoàn tất tải file
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error: unknown) {
+      console.error("Lỗi khi tải file mẫu:", error);
+      alert("Có lỗi xảy ra khi tải file mẫu từ hệ thống!");
     }
   };
 
@@ -286,7 +441,7 @@ function CreateTicketDrawerContent({
 
     onSubmit({
       type: currentType,
-      status: "processing",
+      status: "PROCESSING",
       totalQuantity: currentTotalQty,
       items: cleanItems,
       warehouse,
@@ -355,7 +510,7 @@ function CreateTicketDrawerContent({
                 <label className="ctd-label">Export Reason *</label>
                 <CustomDrawerDropdown
                   value={exportReason}
-                  options={MOCK_EXPORT_REASONS}
+                  options={EXPORT_REASON_OPTIONS}
                   onChange={(val) => setExportReason(val)}
                   placeholder="Select export reason..."
                 />
@@ -366,10 +521,7 @@ function CreateTicketDrawerContent({
               <label className="ctd-label">Warehouse *</label>
               <CustomDrawerDropdown
                 value={warehouse}
-                options={[
-                  { value: "WH-HN-01", label: "Main Warehouse - A1" },
-                  { value: "WH-HCM-01", label: "Main Warehouse - B1" },
-                ]}
+                options={warehouseOptions}
                 onChange={(val) => setWarehouse(val)}
                 placeholder="Select warehouse..."
               />
@@ -397,6 +549,14 @@ function CreateTicketDrawerContent({
                   onChange={handleImportExcel}
                 />
                 <button
+                  type="button"
+                  className="ctd-btn-outline"
+                  onClick={handleDownloadTemplate}
+                >
+                  Download Template
+                </button>
+
+                <button
                   className="ctd-btn-outline"
                   onClick={() => fileInputRef.current?.click()}
                 >
@@ -415,27 +575,7 @@ function CreateTicketDrawerContent({
             <div className="ctd-form-grid">
               <div className="ctd-form-group">
                 <label className="ctd-label">SKU *</label>
-                {currentType === "export" ? (
-                  <CustomDrawerDropdown
-                    value={formSku}
-                    options={MOCK_INVENTORY.map((item) => ({
-                      value: item.sku,
-                      label: item.sku,
-                    }))}
-                    showSearch={true}
-                    onChange={(selectedSku) => {
-                      setFormSku(selectedSku);
-                      const found = MOCK_INVENTORY.find(
-                        (item) => item.sku === selectedSku,
-                      );
-                      if (found) {
-                        setFormName(found.name);
-                        setAvailableQty(found.available);
-                      }
-                    }}
-                    placeholder="Select product..."
-                  />
-                ) : (
+                <div style={{ display: "flex", gap: "8px" }}>
                   <input
                     type="text"
                     className="ctd-input"
@@ -443,7 +583,16 @@ function CreateTicketDrawerContent({
                     onChange={(e) => setFormSku(e.target.value)}
                     placeholder="Enter SKU..."
                   />
-                )}
+                  {currentType === "export" && (
+                    <button
+                      type="button"
+                      className="ctd-btn-outline"
+                      onClick={handleCheckSku}
+                    >
+                      Check
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="ctd-form-group">
                 <label className="ctd-label">Product Name</label>

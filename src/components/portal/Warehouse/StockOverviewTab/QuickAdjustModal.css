@@ -267,3 +267,46 @@
     transform: translateY(-10px);
   }
 }
+
+/* EXTRACTED INLINE CSS & MODAL TABS */
+.qam-mt-4 {
+  margin-top: 4px;
+}
+.qam-text-danger {
+  font-size: 0.85rem;
+  color: #e1251b;
+  margin-top: 4px;
+  font-weight: 500;
+}
+.qam-text-warning {
+  font-size: 0.85rem;
+  color: #d97706;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.qam-tabs-header {
+  display: flex;
+  gap: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 20px;
+}
+.qam-tab-btn {
+  background: none;
+  border: none;
+  padding: 8px 4px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #6b7280;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.qam-tab-btn:hover {
+  color: #111827;
+}
+.qam-tab-btn.active {
+  color: #111827;
+  border-bottom-color: #111827;
+}

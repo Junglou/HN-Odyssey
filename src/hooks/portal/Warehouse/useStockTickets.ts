@@ -1,8 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import axiosClient from "../../../api/axiosClient";
 
-// types
+// ----------------------
+// 1. FE TYPES
+// ----------------------
 export type TicketType = "import" | "export";
-export type TicketStatus = "processing" | "completed" | "cancelled";
+export type TicketStatus = "PROCESSING" | "COMPLETED" | "CANCELLED";
 
 export interface TicketItem {
   sku: string;
@@ -27,9 +30,47 @@ export interface StockTicketRow {
   cancelReason?: string;
 }
 
-// mock data
+// ----------------------
+// 2. BE RESPONSE INTERFACES
+// ----------------------
+interface BackendActor {
+  email?: string;
+}
 
-// hook
+interface BackendProduct {
+  name?: string;
+}
+
+interface BackendTransactionItem {
+  sku: string;
+  product_id?: BackendProduct;
+  quantity: number;
+  note?: string;
+}
+
+interface BackendTransaction {
+  _id: string;
+  transaction_code: string;
+  action_type: string;
+  warehouse?: string;
+  created_at: string;
+  actor_id?: BackendActor;
+  total_quantity: number;
+  status: string;
+  note: string;
+  items: BackendTransactionItem[];
+  supplier?: string;
+  export_reason?: string;
+  cancel_reason?: string;
+}
+
+interface ErrorResponse {
+  message?: string;
+}
+
+// ----------------------
+// 3. MAIN HOOK
+// ----------------------
 export function useStockTickets() {
   // states
   const [data, setData] = useState<StockTicketRow[]>([]);
@@ -48,40 +89,71 @@ export function useStockTickets() {
   const [loading, setLoading] = useState(false);
   const [refetchTrigger, setRefetchTrigger] = useState(0);
 
-  // derived data
-  useEffect(() => {
-    const fetchTickets = async () => {
-      setLoading(true);
-      try {
-        const queryParams = new URLSearchParams({
-          page: pagination.page.toString(),
-          limit: pagination.limit.toString(),
-          search: filters.search,
-          type: filters.type !== "all" ? filters.type : "",
-        }).toString();
+  // fetch data
+  const fetchTickets = useCallback(async () => {
+    setLoading(true);
+    try {
+      const queryParams = new URLSearchParams({
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString(),
+      });
 
-        const response = await fetch(
-          `http://localhost:8080/api/tickets?${queryParams}`,
-        );
-        if (!response.ok) throw new Error("Fetch failed");
-
-        const result = await response.json();
-        setData(result.data || []);
-        setPagination((prev) => ({
-          ...prev,
-          total: result.total || 0,
-          totalPages: result.totalPages || 1,
-        }));
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
+      if (filters.search) queryParams.append("search", filters.search);
+      // BE sẽ tự handle type = 'import' | 'export' | 'all' trong hàm getAllHistory
+      if (filters.type !== "all") {
+        queryParams.append("action_type", filters.type.toUpperCase());
       }
-    };
 
+      // Gọi API Get All History đã tạo ở BE
+      const response = await axiosClient.get(
+        `/inventory/transactions/history/all?${queryParams.toString()}`,
+      );
+
+      const resultData: BackendTransaction[] = response.data.data;
+      // Tùy BaseResponse trả về (meta hoặc pagination)
+      const meta = response.data.meta || response.data.pagination;
+
+      // Map BE schema sang FE row
+      const mappedData: StockTicketRow[] = resultData.map(
+        (item: BackendTransaction) => ({
+          id: item._id,
+          ticketCode: item.transaction_code,
+          type: item.action_type.toLowerCase() as TicketType,
+          warehouse: item.warehouse || "N/A",
+          createdDate: item.created_at,
+          createdBy: item.actor_id?.email || "N/A",
+          totalQuantity: item.total_quantity,
+          status: item.status as TicketStatus,
+          note: item.note,
+          items: (item.items || []).map((i: BackendTransactionItem) => ({
+            sku: i.sku || "N/A",
+            productName: i.product_id?.name || "Sản phẩm không xác định",
+            quantity: i.quantity || 0,
+            reason: i.note || "",
+          })),
+          supplier: item.supplier,
+          exportReason: item.export_reason,
+          cancelReason: item.cancel_reason,
+        }),
+      );
+
+      setData(mappedData);
+      setPagination((prev) => ({
+        ...prev,
+        total: meta?.totalItems || 0,
+        totalPages: meta?.totalPages || 1,
+      }));
+    } catch (error: unknown) {
+      console.error("Lỗi tải danh sách phiếu:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [pagination.page, pagination.limit, filters.search, filters.type]);
+
+  useEffect(() => {
     const delay = setTimeout(() => fetchTickets(), 500);
     return () => clearTimeout(delay);
-  }, [pagination.page, pagination.limit, filters, refetchTrigger]);
+  }, [fetchTickets, refetchTrigger]);
 
   // actions
   const actions = {
@@ -115,52 +187,109 @@ export function useStockTickets() {
       >,
     ) => {
       try {
-        const response = await fetch("http://localhost:8080/api/tickets", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!response.ok) throw new Error("Lỗi tạo phiếu");
-        alert("Tạo phiếu thành công!");
+        let endpoint = "";
+        let requestBody = {};
+
+        // Phân tách payload gửi BE dựa trên Type
+        if (payload.type === "import") {
+          endpoint = "/inventory/transactions/import";
+          requestBody = {
+            warehouse: payload.warehouse,
+            supplier: payload.supplier,
+            note: payload.note,
+            items: payload.items.map((i) => ({
+              sku: i.sku,
+              quantity: i.quantity,
+              reason: i.reason,
+            })),
+          };
+        } else {
+          endpoint = "/inventory/transactions/export";
+          requestBody = {
+            warehouse: payload.warehouse,
+            exportReason: payload.exportReason,
+            note: payload.note,
+            items: payload.items.map((i) => ({
+              sku: i.sku,
+              quantity: i.quantity,
+              reason: i.reason,
+            })),
+          };
+        }
+
+        await axiosClient.post(endpoint, requestBody);
+
+        alert("Tạo phiếu nháp thành công!");
         setRefetchTrigger((prev) => prev + 1);
         setPagination((prev) => ({ ...prev, page: 1 }));
-      } catch (error) {
+      } catch (error: unknown) {
         console.error(error);
-        alert("Có lỗi xảy ra khi tạo phiếu!");
+        const err = error as ErrorResponse;
+        alert(err.message || "Có lỗi xảy ra khi tạo phiếu!");
       }
     },
     completeTicket: async (ticketId: string) => {
       try {
-        const response = await fetch(
-          `http://localhost:8080/api/tickets/${ticketId}/complete`,
-          {
-            method: "PUT",
-          },
-        );
-        if (!response.ok) throw new Error("Lỗi cập nhật");
-        alert("Đã hoàn thành phiếu!");
+        await axiosClient.patch(`/inventory/transactions/${ticketId}/complete`);
+        alert("Đã hoàn tất phiếu và cập nhật tồn kho!");
         setRefetchTrigger((prev) => prev + 1);
-      } catch (error) {
+      } catch (error: unknown) {
         console.error(error);
-        alert("Lỗi hoàn thành phiếu!");
+        const err = error as ErrorResponse;
+        alert(err.message || "Lỗi hoàn thành phiếu!");
       }
     },
     cancelTicket: async (ticketId: string, reason: string) => {
       try {
-        const response = await fetch(
-          `http://localhost:8080/api/tickets/${ticketId}/cancel`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ reason }),
-          },
-        );
-        if (!response.ok) throw new Error("Lỗi hủy phiếu");
+        await axiosClient.patch(`/inventory/transactions/${ticketId}/cancel`, {
+          reason,
+        });
         alert("Đã hủy phiếu!");
         setRefetchTrigger((prev) => prev + 1);
-      } catch (error) {
+      } catch (error: unknown) {
         console.error(error);
-        alert("Lỗi hủy phiếu!");
+        const err = error as ErrorResponse;
+        alert(err.message || "Lỗi hủy phiếu!");
+      }
+    },
+
+    exportPdf: async (
+      ticketId: string,
+      type: TicketType,
+      ticketCode: string,
+    ) => {
+      try {
+        // Cập nhật endpoint tự động chọn API tương ứng với type
+        const endpoint =
+          type === "import"
+            ? `/inventory/transactions/import/history/pdf/${ticketId}`
+            : `/inventory/transactions/export/history/pdf/${ticketId}`;
+
+        const response = await axiosClient.get(endpoint, {
+          responseType: "blob",
+        });
+
+        const blob = new Blob([response.data], { type: "application/pdf" });
+        const url = window.URL.createObjectURL(blob);
+
+        const link = document.createElement("a");
+        link.href = url;
+
+        // Cập nhật tên file tải về
+        const fileName =
+          type === "import"
+            ? `PhieuNhap_${ticketCode}.pdf`
+            : `PhieuXuat_${ticketCode}.pdf`;
+
+        link.setAttribute("download", fileName);
+        document.body.appendChild(link);
+        link.click();
+
+        link.parentNode?.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } catch (error: unknown) {
+        console.error(error);
+        alert("Lỗi khi tải PDF từ hệ thống!");
       }
     },
   };

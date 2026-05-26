@@ -34,7 +34,7 @@ function CustomDropdown({
   className?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [hasOpened, setHasOpened] = useState(false); // Thêm state
+  const [hasOpened, setHasOpened] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -170,6 +170,36 @@ export default function RequestTab({
     );
   };
 
+  // Hàm xử lý an toàn cho Date
+  const safeFormatDate = (dateString: string | undefined) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "N/A";
+    return date.toLocaleString("vi-VN");
+  };
+
+  // Thuật toán hiển thị phân trang thông minh (1 2 3 ... 122)
+  const getPaginationGroup = () => {
+    const { page, totalPages } = pagination;
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    if (page <= 3) {
+      return [1, 2, 3, 4, "...", totalPages];
+    }
+    if (page >= totalPages - 2) {
+      return [
+        1,
+        "...",
+        totalPages - 3,
+        totalPages - 2,
+        totalPages - 1,
+        totalPages,
+      ];
+    }
+    return [1, "...", page - 1, page, page + 1, "...", totalPages];
+  };
+
   // main render
   return (
     <div className="rt-wrapper">
@@ -272,7 +302,7 @@ export default function RequestTab({
                           {item.type}
                         </span>
                       </td>
-                      <td>{new Date(item.createdAt).toLocaleString()}</td>
+                      <td>{safeFormatDate(item.createdAt)}</td>
                       <td style={{ textAlign: "center" }}>
                         {renderStatus(item.status)}
                       </td>
@@ -368,18 +398,30 @@ export default function RequestTab({
             &lt;
           </button>
 
-          {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(
-            (num) => (
-              <button
-                key={num}
-                type="button"
-                className={`rt-page-num ${pagination.page === num ? "active" : ""}`}
-                onClick={(e) => {
-                  e.currentTarget.blur();
-                  actions.changePage(num);
+          {getPaginationGroup().map((item, idx) =>
+            item === "..." ? (
+              <span
+                key={`ellipsis-${idx}`}
+                style={{
+                  padding: "0 8px",
+                  color: "#6b7280",
+                  cursor: "default",
+                  fontWeight: 600,
                 }}
               >
-                {num}
+                ...
+              </span>
+            ) : (
+              <button
+                key={item}
+                type="button"
+                className={`rt-page-num ${pagination.page === item ? "active" : ""}`}
+                onClick={(e) => {
+                  e.currentTarget.blur();
+                  actions.changePage(Number(item));
+                }}
+              >
+                {item}
               </button>
             ),
           )}
