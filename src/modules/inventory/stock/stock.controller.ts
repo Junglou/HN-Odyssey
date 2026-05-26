@@ -1,5 +1,3 @@
-// src/modules/inventory/stock/stock.controller.ts
-
 import {
   Body,
   Controller,
@@ -25,6 +23,7 @@ import { RequirePermissions } from 'src/common/decorators/permissions.decorator'
 import { Action, Resource } from 'src/common/enums/resource.enum';
 import { Public } from 'src/common/decorators/public.decorator';
 import { BaseResponse } from 'src/common/dtos/base-response.dto';
+import { GetPendingRequestsDto } from './dto/get-pending-requests.dto';
 
 interface RequestUser {
   email: string;
@@ -113,5 +112,26 @@ export class StockController {
   @Post('restock')
   async restock(@Body() dto: AdjustStockDto) {
     return this.stockService.restock(dto);
+  }
+
+  // Lấy danh sách yêu cầu chờ duyệt (API dành riêng cho RequestTab ở FE)
+  @Get('requests')
+  @RequirePermissions(Resource.TRANSFERS, Action.READ)
+  async getPendingRequests(@Query() query: GetPendingRequestsDto) {
+    const result = await this.stockService.getPendingRequests(query);
+
+    // Sử dụng BaseResponse để trả về đúng chuẩn Pagination chung của dự án
+    return new BaseResponse(
+      true,
+      'Lấy danh sách yêu cầu kho thành công',
+      result.data,
+      {
+        totalItems: result.total,
+        itemCount: result.data.length,
+        itemsPerPage: result.limit,
+        totalPages: Math.ceil(result.total / result.limit) || 1,
+        currentPage: result.page,
+      },
+    );
   }
 }

@@ -7,6 +7,7 @@ import {
   FilterQuery,
   UpdateQuery,
   isValidObjectId,
+  PipelineStage,
 } from 'mongoose';
 
 import { AdjustStockDto } from './dto/adjust-stock.dto';
@@ -35,6 +36,12 @@ import { StockGateway } from './stock.gateway';
 import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
 import { Resource } from 'src/common/enums/resource.enum';
 import { Department } from 'src/common/enums/department.enum';
+import { SYSTEM_CONSTANTS } from 'src/common/constants/system.constant';
+import {
+  GetPendingRequestsDto,
+  RequestFilterStatus,
+  RequestFilterType,
+} from './dto/get-pending-requests.dto';
 
 interface VariantStockInfo {
   sku: string;
@@ -59,6 +66,81 @@ interface ProductAlertDoc {
   max_stock?: number;
 }
 
+// Định nghĩa Interface cho kết quả trả về từ DB
+interface StockVariantData {
+  sku: string;
+  stock: number;
+  stock_on_hold?: number;
+  min_stock?: number;
+  max_stock?: number;
+}
+
+interface StockProductData {
+  _id: unknown;
+  sku: string;
+  name: string;
+  thumbnail: string;
+  stock: number;
+  stock_on_hold?: number; // Cần thiết để tính Available
+  min_stock: number;
+  max_stock?: number;
+  has_variants: boolean;
+  variants?: StockVariantData[];
+  category_info?: Array<{ name: string }>; // Kết quả từ $lookup
+  warehouse_info?: Array<{ name: string; code?: string }>; // Kết quả từ $lookup
+}
+
+interface AggregationResult {
+  data: StockProductData[];
+  total: { count: number }[];
+}
+
+export interface PopulatedOrderProduct {
+  _id: Types.ObjectId;
+  name: string;
+}
+
+export interface PopulatedOrderItem {
+  product_id: PopulatedOrderProduct | Types.ObjectId | null;
+  sku: string;
+  product_name: string;
+  quantity: number;
+}
+
+export interface OrderTimelineItem {
+  status: string;
+  timestamp: Date;
+  actor: string;
+  note?: string;
+}
+
+export interface PopulatedOrder {
+  _id: Types.ObjectId;
+  order_code: string;
+  status: string;
+  createdAt?: Date;
+  created_at?: Date;
+  items: PopulatedOrderItem[];
+  timeline?: OrderTimelineItem[];
+}
+
+export interface RequestItemOutput {
+  sku: string;
+  productName: string;
+  quantity: number;
+}
+
+export interface RequestDataOutput {
+  id: string;
+  requestCode: string;
+  type: 'import' | 'export';
+  source: 'Sales' | 'Purchasing';
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: Date | string;
+  items: RequestItemOutput[];
+  note: string;
+}
+
 @Injectable()
 export class StockService {
   constructor(
@@ -75,85 +157,211 @@ export class StockService {
   async getStockList(queryDto: GetStockDto) {
     const {
       search,
-      out_of_stock,
+      status,
+      category,
       sort_by,
       sort_order,
       page = 1,
       limit = 10,
     } = queryDto as GetStockDto & { page?: number; limit?: number };
 
-    const filter: FilterQuery<ProductDocument> = { is_deleted: false };
+    // Định nghĩa Interface cho MatchStage
+    interface MatchStage {
+      is_deleted: boolean;
+      $or?: Record<string, unknown>[];
+    }
+
+    // 1. Pipeline bắt đầu bằng các điều kiện cơ bản
+    const matchStage: MatchStage = { is_deleted: false };
 
     if (search) {
-      filter.$or = [
+      matchStage.$or = [
         { sku: { $regex: search, $options: 'i' } },
         { name: { $regex: search, $options: 'i' } },
         { 'variants.sku': { $regex: search, $options: 'i' } },
       ];
     }
 
-    if (out_of_stock) {
-      filter.$or = [
-        { stock: { $lte: 0 }, has_variants: false },
-        { 'variants.stock': { $lte: 0 }, has_variants: true },
-      ];
+    const pipeline: PipelineStage[] = [
+      { $match: matchStage as FilterQuery<ProductDocument> },
+    ];
+
+    // 2. JOIN BẢNG ĐỂ LẤY CATEGORY VÀ WAREHOUSE (LOCATION)
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'categories', // Tên collection (thường là số nhiều viết thường)
+          localField: 'categories',
+          foreignField: '_id',
+          as: 'category_info',
+        },
+      } as PipelineStage.Lookup,
+      {
+        $lookup: {
+          from: 'warehouses', // Tên collection của Warehouse
+          localField: 'warehouse_id',
+          foreignField: '_id',
+          as: 'warehouse_info',
+        },
+      } as PipelineStage.Lookup,
+    );
+
+    // Lọc theo category slug (nếu FE có truyền lên)
+    if (category && category !== 'all') {
+      pipeline.push({
+        $match: {
+          'category_info.slug': category,
+        },
+      });
     }
 
-    const sort: Record<string, 1 | -1> = {};
-    if (sort_by) {
-      sort[sort_by] = sort_order === 'desc' ? -1 : 1;
-    } else {
-      sort['created_at'] = -1;
+    // 3. LOGIC TÍNH STATUS NHƯ CŨ BẠN ĐÃ VIẾT
+    pipeline.push({
+      $addFields: {
+        computed_status: {
+          $cond: {
+            if: { $eq: ['$has_variants', true] },
+            then: {
+              $map: {
+                input: '$variants',
+                as: 'v',
+                in: {
+                  sku: '$$v.sku',
+                  status: {
+                    $switch: {
+                      branches: [
+                        {
+                          case: { $lte: ['$$v.stock', 0] },
+                          then: 'OUT_OF_STOCK',
+                        },
+                        {
+                          case: {
+                            $lte: [
+                              '$$v.stock',
+                              { $ifNull: ['$$v.min_stock', '$min_stock', 0] },
+                            ],
+                          },
+                          then: 'LOW_STOCK',
+                        },
+                      ],
+                      default: 'IN_STOCK',
+                    },
+                  },
+                },
+              },
+            },
+            else: [
+              {
+                sku: '$sku',
+                status: {
+                  $switch: {
+                    branches: [
+                      { case: { $lte: ['$stock', 0] }, then: 'OUT_OF_STOCK' },
+                      {
+                        case: {
+                          $lte: ['$stock', { $ifNull: ['$min_stock', 0] }],
+                        },
+                        then: 'LOW_STOCK',
+                      },
+                    ],
+                    default: 'IN_STOCK',
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+    } as PipelineStage.AddFields);
+
+    // 4. Lọc theo status (nếu FE có truyền lên và khác 'all')
+    if (status && status !== 'all') {
+      pipeline.push({
+        $match: {
+          'computed_status.status': status,
+        },
+      });
     }
 
-    const skip = (Number(page) - 1) * Number(limit);
-    const products = await this.productModel
-      .find(filter)
-      .select(
-        'sku name thumbnail stock min_stock max_stock has_variants variants status',
-      )
-      .sort(sort)
-      .skip(skip)
-      .limit(Number(limit))
-      .lean();
+    // 5. Sắp xếp
+    const sortStage: Record<string, 1 | -1> = {};
+    const sortBy = sort_by || 'created_at';
+    sortStage[sortBy] = sort_order === 'desc' ? -1 : 1;
 
-    const total = await this.productModel.countDocuments(filter);
+    // 6. Phân trang và Facet
+    pipeline.push({
+      $facet: {
+        data: [
+          { $sort: sortStage },
+          { $skip: (Number(page) - 1) * Number(limit) },
+          { $limit: Number(limit) },
+        ],
+        total: [{ $count: 'count' }],
+      },
+    } as PipelineStage.Facet);
 
+    // 7. THỰC THI PIPELINE
+    const results =
+      await this.productModel.aggregate<AggregationResult>(pipeline);
+
+    const result = results[0];
+    const products = result?.data || [];
+    const total = result?.total[0]?.count || 0;
+
+    // 8. MAP DỮ LIỆU ĐỂ TRẢ VỀ FRONTEND ĐẦY ĐỦ CÁC CỘT
     const formattedData = products.map((product) => {
-      let statusColor = 'IN_STOCK';
-      if (product.stock <= 0) statusColor = 'OUT_OF_STOCK';
-      else if (product.stock <= product.min_stock) statusColor = 'LOW_STOCK';
-      const variants =
-        product.has_variants && Array.isArray(product.variants)
-          ? product.variants.map((item) => {
-              // Mở rộng type của item hiện tại kèm theo min_stock (optional)
-              const v = item as typeof item & { min_stock?: number };
+      // Lấy tên danh mục đầu tiên
+      const categoryName = product.category_info?.[0]?.name || 'N/A';
 
-              // Lấy min_stock của biến thể, nếu không có thì lấy của sản phẩm mẹ
-              const variantMinStock = v.min_stock ?? product.min_stock ?? 0;
+      // Lấy tên kho hàng (Location)
+      const locationName =
+        product.warehouse_info?.[0]?.name ||
+        product.warehouse_info?.[0]?.code ||
+        'Kho chính';
 
-              return {
-                sku: v.sku,
-                stock: v.stock,
-                statusColor:
-                  v.stock <= 0
-                    ? 'OUT_OF_STOCK'
-                    : v.stock <= variantMinStock
-                      ? 'LOW_STOCK'
-                      : 'IN_STOCK',
-              };
-            })
-          : [];
+      // Tính Total & Available cho Sản phẩm (nếu không có biến thể)
+      const total_quantity = product.stock || 0;
+      const available_quantity = total_quantity - (product.stock_on_hold || 0);
+
+      const statusColor =
+        product.stock <= 0
+          ? 'OUT_OF_STOCK'
+          : product.stock <= product.min_stock
+            ? 'LOW_STOCK'
+            : 'IN_STOCK';
 
       return {
         _id: product._id,
         sku: product.sku,
         name: product.name,
         thumbnail: product.thumbnail,
-        total_stock: product.stock,
+        category: categoryName, // Mới thêm cho FE
+        location: locationName, // Mới thêm cho FE
+        total_quantity: total_quantity, // Đổi tên để map chuẩn FE
+        available_quantity: available_quantity, // Tính Available = Stock - Hold
         status_color: statusColor,
         has_variants: product.has_variants,
-        variants,
+        min_stock: product.min_stock,
+        max_stock: product.max_stock,
+        variants:
+          product.variants?.map((v) => {
+            const varTotal = v.stock || 0;
+            const varAvailable = varTotal - (v.stock_on_hold || 0);
+
+            return {
+              sku: v.sku,
+              total_stock: varTotal,
+              available_stock: varAvailable,
+              min_stock: v.min_stock,
+              max_stock: v.max_stock,
+              statusColor:
+                v.stock <= 0
+                  ? 'OUT_OF_STOCK'
+                  : v.stock <= (v.min_stock ?? product.min_stock ?? 0)
+                    ? 'LOW_STOCK'
+                    : 'IN_STOCK',
+            };
+          }) || [],
       };
     });
 
@@ -174,6 +382,16 @@ export class StockService {
   ) {
     const { product_id, sku, adjustment_value, reason } = dto;
 
+    // TẠO ID HỢP LỆ CHO HỆ THỐNG ĐỂ VƯỢ QUA MONGOOSE CAST ERROR
+    const validActorIdStr = isValidObjectId(actorId)
+      ? actorId
+      : SYSTEM_CONSTANTS.SYSTEM_ACTOR_ID;
+    const validActorObjectId = new Types.ObjectId(validActorIdStr);
+
+    if (!product_id || !isValidObjectId(product_id)) {
+      throw new BadRequestException('ID sản phẩm không hợp lệ.');
+    }
+
     const product = await this.productModel.findById(product_id);
     if (!product) throw new BadRequestException('Sản phẩm không tồn tại');
 
@@ -188,16 +406,15 @@ export class StockService {
     }
 
     const newStock = oldStock + adjustment_value;
-    // AC7: Ngăn chặn lưu tồn kho về số âm
     if (newStock < 0)
       throw new BadRequestException(
         'Tồn kho cuối cùng không được phép nhỏ hơn 0 (AC7).',
       );
 
-    // Thực hiện update
     const filter: FilterQuery<ProductDocument> = {
       _id: new Types.ObjectId(product_id),
     };
+
     const updateQuery: UpdateQuery<ProductDocument> = {};
     if (product.has_variants) {
       filter['variants.sku'] = sku;
@@ -217,11 +434,11 @@ export class StockService {
     if (!updatedProduct)
       throw new BadRequestException('Không thể cập nhật tồn kho.');
 
-    // AC5: Ghi Audit Log chi tiết (Audit Trail)
+    // LOG AUDIT VỚI ID HỢP LỆ
     await this.auditLogsService.log({
       action: 'MANUAL_ADJUST_STOCK',
       collection_name: Resource.INVENTORY,
-      actor_id: actorId,
+      actor_id: validActorIdStr,
       target_id: product._id.toString(),
       department: Department.WAREHOUSE,
       detail: {
@@ -229,28 +446,33 @@ export class StockService {
         old_value: oldStock,
         new_value: newStock,
         adjustment: adjustment_value,
-        reason: reason, // AC3: Lý do bắt buộc
+        reason: reason,
       },
       ip,
       user_agent: userAgent,
     });
 
-    // Real-time update (AC2)
     this.stockGateway.emitStockUpdate(product_id, sku, newStock);
 
-    // Ghi StockTransaction để tra cứu nội bộ module
+    // MAPPING CHUẨN CẤU TRÚC THEO STOCK-TRANSACTION.SCHEMA.TS
     await this.transactionModel.create({
-      product_id: product._id,
-      sku: sku || product.sku,
+      transaction_code: `ADJ-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       action_type: 'MANUAL_ADJUST',
-      old_value: oldStock,
-      new_value: newStock,
-      changed_value: adjustment_value,
-      reason,
-      actor_id: new Types.ObjectId(actorId),
+      status: 'COMPLETED',
+      items: [
+        {
+          product_id: product._id,
+          sku: sku || product.sku,
+          quantity: Math.abs(adjustment_value) || 1, // Đảm bảo số dương (min 1)
+          note: `Thay đổi: ${adjustment_value > 0 ? '+' : ''}${adjustment_value}`,
+        },
+      ],
+      total_quantity: Math.abs(adjustment_value) || 1,
+      note: `Điều chỉnh thủ công (Cũ: ${oldStock}, Mới: ${newStock})`,
+      reason: reason || 'Không có lý do',
+      actor_id: validActorObjectId,
     });
 
-    // AC4: Kiểm tra ngưỡng cảnh báo
     await this.triggerStockAlert(updatedProduct, sku);
 
     return {
@@ -260,7 +482,7 @@ export class StockService {
     };
   }
 
-  // [US4] TIẾP NHẬN ĐƠN HÀNG
+  // [US4] TIẾP NHẬN ĐƠN HÀNG (Hỗ trợ cả Xuất kho và Nhập kho hoàn trả/thu cũ)
   async acceptOrders(
     dto: AcceptOrderDto,
     actorId: string,
@@ -274,6 +496,11 @@ export class StockService {
       errors: [] as Array<{ order_id: string; reason: string }>,
     };
 
+    const validActorIdStr = isValidObjectId(actorId)
+      ? actorId
+      : SYSTEM_CONSTANTS.SYSTEM_ACTOR_ID;
+    const validActorObjectId = new Types.ObjectId(validActorIdStr);
+
     for (const orderId of order_ids) {
       try {
         const order = await this.orderModel.findById(orderId);
@@ -281,65 +508,99 @@ export class StockService {
         if (!order) throw new Error('Đơn hàng không tồn tại');
         if (order.status === 'CANCELLED')
           throw new Error('Đơn hàng đã bị hủy (AC4)');
-        if (order.status !== 'PENDING' && order.status !== 'CONFIRMED') {
-          throw new Error(`Trạng thái không hợp lệ: ${order.status}`);
+
+        // Phân loại luồng xử lý dựa trên trạng thái đơn hàng
+        const isExport = ['PENDING', 'CONFIRMED'].includes(order.status);
+        const isImport = ['RETURNED', 'TRADE_IN_REVIEW'].includes(order.status);
+
+        if (!isExport && !isImport) {
+          throw new Error(`Trạng thái không hợp lệ để duyệt: ${order.status}`);
         }
 
+        // Lặp qua từng sản phẩm trong đơn hàng
         for (const item of order.items) {
           const product = await this.productModel
             .findById(item.product_id)
-            .select('has_variants stock stock_on_hold variants');
+            .select('has_variants stock stock_on_hold variants name');
 
           if (!product) throw new Error(`Sản phẩm ${item.sku} không tồn tại`);
 
-          // [FIX US4-AC7] Kiểm tra lại tồn kho lần cuối trước khi trừ
-          let currentHold = 0;
-          if (product.has_variants) {
-            const v = product.variants.find((x) => x.sku === item.sku);
-            if (!v) throw new Error(`Không tìm thấy biến thể ${item.sku}`);
-
-            // FIX: Bổ sung type an toàn cho stock_on_hold
-            const variantData = v as typeof v & { stock_on_hold?: number };
-            currentHold = variantData.stock_on_hold ?? 0;
-          } else {
-            currentHold = product.stock_on_hold;
-          }
-
-          if (currentHold < item.quantity) {
-            // Chặn quy trình tiếp nhận và báo lỗi AC7
-            throw new Error(
-              `Sản phẩm ${item.sku} không đủ tồn kho chờ xử lý (Thực tế: ${currentHold}, Cần: ${item.quantity})`,
-            );
-          }
-
           const filter: FilterQuery<ProductDocument> = { _id: item.product_id };
-          const update: UpdateQuery<ProductDocument> = {};
+          const update: UpdateQuery<ProductDocument> = {
+            $inc: {} as Record<string, number>,
+          };
 
-          if (product.has_variants) {
-            filter['variants.sku'] = item.sku;
-            update.$inc = {
-              'variants.$.stock_on_hold': -item.quantity,
-              // stock_on_hold: -item.quantity,
-            };
+          if (isExport) {
+            // ==========================================
+            // LUỒNG XUẤT KHO (Đơn hàng bán ra)
+            // ==========================================
+            let currentHold = 0;
+            let currentTotalStock = 0;
+
+            if (product.has_variants) {
+              const v = product.variants.find((x) => x.sku === item.sku);
+              if (!v) throw new Error(`Không tìm thấy biến thể ${item.sku}`);
+              currentHold = v.stock_on_hold ?? 0;
+              currentTotalStock = v.stock ?? 0;
+            } else {
+              currentHold = product.stock_on_hold ?? 0;
+              currentTotalStock = product.stock ?? 0;
+            }
+
+            const holdToDeduct = Math.min(currentHold, item.quantity);
+            const missingHold = item.quantity - holdToDeduct;
+
+            if (missingHold > 0 && currentTotalStock < missingHold) {
+              throw new Error(
+                `Sản phẩm ${item.sku} đã hết hàng (Thực tế còn: ${currentTotalStock}, Cần xuất: ${item.quantity})`,
+              );
+            }
+
+            if (product.has_variants) {
+              filter['variants.sku'] = item.sku;
+              // Khởi tạo $inc object trước khi gán
+              update.$inc = {
+                'variants.$.stock_on_hold': -holdToDeduct,
+                'variants.$.stock': -missingHold,
+                stock: -missingHold,
+              };
+            } else {
+              update.$inc = {
+                stock_on_hold: -holdToDeduct,
+                stock: -missingHold,
+              };
+            }
           } else {
-            update.$inc = { stock_on_hold: -item.quantity };
+            // ==========================================
+            // LUỒNG NHẬP KHO (Hàng Hoàn trả / Thu cũ)
+            // ==========================================
+            if (product.has_variants) {
+              filter['variants.sku'] = item.sku;
+              update.$inc = {
+                'variants.$.stock': item.quantity,
+                stock: item.quantity,
+              };
+            } else {
+              update.$inc = {
+                stock: item.quantity,
+              };
+            }
           }
 
+          // Thực hiện cập nhật Database
           const updatedProduct = await this.productModel.findOneAndUpdate(
             filter,
             update,
             { new: true },
           );
 
+          // Phát sự kiện cập nhật Realtime qua Socket
           if (updatedProduct) {
-            // Xác định tồn kho hiện tại để bắn WebSocket
             let currentStock = updatedProduct.stock;
             if (updatedProduct.has_variants) {
               const v = updatedProduct.variants.find((x) => x.sku === item.sku);
               if (v) currentStock = v.stock;
             }
-
-            // Bắn tín hiệu Real-time
             this.stockGateway.emitStockUpdate(
               updatedProduct._id.toString(),
               item.sku,
@@ -347,38 +608,56 @@ export class StockService {
             );
           }
 
+          // GHI NHẬN TRANSACTION LỊCH SỬ NHẬP/XUẤT
           await this.transactionModel.create({
-            product_id: item.product_id,
-            sku: item.sku,
-            action_type: 'ORDER_ACCEPTED',
-            old_value: 0,
-            new_value: 0,
-            changed_value: -item.quantity,
-            reason: `Tiếp nhận đơn hàng ${order.order_code}`,
-            actor_id: isValidObjectId(actorId)
-              ? new Types.ObjectId(actorId)
-              : null,
+            transaction_code: `ACC-${order.order_code}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            action_type: isExport ? 'ORDER_ACCEPTED' : 'IMPORT',
+            status: 'COMPLETED',
+            items: [
+              {
+                product_id: item.product_id,
+                sku: item.sku,
+                quantity: item.quantity,
+                note: isExport
+                  ? 'Trừ kho xuất bán'
+                  : 'Nhập lại kho (Hoàn trả/Thu cũ)',
+              },
+            ],
+            total_quantity: item.quantity,
+            note: isExport
+              ? `Tiếp nhận đơn hàng ${order.order_code}`
+              : `Thu nhận hàng từ phiếu ${order.order_code}`,
+            reason: isExport
+              ? `Xuất đơn hàng ${order.order_code}`
+              : `Nhập hàng hoàn trả/thu cũ ${order.order_code}`,
+            reference_code: String(order.order_code),
+            actor_id: validActorObjectId,
           });
         }
 
-        order.status = 'PROCESSING';
+        // Cập nhật trạng thái đơn hàng (Order Status)
+        // Nếu là hàng trả về thì đổi thành COMPLETED để đánh dấu kho đã hoàn tất khâu nhận
+        order.status = isExport ? 'PROCESSING' : 'COMPLETED';
         order.timeline.push({
-          status: 'PROCESSING',
+          status: order.status,
           timestamp: new Date(),
-          actor: actorId ? actorId.toString() : 'SYSTEM',
-          note: 'Đã tiếp nhận đơn hàng',
+          actor: validActorIdStr,
+          note: isExport
+            ? 'Đã tiếp nhận đơn hàng xuất'
+            : 'Kho đã nhận được hàng và nhập lại thành công',
         });
         await order.save();
 
+        // Ghi Audit Log
         await this.auditLogsService.log({
-          action: 'ACCEPT_ORDER',
+          action: isExport ? 'ACCEPT_ORDER_EXPORT' : 'ACCEPT_ORDER_IMPORT',
           collection_name: Resource.TRANSFERS,
-          actor_id: actorId,
+          actor_id: validActorIdStr,
           target_id: order._id.toString(),
           department: Department.WAREHOUSE,
           detail: {
             order_code: String(order.order_code),
-            message: `Tiếp nhận đơn hàng thành công. Trạng thái -> PROCESSING`,
+            message: `Tiếp nhận thành công. Trạng thái -> ${order.status}`,
           },
           ip,
           user_agent: userAgent,
@@ -392,7 +671,7 @@ export class StockService {
       }
     }
 
-    return { message: 'Hoàn tất quy trình tiếp nhận', ...results };
+    return { message: 'Hoàn tất quy trình xử lý yêu cầu', ...results };
   }
 
   private async triggerStockAlert(
@@ -655,6 +934,9 @@ export class StockService {
   // [US3 - AC4] THIẾT LẬP NGƯỠNG TỒN KHO
   async updateThresholds(dto: UpdateThresholdsDto, actorId: string) {
     const { product_id, sku, min_stock, max_stock } = dto;
+    const validActorIdStr = isValidObjectId(actorId)
+      ? actorId
+      : SYSTEM_CONSTANTS.SYSTEM_ACTOR_ID;
 
     const product = await this.productModel.findById(product_id);
     if (!product) throw new BadRequestException('Sản phẩm không tồn tại');
@@ -687,11 +969,10 @@ export class StockService {
     if (!updatedProduct)
       throw new BadRequestException('Không thể cập nhật ngưỡng tồn kho.');
 
-    // Ghi Audit Log cho hành động thay đổi cấu hình kho (Rất quan trọng để đối soát)
     await this.auditLogsService.log({
       action: 'UPDATE_STOCK_THRESHOLDS',
       collection_name: Resource.INVENTORY,
-      actor_id: actorId,
+      actor_id: validActorIdStr, // Dùng biến ID chuẩn
       target_id: product._id,
       department: Department.WAREHOUSE,
       detail: {
@@ -703,7 +984,6 @@ export class StockService {
       is_success: true,
     });
 
-    // Áp dụng ngay lập tức để kiểm tra trạng thái và tắt/mở cảnh báo (Real-time AC7, AC8)
     await this.triggerStockAlert(updatedProduct, sku || product.sku);
 
     return { success: true, message: 'Đã cập nhật ngưỡng cảnh báo tồn kho' };
@@ -714,24 +994,26 @@ export class StockService {
     const { order_id, reason } = dto;
     const order = await this.orderModel.findById(order_id);
 
+    const validActorIdStr = isValidObjectId(actorId)
+      ? actorId
+      : SYSTEM_CONSTANTS.SYSTEM_ACTOR_ID;
+
     if (!order) throw new BadRequestException('Đơn hàng không tồn tại');
 
-    // Đổi trạng thái sang ON_HOLD (Chờ xác nhận lại)
     order.status = 'ON_HOLD';
     order.timeline.push({
       status: 'ON_HOLD',
       timestamp: new Date(),
-      actor: actorId,
+      actor: validActorIdStr,
       note: `Gửi phản hồi / Tạm giữ: ${reason}`,
     });
 
     await order.save();
 
-    // BỔ SUNG AUDIT LOG THEO AC6
     await this.auditLogsService.log({
       action: 'REPORT_ORDER_ISSUE',
       collection_name: Resource.TRANSFERS,
-      actor_id: actorId,
+      actor_id: validActorIdStr, // Dùng biến ID chuẩn
       target_id: order._id,
       department: Department.WAREHOUSE,
       detail: {
@@ -742,7 +1024,6 @@ export class StockService {
       is_success: true,
     });
 
-    // Gửi Event cảnh báo cho bộ phận CSKH (Sales/Support)
     this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
       error_code: `ORDER_HOLD_${String(order.order_code)}`,
       message: `Đơn hàng #${String(order.order_code)} bị tạm giữ bởi kho. Lý do: ${reason}`,
@@ -750,5 +1031,131 @@ export class StockService {
     });
 
     return { success: true, message: 'Đã ghi nhận vấn đề và tạm giữ đơn hàng' };
+  }
+
+  // LẤY DANH SÁCH YÊU CẦU XUẤT/NHẬP KHO CHỜ DUYỆT (Đồng bộ với FE RequestTab)
+  async getPendingRequests(queryDto: GetPendingRequestsDto) {
+    const { search, type, status, page = 1, limit = 10 } = queryDto;
+
+    const filter: FilterQuery<OrderDocument> = {};
+
+    // 1. TẠO TẬP HỢP CÁC TRẠNG THÁI (STATUS) ĐƯỢC PHÉP DỰA TRÊN FILTER CỦA FE
+    let allowedStatuses: string[] = [];
+
+    if (status === RequestFilterStatus.PENDING) {
+      // Pending của Kho bao gồm Đơn chờ xuất đi VÀ Đơn chờ nhập về
+      allowedStatuses = ['PENDING', 'CONFIRMED', 'TRADE_IN_REVIEW', 'RETURNED'];
+    } else if (status === RequestFilterStatus.ACCEPTED) {
+      // Đã duyệt (Thành công)
+      allowedStatuses = ['PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+    } else if (status === RequestFilterStatus.REJECTED) {
+      // Bị từ chối / Tạm giữ
+      allowedStatuses = ['ON_HOLD', 'CANCELLED'];
+    } else {
+      // ALL
+      allowedStatuses = [
+        'PENDING',
+        'CONFIRMED',
+        'TRADE_IN_REVIEW',
+        'RETURNED',
+        'PROCESSING',
+        'SHIPPED',
+        'DELIVERED',
+        'COMPLETED',
+        'ON_HOLD',
+        'CANCELLED',
+      ];
+    }
+
+    // 2. LỌC TIẾP THEO LOẠI (TYPE: IMPORT / EXPORT)
+    if (type === RequestFilterType.IMPORT) {
+      // Chỉ giữ lại các status thuộc luồng nhập kho
+      allowedStatuses = allowedStatuses.filter((s) =>
+        ['TRADE_IN_REVIEW', 'RETURNED'].includes(s),
+      );
+    } else if (type === RequestFilterType.EXPORT) {
+      // Loại bỏ các status thuộc luồng nhập kho
+      allowedStatuses = allowedStatuses.filter(
+        (s) => !['TRADE_IN_REVIEW', 'RETURNED'].includes(s),
+      );
+    }
+
+    // Áp dụng mảng status cuối cùng vào điều kiện truy vấn
+    filter.status = { $in: allowedStatuses };
+
+    // 3. TÌM KIẾM THEO MÃ ĐƠN
+    if (search) {
+      filter.order_code = { $regex: search, $options: 'i' };
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+
+    // 4. TRUY VẤN DATABASE
+    const [orders, total] = await Promise.all([
+      this.orderModel
+        .find(filter)
+        .populate('items.product_id', 'name')
+        .sort({ created_at: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean<PopulatedOrder[]>(),
+      this.orderModel.countDocuments(filter),
+    ]);
+
+    // 5. MAP DỮ LIỆU ĐỂ TRẢ VỀ FRONTEND CHUẨN XÁC
+    const formattedData: RequestDataOutput[] = orders.map((order) => {
+      let mappedStatus: 'pending' | 'accepted' | 'rejected' = 'pending';
+      let mappedType: 'import' | 'export' = 'export';
+      let mappedSource: 'Sales' | 'Purchasing' = 'Sales'; // Mặc định là Bán hàng
+
+      // Phân loại Import / Export và Nguồn (Source)
+      if (['RETURNED', 'TRADE_IN_REVIEW'].includes(order.status)) {
+        mappedType = 'import';
+        mappedSource = 'Purchasing'; // <-- ĐÃ SỬA: Đơn hoàn/thu cũ sẽ tính là Thu mua (Purchasing)
+      }
+
+      // Phân loại Status cho giao diện
+      if (
+        ['PENDING', 'CONFIRMED', 'TRADE_IN_REVIEW', 'RETURNED'].includes(
+          order.status,
+        )
+      ) {
+        mappedStatus = 'pending';
+      } else if (['ON_HOLD', 'CANCELLED'].includes(order.status)) {
+        mappedStatus = 'rejected';
+      } else {
+        mappedStatus = 'accepted';
+      }
+
+      // Lấy ghi chú mới nhất từ timeline
+      let latestNote = '';
+      if (order.timeline && order.timeline.length > 0) {
+        latestNote = order.timeline[order.timeline.length - 1].note || '';
+      }
+
+      return {
+        id: order._id.toString(),
+        requestCode: String(order.order_code || order._id),
+        type: mappedType,
+        source: mappedSource, // <-- TRUYỀN BIẾN ĐỘNG VÀO ĐÂY ĐỂ FE NHẬN
+        status: mappedStatus,
+        createdAt: order.createdAt || order.created_at || new Date(),
+        note: latestNote,
+        items: order.items.map((item) => {
+          return {
+            sku: item.sku,
+            productName: item.product_name || 'Sản phẩm không xác định',
+            quantity: item.quantity,
+          };
+        }),
+      };
+    });
+
+    return {
+      data: formattedData,
+      total,
+      page: Number(page),
+      limit: Number(limit),
+    };
   }
 }

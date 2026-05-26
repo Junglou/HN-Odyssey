@@ -45,6 +45,9 @@ export class ProductVariant {
 
   @Prop({ type: Number, default: 0 })
   max_stock: number;
+
+  @Prop({ type: Number, default: 0 })
+  stock_on_hold: number;
 }
 
 export const ProductVariantSchema =

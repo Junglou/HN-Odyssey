@@ -7,8 +7,8 @@ export class GetTransactionsDto extends PaginationQueryDto {
   search?: string; // Tìm theo Mã phiếu hoặc Tên nhân viên (AC3)
 
   @IsOptional()
-  @IsEnum(['IMPORT', 'MANUAL_ADJUST', 'ORDER_ACCEPTED', 'RESTOCK'])
-  action_type?: string; // Mặc định mình sẽ filter theo 'IMPORT' ở service
+  @IsEnum(['IMPORT', 'EXPORT', 'MANUAL_ADJUST', 'ORDER_ACCEPTED', 'RESTOCK'])
+  action_type?: string;
 
   @IsOptional()
   @IsString()

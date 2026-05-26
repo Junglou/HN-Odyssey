@@ -12,6 +12,7 @@ import {
   BadRequestException,
   Res,
   UnauthorizedException,
+  Patch,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response, Request } from 'express';
@@ -42,6 +43,7 @@ export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
 
   // 1. NGHIỆP VỤ NHẬP KHO (IMPORT STOCK)
+  // Quy tắc thứ tự: static routes trước, dynamic (:id) sau cùng
 
   @Post('import')
   @RequirePermissions(Resource.TRANSFERS, Action.CREATE)
@@ -73,11 +75,11 @@ export class TransactionsController {
     );
   }
 
+  // import/history
   @Get('import/history')
   @RequirePermissions(Resource.TRANSFERS, Action.READ)
   async getImportHistory(@Query() query: GetTransactionsDto) {
     const result = await this.transactionsService.getImportHistory(query);
-
     return new BaseResponse(
       true,
       'Lấy lịch sử nhập hàng thành công',
@@ -92,13 +94,24 @@ export class TransactionsController {
     );
   }
 
-  @Get('import/history/:id')
-  @RequirePermissions(Resource.TRANSFERS, Action.READ)
-  async getImportDetail(@Param('id') id: string) {
-    const data = await this.transactionsService.getImportDetail(id);
-    return new BaseResponse(true, 'Lấy chi tiết phiếu nhập thành công', data);
+  // import/history/export/excel
+  @Get('import/history/export/excel')
+  @RequirePermissions(Resource.TRANSFERS, Action.EXPORT)
+  async exportHistoryExcel(
+    @Query() query: GetTransactionsDto,
+    @Res() res: Response,
+  ) {
+    await this.transactionsService.exportHistoryExcel(query, res);
   }
 
+  //  import/history/export/excel/:id
+  @Get('import/history/export/excel/:id')
+  @RequirePermissions(Resource.TRANSFERS, Action.EXPORT)
+  async exportDetailExcel(@Param('id') id: string, @Res() res: Response) {
+    await this.transactionsService.exportDetailExcel(id, res);
+  }
+
+  // import/excel/preview
   @Post('import/excel/preview')
   @RequirePermissions(Resource.TRANSFERS, Action.CREATE)
   @UseInterceptors(
@@ -125,23 +138,30 @@ export class TransactionsController {
     );
   }
 
-  @Get('import/history/export/excel')
-  @RequirePermissions(Resource.TRANSFERS, Action.EXPORT)
-  async exportHistoryExcel(
-    @Query() query: GetTransactionsDto,
-    @Res() res: Response,
-  ) {
-    await this.transactionsService.exportHistoryExcel(query, res);
-    // Lưu ý: thư viện exceljs workbook.xlsx.write(res) sẽ tự động end stream
+  // import/excel/template
+  @Get('import/excel/template')
+  @RequirePermissions(Resource.TRANSFERS, Action.READ)
+  async downloadImportTemplate(@Res() res: Response) {
+    await this.transactionsService.downloadImportTemplate(res);
   }
 
-  @Get('import/history/export/excel/:id')
-  @RequirePermissions(Resource.TRANSFERS, Action.EXPORT)
-  async exportDetailExcel(@Param('id') id: string, @Res() res: Response) {
-    await this.transactionsService.exportDetailExcel(id, res);
+  //  import/history/pdf/:id
+  @Get('import/history/pdf/:id')
+  @RequirePermissions(Resource.TRANSFERS, Action.READ)
+  async exportImportDetailPdf(@Param('id') id: string, @Res() res: Response) {
+    await this.transactionsService.exportImportDetailPdf(id, res);
+  }
+
+  //  import/history/:id — phải đứng SAU tất cả static của prefix này
+  @Get('import/history/:id')
+  @RequirePermissions(Resource.TRANSFERS, Action.READ)
+  async getImportDetail(@Param('id') id: string) {
+    const data = await this.transactionsService.getImportDetail(id);
+    return new BaseResponse(true, 'Lấy chi tiết phiếu nhập thành công', data);
   }
 
   // 2. NGHIỆP VỤ XUẤT KHO (EXPORT STOCK)
+  // Quy tắc thứ tự: static routes trước, dynamic (:id) sau cùng
 
   @Post('export')
   @RequirePermissions(Resource.TRANSFERS, Action.CREATE)
@@ -169,32 +189,7 @@ export class TransactionsController {
     );
   }
 
-  @Post('export/:id/cancel')
-  @RequirePermissions(Resource.TRANSFERS, Action.CANCEL)
-  async cancelExportNote(
-    @Param('id') id: string,
-    @Body('reason') reason: string,
-    @Req() req: RequestWithUser,
-  ) {
-    const actorId = req.user?._id;
-    if (!actorId) throw new UnauthorizedException('Không xác định được user');
-    if (!reason)
-      throw new BadRequestException('Bắt buộc phải nhập lý do hủy phiếu');
-
-    await this.transactionsService.cancelExportNote(
-      id,
-      reason,
-      actorId,
-      req.ip,
-      req.headers['user-agent'],
-    );
-    return new BaseResponse(
-      true,
-      'Hủy phiếu xuất và hoàn trả tồn kho thành công',
-      null,
-    );
-  }
-
+  // export/history
   @Get('export/history')
   @RequirePermissions(Resource.TRANSFERS, Action.READ)
   async getExportHistory(@Query() query: GetTransactionsDto) {
@@ -213,13 +208,31 @@ export class TransactionsController {
     );
   }
 
-  @Get('export/history/:id')
-  @RequirePermissions(Resource.TRANSFERS, Action.READ)
-  async getExportDetail(@Param('id') id: string) {
-    const data = await this.transactionsService.getExportDetail(id);
-    return new BaseResponse(true, 'Lấy chi tiết phiếu xuất thành công', data);
+  // export/history/export/excel
+  @Get('export/history/export/excel')
+  @RequirePermissions(Resource.TRANSFERS, Action.EXPORT)
+  async exportHistoryExcelReport(
+    @Query() query: GetTransactionsDto,
+    @Res() res: Response,
+  ) {
+    await this.transactionsService.exportHistoryExcelReport(query, res);
   }
 
+  //  export/history/export/excel/:id
+  @Get('export/history/export/excel/:id')
+  @RequirePermissions(Resource.TRANSFERS, Action.EXPORT)
+  async exportDetailExcelReport(@Param('id') id: string, @Res() res: Response) {
+    await this.transactionsService.exportDetailExcelReport(id, res);
+  }
+
+  //  export/history/pdf/:id  ← FIX: đứng trước export/history/:id
+  @Get('export/history/pdf/:id')
+  @RequirePermissions(Resource.TRANSFERS, Action.READ)
+  async exportDetailPdf(@Param('id') id: string, @Res() res: Response) {
+    await this.transactionsService.exportDetailPdf(id, res);
+  }
+
+  // export/excel/preview
   @Post('export/excel/preview')
   @RequirePermissions(Resource.TRANSFERS, Action.CREATE)
   @UseInterceptors(
@@ -242,38 +255,83 @@ export class TransactionsController {
     return new BaseResponse(true, 'Đọc file Excel thành công.', result);
   }
 
-  @Get('export/history/export/excel')
-  @RequirePermissions(Resource.TRANSFERS, Action.EXPORT)
-  async exportHistoryExcelReport(
-    @Query() query: GetTransactionsDto,
-    @Res() res: Response,
-  ) {
-    await this.transactionsService.exportHistoryExcelReport(query, res);
-  }
-
-  @Get('export/history/export/excel/:id')
-  @RequirePermissions(Resource.TRANSFERS, Action.EXPORT)
-  async exportDetailExcelReport(@Param('id') id: string, @Res() res: Response) {
-    await this.transactionsService.exportDetailExcelReport(id, res);
-  }
-
-  // 3. API TẢI FILE MẪU (TEMPLATE)
-
-  @Get('import/excel/template')
-  @RequirePermissions(Resource.TRANSFERS, Action.READ)
-  async downloadImportTemplate(@Res() res: Response) {
-    await this.transactionsService.downloadImportTemplate(res);
-  }
-
+  // export/excel/template
   @Get('export/excel/template')
   @RequirePermissions(Resource.TRANSFERS, Action.READ)
   async downloadExportTemplate(@Res() res: Response) {
     await this.transactionsService.downloadExportTemplate(res);
   }
 
-  @Get('export/history/pdf/:id')
-  @RequirePermissions(Resource.TRANSFERS, Action.READ) // Hoặc Action.EXPORT tùy bạn
-  async exportDetailPdf(@Param('id') id: string, @Res() res: Response) {
-    await this.transactionsService.exportDetailPdf(id, res);
+  //  export/history/:id — phải đứng SAU tất cả static của prefix này
+  @Get('export/history/:id')
+  @RequirePermissions(Resource.TRANSFERS, Action.READ)
+  async getExportDetail(@Param('id') id: string) {
+    const data = await this.transactionsService.getExportDetail(id);
+    return new BaseResponse(true, 'Lấy chi tiết phiếu xuất thành công', data);
+  }
+
+  // 3. API DÙNG CHUNG
+
+  // history/all
+  @Get('history/all')
+  @RequirePermissions(Resource.TRANSFERS, Action.READ)
+  async getAllHistory(@Query() query: GetTransactionsDto) {
+    const result = await this.transactionsService.getAllHistory(query);
+    return new BaseResponse(
+      true,
+      'Lấy danh sách phiếu thành công',
+      result.data,
+      {
+        totalItems: result.total,
+        itemCount: result.data.length,
+        itemsPerPage: result.limit,
+        totalPages: Math.ceil(result.total / result.limit),
+        currentPage: result.page,
+      },
+    );
+  }
+
+  //  :id/complete
+  @Patch(':id/complete')
+  @RequirePermissions(Resource.TRANSFERS, Action.UPDATE)
+  async completeTicket(@Param('id') id: string, @Req() req: RequestWithUser) {
+    const actorId = req.user?._id;
+    if (!actorId)
+      throw new UnauthorizedException('Không tìm thấy thông tin user');
+
+    await this.transactionsService.completeTransaction(
+      id,
+      actorId,
+      req.ip,
+      req.headers['user-agent'],
+    );
+    return new BaseResponse(
+      true,
+      'Đã hoàn tất phiếu và cập nhật tồn kho',
+      null,
+    );
+  }
+
+  //  :id/cancel
+  @Patch(':id/cancel')
+  @RequirePermissions(Resource.TRANSFERS, Action.CANCEL)
+  async cancelTicket(
+    @Param('id') id: string,
+    @Body('reason') reason: string,
+    @Req() req: RequestWithUser,
+  ) {
+    const actorId = req.user?._id;
+    if (!actorId)
+      throw new UnauthorizedException('Không tìm thấy thông tin user');
+    if (!reason) throw new BadRequestException('Bắt buộc nhập lý do hủy');
+
+    await this.transactionsService.cancelTransaction(
+      id,
+      reason,
+      actorId,
+      req.ip,
+      req.headers['user-agent'],
+    );
+    return new BaseResponse(true, 'Đã hủy phiếu thành công', null);
   }
 }

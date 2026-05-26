@@ -3,66 +3,75 @@ import { Document, Types } from 'mongoose';
 
 export type StockTransactionDocument = StockTransaction & Document;
 
-// Định nghĩa sub-document cho từng dòng sản phẩm trong phiếu nhập (Đáp ứng AC4 - Đa dòng)
 @Schema({ _id: false })
 export class TransactionItem {
-  @Prop({ type: Types.ObjectId, ref: 'Product', required: true })
-  product_id: Types.ObjectId;
+  // Không require từ FE nữa, BE sẽ tự điền dựa trên SKU
+  @Prop({ type: Types.ObjectId, ref: 'Product' })
+  product_id?: Types.ObjectId;
 
   @Prop({ required: true })
-  sku: string; // Phải có SKU, nếu là sản phẩm cha thì lấy SKU cha, biến thể lấy SKU biến thể
+  sku: string;
 
   @Prop({ required: true, min: 1 })
-  quantity: number; // AC3: Số lượng phải là số dương
+  quantity: number;
 
   @Prop()
-  note?: string; // Ghi chú riêng cho từng dòng (nếu cần)
+  note?: string;
 }
 export const TransactionItemSchema =
   SchemaFactory.createForClass(TransactionItem);
 
 @Schema({ timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } })
 export class StockTransaction {
-  // AC7: Mã phiếu nhập duy nhất (VD: IMP-20260319-XXXX)
   @Prop({ required: true, unique: true, index: true })
   transaction_code: string;
 
+  // GIỮ LẠI TOÀN BỘ ENUM CŨ ĐỂ KHÔNG LỖI TAB REQUEST QUEUE
   @Prop({
     required: true,
     enum: ['MANUAL_ADJUST', 'ORDER_ACCEPTED', 'RESTOCK', 'IMPORT', 'EXPORT'],
   })
-  action_type: string; // Với phiếu nhập hàng, ta dùng 'IMPORT'
+  action_type: string;
 
+  // CẬP NHẬT: Thêm PROCESSING cho phiếu nháp
   @Prop({
     required: true,
-    enum: ['COMPLETED', 'CANCELLED'],
-    default: 'COMPLETED',
+    enum: ['PROCESSING', 'COMPLETED', 'CANCELLED'],
+    default: 'PROCESSING',
   })
-  status: string; // Bổ sung thêm trường status để quản lý trạng thái Hủy phiếu
+  status: string;
 
-  // Mảng chi tiết các sản phẩm được nhập (AC4)
+  // CÁC TRƯỜNG MỚI BỔ SUNG (Nên để optional để các luồng cũ không bị lỗi văng DB)
+  @Prop()
+  warehouse?: string;
+
+  @Prop()
+  supplier?: string;
+
+  @Prop()
+  export_reason?: string;
+
+  @Prop()
+  cancel_reason?: string;
+
+  // CÁC TRƯỜNG CŨ GIỮ NGUYÊN
   @Prop({ type: [TransactionItemSchema], required: true, default: [] })
   items: TransactionItem[];
 
-  // Tổng số lượng của cả phiếu (Tiện cho việc query/thống kê)
   @Prop({ required: true, default: 0 })
   total_quantity: number;
 
-  // AC6: Bắt buộc phải có Ghi chú hoặc Tham chiếu
-  @Prop({ required: true })
+  @Prop({ default: '' })
   note: string;
 
   @Prop()
-  reference_code?: string; // Mã tham chiếu (VD: Số hóa đơn từ nhà cung cấp)
+  reference_code?: string; // Khôi phục lại mã tham chiếu
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
-  actor_id: Types.ObjectId; // AC5: Ghi nhận ID nhân viên thực hiện
+  actor_id: Types.ObjectId;
 
   created_at: Date;
   updated_at: Date;
-
-  // Đánh dấu đây là dữ liệu Read-only (AC4 - Lịch sử nhập hàng)
-  // Thực tế MongoDB không có khoá cứng, ta sẽ dùng code Logic để block các hành vi Update/Delete
 }
 
 export const StockTransactionSchema =

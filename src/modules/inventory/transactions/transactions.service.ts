@@ -1,7 +1,7 @@
 import {
   BadRequestException,
   Injectable,
-  InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, FilterQuery, Model, Types, UpdateQuery } from 'mongoose';
@@ -26,6 +26,13 @@ import { CreateExportNoteDto } from './dto/create-export-note.dto';
 import PDFDocument from 'pdfkit';
 import * as path from 'path';
 import * as fs from 'fs';
+
+export interface ProcessedTransactionItem {
+  product_id: Types.ObjectId;
+  sku: string;
+  quantity: number;
+  note: string;
+}
 
 export interface UpdatedProductInfo {
   productId: string;
@@ -76,6 +83,27 @@ export interface ExportDetail {
     sku: string;
     product_name: string;
     quantity_exported: number;
+    note?: string;
+  }>;
+}
+
+export interface ImportDetail {
+  transaction_code: string;
+  status: string;
+  created_at: Date;
+  note: string;
+  reference_code?: string;
+  supplier?: string;
+  actor: {
+    full_name?: string;
+    first_Name?: string;
+    last_Name?: string;
+    email: string;
+  };
+  items: Array<{
+    sku: string;
+    product_name: string;
+    quantity_imported: number;
     note?: string;
   }>;
 }
@@ -154,7 +182,8 @@ export class TransactionsService {
     const [transactions, total] = await Promise.all([
       this.transactionModel
         .find(filter)
-        .populate('actor_id', 'first_Name last_Name email full_name')
+        .populate('actor_id', 'email')
+        .populate('items.product_id', 'name')
         .sort({ [sort_by || 'created_at']: sort_order === 'asc' ? 1 : -1 })
         .skip(skip)
         .limit(Number(limit))
@@ -173,7 +202,6 @@ export class TransactionsService {
   private extractString(value: unknown): string {
     if (value === null || value === undefined) return '';
 
-    // Kiểm tra các kiểu dữ liệu nguyên thủy trước khi ép kiểu
     if (typeof value === 'string') return value.trim();
     if (typeof value === 'number' || typeof value === 'boolean')
       return String(value);
@@ -199,135 +227,70 @@ export class TransactionsService {
     return '';
   }
 
+  // 1. TẠO PHIẾU NHẬP (Chỉ lưu nháp, CHƯA CỘNG KHO)
   async createImportNote(
     dto: CreateImportNoteDto,
     actorId: string,
     ip?: string,
     userAgent?: string,
   ) {
-    const session = await this.connection.startSession();
-    session.startTransaction();
-    try {
-      let totalQuantity = 0;
-      const updatedProducts: UpdatedProductInfo[] = [];
+    let totalQuantity = 0;
+    const processedItems: ProcessedTransactionItem[] = [];
 
-      for (const item of dto.items) {
-        const product = await this.productModel
-          .findById(item.product_id)
-          .session(session);
-        if (!product)
-          throw new BadRequestException(
-            `Sản phẩm ID ${item.product_id} không tồn tại.`,
-          );
+    for (const item of dto.items) {
+      const product = await this.productModel
+        .findOne({
+          $or: [{ sku: item.sku }, { 'variants.sku': item.sku }],
+          is_deleted: false,
+        })
+        .lean();
 
-        const filter: FilterQuery<ProductDocument> = {
-          _id: new Types.ObjectId(item.product_id),
-        };
-        const updateQuery: UpdateQuery<ProductDocument> = {};
-
-        if (product.has_variants) {
-          const variant = product.variants.find((v) => v.sku === item.sku);
-          if (!variant)
-            throw new BadRequestException(
-              `SKU ${item.sku} không thuộc sản phẩm ${product.name}.`,
-            );
-          filter['variants.sku'] = item.sku;
-          updateQuery.$inc = {
-            'variants.$.stock': item.quantity,
-            stock: item.quantity,
-          };
-        } else {
-          if (product.sku !== item.sku)
-            throw new BadRequestException(`SKU ${item.sku} không khớp.`);
-          updateQuery.$inc = { stock: item.quantity };
-        }
-
-        const updatedProduct = await this.productModel.findOneAndUpdate(
-          filter,
-          updateQuery,
-          { new: true, session },
-        );
-        if (!updatedProduct)
-          throw new InternalServerErrorException(
-            `Lỗi cập nhật tồn kho SKU ${item.sku}`,
-          );
-
-        // FIX: Lấy tồn kho chuẩn xác từ DB sau khi đã cộng vào
-        let actualNewStock = 0;
-        if (updatedProduct.has_variants) {
-          const v = updatedProduct.variants.find((v) => v.sku === item.sku);
-          actualNewStock = v?.stock || 0;
-        } else {
-          actualNewStock = updatedProduct.stock || 0;
-        }
-
-        totalQuantity += item.quantity;
-        updatedProducts.push({
-          productId: updatedProduct._id.toString(),
-          sku: item.sku,
-          newStock: actualNewStock, // Dùng số lấy từ DB
-        });
-      }
-
-      if (!Types.ObjectId.isValid(actorId)) {
+      if (!product) {
         throw new BadRequestException(
-          `ID người thực hiện (${actorId}) không hợp lệ.`,
+          `SKU ${item.sku} không tồn tại trong hệ thống.`,
         );
       }
 
-      const transactionCode = this.generateCode('IMP');
-      const newTransaction = await this.transactionModel.create(
-        [
-          {
-            transaction_code: transactionCode,
-            action_type: 'IMPORT',
-            // FIX: Xóa vòng lặp check ID thừa thãi
-            items: dto.items.map((i) => ({
-              product_id: new Types.ObjectId(i.product_id),
-              sku: i.sku,
-              quantity: i.quantity,
-              note: dto.note,
-            })),
-            total_quantity: totalQuantity,
-            note: dto.note,
-            reference_code: dto.reference_code,
-            actor_id: Types.ObjectId.isValid(actorId)
-              ? new Types.ObjectId(actorId)
-              : null,
-          },
-        ],
-        { session },
-      );
-
-      await this.auditLogsService.log({
-        action: 'CREATE_IMPORT_NOTE',
-        collection_name: Resource.TRANSFERS,
-        actor_id: actorId,
-        target_id: newTransaction[0]._id.toString(),
-        department: Department.WAREHOUSE,
-        detail: {
-          message: dto.file_name
-            ? `Nhập từ file [${dto.file_name}]`
-            : 'Nhập thủ công',
-          code: transactionCode,
-          total: totalQuantity,
-          items: dto.items.map((i) => ({ sku: i.sku, quantity: i.quantity })),
-        },
-        ip,
-        user_agent: userAgent,
+      totalQuantity += item.quantity;
+      processedItems.push({
+        product_id: product._id,
+        sku: item.sku,
+        quantity: item.quantity,
+        note: item.reason || '',
       });
-
-      await session.commitTransaction();
-      updatedProducts.forEach((p) =>
-        this.stockGateway.emitStockUpdate(p.productId, p.sku, p.newStock),
-      );
-      return newTransaction[0];
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      void session.endSession();
     }
+
+    const transactionCode = this.generateCode('IMP');
+    const newTransaction = await this.transactionModel.create({
+      transaction_code: transactionCode,
+      action_type: 'IMPORT',
+      status: 'PROCESSING',
+      warehouse: dto.warehouse,
+      supplier: dto.supplier,
+      note: dto.note || '',
+      total_quantity: totalQuantity,
+      items: processedItems,
+      actor_id: Types.ObjectId.isValid(actorId)
+        ? new Types.ObjectId(actorId)
+        : null,
+    });
+
+    await this.auditLogsService.log({
+      action: 'CREATE_IMPORT_TICKET',
+      collection_name: Resource.TRANSFERS,
+      actor_id: actorId,
+      target_id: newTransaction._id?.toString() ?? '',
+      department: Department.WAREHOUSE,
+      detail: {
+        code: transactionCode,
+        status: 'PROCESSING',
+        total: totalQuantity,
+      },
+      ip,
+      user_agent: userAgent, // LỖI 2: Sửa userAgent thành user_agent
+    });
+
+    return newTransaction;
   }
 
   async getImportHistory(queryDto: GetTransactionsDto) {
@@ -380,21 +343,18 @@ export class TransactionsService {
     let headerRowNumber = -1;
     let headerRowValues: (string | undefined)[] = [];
 
-    // BƯỚC 1: TÌM DÒNG HEADER CHUẨN XÁC
     for (let i = 1; i <= 10; i++) {
       const row = worksheet.getRow(i);
       const values = row.values as (string | undefined)[];
 
       if (!values || values.length === 0) continue;
 
-      // Lấy text của tất cả các ô trong dòng để kiểm tra
       const cellTexts = values.map((v) =>
         String(v || '')
           .trim()
           .toLowerCase(),
       );
 
-      // Dòng header phải có chứa ô chính xác là 'sku' hoặc 'mã sku' VÀ có ô 'số lượng'
       const hasSku = cellTexts.some(
         (text) => text === 'sku' || text === 'mã sku',
       );
@@ -413,7 +373,6 @@ export class TransactionsService {
       );
     }
 
-    // BƯỚC 2: XÁC ĐỊNH CHỈ SỐ CỘT ĐỘNG
     let skuIdx = -1,
       qtyIdx = -1,
       noteIdx = -1;
@@ -441,12 +400,11 @@ export class TransactionsService {
       .select('_id sku has_variants variants')
       .lean();
 
-    // BƯỚC 3: ĐỌC DỮ LIỆU
     worksheet.eachRow((row, rowNumber) => {
       if (rowNumber <= headerRowNumber) return;
 
       const sku = this.extractString(row.getCell(skuIdx).value);
-      if (!sku) return; // Bỏ qua dòng trống
+      if (!sku) return;
 
       const note =
         noteIdx !== -1 ? this.extractString(row.getCell(noteIdx).value) : '';
@@ -498,13 +456,11 @@ export class TransactionsService {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Lịch sử nhập hàng');
 
-    // 1. Cấu hình độ rộng 4 cột (Thêm cột Người thực hiện)
-    sheet.getColumn(1).width = 25; // Mã Phiếu
-    sheet.getColumn(2).width = 35; // Người thực hiện
-    sheet.getColumn(3).width = 15; // Tổng SL
-    sheet.getColumn(4).width = 45; // Ghi chú
+    sheet.getColumn(1).width = 25;
+    sheet.getColumn(2).width = 35;
+    sheet.getColumn(3).width = 15;
+    sheet.getColumn(4).width = 45;
 
-    // 2. Tiêu đề báo cáo (Dòng 1 - Chữ đỏ to, căn giữa)
     sheet.mergeCells('A1:D1');
     const titleCell = sheet.getCell('A1');
     titleCell.value = 'BÁO CÁO TỔNG HỢP LỊCH SỬ NHẬP KHO';
@@ -517,11 +473,9 @@ export class TransactionsService {
     titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
     sheet.getRow(1).height = 30;
 
-    // 3. Thông tin bộ lọc & Thời gian xuất (Dòng 2 - In nghiêng)
     sheet.mergeCells('A2:D2');
     const infoCell = sheet.getCell('A2');
 
-    // Format ngày giờ đẹp để hiển thị
     const startDateStr = queryDto.start_date
       ? new Date(queryDto.start_date).toLocaleDateString('vi-VN')
       : 'Từ trước tới nay';
@@ -534,9 +488,8 @@ export class TransactionsService {
     infoCell.font = { name: 'Arial', size: 10, italic: true };
     infoCell.alignment = { vertical: 'middle', horizontal: 'center' };
 
-    sheet.addRow([]); // Dòng 3 để trống tạo khoảng cách
+    sheet.addRow([]);
 
-    // 4. Header của Bảng dữ liệu (Dòng 4 - Nền xanh chữ trắng)
     const headerRow = sheet.addRow([
       'Mã Phiếu',
       'Người thực hiện',
@@ -565,13 +518,11 @@ export class TransactionsService {
       };
     });
 
-    // 5. Đổ dữ liệu Data (Từ dòng 5 trở đi)
     history.data.forEach((t) => {
       const actor = t.actor_id as unknown as PopulatedActor;
 
       let actorInfo = 'Hệ thống';
 
-      // TypeScript giờ đã hiểu actor có first_Name và last_Name
       if (actor && actor.first_Name && actor.last_Name) {
         actorInfo = `${actor.first_Name} ${actor.last_Name}\n(${actor.email})`;
       } else if (actor && actor.email) {
@@ -601,7 +552,6 @@ export class TransactionsService {
       });
     });
 
-    // 6. Gán tên file chuẩn chuyên nghiệp
     const exportDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const fileName = `LichSuNhapHang_${exportDate}.xlsx`;
 
@@ -618,13 +568,11 @@ export class TransactionsService {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Chi Tiết Phiếu Nhập');
 
-    // 1. Cấu hình độ rộng cột
-    sheet.getColumn(1).width = 20; // SKU
-    sheet.getColumn(2).width = 45; // Tên SP
-    sheet.getColumn(3).width = 15; // SL
-    sheet.getColumn(4).width = 40; // Ghi chú
+    sheet.getColumn(1).width = 20;
+    sheet.getColumn(2).width = 45;
+    sheet.getColumn(3).width = 15;
+    sheet.getColumn(4).width = 40;
 
-    // 2. Tiêu đề báo cáo (Merge cell, chữ to in đậm)
     sheet.mergeCells('A1:D1');
     const titleCell = sheet.getCell('A1');
     titleCell.value = `PHIẾU NHẬP KHO: ${detail.transaction_code}`;
@@ -633,11 +581,10 @@ export class TransactionsService {
       size: 14,
       bold: true,
       color: { argb: 'FFD32F2F' },
-    }; // Chữ đỏ Material
+    };
     titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
     sheet.getRow(1).height = 30;
 
-    // 3. Thông tin người thực hiện (Nhỏ, in nghiêng bên góc phải)
     sheet.mergeCells('A2:D2');
     const infoCell = sheet.getCell('A2');
 
@@ -651,9 +598,8 @@ export class TransactionsService {
     infoCell.font = { name: 'Arial', size: 10, italic: true };
     infoCell.alignment = { vertical: 'middle', horizontal: 'right' };
 
-    sheet.addRow([]); // Dòng 3 để trống cho thoáng
+    sheet.addRow([]);
 
-    // 4. Header của Bảng dữ liệu (Dòng 4)
     const headerRow = sheet.addRow([
       'SKU',
       'Tên sản phẩm',
@@ -682,7 +628,6 @@ export class TransactionsService {
       };
     });
 
-    // 5. Đổ dữ liệu Data
     detail.items.forEach((i) => {
       const row = sheet.addRow([
         i.sku,
@@ -698,7 +643,6 @@ export class TransactionsService {
           bottom: { style: 'thin' },
           right: { style: 'thin' },
         };
-        // Căn giữa cột Số lượng, tên SP và Ghi chú thì wrap text (tự động xuống dòng)
         cell.alignment = {
           vertical: 'middle',
           horizontal: colNumber === 3 ? 'center' : 'left',
@@ -716,251 +660,84 @@ export class TransactionsService {
     return workbook.xlsx.write(res);
   }
 
-  // NGHIỆP VỤ XUẤT KHO (EXPORT STOCK)
-
+  // 2. TẠO PHIẾU XUẤT (Chỉ lưu nháp, CHƯA TRỪ KHO)
   async createExportNote(
-    dto: CreateExportNoteDto, // Sử dụng CreateExportNoteDto
+    dto: CreateExportNoteDto,
     actorId: string,
     ip?: string,
     userAgent?: string,
   ) {
-    const session = await this.connection.startSession();
-    session.startTransaction();
-    try {
-      let totalQuantity = 0;
-      const updatedProducts: UpdatedProductInfo[] = [];
+    let totalQuantity = 0;
+    const processedItems: ProcessedTransactionItem[] = [];
 
-      for (const item of dto.items) {
-        const product = await this.productModel
-          .findById(item.product_id)
-          .session(session);
-        if (!product)
+    for (const item of dto.items) {
+      const product = await this.productModel
+        .findOne({
+          $or: [{ sku: item.sku }, { 'variants.sku': item.sku }],
+          is_deleted: false,
+        })
+        .lean();
+
+      if (!product)
+        throw new BadRequestException(`SKU ${item.sku} không tồn tại.`);
+
+      if (product.has_variants) {
+        const variant = product.variants.find((v) => v.sku === item.sku);
+        if (!variant || (variant.stock || 0) < item.quantity) {
           throw new BadRequestException(
-            `Sản phẩm ID ${item.product_id} không tồn tại.`,
+            `SKU ${item.sku} không đủ tồn kho để xuất.`,
           );
-
-        const filter: FilterQuery<ProductDocument> = {
-          _id: new Types.ObjectId(item.product_id),
-        };
-        const updateQuery: UpdateQuery<ProductDocument> = {};
-
-        // AC2 & AC4: Đối chiếu tồn kho khả dụng và trừ kho
-        if (product.has_variants) {
-          const variant = product.variants.find((v) => v.sku === item.sku);
-          if (!variant)
-            throw new BadRequestException(
-              `SKU ${item.sku} không thuộc sản phẩm ${product.name}.`,
-            );
-
-          if ((variant.stock || 0) < item.quantity) {
-            throw new BadRequestException(
-              `Số lượng xuất vượt quá tồn kho hiện có cho SKU ${item.sku} (Tồn: ${variant.stock}).`,
-            );
-          }
-
-          filter['variants.sku'] = item.sku;
-          updateQuery.$inc = {
-            'variants.$.stock': -item.quantity,
-            stock: -item.quantity,
-          };
-        } else {
-          if (product.sku !== item.sku)
-            throw new BadRequestException(`SKU ${item.sku} không khớp.`);
-          if ((product.stock || 0) < item.quantity) {
-            throw new BadRequestException(
-              `Số lượng xuất vượt quá tồn kho hiện có cho SKU ${item.sku} (Tồn: ${product.stock}).`,
-            );
-          }
-
-          updateQuery.$inc = { stock: -item.quantity };
         }
-
-        const updatedProduct = await this.productModel.findOneAndUpdate(
-          filter,
-          updateQuery,
-          { new: true, session },
-        );
-        if (!updatedProduct)
-          throw new InternalServerErrorException(
-            `Lỗi cập nhật tồn kho SKU ${item.sku}`,
+      } else {
+        if ((product.stock || 0) < item.quantity) {
+          throw new BadRequestException(
+            `SKU ${item.sku} không đủ tồn kho để xuất.`,
           );
-
-        // FIX: Lấy tồn kho chuẩn xác từ DB sau khi đã trừ đi (giống hệt hàm Import)
-        let actualNewStock = 0;
-        if (updatedProduct.has_variants) {
-          const v = updatedProduct.variants.find((v) => v.sku === item.sku);
-          actualNewStock = v?.stock || 0;
-        } else {
-          actualNewStock = updatedProduct.stock || 0;
         }
-
-        totalQuantity += item.quantity;
-        updatedProducts.push({
-          productId: updatedProduct._id.toString(),
-          sku: item.sku,
-          newStock: actualNewStock, // Dùng số lấy từ DB
-        });
       }
 
-      const transactionCode = this.generateCode('EXP');
-      const newTransaction = await this.transactionModel.create(
-        [
-          {
-            transaction_code: transactionCode,
-            action_type: 'EXPORT', // Đánh dấu là phiếu xuất
-            status: 'COMPLETED',
-            items: dto.items.map((i) => ({
-              product_id: new Types.ObjectId(i.product_id),
-              sku: i.sku,
-              quantity: i.quantity,
-              note: dto.note,
-            })),
-            total_quantity: totalQuantity,
-            note: dto.note,
-            reference_code: dto.reference_code,
-            actor_id: Types.ObjectId.isValid(actorId)
-              ? new Types.ObjectId(actorId)
-              : null,
-          },
-        ],
-        { session },
-      );
-
-      // AC5: Ghi Audit Log
-      await this.auditLogsService.log({
-        action: 'CREATE_EXPORT_NOTE',
-        collection_name: Resource.TRANSFERS,
-        actor_id: actorId,
-        target_id: newTransaction[0]._id.toString(),
-        department: Department.WAREHOUSE,
-        detail: {
-          message: dto.file_name
-            ? `Xuất từ file [${dto.file_name}]`
-            : 'Xuất thủ công',
-          code: transactionCode,
-          status: 'STOCK_DECREASED_SUCCESSFULLY',
-          reason: dto.note,
-          total: totalQuantity,
-          items: dto.items.map((i) => ({ sku: i.sku, quantity: i.quantity })),
-        },
-        ip,
-        user_agent: userAgent,
+      totalQuantity += item.quantity;
+      processedItems.push({
+        product_id: product._id, // LỖI 1
+        sku: item.sku,
+        quantity: item.quantity,
+        note: item.reason || '',
       });
-
-      await session.commitTransaction();
-      updatedProducts.forEach((p) =>
-        this.stockGateway.emitStockUpdate(p.productId, p.sku, p.newStock),
-      );
-      return newTransaction[0];
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      void session.endSession();
     }
+
+    const transactionCode = this.generateCode('EXP');
+    const newTransaction = await this.transactionModel.create({
+      transaction_code: transactionCode,
+      action_type: 'EXPORT',
+      status: 'PROCESSING',
+      warehouse: dto.warehouse,
+      export_reason: dto.exportReason,
+      note: dto.note || '',
+      total_quantity: totalQuantity,
+      items: processedItems,
+      actor_id: Types.ObjectId.isValid(actorId)
+        ? new Types.ObjectId(actorId)
+        : null,
+    });
+
+    await this.auditLogsService.log({
+      action: 'CREATE_EXPORT_TICKET',
+      collection_name: Resource.TRANSFERS,
+      actor_id: actorId,
+      target_id: newTransaction._id?.toString() ?? '',
+      department: Department.WAREHOUSE,
+      detail: {
+        code: transactionCode,
+        status: 'PROCESSING',
+        total: totalQuantity,
+      },
+      ip,
+      user_agent: userAgent, // LỖI 2
+    });
+
+    return newTransaction;
   }
 
-  // AC7 (US1): Hủy phiếu xuất và hoàn tồn kho
-  async cancelExportNote(
-    transactionId: string,
-    reason: string,
-    actorId: string,
-    ip?: string,
-    userAgent?: string,
-  ) {
-    const session = await this.connection.startSession();
-    session.startTransaction();
-    try {
-      const transaction = await this.transactionModel
-        .findById(transactionId)
-        .session(session);
-
-      if (!transaction || transaction.action_type !== 'EXPORT') {
-        throw new BadRequestException('Phiếu xuất không tồn tại.');
-      }
-      if (transaction.status === 'CANCELLED') {
-        throw new BadRequestException('Phiếu xuất này đã được hủy trước đó.');
-      }
-
-      const updatedProducts: UpdatedProductInfo[] = [];
-
-      for (const item of transaction.items) {
-        const filter: FilterQuery<ProductDocument> = { _id: item.product_id };
-        const updateQuery: UpdateQuery<ProductDocument> = {};
-
-        // Xác định filter cho biến thể hoặc sản phẩm đơn lẻ
-        const productCheck = await this.productModel
-          .findById(item.product_id)
-          .session(session);
-        if (productCheck?.has_variants) {
-          filter['variants.sku'] = item.sku;
-          updateQuery.$inc = {
-            'variants.$.stock': item.quantity,
-            stock: item.quantity,
-          };
-        } else {
-          updateQuery.$inc = { stock: item.quantity };
-        }
-
-        // THỰC HIỆN CẬP NHẬT VÀ LẤY DỮ LIỆU MỚI NHẤT
-        const updatedProduct = await this.productModel.findOneAndUpdate(
-          filter,
-          updateQuery,
-          { new: true, session },
-        );
-
-        if (updatedProduct) {
-          let actualStock = 0;
-          if (updatedProduct.has_variants) {
-            const v = updatedProduct.variants.find((v) => v.sku === item.sku);
-            actualStock = v?.stock || 0;
-          } else {
-            actualStock = updatedProduct.stock || 0;
-          }
-
-          updatedProducts.push({
-            productId: updatedProduct._id.toString(),
-            sku: item.sku,
-            newStock: actualStock, // Lấy từ kết quả DB trả về
-          });
-        }
-      }
-
-      transaction.status = 'CANCELLED';
-      transaction.note = `${transaction.note} | Lý do hủy: ${reason}`;
-      await transaction.save({ session });
-
-      // Ghi log chi tiết
-      await this.auditLogsService.log({
-        action: 'CANCEL_EXPORT_NOTE',
-        collection_name: Resource.TRANSFERS,
-        actor_id: actorId,
-        target_id: transaction._id.toString(),
-        department: Department.WAREHOUSE,
-        detail: {
-          code: transaction.transaction_code,
-          reason: reason,
-          total_items: transaction.items.length,
-        },
-        ip,
-        user_agent: userAgent,
-      });
-
-      await session.commitTransaction();
-
-      // Phát tín hiệu cập nhật qua Socket
-      updatedProducts.forEach((p) =>
-        this.stockGateway.emitStockUpdate(p.productId, p.sku, p.newStock),
-      );
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      void session.endSession();
-    }
-  }
-
-  // AC1, AC2, AC3, AC5 (US Lịch Sử)
   async getExportHistory(queryDto: GetTransactionsDto) {
     return this.getBaseHistory('EXPORT', queryDto);
   }
@@ -1002,13 +779,11 @@ export class TransactionsService {
     };
   }
 
-  // Preview Excel với logic Kiểm tra Tồn kho gắt gao hơn
   async previewExcelExport(file: Express.Multer.File) {
     if (!file) throw new BadRequestException('Vui lòng tải lên file Excel');
 
     const workbook = new ExcelJS.Workbook();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    await workbook.xlsx.load(file.buffer as any);
+    await workbook.xlsx.load(file.buffer as unknown as ArrayBuffer);
 
     const worksheet = workbook.worksheets[0];
     if (!worksheet) throw new BadRequestException('File rỗng');
@@ -1019,30 +794,44 @@ export class TransactionsService {
     for (let i = 1; i <= 10; i++) {
       const row = worksheet.getRow(i);
       const values = row.values as (string | undefined)[];
-      if (
-        values &&
-        values.some((v) => String(v).toLowerCase().includes('sku'))
-      ) {
+
+      if (!values || values.length === 0) continue;
+
+      const cellTexts = values.map((v) =>
+        String(v || '')
+          .trim()
+          .toLowerCase(),
+      );
+
+      // Yêu cầu bắt buộc phải tìm đúng tên cột thay vì chỉ chứa từ khóa
+      const hasSku = cellTexts.some(
+        (text) => text === 'sku' || text === 'mã sku',
+      );
+      const hasQty = cellTexts.some((text) => text.includes('số lượng'));
+
+      if (hasSku && hasQty) {
         headerRowNumber = i;
         headerRowValues = values;
         break;
       }
     }
 
-    if (headerRowNumber === -1)
+    if (headerRowNumber === -1) {
       throw new BadRequestException(
-        'Không tìm thấy dòng tiêu đề hợp lệ (Yêu cầu có cột SKU)',
+        'Không tìm thấy dòng tiêu đề hợp lệ (Yêu cầu có cột Mã SKU và Số lượng ở các ô riêng biệt)',
       );
+    }
 
     let skuIdx = -1,
       qtyIdx = -1,
       noteIdx = -1;
+
     headerRowValues.forEach((val, idx) => {
       if (!val) return;
       const cleanVal = String(val).trim().toLowerCase();
-      if (cleanVal.includes('sku')) skuIdx = idx;
+      if (cleanVal === 'sku' || cleanVal === 'mã sku') skuIdx = idx;
       if (cleanVal.includes('số lượng')) qtyIdx = idx;
-      if (cleanVal.includes('lý do') || cleanVal.includes('ghi chú'))
+      if (cleanVal.includes('ghi chú') || cleanVal.includes('lý do'))
         noteIdx = idx;
     });
 
@@ -1096,7 +885,6 @@ export class TransactionsService {
         rowResult.errors.push('SKU không tồn tại');
       } else {
         rowResult.product_id = foundProduct._id.toString();
-        // Kiểm tra tồn kho ngay lúc preview (AC6)
         let currentStock = 0;
         if (foundProduct.has_variants) {
           const v = foundProduct.variants.find((v) => v.sku === sku);
@@ -1122,7 +910,6 @@ export class TransactionsService {
   }
 
   async exportHistoryExcelReport(queryDto: GetTransactionsDto, res: Response) {
-    // US3 - AC9: Xử lý chặn xuất nếu dữ liệu quá lớn để tránh treo server
     const filter: FilterQuery<StockTransactionDocument> = {
       action_type: 'EXPORT',
     };
@@ -1140,7 +927,6 @@ export class TransactionsService {
       );
     }
 
-    // Tái sử dụng query nhưng limit cực lớn để lấy hết data xuất file
     const fullQuery = { ...queryDto, limit: 50000, page: 1 };
     const history = await this.getExportHistory(fullQuery);
 
@@ -1161,7 +947,7 @@ export class TransactionsService {
       size: 14,
       bold: true,
       color: { argb: 'FFE65100' },
-    }; // Chữ Cam sẫm
+    };
     titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
     sheet.getRow(1).height = 30;
 
@@ -1191,7 +977,7 @@ export class TransactionsService {
         type: 'pattern',
         pattern: 'solid',
         fgColor: { argb: 'FFEF6C00' },
-      }; // Nền cam
+      };
       cell.alignment = { vertical: 'middle', horizontal: 'center' };
       cell.border = {
         top: { style: 'thin' },
@@ -1201,7 +987,6 @@ export class TransactionsService {
       };
     });
 
-    // US3 - AC7: Xử lý file trống không báo lỗi, chỉ trả Header
     if (history.data.length > 0) {
       history.data.forEach((t) => {
         const actor = t.actor_id as unknown as PopulatedActor;
@@ -1221,7 +1006,7 @@ export class TransactionsService {
             name: 'Arial',
             size: 10,
             color: t.status === 'CANCELLED' ? { argb: 'FFD32F2F' } : undefined,
-          }; // Đỏ nếu hủy
+          };
           cell.border = {
             top: { style: 'thin' },
             left: { style: 'thin' },
@@ -1237,7 +1022,6 @@ export class TransactionsService {
       });
     }
 
-    // US3 - AC5: Tự động đặt tên file
     const exportDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const fileName = `XuatKho_${exportDate}.xlsx`;
 
@@ -1249,7 +1033,6 @@ export class TransactionsService {
     return workbook.xlsx.write(res);
   }
 
-  // AC1 (US Xuất Excel): Xuất Chi tiết 1 phiếu ra Excel
   async exportDetailExcelReport(id: string, res: Response) {
     const detail = await this.getExportDetail(id);
     const workbook = new ExcelJS.Workbook();
@@ -1339,8 +1122,6 @@ export class TransactionsService {
     res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
     return workbook.xlsx.write(res);
   }
-
-  // TẠO FILE MẪU NHẬP/XUẤT EXCEL
 
   private buildExcelTemplateConfig(
     sheet: ExcelJS.Worksheet,
@@ -1529,12 +1310,14 @@ export class TransactionsService {
   }
 
   async exportDetailPdf(id: string, res: Response) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Mã định danh phiếu xuất không hợp lệ.');
+    }
     const rawData = await this.getExportDetail(id);
     const detail = rawData as unknown as ExportDetail;
 
     const doc = new PDFDocument({ margin: 40, size: 'A4' });
 
-    // 1. Đăng ký Font
     const fontPath = 'src/common/fonts/Roboto-Regular.ttf';
     const fontBoldPath = 'src/common/fonts/Roboto-Bold.ttf';
     const fontItalicPath = 'src/common/fonts/Roboto-Italic.ttf';
@@ -1558,7 +1341,6 @@ export class TransactionsService {
     );
     doc.pipe(res);
 
-    // 2. WATERMARK (Nếu đơn bị hủy)
     if (detail.status === 'CANCELLED') {
       doc
         .save()
@@ -1570,18 +1352,15 @@ export class TransactionsService {
         .restore();
     }
 
-    // Khung viền trang chuyên nghiệp
     doc.rect(20, 20, 555, 802).stroke('#CCCCCC');
 
-    // 3. HEADER (TÍCH HỢP LOGO.JPG)
     const logoPath = path.join(process.cwd(), 'src/common/assets/Logo.jpg');
     let textStartX = 40;
     const headerY = 40;
 
     if (fs.existsSync(logoPath)) {
-      // Chèn Logo.jpg
       doc.image(logoPath, 40, 35, { width: 55 });
-      textStartX = 105; // Đẩy chữ sang phải để nhường chỗ cho logo
+      textStartX = 105;
     }
 
     doc
@@ -1605,7 +1384,6 @@ export class TransactionsService {
         headerY + 30,
       );
 
-    // Box mã phiếu (Góc phải trên cùng)
     doc.rect(400, 40, 155, 45).stroke('#E0E0E0');
     doc
       .font('Roboto-Bold')
@@ -1619,7 +1397,6 @@ export class TransactionsService {
 
     doc.moveTo(40, 110).lineTo(555, 110).stroke('#EEEEEE');
 
-    // 4. TIÊU ĐỀ PHIẾU
     doc.y = 130;
     doc
       .font('Roboto-Bold')
@@ -1636,7 +1413,6 @@ export class TransactionsService {
       );
     doc.moveDown(1);
 
-    // 5. KHỐI THÔNG TIN CHUNG
     const startInfoY = doc.y;
     doc.fontSize(10).fillColor('#212121');
 
@@ -1679,7 +1455,6 @@ export class TransactionsService {
 
     doc.y = startInfoY + infoBoxHeight + 20;
 
-    // 6. BẢNG SẢN PHẨM (Đã canh lề chuẩn)
     const tableTop = doc.y;
     const col = { stt: 40, sku: 80, name: 180, qty: 470 };
 
@@ -1725,7 +1500,6 @@ export class TransactionsService {
       doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#EEEEEE').stroke();
     });
 
-    // 7. TỔNG CỘNG
     const finalY = doc.y;
     doc.rect(40, finalY, 515, 30).fill('#EEEEEE').stroke('#BDBDBD');
     doc
@@ -1737,7 +1511,6 @@ export class TransactionsService {
       align: 'center',
     });
 
-    // 8. CHỮ KÝ
     doc.y = finalY + 50;
     const signY = doc.y;
     const signCol = { c1: 60, c2: 240, c3: 420 };
@@ -1753,5 +1526,434 @@ export class TransactionsService {
     doc.text('(Ký và ghi rõ họ tên)', signCol.c3 + 5, signY + 15);
 
     doc.end();
+  }
+
+  async exportImportDetailPdf(id: string, res: Response) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Mã định danh phiếu nhập không hợp lệ.');
+    }
+    const rawData = await this.getImportDetail(id);
+    const detail = rawData as unknown as ImportDetail;
+
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+
+    const fontPath = 'src/common/fonts/Roboto-Regular.ttf';
+    const fontBoldPath = 'src/common/fonts/Roboto-Bold.ttf';
+    const fontItalicPath = 'src/common/fonts/Roboto-Italic.ttf';
+
+    try {
+      doc.registerFont('Roboto', fontPath);
+      doc.registerFont('Roboto-Bold', fontBoldPath);
+      doc.registerFont('Roboto-Italic', fontItalicPath);
+      doc.font('Roboto');
+    } catch (error: unknown) {
+      console.error(
+        'Thiếu font trong src/common/fonts/ - Chi tiết:',
+        (error as Error).message,
+      );
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=PhieuNhap_${detail.transaction_code}.pdf`,
+    );
+    doc.pipe(res);
+
+    if (detail.status === 'CANCELLED') {
+      doc
+        .save()
+        .opacity(0.07)
+        .fillColor('#FF0000')
+        .fontSize(70)
+        .rotate(-45, { origin: [300, 400] })
+        .text('ĐÃ HỦY PHIẾU', 100, 400, { align: 'center' })
+        .restore();
+    }
+
+    doc.rect(20, 20, 555, 802).stroke('#CCCCCC');
+
+    const logoPath = path.join(process.cwd(), 'src/common/assets/Logo.jpg');
+    let textStartX = 40;
+    const headerY = 40;
+
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, 40, 35, { width: 55 });
+      textStartX = 105;
+    }
+
+    doc
+      .font('Roboto-Bold')
+      .fontSize(14)
+      .fillColor('#1A237E')
+      .text('H&N ODYSSEY - E-COMMERCE SYSTEM', textStartX, headerY);
+
+    doc
+      .font('Roboto')
+      .fontSize(9)
+      .fillColor('#616161')
+      .text(
+        'Địa chỉ: 45 Nguyễn Khắc Nhu, P. Cô Giang, Q. 1, TP. HCM',
+        textStartX,
+        headerY + 18,
+      )
+      .text(
+        'Hotline: 1900 6789 | Website: hnodyssey.com',
+        textStartX,
+        headerY + 30,
+      );
+
+    doc.rect(400, 40, 155, 45).stroke('#E0E0E0');
+    doc
+      .font('Roboto-Bold')
+      .fontSize(8)
+      .fillColor('#757575')
+      .text('MÃ GIAO DỊCH:', 410, 50);
+    doc
+      .fontSize(11)
+      .fillColor('#D32F2F')
+      .text(detail.transaction_code, 410, 62);
+
+    doc.moveTo(40, 110).lineTo(555, 110).stroke('#EEEEEE');
+
+    doc.y = 130;
+    doc
+      .font('Roboto-Bold')
+      .fontSize(22)
+      .fillColor('#1976D2') // Phân biệt màu sắc với phiếu xuất (E65100)
+      .text('PHIẾU NHẬP KHO', { align: 'center' });
+    doc
+      .font('Roboto')
+      .fontSize(10)
+      .fillColor('#616161')
+      .text(
+        `Ngày lập: ${new Date(detail.created_at).toLocaleString('vi-VN')}`,
+        { align: 'center' },
+      );
+    doc.moveDown(1);
+
+    const startInfoY = doc.y;
+    doc.fontSize(10).fillColor('#212121');
+
+    const infoText = `Nhà cung cấp: ${detail.supplier || 'N/A'}\nGhi chú: ${detail.note || 'N/A'}`;
+    const infoHeight = doc.heightOfString(infoText, { width: 490 });
+    const infoBoxHeight = 45 + infoHeight;
+
+    doc
+      .rect(40, startInfoY, 515, infoBoxHeight)
+      .fill('#FAFAFA')
+      .stroke('#EEEEEE');
+    doc.fillColor('#212121');
+
+    doc
+      .font('Roboto-Bold')
+      .text('Người thực hiện:', 55, startInfoY + 10, { continued: true })
+      .font('Roboto')
+      .text(` ${detail.actor?.full_name || detail.actor?.email}`);
+
+    doc
+      .font('Roboto-Bold')
+      .text('Trạng thái:', 360, startInfoY + 10, { continued: true })
+      .font('Roboto')
+      .fillColor(detail.status === 'CANCELLED' ? '#D32F2F' : '#2E7D32')
+      .text(` ${detail.status === 'CANCELLED' ? 'ĐÃ HỦY' : 'HOÀN TẤT'}`);
+
+    doc
+      .fillColor('#212121')
+      .font('Roboto-Bold')
+      .text('Tham chiếu:', 360, startInfoY + 25, { continued: true })
+      .font('Roboto')
+      .text(` ${String(detail.reference_code || 'N/A')}`);
+
+    doc
+      .font('Roboto-Bold')
+      .text('Nhà cung cấp:', 55, startInfoY + 25, { continued: false });
+    doc
+      .font('Roboto')
+      .text(detail.supplier || 'N/A', 140, startInfoY + 25, { width: 210 });
+
+    doc
+      .font('Roboto-Bold')
+      .text('Ghi chú:', 55, startInfoY + 40, { continued: false });
+    doc
+      .font('Roboto')
+      .text(detail.note || 'N/A', 110, startInfoY + 40, { width: 240 });
+
+    doc.y = startInfoY + infoBoxHeight + 20;
+
+    const tableTop = doc.y;
+    const col = { stt: 40, sku: 80, name: 180, qty: 470 };
+
+    doc.rect(40, tableTop, 515, 25).fill('#1A237E');
+    doc.fillColor('#FFFFFF').font('Roboto-Bold');
+    doc.text('STT', col.stt + 5, tableTop + 7, { width: 30, align: 'center' });
+    doc.text('MÃ SKU', col.sku, tableTop + 7);
+    doc.text('TÊN SẢN PHẨM / BIẾN THỂ', col.name, tableTop + 7);
+    doc.text('SL NHẬP', col.qty, tableTop + 7, { width: 80, align: 'center' });
+
+    doc.y = tableTop + 25;
+    let totalQty = 0;
+
+    detail.items.forEach((item, index) => {
+      const rowY = doc.y;
+      const nameHeight = doc.heightOfString(item.product_name, { width: 280 });
+      const rowHeight = Math.max(25, nameHeight + 10);
+
+      if (rowY + rowHeight > 760) {
+        doc.addPage();
+        doc.rect(20, 20, 555, 802).stroke('#CCCCCC');
+        doc.y = 40;
+      }
+
+      if (index % 2 === 0) {
+        doc.rect(40, doc.y, 515, rowHeight).fill('#F9F9F9');
+      }
+
+      doc.fillColor('#212121').font('Roboto');
+      doc.text((index + 1).toString(), col.stt + 5, rowY + 7, {
+        width: 30,
+        align: 'center',
+      });
+      doc.text(item.sku, col.sku, rowY + 7);
+      doc.text(item.product_name, col.name, rowY + 7, { width: 280 });
+      doc.text(item.quantity_imported.toString(), col.qty, rowY + 7, {
+        width: 80,
+        align: 'center',
+      });
+
+      totalQty += item.quantity_imported;
+      doc.y = rowY + rowHeight;
+      doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#EEEEEE').stroke();
+    });
+
+    const finalY = doc.y;
+    doc.rect(40, finalY, 515, 30).fill('#EEEEEE').stroke('#BDBDBD');
+    doc
+      .fillColor('#000000')
+      .font('Roboto-Bold')
+      .text('TỔNG CỘNG SỐ LƯỢNG:', col.sku, finalY + 10);
+    doc.fontSize(13).text(totalQty.toString(), col.qty, finalY + 9, {
+      width: 80,
+      align: 'center',
+    });
+
+    doc.y = finalY + 50;
+    const signY = doc.y;
+    const signCol = { c1: 60, c2: 240, c3: 420 };
+
+    doc.fontSize(10).font('Roboto-Bold').fillColor('#212121');
+    doc.text('Người lập phiếu', signCol.c1, signY);
+    doc.text('Người giao hàng', signCol.c2, signY);
+    doc.text('Thủ kho nhập', signCol.c3, signY);
+
+    doc.font('Roboto-Italic').fontSize(8).fillColor('#757575');
+    doc.text('(Ký và ghi rõ họ tên)', signCol.c1 + 5, signY + 15);
+    doc.text('(Ký và ghi rõ họ tên)', signCol.c2 + 5, signY + 15);
+    doc.text('(Ký và ghi rõ họ tên)', signCol.c3 + 5, signY + 15);
+
+    doc.end();
+  }
+
+  // 3. HOÀN TẤT PHIẾU VÀ CẬP NHẬT KHO THỰC TẾ (US1)
+  async completeTransaction(
+    id: string,
+    actorId: string,
+    ip?: string,
+    userAgent?: string,
+  ) {
+    const session = await this.connection.startSession();
+    session.startTransaction();
+    try {
+      const transaction = await this.transactionModel
+        .findById(id)
+        .session(session);
+      if (!transaction)
+        throw new NotFoundException('Phiếu giao dịch không tồn tại.');
+      if (transaction.status !== 'PROCESSING') {
+        throw new BadRequestException(
+          'Chỉ có thể hoàn tất các phiếu đang ở trạng thái Processing.',
+        );
+      }
+
+      const updatedProducts: UpdatedProductInfo[] = [];
+
+      for (const item of transaction.items) {
+        const product = await this.productModel
+          .findById(item.product_id)
+          .session(session);
+        if (!product) {
+          const safeId = item.product_id
+            ? item.product_id.toString()
+            : 'Không xác định';
+          throw new BadRequestException(`Sản phẩm ID ${safeId} không tồn tại.`);
+        }
+
+        const filter: FilterQuery<ProductDocument> = { _id: item.product_id };
+        const updateQuery: UpdateQuery<ProductDocument> = {};
+
+        const multiplier = transaction.action_type === 'IMPORT' ? 1 : -1;
+
+        if (product.has_variants) {
+          const variant = product.variants.find((v) => v.sku === item.sku);
+          if (
+            transaction.action_type === 'EXPORT' &&
+            (!variant || (variant.stock || 0) < item.quantity)
+          ) {
+            throw new BadRequestException(
+              `SKU ${item.sku} không đủ tồn kho (Hiện có: ${variant?.stock || 0}).`,
+            );
+          }
+          filter['variants.sku'] = item.sku;
+          updateQuery.$inc = {
+            'variants.$.stock': item.quantity * multiplier,
+            stock: item.quantity * multiplier,
+          };
+        } else {
+          if (
+            transaction.action_type === 'EXPORT' &&
+            (product.stock || 0) < item.quantity
+          ) {
+            throw new BadRequestException(`SKU ${item.sku} không đủ tồn kho.`);
+          }
+          updateQuery.$inc = { stock: item.quantity * multiplier };
+        }
+
+        const updatedProduct = await this.productModel.findOneAndUpdate(
+          filter,
+          updateQuery,
+          { new: true, session },
+        );
+        if (updatedProduct) {
+          let actualStock = 0;
+          if (updatedProduct.has_variants) {
+            const v = updatedProduct.variants.find((v) => v.sku === item.sku);
+            actualStock = v?.stock || 0;
+          } else {
+            actualStock = updatedProduct.stock || 0;
+          }
+          updatedProducts.push({
+            productId: updatedProduct._id.toString(),
+            sku: item.sku,
+            newStock: actualStock,
+          });
+        }
+      }
+
+      transaction.status = 'COMPLETED';
+      await transaction.save({ session });
+
+      await this.auditLogsService.log({
+        action: 'COMPLETE_TICKET',
+        collection_name: Resource.TRANSFERS,
+        actor_id: actorId,
+        target_id: transaction._id?.toString() ?? '',
+        department: Department.WAREHOUSE,
+        detail: {
+          code: transaction.transaction_code,
+          action: transaction.action_type,
+        },
+        ip,
+        user_agent: userAgent, // LỖI 2
+      });
+
+      await session.commitTransaction();
+      updatedProducts.forEach((p) =>
+        this.stockGateway.emitStockUpdate(p.productId, p.sku, p.newStock),
+      );
+      return transaction;
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      void session.endSession();
+    }
+  }
+
+  // 4. HỦY PHIẾU (Chỉ đổi status, không chạm vào tồn kho do phiếu vốn dĩ chưa apply)
+  async cancelTransaction(
+    id: string,
+    reason: string,
+    actorId: string,
+    ip?: string,
+    userAgent?: string,
+  ) {
+    const transaction = await this.transactionModel.findById(id);
+    if (!transaction) throw new NotFoundException('Phiếu không tồn tại');
+    if (transaction.status !== 'PROCESSING') {
+      throw new BadRequestException(
+        'Chỉ có thể hủy phiếu đang xử lý. Nếu đã hoàn tất, vui lòng tạo phiếu xuất/nhập bù trừ.',
+      );
+    }
+
+    transaction.status = 'CANCELLED';
+    transaction.cancel_reason = reason;
+    await transaction.save();
+
+    await this.auditLogsService.log({
+      action: 'CANCEL_TICKET',
+      collection_name: Resource.TRANSFERS,
+      actor_id: actorId,
+      target_id: transaction._id?.toString() ?? '',
+      department: Department.WAREHOUSE,
+      detail: { code: transaction.transaction_code, reason: reason },
+      ip,
+      user_agent: userAgent, // LỖI 2
+    });
+
+    return transaction;
+  }
+
+  // 5. GET TẤT CẢ LỊCH SỬ CHO DROPDOWN "ALL TYPES"
+  async getAllHistory(queryDto: GetTransactionsDto) {
+    // Lấy thẳng biến chuẩn từ DTO
+    const actionType = queryDto.action_type;
+
+    // Điều hướng logic gọi hàm
+    if (actionType === 'IMPORT') return this.getBaseHistory('IMPORT', queryDto);
+    if (actionType === 'EXPORT') return this.getBaseHistory('EXPORT', queryDto);
+
+    // Nếu actionType không được truyền (tương đương với FE chọn 'All Types')
+    const { search, page = 1, limit = 10 } = queryDto;
+    const filter: FilterQuery<StockTransactionDocument> = {};
+
+    if (search) {
+      const matchedUsers = await this.userModel
+        .find({
+          $or: [
+            { full_name: { $regex: search, $options: 'i' } },
+            { email: { $regex: search, $options: 'i' } },
+          ],
+        })
+        .select('_id')
+        .lean();
+
+      const matchedUserIds = matchedUsers.map((u) => u._id);
+
+      filter.$or = [
+        { transaction_code: { $regex: search, $options: 'i' } },
+        { reference_code: { $regex: search, $options: 'i' } },
+        { actor_id: { $in: matchedUserIds } },
+      ];
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const [transactions, total] = await Promise.all([
+      this.transactionModel
+        .find(filter)
+        .populate('actor_id', 'email full_name') // Có thể thêm 'full_name' vào populate nếu FE cần hiển thị
+        .populate('items.product_id', 'name')
+        .sort({ created_at: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      this.transactionModel.countDocuments(filter),
+    ]);
+
+    return {
+      data: transactions,
+      total,
+      page: Number(page),
+      limit: Number(limit),
+    };
   }
 }

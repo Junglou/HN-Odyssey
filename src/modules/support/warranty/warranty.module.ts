@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { WarrantyController } from './warranty.controller';
 import { WarrantyService } from './warranty.service';
-import { WarrantyListener } from './warranty.listener'; // File chứa @OnEvent và @Cron
+import { WarrantyListener } from './warranty.listener';
 
 // Import các Schema đã định nghĩa trong file schemas/warranty-claim.schema.ts
 import {
