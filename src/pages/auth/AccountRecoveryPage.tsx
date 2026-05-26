@@ -83,7 +83,7 @@ const AccountRecoveryPage = () => {
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
         <svg
-          className="arrow-icon"
+          className="recovery-arrow-icon"
           width="24"
           height="24"
           viewBox="0 0 24 24"
@@ -134,7 +134,12 @@ const AccountRecoveryPage = () => {
             </li>
           </ul>
 
-          <button className="recovery-explore-btn">Explore</button>
+          <button
+            className="recovery-explore-btn"
+            onClick={() => navigate("/")}
+          >
+            Explore
+          </button>
         </div>
       </div>
     </div>

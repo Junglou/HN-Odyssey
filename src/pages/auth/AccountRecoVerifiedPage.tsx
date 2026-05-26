@@ -97,7 +97,7 @@ const AccountRecoVerifiedPage = () => {
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
         <svg
-          className="arrow-icon"
+          className="reco-verified-arrow-icon"
           width="24"
           height="24"
           viewBox="0 0 24 24"
@@ -146,7 +146,12 @@ const AccountRecoVerifiedPage = () => {
               Regain full account access.
             </li>
           </ul>
-          <button className="reco-verified-explore-btn">Privacy Policy</button>
+          <button
+            className="reco-verified-explore-btn"
+            onClick={() => navigate("/")}
+          >
+            Explore
+          </button>
         </div>
       </div>
     </div>

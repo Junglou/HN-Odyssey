@@ -1,0 +1,248 @@
+/* container */
+.checkout-form-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+/* rows */
+.checkout-form-row {
+  display: flex;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.checkout-form-row > * {
+  flex: 1;
+}
+
+/* inputs */
+.checkout-input-group {
+  position: relative;
+  width: 100%;
+}
+
+.checkout-form-input {
+  width: 100%;
+  padding: 1rem 1.5rem;
+  border-radius: 50px;
+  border: 1px solid #888;
+  font-size: 1rem;
+  background-color: #ffffff;
+  outline: none;
+  box-sizing: border-box;
+  color: #333;
+  font-family: "Lexend Exa", sans-serif;
+  transition: all 0.2s ease;
+
+  /* Line gạch dưới đặc trưng từ Auth UI */
+  background-image: linear-gradient(to right, #ccc, #ccc);
+  background-repeat: no-repeat;
+  background-position: center bottom 12px;
+  background-size: calc(100% - 3rem) 1px;
+}
+
+.checkout-form-input:focus {
+  border-color: #000;
+  border-width: 1.5px;
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.05);
+  background-image: linear-gradient(to right, #333, #333);
+}
+
+.checkout-form-input::placeholder {
+  color: rgba(0, 0, 0, 0.5);
+  font-weight: 300;
+}
+
+/* custom dropdown list */
+.checkout-dropdown-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #888;
+  border-radius: 20px;
+  margin-top: 8px;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 8px 0;
+  animation: checkoutSlideDownFade 0.2s ease-out forwards;
+}
+
+.checkout-dropdown-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.checkout-dropdown-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.checkout-dropdown-list::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+}
+
+.checkout-dropdown-item {
+  padding: 12px 1.5rem;
+  font-family: "Lexend Exa", sans-serif;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.checkout-dropdown-item:hover {
+  background: #f5f5f5;
+}
+
+/* icons */
+.checkout-select-icon {
+  position: absolute;
+  right: 1.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #000;
+  pointer-events: none;
+  transition: transform 0.2s ease;
+}
+
+/* Xoay icon khi mở dropdown */
+.checkout-select-icon.open {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+/* otp */
+.checkout-otp-row {
+  align-items: center;
+}
+
+.checkout-otp-group {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex: 1;
+}
+
+.checkout-otp-timer {
+  position: absolute;
+  right: 1.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: "Lexend Deca", sans-serif;
+  font-size: 1rem;
+  color: rgba(0, 0, 0, 0.5);
+  font-weight: 400;
+  pointer-events: none;
+}
+
+/* buttons */
+.checkout-send-otp-btn {
+  height: 50px;
+  padding: 0 1.5rem;
+  background-color: #000;
+  color: #fff;
+  border: none;
+  border-radius: 50px;
+  font-family: "Lexend Deca", sans-serif;
+  font-size: 1rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
+}
+
+.checkout-send-otp-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.checkout-send-otp-btn:disabled {
+  background-color: #555;
+  cursor: not-allowed;
+}
+
+/* checkboxes */
+.checkout-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.checkout-checkbox-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.checkout-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  cursor: pointer;
+}
+
+.checkout-checkbox-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1d1b20;
+}
+
+.checkout-checkbox-text {
+  font-family: "Lexend Deca", sans-serif;
+  font-weight: 300;
+  font-size: 1.1rem;
+  color: #000;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* text animation */
+@keyframes checkoutSlideDownFade {
+  0% {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.checkout-checkbox-subtext {
+  font-family: "Lexend Deca", sans-serif;
+  font-weight: 200;
+  font-size: 0.9rem;
+  color: #000;
+  line-height: 1.5;
+  margin: 0 0 0 2.25rem;
+  animation: checkoutSlideDownFade 0.3s ease-out forwards;
+}
+
+.checkout-gift-icon {
+  color: #1e1e1e;
+  margin-left: 0.25rem;
+}
+
+/* responsive */
+@media screen and (max-width: 768px) {
+  .checkout-form-row {
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .checkout-otp-group {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .checkout-send-otp-btn {
+    width: 100%;
+  }
+}

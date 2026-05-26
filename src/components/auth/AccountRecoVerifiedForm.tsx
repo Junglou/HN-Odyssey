@@ -1,8 +1,8 @@
-// src/components/auth/AccountRecoVerifiedForm.tsx
 import { useState, type FormEvent } from "react";
 import "./AccountRecoVerifiedForm.css";
 import { toast } from "react-toastify";
 
+// interfaces
 export interface RecoVerifiedPayload {
   newPassword: string;
   confirmNewPassword: string;
@@ -28,6 +28,7 @@ const AccountRecoVerifiedForm = ({
   onLoginClick,
   onRegisterClick,
 }: AccountRecoVerifiedFormProps) => {
+  // hooks/states
   const [formData, setFormData] = useState<RecoVerifiedPayload>({
     newPassword: "",
     confirmNewPassword: "",
@@ -36,6 +37,7 @@ const AccountRecoVerifiedForm = ({
     otpCode: "",
   });
 
+  // handlers
   const handleChange = (field: keyof RecoVerifiedPayload, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
@@ -82,6 +84,7 @@ const AccountRecoVerifiedForm = ({
     onSubmit(formData);
   };
 
+  // render
   return (
     <div className="verified-form-wrapper">
       <h1 className="verified-form-title">Let’s get you back in.</h1>

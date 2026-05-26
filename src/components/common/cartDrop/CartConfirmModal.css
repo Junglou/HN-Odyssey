@@ -1,0 +1,104 @@
+/* lớp phủ và căn giữa khối modal */
+.cart-confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 3000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: "Lexend Exa", sans-serif;
+}
+
+/* khung hộp thoại */
+.cart-confirm-box {
+  background-color: #ffffff;
+  width: 100%;
+  max-width: 400px;
+  border-radius: 10px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* thanh đầu hộp thoại */
+.cart-confirm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cart-confirm-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #000000;
+  margin: 0;
+}
+
+.cart-confirm-close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #838383;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.cart-confirm-close-btn:hover {
+  color: #000000;
+}
+
+/* tin nhắn văn bản thông báo */
+.cart-confirm-message {
+  font-family: "Lexend", sans-serif;
+  font-size: 1rem;
+  color: #000000;
+  margin: 0 0 10px 0;
+  line-height: 1.5;
+}
+
+/* cụm nút hành động */
+.cart-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.cart-btn-cancel,
+.cart-btn-confirm {
+  font-family: "Lexend Exa", sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  height: 40px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  padding: 0 16px;
+}
+
+.cart-btn-cancel {
+  background: #f3f4f6;
+  color: #000000;
+}
+
+.cart-btn-cancel:hover {
+  background: #e5e7eb;
+}
+
+.cart-btn-confirm {
+  background: #000000;
+  color: #ffffff;
+}
+
+.cart-btn-confirm:hover {
+  background: #333333;
+}

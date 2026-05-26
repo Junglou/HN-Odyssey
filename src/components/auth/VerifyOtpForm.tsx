@@ -4,8 +4,8 @@ import { toast } from "react-toastify";
 
 interface VerifyOtpFormProps {
   initialEmail?: string;
-  onSubmit: (email: string, otp: string) => void; // Hàm xử lý khi bấm nút Process
-  onResend: (email: string) => void; // Hàm xử lý khi bấm nút Send Request
+  onSubmit: (email: string, otp: string) => void;
+  onResend: (email: string) => void;
   timer: number;
   loading: boolean;
   onLoginClick: () => void;
@@ -25,32 +25,26 @@ const VerifyOtpForm = ({
   onHelpClick,
 }: VerifyOtpFormProps) => {
   // State
-  // Khởi tạo giá trị ban đầu là initialEmail (từ location state)
   const [email, setEmail] = useState(initialEmail);
   const [otp, setOtp] = useState("");
 
   // Handlers xử lý sự kiện
-  // Xử lý khi Submit Form (Nút Process)
   const handleSubmit = (e: FormEvent) => {
-    e.preventDefault(); // Chặn reload trang
+    e.preventDefault();
 
     // Validate cơ bản
     if (!email || !otp) {
       toast.warning("Vui lòng nhập đầy đủ thông tin!");
       return;
     }
-
-    // Gọi hàm onSubmit của cha (VerifyOtpPage)
     onSubmit(email, otp);
   };
 
-  // Xử lý khi bấm Gửi lại mã (Send Request)
   const handleResend = () => {
     if (!email) {
       toast.warning("Vui lòng nhập Email/SĐT để nhận mã!");
       return;
     }
-    // Gọi hàm onResend của cha
     onResend(email);
   };
 
@@ -64,7 +58,6 @@ const VerifyOtpForm = ({
           disabled={loading}
           style={{ border: "none", padding: 0, margin: 0 }}
         >
-          {/* Input Email/SDT */}
           <div className="verify-input-group">
             <input
               type="text"
@@ -74,34 +67,29 @@ const VerifyOtpForm = ({
               onChange={(e) => setEmail(e.target.value)}
               required
             />
-            {/* Dấu sao bắt buộc */}
             <span className="verify-required-mark">*</span>
           </div>
 
-          {/* Hàng chứa: OTP + Timer + Nút gửi */}
           <div className="verify-otp-row">
-            {/* Ô nhập OTP (Chứa cả Timer bên trong) */}
-            <div className="otp-input-container">
+            <div className="verify-otp-input-container">
               <input
                 type="text"
-                className="verify-form-input" // Dùng chung style gạch chân
+                className="verify-form-input"
                 placeholder="OTP"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
                 maxLength={6}
                 required
-                style={{ letterSpacing: "2px" }} // Giãn chữ số cho dễ nhìn
+                style={{ letterSpacing: "2px" }}
               />
-              {/* Hiển thị đếm ngược (nếu timer > 0) */}
-              {timer > 0 && <span className="otp-timer">{timer}S</span>}
+              {timer > 0 && <span className="verify-otp-timer">{timer}S</span>}
             </div>
 
-            {/* Nút Send Request (Nằm cạnh ô OTP) */}
             <button
               type="button"
               className="verify-send-btn"
               onClick={handleResend}
-              disabled={timer > 0 || loading} // Disable khi đang đếm ngược hoặc loading
+              disabled={timer > 0 || loading}
             >
               {timer > 0 ? "Wait..." : "Send Request"}
             </button>
@@ -127,10 +115,10 @@ const VerifyOtpForm = ({
 
       {/* Link điều hướng dưới cùng */}
       <div className="verify-footer-links">
-        <span className="text-link" onClick={onRegisterClick}>
+        <span className="verify-text-link" onClick={onRegisterClick}>
           You are new? Join just here.
         </span>
-        <span className="text-link" onClick={onLoginClick}>
+        <span className="verify-text-link" onClick={onLoginClick}>
           Already have one.
         </span>
       </div>

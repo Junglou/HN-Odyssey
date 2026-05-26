@@ -1,4 +1,4 @@
-/* Form Wrapper */
+/* wrapper */
 .recovery-form-wrapper {
   width: 100%;
   max-width: 480px;
@@ -8,13 +8,11 @@
   color: #000;
   display: flex;
   flex-direction: column;
-
-  /* Animation xuất hiện */
   animation: formFadeInUp 1s cubic-bezier(0.25, 1, 0.5, 1) both;
   animation-delay: 0.5s;
 }
 
-/* Typography */
+/* typography */
 .recovery-title {
   font-size: 2.5rem;
   font-weight: 800;
@@ -24,14 +22,13 @@
   line-height: 1.2;
 }
 
-/* Input Styles */
+/* inputs */
 .recovery-input-group {
   position: relative;
   margin-bottom: 1.5rem;
   width: 100%;
 }
 
-/* Style chung cho Input */
 .recovery-form-input {
   width: 100%;
   padding: 1rem 1.5rem;
@@ -44,20 +41,18 @@
   color: #333;
   font-family: "Lexend Exa", sans-serif;
   transition: all 0.2s ease;
-
-  /* [Signature Style] Dòng kẻ gradient dưới chân text */
   background-image: linear-gradient(to right, #ccc, #ccc);
   background-repeat: no-repeat;
   background-position: center bottom 12px;
   background-size: calc(100% - 3rem) 1px;
 }
 
-/* Textarea: Bo góc ít hơn & Không có dòng kẻ gradient (để tránh xấu) */
+/* Textarea */
 textarea.recovery-form-input {
   border-radius: 20px;
   resize: none;
   height: 120px;
-  background-image: none; /* Bỏ dòng kẻ cho textarea */
+  background-image: none;
 }
 
 /* Hiệu ứng Focus */
@@ -65,7 +60,6 @@ textarea.recovery-form-input {
   border-color: #000;
   border-width: 1.5px;
   box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.05);
-  /* Đậm dòng kẻ khi focus (trừ textarea) */
   background-image: linear-gradient(to right, #333, #333);
 }
 
@@ -83,7 +77,7 @@ textarea.recovery-form-input:focus {
   pointer-events: none;
 }
 
-/* OTP Row Layout */
+/* otp */
 .recovery-otp-row {
   display: flex;
   gap: 1rem;
@@ -108,6 +102,7 @@ textarea.recovery-form-input:focus {
   pointer-events: none;
 }
 
+/* buttons */
 .recovery-send-btn {
   background-color: #000;
   color: #fff;
@@ -127,19 +122,20 @@ textarea.recovery-form-input:focus {
   opacity: 0.9;
   transform: translateY(-1px);
 }
+
 .recovery-send-btn:disabled {
   background-color: #555;
   cursor: not-allowed;
 }
 
-/* Custom File Input */
-.file-input-wrapper {
+/* file input */
+.recovery-file-input-wrapper {
   position: relative;
   width: 100%;
   margin-bottom: 1.5rem;
 }
 
-.file-input-label {
+.recovery-file-input-label {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -155,23 +151,23 @@ textarea.recovery-form-input:focus {
   transition: all 0.2s ease;
 }
 
-.file-input-label.has-file {
+.recovery-file-input-label.has-file {
   color: #000;
   border-color: #000;
 }
 
-.file-input-label:hover {
+.recovery-file-input-label:hover {
   background-color: #f9f9f9;
 }
 
-.paperclip-icon {
+.recovery-paperclip-icon {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
   margin-left: 10px;
 }
 
-/* Buttons & Links */
+/* buttons & links */
 .recovery-process-btn {
   width: 150px;
   padding: 0.8rem 2rem;
@@ -214,6 +210,7 @@ textarea.recovery-form-input:focus {
   opacity: 0.7;
 }
 
+/* animation */
 @keyframes formFadeInUp {
   from {
     opacity: 0;

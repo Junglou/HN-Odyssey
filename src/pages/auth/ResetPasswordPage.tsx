@@ -1,32 +1,32 @@
+// imports
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import ResetPasswordForm from "../../components/auth/ResetPasswordForm";
-import { useResetPassword } from "../../hooks/auth/useResetPassword"; // Import Hook thật
+import { useResetPassword } from "../../hooks/auth/useResetPassword";
 import { toast } from "react-toastify";
-import "./ResetPasswordPage.css";
-
-// Import Icons
 import {
   SearchIcon,
   FileIcon,
   CartIcon,
   HeadsetIcon,
 } from "../../assets/icons/AuthIcons";
+import "./ResetPasswordPage.css";
 
+// component
 const ResetPasswordPage = () => {
+  // states
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // hooks
   const navigate = useNavigate();
   const location = useLocation();
-
-  // Lấy dữ liệu từ trang Verify OTP gửi sang
-  const identifier = location.state?.identifier; // Email hoặc SĐT
-  const otpCode = location.state?.otpCode;
-
-  // Sử dụng Hook để gọi API
   const { resetPassword, loading } = useResetPassword();
 
-  // Tắt/bật để test giao diện
-  // Bảo mật: Nếu không có OTP (truy cập chui) thì đá về Login
+  // variables
+  const identifier = location.state?.identifier;
+  const otpCode = location.state?.otpCode;
+
+  // lifecycle
   useEffect(() => {
     if (!identifier || !otpCode) {
       toast.error("Yêu cầu không hợp lệ. Vui lòng thực hiện lại.");
@@ -34,6 +34,7 @@ const ResetPasswordPage = () => {
     }
   }, [identifier, otpCode, navigate]);
 
+  // handlers
   const handleReset = async (newPassword: string) => {
     try {
       await resetPassword({
@@ -42,7 +43,6 @@ const ResetPasswordPage = () => {
         newPassword: newPassword,
         confirmNewPassword: newPassword,
       });
-
       toast.success("Đổi mật khẩu thành công! Vui lòng đăng nhập.");
       navigate("/login");
     } catch (error) {
@@ -54,17 +54,16 @@ const ResetPasswordPage = () => {
     }
   };
 
+  // render
   return (
     <div className={`reset-page-container ${isCollapsed ? "collapsed" : ""}`}>
-      {/* CỘT TRÁI: FORM */}
       <div className="reset-left-section">
         <ResetPasswordForm
           onSubmit={handleReset}
-          loading={loading} // Loading thật từ API
+          loading={loading}
           onLoginClick={() => navigate("/login")}
           onRegisterClick={() => navigate("/register")}
           onHelpClick={() => {
-            // Quay lại trang Verify nếu cần hỗ trợ
             navigate("/verify-otp", {
               state: { email: identifier, type: "FORGOT_PASSWORD" },
             });
@@ -72,7 +71,6 @@ const ResetPasswordPage = () => {
         />
       </div>
 
-      {/* Mũi tên */}
       <div
         className="reset-back-arrow-container"
         onClick={() => setIsCollapsed(!isCollapsed)}
@@ -93,7 +91,6 @@ const ResetPasswordPage = () => {
         </svg>
       </div>
 
-      {/* CỘT PHẢI: INFO */}
       <div className="reset-right-section">
         <div className="reset-info-card">
           <h2 className="reset-info-title">No account? No problem.</h2>
