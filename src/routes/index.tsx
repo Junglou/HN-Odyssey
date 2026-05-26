@@ -9,6 +9,8 @@ import SecondCharmPage from "../pages/secondCharm/SecondCharmPage";
 import BlogNewsPage from "../pages/blogNews/BlogNewsPage";
 import ProductListPage from "../pages/products/ProductListPage";
 import ProductDetailPage from "../pages/productDetail/ProductDetailPage";
+import CheckoutPage from "../pages/checkout/CheckoutPage";
+import ShoppingCartPage from "../pages/shoppingCart/ShoppingCartPage";
 
 import LoginPage from "../pages/auth/LoginPage";
 import RegisterPage from "../pages/auth/RegisterPage";
@@ -62,7 +64,6 @@ import StockManagementPage from "../pages/portal/Warehouse/StockManagementPage";
 
 import OrderManagementPage from "../pages/portal/OrderManagement/OrderManagement/OrderManagementPage";
 import TradeInManagementPage from "../pages/portal/OrderManagement/TradeInManagement/TradeInManagementPage";
-import ShoppingCartPage from "../pages/shoppingCart/ShoppingCartPage";
 
 export const router = createBrowserRouter([
   // route auth
@@ -123,6 +124,10 @@ export const router = createBrowserRouter([
       {
         path: "cart",
         element: <ShoppingCartPage />,
+      },
+      {
+        path: "checkout",
+        element: <CheckoutPage />,
       },
       // todo: cum route profile nay can duoc boc bang auth guard de kiem tra token khi chay thuc te, hien tai de day de tien hanh thu nghiem
       {
