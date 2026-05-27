@@ -2,17 +2,15 @@ import "./VariantManagement.css";
 import { CleanTrashIcon } from "../../../../assets/icons/VariantManagementIcons";
 import { EditPenIcon } from "../../../../assets/icons/ProductManagementIcons";
 
-// type và logic quản lý biến thể
-import type { Variant } from "../../../../hooks/portal/ProductCatalog/VariantManagement/useVariantManagement";
+import type { Attribute } from "../../../../hooks/portal/ProductCatalog/VariantManagement/useVariantManagement";
 
-// component quản lý biến thể
 interface VariantManagementProps {
-  data: Variant[];
+  data: Attribute[];
   search: string;
   actions: {
     changeSearch: (val: string) => void;
-    openDrawer: (mode: "add" | "edit", variant?: Variant) => void;
-    deleteSingle: (id: number) => void;
+    openDrawer: (mode: "add" | "edit", attribute?: Attribute) => void;
+    openDeleteModal: (id: string) => void;
   };
 }
 
@@ -25,15 +23,17 @@ export default function VariantManagement({
     <div className="vm-container">
       <div className="vm-header">
         <div>
-          <h1 className="vm-title">Variant Management</h1>
-          <p className="vm-breadcrumb">Product Catalog / Variant Management</p>
+          <h1 className="vm-title">Attribute Management</h1>
+          <p className="vm-breadcrumb">
+            Product Catalog / Attribute Management
+          </p>
         </div>
         <button
           type="button"
           className="vm-btn-add"
           onClick={() => actions.openDrawer("add")}
         >
-          Add New Variant
+          Add New Attribute
         </button>
       </div>
 
@@ -42,8 +42,7 @@ export default function VariantManagement({
           <input
             type="text"
             className="vm-search-input"
-            placeholder="Search by name or value..."
-            aria-label="Search variants"
+            placeholder="Search by name, code..."
             value={search}
             onChange={(e) => actions.changeSearch(e.target.value)}
           />
@@ -53,38 +52,40 @@ export default function VariantManagement({
           <table className="vm-table">
             <thead>
               <tr>
-                <th style={{ width: "25%" }}>Variant Name</th>
-                <th style={{ width: "40%" }}>Variant Values</th>
-                <th style={{ width: "20%" }}>Status</th>
-                <th style={{ width: "15%", textAlign: "right" }}>Actions</th>
+                <th style={{ width: "20%" }}>Name</th>
+                <th style={{ width: "15%" }}>Code</th>
+                <th style={{ width: "15%" }}>Display Type</th>
+                <th style={{ width: "25%" }}>Values</th>
+                <th style={{ width: "15%" }}>Status</th>
+                <th style={{ width: "10%" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {data.length > 0 ? (
-                data.map((variant) => (
-                  <tr key={variant.id}>
-                    <td>{variant.name}</td>
+                data.map((attr) => (
+                  <tr key={attr.id}>
+                    <td className="font-medium">{attr.name}</td>
+                    <td>{attr.code}</td>
+                    <td>{attr.display_type}</td>
                     <td>
-                      <div className="vm-values-group">
-                        {variant.values.length > 0 ? (
-                          variant.values.map((val) => (
-                            <span
-                              key={`${variant.id}-${val}`}
-                              className="vm-chip"
-                            >
-                              {val}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="vm-empty-text">Empty</span>
-                        )}
-                      </div>
+                      {attr.values.length} value(s){" "}
+                      <span style={{ fontSize: "12px", color: "#666" }}>
+                        (
+                        {attr.values
+                          .slice(0, 3)
+                          .map((v) => v.label)
+                          .join(", ")}
+                        {attr.values.length > 3 ? "..." : ""})
+                      </span>
                     </td>
                     <td>
                       <span
-                        className={`vm-status-badge status-${variant.status}`}
+                        className={`vm-status-badge ${
+                          attr.is_active ? "status-Active" : "status-Inactive"
+                        }`}
                       >
-                        <span className="vm-dot"></span> {variant.status}
+                        <span className="vm-dot"></span>{" "}
+                        {attr.is_active ? "Active" : "Inactive"}
                       </span>
                     </td>
                     <td>
@@ -92,8 +93,8 @@ export default function VariantManagement({
                         <button
                           type="button"
                           className="vm-icon-btn"
-                          title="Edit Variant"
-                          onClick={() => actions.openDrawer("edit", variant)}
+                          title="Edit Attribute"
+                          onClick={() => actions.openDrawer("edit", attr)}
                         >
                           <EditPenIcon />
                         </button>
@@ -101,8 +102,8 @@ export default function VariantManagement({
                         <button
                           type="button"
                           className="vm-icon-btn"
-                          title="Delete Variant"
-                          onClick={() => actions.deleteSingle(variant.id)}
+                          title="Delete Attribute"
+                          onClick={() => actions.openDeleteModal(attr.id)}
                         >
                           <CleanTrashIcon />
                         </button>
@@ -112,8 +113,8 @@ export default function VariantManagement({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={4} className="vm-td-empty">
-                    No variants found.
+                  <td colSpan={6} className="vm-td-empty">
+                    No attributes found.
                   </td>
                 </tr>
               )}

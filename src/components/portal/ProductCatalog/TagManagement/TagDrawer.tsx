@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import "./TagDrawer.css";
 
 // icon
 import { ArrowLeftIcon } from "../../../../assets/icons/TagManagementIcons";
+import { ChevronDownSmallIcon } from "../../../../assets/icons/OrderManagementIcons";
 
 import type {
   Tag,
@@ -17,10 +18,27 @@ interface TagDrawerProps {
   onSubmit: (data: TagFormData) => void;
 }
 
+// Bảng màu chuẩn
+const COLOR_SWATCHES = [
+  "#111827",
+  "#374151",
+  "#6B7280",
+  "#E5E7EB",
+  "#FFFFFF",
+  "#EF4444",
+  "#F97316",
+  "#F59E0B",
+  "#10B981",
+  "#3B82F6",
+  "#6366F1",
+  "#8B5CF6",
+  "#EC4899",
+];
+
 export default function TagDrawer(props: TagDrawerProps) {
   if (!props.isOpen) return null;
 
-  const formKey = props.initialData?.id || "new-tag";
+  const formKey = props.initialData?._id || "new-tag";
 
   return <TagDrawerContent key={formKey} {...props} />;
 }
@@ -38,15 +56,73 @@ function TagDrawerContent({
       return {
         name: initialData.name,
         description: initialData.description,
-        status: initialData.status,
+        scope: initialData.scope,
+        bg_color: initialData.bg_color,
+        text_color: initialData.text_color,
       };
     }
     return {
       name: "",
       description: "",
-      status: "Active",
+      scope: "PRODUCT",
+      bg_color: "#E0E0E0",
+      text_color: "#333333",
     };
   });
+
+  // dropdown states
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [hasDropdownOpened, setHasDropdownOpened] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // color dropdown states
+  const [isBgDropdownOpen, setIsBgDropdownOpen] = useState(false);
+  const [isTextDropdownOpen, setIsTextDropdownOpen] = useState(false);
+  const bgDropdownRef = useRef<HTMLDivElement>(null);
+  const textDropdownRef = useRef<HTMLDivElement>(null);
+
+  // validation states
+  const [nameError, setNameError] = useState("");
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (dropdownRef.current && !dropdownRef.current.contains(target)) {
+        setIsDropdownOpen(false);
+      }
+      if (bgDropdownRef.current && !bgDropdownRef.current.contains(target)) {
+        setIsBgDropdownOpen(false);
+      }
+      if (
+        textDropdownRef.current &&
+        !textDropdownRef.current.contains(target)
+      ) {
+        setIsTextDropdownOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
+
+  // close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsDropdownOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
 
   return (
     <>
@@ -78,13 +154,17 @@ function TagDrawerContent({
               Tag Name <span className="td-required">*</span>
             </label>
             <input
+              ref={nameInputRef}
               type="text"
+              className={nameError ? "td-input-error" : ""}
               placeholder="e.g. Summer Collection"
               value={formData.name}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, name: e.target.value }))
-              }
+              onChange={(e) => {
+                setFormData((prev) => ({ ...prev, name: e.target.value }));
+                if (nameError) setNameError("");
+              }}
             />
+            {nameError && <span className="td-error-message">{nameError}</span>}
           </div>
 
           <div className="td-form-group">
@@ -103,22 +183,144 @@ function TagDrawerContent({
           </div>
 
           <div className="td-form-group">
-            <label>Tag Status</label>
-            <div className="td-status-toggle-wrapper">
-              <button
-                type="button"
-                role="switch"
-                aria-checked={formData.status === "Active"}
-                className={`td-toggle-switch ${formData.status === "Active" ? "on" : ""}`}
-                onClick={(e) => {
-                  setFormData((prev) => ({
-                    ...prev,
-                    status: prev.status === "Active" ? "Inactive" : "Active",
-                  }));
-                  e.currentTarget.blur();
+            <label>Scope</label>
+            {/* Custom Dropdown */}
+            <div className="td-custom-dropdown" ref={dropdownRef}>
+              <div
+                className={`td-dropdown-trigger ${isDropdownOpen ? "active" : ""}`}
+                onClick={() => {
+                  setIsDropdownOpen(!isDropdownOpen);
+                  if (!hasDropdownOpened) setHasDropdownOpened(true);
                 }}
-              ></button>
-              <span className="td-status-label">{formData.status}</span>
+              >
+                <span>{formData.scope === "PRODUCT" ? "Product" : "Blog"}</span>
+                <div
+                  className={`td-dropdown-arrow ${isDropdownOpen ? "open" : ""}`}
+                >
+                  <ChevronDownSmallIcon />
+                </div>
+              </div>
+
+              <div
+                className={`td-dropdown-options ${
+                  isDropdownOpen ? "open" : hasDropdownOpened ? "closed" : ""
+                }`}
+              >
+                <div
+                  className={`td-dropdown-option ${
+                    formData.scope === "PRODUCT" ? "selected" : ""
+                  }`}
+                  onClick={() => {
+                    setFormData({ ...formData, scope: "PRODUCT" });
+                    setIsDropdownOpen(false);
+                  }}
+                >
+                  Product
+                </div>
+                <div
+                  className={`td-dropdown-option ${
+                    formData.scope === "BLOG" ? "selected" : ""
+                  }`}
+                  onClick={() => {
+                    setFormData({ ...formData, scope: "BLOG" });
+                    setIsDropdownOpen(false);
+                  }}
+                >
+                  Blog
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="td-color-group">
+            {/* Custom Dropdown: Background Color */}
+            <div className="td-form-group td-color-item" ref={bgDropdownRef}>
+              <label>Background Color</label>
+              <div
+                className={`td-color-trigger ${isBgDropdownOpen ? "active" : ""}`}
+                onClick={() => {
+                  setIsBgDropdownOpen(!isBgDropdownOpen);
+                  setIsTextDropdownOpen(false); // Đóng menu kia nếu đang mở
+                }}
+              >
+                <div
+                  className="td-color-preview"
+                  style={{ backgroundColor: formData.bg_color }}
+                ></div>
+                <span className="td-color-hex">{formData.bg_color}</span>
+              </div>
+
+              {isBgDropdownOpen && (
+                <div className="td-color-menu">
+                  <div className="td-color-swatches">
+                    {COLOR_SWATCHES.map((color) => (
+                      <div
+                        key={color}
+                        className="td-color-swatch-item"
+                        style={{ backgroundColor: color }}
+                        onClick={() => {
+                          setFormData({ ...formData, bg_color: color });
+                          setIsBgDropdownOpen(false);
+                        }}
+                      ></div>
+                    ))}
+                  </div>
+                  <input
+                    type="text"
+                    className="td-input td-color-hex-input"
+                    value={formData.bg_color}
+                    onChange={(e) =>
+                      setFormData({ ...formData, bg_color: e.target.value })
+                    }
+                    placeholder="#HEX"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Custom Dropdown: Text Color */}
+            <div className="td-form-group td-color-item" ref={textDropdownRef}>
+              <label>Text Color</label>
+              <div
+                className={`td-color-trigger ${isTextDropdownOpen ? "active" : ""}`}
+                onClick={() => {
+                  setIsTextDropdownOpen(!isTextDropdownOpen);
+                  setIsBgDropdownOpen(false);
+                }}
+              >
+                <div
+                  className="td-color-preview"
+                  style={{ backgroundColor: formData.text_color }}
+                ></div>
+                <span className="td-color-hex">{formData.text_color}</span>
+              </div>
+
+              {isTextDropdownOpen && (
+                <div className="td-color-menu">
+                  <div className="td-color-swatches">
+                    {COLOR_SWATCHES.map((color) => (
+                      <div
+                        key={color}
+                        className="td-color-swatch-item"
+                        style={{ backgroundColor: color }}
+                        onClick={() => {
+                          setFormData({ ...formData, text_color: color });
+                          setIsTextDropdownOpen(false);
+                        }}
+                      ></div>
+                    ))}
+                  </div>
+                  <input
+                    type="text"
+                    className="td-input td-color-hex-input"
+                    value={formData.text_color}
+                    onChange={(e) =>
+                      setFormData({ ...formData, text_color: e.target.value })
+                    }
+                    placeholder="#HEX"
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -139,7 +341,8 @@ function TagDrawerContent({
             className="td-btn-submit"
             onClick={(e) => {
               if (!formData.name.trim()) {
-                alert("Vui lòng nhập Tag Name!");
+                setNameError("Tag Name is required!");
+                nameInputRef.current?.focus();
                 return;
               }
               onSubmit(formData);

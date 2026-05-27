@@ -1,224 +1,199 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
+import axiosClient from "../../../../api/axiosClient";
 
-// prop và type cho biến thể
-export type VariantStatus = "Active" | "Inactive";
-
-export interface Variant {
-  id: number;
-  name: string;
-  values: string[];
-  status: VariantStatus;
+// types
+export interface AttributeValue {
+  label: string;
+  value: string;
+  meta?: string;
 }
 
-export interface VariantFormData {
+export interface Attribute {
+  id: string;
   name: string;
-  values: string;
-  status: VariantStatus;
+  code: string;
+  display_type: string;
+  description?: string;
+  values: AttributeValue[];
+  is_active: boolean;
 }
 
-// mock data ban đầu
-const INITIAL_VARIANTS: Variant[] = [
-  {
-    id: 1,
-    name: "Size",
-    values: ["Small(S)", "Medium(M)", "Large(L)", "Extra Large(XL)"],
-    status: "Active",
-  },
-  {
-    id: 2,
-    name: "Color",
-    values: ["Red", "Blue", "Green", "Black", "White"],
-    status: "Active",
-  },
-  {
-    id: 3,
-    name: "Material",
-    values: ["Cotton", "Polyester", "Silk"],
-    status: "Inactive",
-  },
-  {
-    id: 4,
-    name: "Style",
-    values: ["Casual", "Formal", "Sport"],
-    status: "Active",
-  },
-];
+export interface AttributeFormData {
+  name: string;
+  code: string;
+  display_type: string;
+  description?: string;
+  values: AttributeValue[];
+  is_active: boolean;
+}
 
-const parseVariantValues = (valuesStr: string): string[] => {
-  const parsed = valuesStr
-    .split(",")
-    .map((v) => v.trim())
-    .filter((v) => v.length > 0);
-  return Array.from(new Set(parsed));
-};
+export interface ApiError {
+  response?: {
+    data?: {
+      message?: string | string[];
+    };
+  };
+}
 
-// kiểm tra dữ liệu trước khi lưu
-const validateVariant = (data: VariantFormData): boolean => {
-  return data.name.trim().length > 0 && data.values.trim().length > 0;
-};
-
+// hook
 export function useVariantManagement() {
-  const [variants, setVariants] = useState<Variant[]>(INITIAL_VARIANTS);
-  const [search, setSearch] = useState<string>("");
-  const nextIdCounter = useRef<number>(5);
-
-  // quản lý trạng thái drawer thêm/sửa
+  // states
+  const [attributes, setAttributes] = useState<Attribute[]>([]);
+  const [search, setSearch] = useState("");
   const [drawerConfig, setDrawerConfig] = useState<{
     isOpen: boolean;
     mode: "add" | "edit";
-    editingVariant: Variant | null;
+    editingAttribute: Attribute | null;
     isSubmitting: boolean;
-  }>({ isOpen: false, mode: "add", editingVariant: null, isSubmitting: false });
-
-  // quản lý popup xác nhận xóa
+  }>({
+    isOpen: false,
+    mode: "add",
+    editingAttribute: null,
+    isSubmitting: false,
+  });
   const [deleteConfig, setDeleteConfig] = useState<{
     isOpen: boolean;
-    variantId: number | null;
+    attributeId: string | null;
     isDeleting: boolean;
-  }>({ isOpen: false, variantId: null, isDeleting: false });
+  }>({ isOpen: false, attributeId: null, isDeleting: false });
 
-  // search filter
-  const filteredVariants = useMemo(() => {
+  // api
+  const fetchAttributesData = async () => {
+    const res = await axiosClient.get("/attributes");
+    const data = res.data?.data || res.data || [];
+
+    return data.map(
+      (item: {
+        _id: string;
+        name: string;
+        code: string;
+        display_type: string;
+        description?: string;
+        values?: AttributeValue[];
+        is_active?: boolean;
+      }) => ({
+        id: item._id,
+        name: item.name,
+        code: item.code,
+        display_type: item.display_type,
+        description: item.description,
+        values: item.values || [],
+        is_active: item.is_active ?? true,
+      }),
+    );
+  };
+
+  const refreshData = useCallback(() => {
+    fetchAttributesData()
+      .then((data) => setAttributes(data))
+      .catch((error) => {
+        const err = error as ApiError;
+        toast.error(
+          (err.response?.data?.message as string) ||
+            "Lỗi tải danh sách thuộc tính",
+        );
+      });
+  }, []);
+
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
+
+  // helper
+  const filteredAttributes = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
-    if (!normalizedSearch) return variants;
+    if (!normalizedSearch) return attributes;
 
-    return variants.filter((v) => {
-      const matchName = v.name.toLowerCase().includes(normalizedSearch);
-      const matchValues = v.values.some((val) =>
-        val.toLowerCase().includes(normalizedSearch),
-      );
-      return matchName || matchValues;
-    });
-  }, [variants, search]);
+    return attributes.filter(
+      (attr) =>
+        attr.name.toLowerCase().includes(normalizedSearch) ||
+        attr.code.toLowerCase().includes(normalizedSearch) ||
+        attr.values.some(
+          (v) =>
+            v.label.toLowerCase().includes(normalizedSearch) ||
+            v.value.toLowerCase().includes(normalizedSearch),
+        ),
+    );
+  }, [search, attributes]);
 
-  // thao tác thay đổi search, mở/đóng drawer, mở popup xóa
+  // handle
   const actions = {
     changeSearch: (val: string) => setSearch(val),
-
-    openDrawer: (mode: "add" | "edit", variant?: Variant) => {
+    openDrawer: (mode: "add" | "edit", attribute?: Attribute) => {
       setDrawerConfig({
         isOpen: true,
         mode,
-        editingVariant: variant || null,
+        editingAttribute: attribute || null,
         isSubmitting: false,
       });
     },
-
     closeDrawer: () => {
       setDrawerConfig({
         isOpen: false,
         mode: "add",
-        editingVariant: null,
+        editingAttribute: null,
         isSubmitting: false,
       });
     },
-
-    deleteSingle: (id: number) => {
-      setDeleteConfig({
-        isOpen: true,
-        variantId: id,
-        isDeleting: false,
-      });
+    openDeleteModal: (id: string) => {
+      setDeleteConfig({ isOpen: true, attributeId: id, isDeleting: false });
     },
-
     closeDeleteModal: () => {
-      setDeleteConfig({
-        isOpen: false,
-        variantId: null,
-        isDeleting: false,
-      });
+      setDeleteConfig({ isOpen: false, attributeId: null, isDeleting: false });
     },
   };
 
-  // hàm thêm mới biến thể
-  const handleAddVariant = (
-    data: VariantFormData,
-    processedValues: string[],
-  ) => {
-    const newVariant: Variant = {
-      id: nextIdCounter.current,
-      name: data.name.trim(),
-      values: processedValues,
-      status: data.status,
-    };
-    nextIdCounter.current += 1;
-    setVariants((prev) => [newVariant, ...prev]);
-    toast.success("Thêm biến thể thành công!");
-  };
-
-  // hàm cập nhật biến thể
-  const handleEditVariant = (
-    data: VariantFormData,
-    processedValues: string[],
-    currentEditId: number,
-  ) => {
-    setVariants((prev) =>
-      prev.map((v) =>
-        v.id === currentEditId
-          ? {
-              ...v,
-              name: data.name.trim(),
-              values: processedValues,
-              status: data.status,
-            }
-          : v,
-      ),
-    );
-    toast.success("Cập nhật biến thể thành công!");
-  };
-
-  // logic xử lý submit
-  const handleDrawerSubmit = (data: VariantFormData) => {
-    if (!validateVariant(data)) {
-      toast.error("Vui lòng điền đầy đủ dữ liệu hợp lệ.");
-      return;
-    }
-
-    const currentMode = drawerConfig.mode;
-    const currentEditId = drawerConfig.editingVariant?.id;
-
+  const handleSaveAttribute = async (data: AttributeFormData) => {
     setDrawerConfig((prev) => ({ ...prev, isSubmitting: true }));
-
     try {
-      const processedValues = parseVariantValues(data.values);
-
-      if (currentMode === "add") {
-        handleAddVariant(data, processedValues);
-      } else if (currentMode === "edit" && currentEditId) {
-        handleEditVariant(data, processedValues, currentEditId);
+      if (drawerConfig.mode === "add") {
+        await axiosClient.post("/attributes", data);
+        toast.success("Tạo thuộc tính thành công!");
+      } else if (
+        drawerConfig.mode === "edit" &&
+        drawerConfig.editingAttribute
+      ) {
+        await axiosClient.patch(
+          `/attributes/${drawerConfig.editingAttribute.id}`,
+          data,
+        );
+        toast.success("Cập nhật thuộc tính thành công!");
       }
-
+      refreshData();
       actions.closeDrawer();
-    } catch {
-      toast.error("Đã xảy ra lỗi trong quá trình lưu dữ liệu.");
+    } catch (error) {
+      const err = error as ApiError;
+      const msg = err.response?.data?.message;
+      toast.error(
+        Array.isArray(msg) ? msg[0] : (msg as string) || "Lỗi lưu dữ liệu",
+      );
       setDrawerConfig((prev) => ({ ...prev, isSubmitting: false }));
     }
   };
 
-  // logic xóa trực tiếp
-  const executeDelete = () => {
-    if (!deleteConfig.variantId || deleteConfig.isDeleting) return;
+  const executeDelete = async () => {
+    if (!deleteConfig.attributeId) return;
     setDeleteConfig((prev) => ({ ...prev, isDeleting: true }));
     try {
-      const idToDelete = deleteConfig.variantId;
-      setVariants((prev) => prev.filter((v) => v.id !== idToDelete));
-
-      toast.success("Đã xóa biến thể thành công!");
+      await axiosClient.delete(`/attributes/${deleteConfig.attributeId}`);
+      toast.success("Đã xóa thuộc tính!");
+      refreshData();
       actions.closeDeleteModal();
-    } catch {
-      toast.error("Đã xảy ra lỗi trong quá trình xóa.");
+    } catch (error) {
+      const err = error as ApiError;
+      toast.error((err.response?.data?.message as string) || "Lỗi xóa dữ liệu");
       setDeleteConfig((prev) => ({ ...prev, isDeleting: false }));
     }
   };
 
   return {
-    filteredVariants,
+    attributes: filteredAttributes,
     search,
     drawerConfig,
     deleteConfig,
     actions,
-    handleDrawerSubmit,
+    handleSaveAttribute,
     executeDelete,
   };
 }

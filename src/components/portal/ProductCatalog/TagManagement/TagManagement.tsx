@@ -6,10 +6,7 @@ import { CleanTrashIcon } from "../../../../assets/icons/VariantManagementIcons"
 import { EditPenIcon } from "../../../../assets/icons/ProductManagementIcons";
 
 // import type từ hook
-import type {
-  Tag,
-  TagStatus,
-} from "../../../../hooks/portal/ProductCatalog/TagManagement/useTagManagement";
+import type { Tag } from "../../../../hooks/portal/ProductCatalog/TagManagement/useTagManagement";
 
 // định nghĩa props nhận từ page
 interface TagManagementProps {
@@ -18,8 +15,7 @@ interface TagManagementProps {
   actions: {
     changeSearch: (val: string) => void;
     openDrawer: (mode: "add" | "edit", tag?: Tag) => void;
-    toggleStatus: (id: number, currentStatus: TagStatus) => void;
-    deleteSingle: (id: number) => void;
+    deleteSingle: (id: string) => void;
   };
 }
 
@@ -28,8 +24,7 @@ export default function TagManagement({
   search,
   actions,
 }: TagManagementProps) {
-  // state quản lý menu 3 chấm
-  const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
   // tắt menu khi click ra ngoài
   useEffect(() => {
@@ -78,15 +73,29 @@ export default function TagManagement({
               <tr>
                 <th style={{ width: "25%" }}>Tag Name</th>
                 <th style={{ width: "40%" }}>Description</th>
-                <th style={{ width: "20%" }}>Status</th>
+                <th style={{ width: "20%" }}>Usage Count</th>
                 <th style={{ width: "15%", textAlign: "right" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {data.length > 0 ? (
                 data.map((tag) => (
-                  <tr key={tag.id}>
-                    <td className="tm-td-name">{tag.name}</td>
+                  <tr key={tag._id}>
+                    <td>
+                      <span
+                        className="tm-tag-name"
+                        style={{
+                          backgroundColor: tag.bg_color,
+                          color: tag.text_color,
+                          padding: "4px 8px",
+                          borderRadius: "4px",
+                          display: "inline-block",
+                          fontWeight: 500,
+                        }}
+                      >
+                        {tag.name}
+                      </span>
+                    </td>
                     <td className="tm-td-desc">
                       {tag.description ? (
                         tag.description
@@ -95,8 +104,8 @@ export default function TagManagement({
                       )}
                     </td>
                     <td>
-                      <span className={`tm-status-badge status-${tag.status}`}>
-                        <span className="tm-dot"></span> {tag.status}
+                      <span style={{ fontWeight: 600, color: "#4B5563" }}>
+                        {tag.usage_count}
                       </span>
                     </td>
                     <td>
@@ -106,7 +115,7 @@ export default function TagManagement({
                           className="tm-icon-btn"
                           title="Delete Tag"
                           onClick={(e) => {
-                            actions.deleteSingle(tag.id);
+                            actions.deleteSingle(tag._id);
                             e.currentTarget.blur();
                           }}
                         >
@@ -114,7 +123,7 @@ export default function TagManagement({
                         </button>
 
                         <div
-                          className={`tm-dropdown-wrapper ${openDropdownId === tag.id ? "is-open" : ""}`}
+                          className={`tm-dropdown-wrapper ${openDropdownId === tag._id ? "is-open" : ""}`}
                         >
                           <button
                             type="button"
@@ -122,7 +131,7 @@ export default function TagManagement({
                             onClick={(e) => {
                               e.stopPropagation();
                               setOpenDropdownId(
-                                openDropdownId === tag.id ? null : tag.id,
+                                openDropdownId === tag._id ? null : tag._id,
                               );
                               e.currentTarget.blur();
                             }}
@@ -130,7 +139,7 @@ export default function TagManagement({
                             <DotsIcon fill="#111827" />
                           </button>
 
-                          {openDropdownId === tag.id && (
+                          {openDropdownId === tag._id && (
                             <div
                               className="tm-dropdown-menu"
                               onClick={(e) => e.stopPropagation()}

@@ -1,151 +1,140 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { toast } from "react-toastify";
+import axiosClient from "../../../../api/axiosClient";
 
-// prop
-export type TagStatus = "Active" | "Inactive";
-
+// types
 export interface Tag {
-  id: number;
+  _id: string;
   name: string;
   description: string;
-  status: TagStatus;
+  scope: string;
+  bg_color: string;
+  text_color: string;
+  usage_count: number;
 }
 
 export interface TagFormData {
   name: string;
   description: string;
-  status: TagStatus;
+  scope: string;
+  bg_color: string;
+  text_color: string;
 }
 
-// mock data
-const INITIAL_TAGS: Tag[] = [
-  {
-    id: 1,
-    name: "Summer Collection",
-    description: "Sản phẩm dành cho mùa hè",
-    status: "Active",
-  },
-  { id: 2, name: "New Arrival", description: "Hàng mới về", status: "Active" },
-  {
-    id: 3,
-    name: "Sale",
-    description: "Sản phẩm đang giảm giá",
-    status: "Active",
-  },
-  {
-    id: 4,
-    name: "Winter Collection",
-    description: "Sản phẩm dành cho mùa đông",
-    status: "Inactive",
-  },
-  {
-    id: 5,
-    name: "Limited Edition",
-    description: "Phiên bản giới hạn số lượng",
-    status: "Active",
-  },
-];
+export interface ApiError {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+}
 
 export function useTagManagement() {
-  const [tags, setTags] = useState<Tag[]>(INITIAL_TAGS);
-  const [search, setSearch] = useState<string>("");
-
-  // quản lý drawer
+  // states
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [search, setSearch] = useState("");
   const [drawerConfig, setDrawerConfig] = useState<{
     isOpen: boolean;
     mode: "add" | "edit";
     editingTag: Tag | null;
   }>({ isOpen: false, mode: "add", editingTag: null });
 
-  // quản lý popup xác nhận xóa
+  // chú ý: đã đổi tagId từ number sang string để khớp với _id của MongoDB
   const [deleteConfig, setDeleteConfig] = useState<{
     isOpen: boolean;
-    tagId: number | null;
+    tagId: string | null;
   }>({ isOpen: false, tagId: null });
 
-  // bộ lọc
+  // effects: tải dữ liệu từ backend
+  useEffect(() => {
+    let isMounted = true;
+    const fetchTags = async () => {
+      try {
+        const res = await axiosClient.get("/tags");
+        if (isMounted && res.data) {
+          // tùy vào format response của backend, thường là mảng trực tiếp hoặc bọc trong data
+          setTags(Array.isArray(res.data) ? res.data : res.data.data || []);
+        }
+      } catch (error) {
+        console.error("lỗi khi tải danh sách thẻ:", error);
+      }
+    };
+    fetchTags();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // derived state: lọc danh sách theo từ khóa tìm kiếm
   const filteredTags = useMemo(() => {
-    if (!search.trim()) return tags;
-    return tags.filter(
-      (t) =>
-        t.name.toLowerCase().includes(search.toLowerCase()) ||
-        t.description.toLowerCase().includes(search.toLowerCase()),
+    return tags.filter((t) =>
+      t.name.toLowerCase().includes(search.toLowerCase()),
     );
   }, [tags, search]);
 
-  // nút action
+  // handlers
   const actions = {
     changeSearch: (val: string) => setSearch(val),
 
     openDrawer: (mode: "add" | "edit", tag?: Tag) => {
-      setDrawerConfig({
-        isOpen: true,
-        mode,
-        editingTag: tag || null,
-      });
+      setDrawerConfig({ isOpen: true, mode, editingTag: tag || null });
     },
 
     closeDrawer: () => {
       setDrawerConfig({ isOpen: false, mode: "add", editingTag: null });
     },
 
-    toggleStatus: (id: number, currentStatus: TagStatus) => {
-      setTags((prev) =>
-        prev.map((t) =>
-          t.id === id
-            ? {
-                ...t,
-                status: currentStatus === "Active" ? "Inactive" : "Active",
-              }
-            : t,
-        ),
-      );
-      toast.success("Cập nhật trạng thái thành công!");
-    },
-
-    deleteSingle: (id: number) => {
+    // đã xóa toggleStatus vì backend không dùng
+    deleteSingle: (id: string) => {
       setDeleteConfig({ isOpen: true, tagId: id });
     },
   };
 
-  const handleDrawerSubmit = (data: TagFormData) => {
-    if (drawerConfig.mode === "add") {
-      const newTag: Tag = {
-        id: Date.now(),
-        name: data.name,
-        description: data.description,
-        status: data.status,
-      };
-      setTags((prev) => [newTag, ...prev]);
-      toast.success("Thêm nhãn thành công!");
-    } else if (drawerConfig.mode === "edit" && drawerConfig.editingTag) {
-      setTags((prev) =>
-        prev.map((t) =>
-          t.id === drawerConfig.editingTag!.id
-            ? {
-                ...t,
-                name: data.name,
-                description: data.description,
-                status: data.status,
-              }
-            : t,
-        ),
-      );
-      toast.success("Cập nhật nhãn thành công!");
+  const handleDrawerSubmit = async (data: TagFormData) => {
+    try {
+      if (drawerConfig.mode === "add") {
+        const res = await axiosClient.post("/tags", data);
+        if (res.data) {
+          setTags((prev) => [res.data, ...prev]);
+          toast.success("thêm thẻ thành công!");
+        }
+      } else if (drawerConfig.mode === "edit" && drawerConfig.editingTag) {
+        const res = await axiosClient.patch(
+          `/tags/${drawerConfig.editingTag._id}`,
+          data,
+        );
+        if (res.data) {
+          setTags((prev) =>
+            prev.map((t) =>
+              t._id === drawerConfig.editingTag!._id ? res.data : t,
+            ),
+          );
+          toast.success("cập nhật thẻ thành công!");
+        }
+      }
+      actions.closeDrawer();
+    } catch (error) {
+      const err = error as ApiError;
+      toast.error(err.response?.data?.message || "có lỗi xảy ra khi lưu thẻ");
     }
-    actions.closeDrawer();
   };
 
-  // xác nhận xóa
-  const executeDelete = () => {
+  const executeDelete = async () => {
     if (deleteConfig.tagId !== null) {
-      setTags((prev) => prev.filter((t) => t.id !== deleteConfig.tagId));
-      toast.success("Đã xóa nhãn thành công!");
+      try {
+        await axiosClient.delete(`/tags/${deleteConfig.tagId}`);
+        setTags((prev) => prev.filter((t) => t._id !== deleteConfig.tagId));
+        toast.success("đã xóa thẻ!");
+      } catch (error) {
+        const err = error as ApiError;
+        toast.error(err.response?.data?.message || "không thể xóa thẻ này");
+      }
     }
     setDeleteConfig({ isOpen: false, tagId: null });
   };
 
   return {
+    tags,
     filteredTags,
     search,
     drawerConfig,

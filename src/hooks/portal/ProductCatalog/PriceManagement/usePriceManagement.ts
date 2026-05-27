@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
+import axiosClient from "../../../../api/axiosClient";
 
-// props và type
-export type PriceStatus = "Approved" | "Pending" | "Rejected" | "Draft";
+// types
+export type PriceStatus = "APPROVED" | "PENDING" | "REJECTED" | "DRAFT";
 
 export interface PriceRecord {
   id: string;
@@ -11,6 +12,7 @@ export interface PriceRecord {
   variant: string;
   status: PriceStatus;
   price: number;
+  currency: string;
 }
 
 export interface PriceFormData {
@@ -19,104 +21,111 @@ export interface PriceFormData {
   effectiveDate: string;
 }
 
-// mock data
-const INITIAL_PRICES: PriceRecord[] = [
-  {
-    id: "1",
-    productName: "Grey Slim Jacket",
-    sku: "CWT-001",
-    variant: "Size: M / Color: Grey",
-    status: "Approved",
-    price: 20.0,
-  },
-  {
-    id: "2",
-    productName: "Grey Slim Jacket",
-    sku: "CWT-002",
-    variant: "Size: M / Color: Grey",
-    status: "Rejected",
-    price: 20.0,
-  },
-  {
-    id: "3",
-    productName: "Grey Slim Jacket",
-    sku: "CWT-003",
-    variant: "Size: M / Color: Grey",
-    status: "Pending",
-    price: 20.0,
-  },
-  {
-    id: "4",
-    productName: "Grey Slim Jacket",
-    sku: "CWT-004",
-    variant: "Size: M / Color: Grey",
-    status: "Approved",
-    price: 20.0,
-  },
-  {
-    id: "5",
-    productName: "Grey Slim Jacket",
-    sku: "CWT-005",
-    variant: "Size: M / Color: Grey",
-    status: "Draft",
-    price: 20.0,
-  },
-  {
-    id: "6",
-    productName: "Grey Slim Jacket",
-    sku: "CWT-006",
-    variant: "Size: M / Color: Grey",
-    status: "Pending",
-    price: 20.0,
-  },
-  {
-    id: "7",
-    productName: "Grey Slim Jacket",
-    sku: "CWT-007",
-    variant: "Size: M / Color: Grey",
-    status: "Approved",
-    price: 20.0,
-  },
-  {
-    id: "8",
-    productName: "Grey Slim Jacket",
-    sku: "CWT-008",
-    variant: "Size: M / Color: Grey",
-    status: "Rejected",
-    price: 20.0,
-  },
-];
+export interface ApiError {
+  response?: {
+    data?: {
+      message?: string | string[];
+    };
+  };
+}
 
+// hook
 export function usePriceManagement() {
-  const [records, setRecords] = useState<PriceRecord[]>(INITIAL_PRICES);
+  // states
+  const [records, setRecords] = useState<PriceRecord[]>([]);
   const [search, setSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<PriceStatus | "All">("All");
+  const [currencyFilter, setCurrencyFilter] = useState<string>("All");
+  const [priceSort, setPriceSort] = useState<"none" | "asc" | "desc">("none");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pagination, setPagination] = useState({ page: 1, limit: 10 });
-
-  // quản lý trạng thái modal
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
     editingRecord: PriceRecord | null;
     isSubmitting: boolean;
   }>({ isOpen: false, editingRecord: null, isSubmitting: false });
 
-  // logic lọc dữ liệu
+  // api
+  const fetchProductsData = async () => {
+    const res = await axiosClient.get("/products");
+    const products = res.data?.data || res.data || [];
+
+    return products.map(
+      (p: {
+        _id: string;
+        name: string;
+        sku: string;
+        has_variants?: boolean;
+        price: number;
+        currency?: string;
+        price_request?: {
+          status?: string;
+          price?: number;
+          currency?: string;
+        };
+      }) => {
+        const status = p.price_request?.status || "APPROVED";
+        const displayPrice = p.price_request?.price || p.price;
+        const displayCurrency =
+          p.price_request?.currency || p.currency || "VND";
+        const variantText = p.has_variants ? "Multiple Variants" : "Single";
+
+        return {
+          id: p._id,
+          productName: p.name,
+          sku: p.sku,
+          variant: variantText,
+          status: status as PriceStatus,
+          price: displayPrice,
+          currency: displayCurrency,
+        } as PriceRecord;
+      },
+    );
+  };
+
+  const refreshData = useCallback(() => {
+    fetchProductsData()
+      .then((data) => {
+        setRecords(data);
+      })
+      .catch((error) => {
+        const err = error as ApiError;
+        toast.error(
+          (err.response?.data?.message as string) ||
+            "Lỗi tải danh sách sản phẩm",
+        );
+      });
+  }, []);
+
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
+
+  // helper
   const filteredRecords = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
-    return records.filter((record) => {
+    const result = records.filter((record) => {
       const matchStatus =
         statusFilter === "All" || record.status === statusFilter;
-
+      const matchCurrency =
+        currencyFilter === "All" || record.currency === currencyFilter;
       const matchSearch =
         !normalizedSearch ||
         record.productName.toLowerCase().includes(normalizedSearch) ||
         record.sku.toLowerCase().includes(normalizedSearch);
 
-      return matchStatus && matchSearch;
+      return matchStatus && matchCurrency && matchSearch;
     });
-  }, [records, search, statusFilter]);
+
+    if (priceSort === "asc") {
+      result.sort((a, b) => a.price - b.price);
+    } else if (priceSort === "desc") {
+      result.sort((a, b) => b.price - a.price);
+    }
+
+    return result;
+  }, [records, search, statusFilter, currencyFilter, priceSort]);
 
   const totalPages = Math.ceil(filteredRecords.length / pagination.limit);
   const startIndex = (pagination.page - 1) * pagination.limit;
@@ -125,15 +134,19 @@ export function usePriceManagement() {
     startIndex + pagination.limit,
   );
 
+  // handle
   const actions = {
     changeSearch: (val: string) => setSearch(val),
     changeStatusFilter: (status: PriceStatus | "All") =>
       setStatusFilter(status),
+    changeCurrencyFilter: (currency: string) => setCurrencyFilter(currency),
+    changePriceSort: (sort: "none" | "asc" | "desc") => setPriceSort(sort),
     clearFilters: () => {
       setSearch("");
       setStatusFilter("All");
+      setCurrencyFilter("All");
+      setPriceSort("none");
     },
-
     toggleSelection: (id: string) => {
       setSelectedIds((prev) => {
         const next = new Set(prev);
@@ -149,11 +162,9 @@ export function usePriceManagement() {
         setSelectedIds(new Set());
       }
     },
-
     changePage: (page: number) => setPagination((p) => ({ ...p, page })),
     changeLimit: (limit: number) => setPagination({ page: 1, limit }),
 
-    // quản lý đóng mở modal
     openSetPriceModal: (record: PriceRecord) => {
       setModalConfig({
         isOpen: true,
@@ -170,12 +181,6 @@ export function usePriceManagement() {
     },
   };
 
-  const updateRecordStatus = (id: string, newStatus: PriceStatus) => {
-    setRecords((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r)),
-    );
-  };
-
   const handleSavePrice = async (data: PriceFormData) => {
     const targetRecord = modalConfig.editingRecord;
     if (!targetRecord) return;
@@ -183,73 +188,94 @@ export function usePriceManagement() {
     setModalConfig((prev) => ({ ...prev, isSubmitting: true }));
 
     try {
-      // giả lập xử lý api
-      await new Promise((resolve) => setTimeout(resolve, 600));
-
-      setRecords((prev) =>
-        prev.map((r) =>
-          r.id === targetRecord.id
-            ? { ...r, price: data.priceAmount, status: "Pending" }
-            : r,
-        ),
-      );
-      toast.success("Đã cập nhật giá và gửi yêu cầu duyệt!");
+      await axiosClient.post(`/products/${targetRecord.id}/price-request`, {
+        price: data.priceAmount,
+        currency: data.currency,
+        effective_date: data.effectiveDate,
+      });
+      toast.success("Đã tạo yêu cầu giá (Draft)!");
+      refreshData();
       actions.closeSetPriceModal();
-    } catch {
-      toast.error("Đã xảy ra lỗi khi lưu giá.");
+    } catch (error) {
+      const err = error as ApiError;
+      toast.error((err.response?.data?.message as string) || "Lỗi lưu giá");
       setModalConfig((prev) => ({ ...prev, isSubmitting: false }));
     }
   };
 
-  // button
   const rowActions = {
-    submitPrice: (id: string) => {
-      updateRecordStatus(id, "Pending");
-      toast.success("Đã gửi yêu cầu duyệt giá!");
+    submitPrice: async (id: string) => {
+      try {
+        await axiosClient.patch(`/products/${id}/price-request/submit`);
+        toast.success("Đã gửi yêu cầu duyệt giá!");
+        refreshData();
+      } catch (error) {
+        const err = error as ApiError;
+        toast.error((err.response?.data?.message as string) || "Lỗi gửi duyệt");
+      }
     },
-    approvePrice: (id: string) => {
-      updateRecordStatus(id, "Approved");
-      toast.success("Đã duyệt giá thành công!");
+    approvePrice: async (id: string) => {
+      try {
+        await axiosClient.patch(`/products/${id}/price-approval`, {
+          action: "approve",
+        });
+        toast.success("Đã duyệt giá thành công!");
+        refreshData();
+      } catch (error) {
+        const err = error as ApiError;
+        toast.error((err.response?.data?.message as string) || "Lỗi duyệt giá");
+      }
     },
-    rejectPrice: (id: string) => {
-      updateRecordStatus(id, "Rejected");
-      toast.warning("Đã từ chối giá!");
+    rejectPrice: async (id: string) => {
+      try {
+        await axiosClient.patch(`/products/${id}/price-approval`, {
+          action: "reject",
+        });
+        toast.warning("Đã từ chối giá!");
+        refreshData();
+      } catch (error) {
+        const err = error as ApiError;
+        toast.error((err.response?.data?.message as string) || "Lỗi từ chối");
+      }
     },
   };
 
-  // logic xử lý duyệt/từ chối (bulk action)
   const bulkActions = {
-    bulkApprove: () => {
-      const targets = records.filter(
-        (r) => selectedIds.has(r.id) && r.status === "Pending",
-      );
+    bulkApprove: async () => {
+      const targets = Array.from(selectedIds);
       if (targets.length === 0) return;
-
-      setRecords((prev) =>
-        prev.map((r) =>
-          selectedIds.has(r.id) && r.status === "Pending"
-            ? { ...r, status: "Approved" }
-            : r,
-        ),
-      );
-      toast.success(`Đã duyệt ${targets.length} mục được chọn!`);
-      setSelectedIds(new Set());
+      try {
+        await axiosClient.patch(`/products/price-requests/bulk-action`, {
+          product_ids: targets,
+          action: "approve",
+        });
+        toast.success(`Đã duyệt ${targets.length} mục được chọn!`);
+        setSelectedIds(new Set());
+        refreshData();
+      } catch (error) {
+        const err = error as ApiError;
+        toast.error(
+          (err.response?.data?.message as string) || "Lỗi duyệt hàng loạt",
+        );
+      }
     },
-    bulkReject: () => {
-      const targets = records.filter(
-        (r) => selectedIds.has(r.id) && r.status === "Pending",
-      );
+    bulkReject: async () => {
+      const targets = Array.from(selectedIds);
       if (targets.length === 0) return;
-
-      setRecords((prev) =>
-        prev.map((r) =>
-          selectedIds.has(r.id) && r.status === "Pending"
-            ? { ...r, status: "Rejected" }
-            : r,
-        ),
-      );
-      toast.warning(`Đã từ chối ${targets.length} mục được chọn!`);
-      setSelectedIds(new Set());
+      try {
+        await axiosClient.patch(`/products/price-requests/bulk-action`, {
+          product_ids: targets,
+          action: "reject",
+        });
+        toast.warning(`Đã từ chối ${targets.length} mục được chọn!`);
+        setSelectedIds(new Set());
+        refreshData();
+      } catch (error) {
+        const err = error as ApiError;
+        toast.error(
+          (err.response?.data?.message as string) || "Lỗi từ chối hàng loạt",
+        );
+      }
     },
   };
 
@@ -263,6 +289,8 @@ export function usePriceManagement() {
     },
     search,
     statusFilter,
+    currencyFilter,
+    priceSort,
     selectedIds,
     modalConfig,
     actions,

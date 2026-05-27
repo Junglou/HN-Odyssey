@@ -19,6 +19,8 @@ interface PriceManagementProps {
   data: PriceRecord[];
   search: string;
   statusFilter: PriceStatus | "All";
+  currencyFilter: string;
+  priceSort: "none" | "asc" | "desc";
   selectedIds: Set<string>;
   pagination: {
     page: number;
@@ -30,6 +32,8 @@ interface PriceManagementProps {
   actions: {
     changeSearch: (val: string) => void;
     changeStatusFilter: (status: PriceStatus | "All") => void;
+    changeCurrencyFilter: (currency: string) => void;
+    changePriceSort: (sort: "none" | "asc" | "desc") => void;
     clearFilters: () => void;
     toggleSelection: (id: string) => void;
     toggleSelectAll: (isSelectAll: boolean) => void;
@@ -52,6 +56,8 @@ export default function PriceManagement({
   data,
   search,
   statusFilter,
+  currencyFilter,
+  priceSort,
   selectedIds,
   pagination,
   actions,
@@ -63,35 +69,44 @@ export default function PriceManagement({
   const statusRef = useRef<HTMLDivElement>(null);
   useClickOutside(statusRef, () => setIsStatusDropdownOpen(false));
 
+  const [isCurrencyDropdownOpen, setIsCurrencyDropdownOpen] = useState(false);
+  const currencyRef = useRef<HTMLDivElement>(null);
+  useClickOutside(currencyRef, () => setIsCurrencyDropdownOpen(false));
+
+  const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
+  const sortRef = useRef<HTMLDivElement>(null);
+  useClickOutside(sortRef, () => setIsSortDropdownOpen(false));
+
   const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
   const limitRef = useRef<HTMLDivElement>(null);
   useClickOutside(limitRef, () => setIsLimitDropdownOpen(false));
 
+  // helper
   const isAllSelected = data.length > 0 && selectedIds.size === data.length;
   const isPartiallySelected =
     selectedIds.size > 0 && selectedIds.size < data.length;
 
   const renderStatusBadge = (status: PriceStatus) => {
     switch (status) {
-      case "Approved":
+      case "APPROVED":
         return (
           <span className="prm-badge prm-badge-approve">
-            <CheckCircleIcon /> Approve
+            <CheckCircleIcon /> Approved
           </span>
         );
-      case "Rejected":
+      case "REJECTED":
         return (
           <span className="prm-badge prm-badge-rejected">
             <XCircleIcon /> Rejected
           </span>
         );
-      case "Pending":
+      case "PENDING":
         return (
           <span className="prm-badge prm-badge-pending">
             <ClockIcon /> Pending
           </span>
         );
-      case "Draft":
+      case "DRAFT":
         return (
           <span className="prm-badge prm-badge-draft">
             <DraftIcon /> Draft
@@ -134,7 +149,7 @@ export default function PriceManagement({
               {isStatusDropdownOpen && (
                 <div className="prm-select-dropdown">
                   {(
-                    ["All", "Approved", "Pending", "Rejected", "Draft"] as const
+                    ["All", "APPROVED", "PENDING", "REJECTED", "DRAFT"] as const
                   ).map((opt) => (
                     <div
                       key={opt}
@@ -151,11 +166,83 @@ export default function PriceManagement({
               )}
             </div>
 
-            <div className="prm-custom-select disabled">
-              <div className="prm-select-trigger">
-                <span>Price</span>
+            <div className="prm-custom-select" ref={currencyRef}>
+              <div
+                className="prm-select-trigger"
+                onClick={() =>
+                  setIsCurrencyDropdownOpen(!isCurrencyDropdownOpen)
+                }
+              >
+                <span>
+                  {!currencyFilter || currencyFilter === "All"
+                    ? "Currency"
+                    : currencyFilter}
+                </span>
                 <ChevronDownSmallIcon />
               </div>
+              {isCurrencyDropdownOpen && (
+                <div className="prm-select-dropdown">
+                  {["All", "VND", "USD", "EUR"].map((opt) => (
+                    <div
+                      key={opt}
+                      className={`prm-select-item ${currencyFilter === opt ? "active" : ""}`}
+                      onClick={() => {
+                        actions.changeCurrencyFilter(opt);
+                        setIsCurrencyDropdownOpen(false);
+                      }}
+                    >
+                      {opt}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="prm-custom-select" ref={sortRef}>
+              <div
+                className="prm-select-trigger"
+                onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+              >
+                <span>
+                  {priceSort === "none"
+                    ? "Sort Price"
+                    : priceSort === "asc"
+                      ? "Price: Low to High"
+                      : "Price: High to Low"}
+                </span>
+                <ChevronDownSmallIcon />
+              </div>
+              {isSortDropdownOpen && (
+                <div className="prm-select-dropdown">
+                  <div
+                    className={`prm-select-item ${priceSort === "none" ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changePriceSort("none");
+                      setIsSortDropdownOpen(false);
+                    }}
+                  >
+                    None
+                  </div>
+                  <div
+                    className={`prm-select-item ${priceSort === "asc" ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changePriceSort("asc");
+                      setIsSortDropdownOpen(false);
+                    }}
+                  >
+                    Price: Low to High
+                  </div>
+                  <div
+                    className={`prm-select-item ${priceSort === "desc" ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changePriceSort("desc");
+                      setIsSortDropdownOpen(false);
+                    }}
+                  >
+                    Price: High to Low
+                  </div>
+                </div>
+              )}
             </div>
 
             <button
@@ -187,7 +274,7 @@ export default function PriceManagement({
           </div>
         </div>
 
-        {/* bảng duyệt giá */}
+        {/* table */}
         <div className="prm-table-wrapper">
           <table className="prm-table">
             <thead>
@@ -230,10 +317,12 @@ export default function PriceManagement({
                     <td>{record.sku}</td>
                     <td>{record.variant}</td>
                     <td>{renderStatusBadge(record.status)}</td>
-                    <td>${record.price.toFixed(2)}</td>
+                    <td>
+                      {record.price.toFixed(2)} {record.currency}
+                    </td>
                     <td>
                       <div className="prm-row-actions">
-                        {record.status === "Draft" && (
+                        {record.status === "DRAFT" && (
                           <>
                             <button
                               type="button"
@@ -251,7 +340,7 @@ export default function PriceManagement({
                             </button>
                           </>
                         )}
-                        {record.status === "Pending" && (
+                        {record.status === "PENDING" && (
                           <>
                             <button
                               type="button"
@@ -269,7 +358,7 @@ export default function PriceManagement({
                             </button>
                           </>
                         )}
-                        {record.status === "Rejected" && (
+                        {record.status === "REJECTED" && (
                           <button
                             type="button"
                             className="prm-btn-action edit"
@@ -332,7 +421,7 @@ export default function PriceManagement({
               &gt;
             </button>
 
-            {/* CUSTOM DROPDOWN CHO PHÂN TRANG */}
+            {/* pagination limit dropdown */}
             <div className="prm-limit-dropdown" ref={limitRef}>
               <div
                 className={`prm-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}

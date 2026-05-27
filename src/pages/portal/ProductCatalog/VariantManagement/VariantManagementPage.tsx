@@ -4,41 +4,37 @@ import ConfirmDeleteModal from "../../../../components/portal/common/ConfirmDele
 import { useVariantManagement } from "../../../../hooks/portal/ProductCatalog/VariantManagement/useVariantManagement";
 import "./VariantManagementPage.css";
 
-// container gọi hook và ném data xuống component giao diện
+// view
 export default function VariantManagementPage() {
   const {
-    filteredVariants,
+    attributes,
     search,
     drawerConfig,
     deleteConfig,
     actions,
-    handleDrawerSubmit,
+    handleSaveAttribute,
     executeDelete,
   } = useVariantManagement();
 
   return (
     <div className="vm-page-container">
-      {/* component danh sách biến thể */}
-      <VariantManagement
-        data={filteredVariants}
-        search={search}
-        actions={actions}
-      />
+      {/* component chính hiển thị danh sách thuộc tính */}
+      <VariantManagement data={attributes} search={search} actions={actions} />
 
-      {/* drawer thêm/sửa biến thể */}
+      {/* thanh trượt thêm/sửa thuộc tính */}
       <VariantDrawer
         isOpen={drawerConfig.isOpen}
         mode={drawerConfig.mode}
-        initialData={drawerConfig.editingVariant}
+        initialData={drawerConfig.editingAttribute}
         isSubmitting={drawerConfig.isSubmitting}
         onClose={actions.closeDrawer}
-        onSubmit={handleDrawerSubmit}
+        onSubmit={handleSaveAttribute}
       />
 
-      {/* modal xác nhận xóa */}
+      {/* popup xác nhận xóa */}
       <ConfirmDeleteModal
         isOpen={deleteConfig.isOpen}
-        message="Are you sure you want to delete this variant?"
+        message="Are you sure you want to delete this attribute?"
         onClose={actions.closeDeleteModal}
         onConfirm={executeDelete}
       />

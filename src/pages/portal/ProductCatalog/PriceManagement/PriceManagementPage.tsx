@@ -9,6 +9,8 @@ export default function PriceManagementPage() {
     pagination,
     search,
     statusFilter,
+    currencyFilter,
+    priceSort,
     selectedIds,
     modalConfig,
     actions,
@@ -25,6 +27,8 @@ export default function PriceManagementPage() {
         pagination={pagination}
         search={search}
         statusFilter={statusFilter}
+        currencyFilter={currencyFilter}
+        priceSort={priceSort}
         selectedIds={selectedIds}
         actions={actions}
         rowActions={rowActions}
