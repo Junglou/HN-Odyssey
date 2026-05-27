@@ -18,6 +18,7 @@ interface CheckoutSummaryProps {
   onPromoCodeChange: (val: string) => void;
   onPlaceOrder: () => void;
   loading: boolean;
+  submitButtonText?: string;
 }
 
 // component
@@ -31,6 +32,7 @@ export default function CheckoutSummary({
   onPromoCodeChange,
   onPlaceOrder,
   loading,
+  submitButtonText,
 }: CheckoutSummaryProps) {
   // hooks/states
   const [isPromoOpen, setIsPromoOpen] = useState(false);
@@ -151,7 +153,7 @@ export default function CheckoutSummary({
         onClick={onPlaceOrder}
         disabled={loading}
       >
-        {loading ? "Processing..." : "Place Order"}
+        {loading ? "Processing..." : submitButtonText || "Place Order"}
       </button>
     </div>
   );

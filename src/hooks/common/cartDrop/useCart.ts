@@ -1,4 +1,7 @@
+// imports
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 
 export interface CartItem {
   id: string;
@@ -37,17 +40,17 @@ const MOCK_CART_ITEMS: CartItem[] = [
   {
     id: "4",
     name: "Vital 2",
-    description:
-      "Advanced trauma kit for severe medical emergency situations. Includes tactical tourniquet.",
-    price: 55.0,
+    description: "Advanced medical treatment for severe injuries.",
+    price: 55.99,
     quantity: 1,
     image: "https://placehold.co/150x150/png?text=Vital+2",
   },
 ];
 
 export function useCart() {
-  const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
   const [items, setItems] = useState<CartItem[]>(MOCK_CART_ITEMS);
+  const [isOpen, setIsOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
@@ -95,6 +98,15 @@ export function useCart() {
     );
   };
 
+  const handleProceedToCheckout = () => {
+    if (items.length === 0) {
+      toast.warning("Giỏ hàng của bạn hiện tại đang trống!");
+      return;
+    }
+    closeCart();
+    navigate("/checkout");
+  };
+
   const subtotal = useMemo(() => {
     return items
       .reduce((sum, item) => sum + item.price * item.quantity, 0)
@@ -112,5 +124,6 @@ export function useCart() {
     decreaseQuantity,
     closeDeleteModal,
     confirmDelete,
+    handleProceedToCheckout,
   };
 }

@@ -1,3 +1,4 @@
+/* wrapper */
 .hn-footer-wrapper {
   background-color: #000000;
   color: #fff;
@@ -28,11 +29,9 @@
 
 .footer-logo-col img {
   width: 100%;
-  max-width: 340px;
+  max-width: 390px;
   height: auto;
   object-fit: contain;
-  transform: scale(1.15);
-  transform-origin: left center;
 }
 
 /* contact */
@@ -70,6 +69,7 @@
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
+  color: #fff;
 }
 
 .social-icon-wrapper:hover {
@@ -144,9 +144,14 @@
   transition: all 0.2s ease;
 }
 
-.newsletter-send-btn:hover {
+.newsletter-send-btn:hover:not(:disabled) {
   background-color: #fff;
   color: #000;
+}
+
+.newsletter-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* horizontal divider */
@@ -157,7 +162,7 @@
   margin-bottom: 3.5rem;
 }
 
-/* BOTTOM SECTION */
+/* bottom section */
 .footer-bottom {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -190,14 +195,12 @@
   padding-right: 0;
 }
 
-/* Tiêu đề cột */
 .nav-col-title {
   font-size: 1.15rem;
   font-weight: 700;
   margin: 0 0 1.5rem 0;
 }
 
-/* Các link bên dưới */
 .footer-nav-link {
   color: #fff;
   text-decoration: none;
@@ -213,7 +216,6 @@
 }
 
 /* responsive */
-/* Dành cho Tablet (Màn hình vừa) */
 @media screen and (max-width: 1024px) {
   .hn-footer-wrapper {
     padding: 3rem 6%;
@@ -268,12 +270,12 @@
   .nav-col-title {
     margin-bottom: 1rem;
   }
+
   .footer-nav-link {
     margin-bottom: 10px;
   }
 }
 
-/* Dành cho Mobile (Màn hình nhỏ) */
 @media screen and (max-width: 600px) {
   .newsletter-form {
     flex-direction: column;

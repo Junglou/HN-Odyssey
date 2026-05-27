@@ -66,7 +66,6 @@ export function useStaticPageManagement() {
     isSubmitting: boolean;
   }>({ isOpen: false, mode: "add", editingRecord: null, isSubmitting: false });
 
-  // 1. DEBOUNCE EFFECT CHO SEARCH
   useEffect(() => {
     const timer = setTimeout(() => {
       if (apiSearch !== search) {
@@ -78,7 +77,6 @@ export function useStaticPageManagement() {
     return () => clearTimeout(timer);
   }, [search, apiSearch]);
 
-  // 2. GỌI API LẤY DANH SÁCH (SERVER-SIDE)
   const fetchPages = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -313,7 +311,6 @@ export function useStaticPageManagement() {
     }
   };
 
-  // 5. BULK ACTIONS
   const bulkActions = {
     bulkActivate: async () => {
       const targets = records.filter(
@@ -332,7 +329,6 @@ export function useStaticPageManagement() {
         setSelectedIds(new Set());
         fetchPages();
       } catch (error: unknown) {
-        // ĐÃ FIX: Khôi phục lại biến error để tránh lỗi syntax trên Vite đời cũ
         const err = error as { message?: string };
         toast.error(err.message || "Lỗi khi xuất bản hàng loạt");
       }

@@ -17,6 +17,28 @@
   transform: translateY(-100%);
 }
 
+/* màng phủ mờ nền di động */
+.mobile-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 999;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.3s ease,
+    visibility 0.3s ease;
+}
+
+.mobile-menu-overlay.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* thanh chính */
 .header-main-bar {
   background-color: #ffffff;
   display: flex;
@@ -26,6 +48,8 @@
   width: 100%;
   box-sizing: border-box;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  position: relative;
+  z-index: 1001;
 }
 
 /* khối trái */
@@ -173,7 +197,7 @@
   border: none;
   cursor: pointer;
   padding: 0;
-  z-index: 1001;
+  z-index: 1002;
 }
 
 .mobile-menu-toggle .bar {

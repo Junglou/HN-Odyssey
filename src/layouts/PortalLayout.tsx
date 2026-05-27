@@ -1,6 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import "./PortalLayout.css";
+import {
+  usePortalNotifications,
+  type PortalNotification,
+} from "../hooks/portal/usePortalNotifications";
 
 // Icons
 import {
@@ -19,36 +23,45 @@ import {
   BellIcon,
 } from "../assets/icons/PortalIcons";
 
-// mock data thông báo
-const MOCK_NOTIFICATIONS = [
-  {
-    title: "New RMA Request",
-    time: "(20m ago)",
-    unread: true,
-    icon: <CatalogIcon />,
-    link: "/portal/trade-in",
-  },
-  {
-    title: "Order #1198 Received",
-    time: "(15m ago)",
-    unread: true,
-    icon: <WarehouseIcon />,
-    link: "/portal/orders",
-  },
-  {
-    title: "System Update Complete",
-    time: "(1d ago)",
-    unread: false,
-    icon: <SystemIcon />,
-    link: "/portal/system",
-  },
-];
+// hàm data thông báo trả về thời gian tương đối và icon tương ứng với loại thông báo
+const getRelativeTime = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffInSeconds < 60) return "vừa xong";
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) return `(${diffInMinutes}m ago)`;
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) return `(${diffInHours}h ago)`;
+  const diffInDays = Math.floor(diffInHours / 24);
+  return `(${diffInDays}d ago)`;
+};
+
+// hàm trả về icon tương ứng dựa trên loại thông báo của backend
+const getNotificationIcon = (type: string) => {
+  switch (type) {
+    case "ORDER":
+      return <OrderIcon />;
+    case "STOCK":
+      return <WarehouseIcon />;
+    case "SYSTEM":
+    case "SECURITY":
+      return <SystemIcon />;
+    case "LOYALTY":
+    case "PROMOTION":
+      return <MarketingIcon />;
+    default:
+      return <BellIcon />;
+  }
+};
 
 const PortalLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
   // Menu States
+  const { notifications, unreadCount, markAsRead } = usePortalNotifications();
   const [isUsersRolesOpen, setIsUsersRolesOpen] = useState(false);
   const [isProductCatalogOpen, setIsProductCatalogOpen] = useState(false);
   const [isCustomerCRMOpen, setIsCustomerCRMOpen] = useState(false);
@@ -109,14 +122,79 @@ const PortalLayout = () => {
   };
 
   // Active Route Helpers
-  const isActive = (path: string) => location.pathname === path;
-  const isParentActive = (basePath: string) =>
-    location.pathname.includes(basePath);
+  const isActive = useCallback(
+    (path: string) => location.pathname === path,
+    [location.pathname],
+  );
 
   const handleNavigate = (path: string) => {
     navigate(path);
     setIsMobileSidebarOpen(false);
   };
+
+  const isParentActive = useCallback(
+    (basePath: string) => location.pathname.includes(basePath),
+    [location.pathname],
+  );
+
+  useEffect(() => {
+    if (
+      isParentActive("/portal/overview") ||
+      isParentActive("/portal/revenue-report") ||
+      isParentActive("/portal/marketing-promotion") ||
+      isParentActive("/portal/bi") ||
+      isParentActive("/portal/inventory")
+    ) {
+      setIsDashboardOpen(true);
+    }
+    if (
+      isParentActive("/portal/products") ||
+      isParentActive("/portal/categories") ||
+      isParentActive("/portal/variants") ||
+      isParentActive("/portal/prices") ||
+      isParentActive("/portal/tags")
+    ) {
+      setIsProductCatalogOpen(true);
+    }
+    if (
+      isParentActive("/portal/orders") ||
+      isParentActive("/portal/trade-in")
+    ) {
+      setIsOrderManagementOpen(true);
+    }
+    if (isParentActive("/portal/warehouse")) {
+      setIsWarehouseOpen(true);
+    }
+    if (
+      isParentActive("/portal/customers") ||
+      isParentActive("/portal/live-chat")
+    ) {
+      setIsCustomerCRMOpen(true);
+    }
+    if (
+      isParentActive("/portal/promotion") ||
+      isParentActive("/portal/review-rating") ||
+      isParentActive("/portal/coupon")
+    ) {
+      setIsMarketingSuiteOpen(true);
+    }
+    if (
+      isParentActive("/portal/users") ||
+      isParentActive("/portal/roles") ||
+      isParentActive("/portal/heatmap")
+    ) {
+      setIsUsersRolesOpen(true);
+    }
+    if (
+      isParentActive("/portal/static-pages") ||
+      isParentActive("/portal/media-management") ||
+      isParentActive("/portal/banner-management") ||
+      isParentActive("/portal/blog-news") ||
+      isParentActive("/portal/content-config")
+    ) {
+      setIsCommunicationOpen(true);
+    }
+  }, [location.pathname, isParentActive]);
 
   return (
     <div className="portal-container">
@@ -539,9 +617,9 @@ const PortalLayout = () => {
             <div className="menu-item-left">
               <BellIcon /> Notifications
             </div>
-            <span className="notification-badge">
-              {MOCK_NOTIFICATIONS.filter((n) => n.unread).length}
-            </span>
+            {unreadCount > 0 && (
+              <span className="notification-badge">{unreadCount}</span>
+            )}
           </div>
 
           <div className="sidebar-divider"></div>
@@ -565,23 +643,40 @@ const PortalLayout = () => {
           </button>
         </div>
         <div className="p-noti-body">
-          {MOCK_NOTIFICATIONS.map((noti, idx) => (
+          {notifications.length === 0 ? (
             <div
-              key={idx}
-              className={`p-noti-item ${noti.unread ? "unread" : ""}`}
-              onClick={() => {
-                if (noti.link) navigate(noti.link);
-                setIsNotiOpen(false);
-              }}
+              style={{ textAlign: "center", padding: "20px", color: "#666" }}
             >
-              <div className="p-noti-icon-wrapper">{noti.icon}</div>
-              <div className="p-noti-content">
-                <p className="p-noti-item-title">{noti.title}</p>
-                <p className="p-noti-item-time">{noti.time}</p>
-              </div>
-              <div className="p-noti-dot"></div>
+              Bạn không có thông báo nào.
             </div>
-          ))}
+          ) : (
+            notifications.map((noti: PortalNotification) => (
+              <div
+                key={noti._id}
+                className={`p-noti-item ${!noti.is_read ? "unread" : ""}`}
+                onClick={() => {
+                  if (!noti.is_read) {
+                    markAsRead(noti._id);
+                  }
+                  if (noti.metadata?.target_url) {
+                    navigate(noti.metadata.target_url);
+                  }
+                  setIsNotiOpen(false);
+                }}
+              >
+                <div className="p-noti-icon-wrapper">
+                  {getNotificationIcon(noti.type)}
+                </div>
+                <div className="p-noti-content">
+                  <p className="p-noti-item-title">{noti.title}</p>
+                  <p className="p-noti-item-time">
+                    {getRelativeTime(noti.createdAt)}
+                  </p>
+                </div>
+                <div className="p-noti-dot"></div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

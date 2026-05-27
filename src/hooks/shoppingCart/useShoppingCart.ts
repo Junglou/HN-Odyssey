@@ -1,5 +1,6 @@
 // imports
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
 // interface
@@ -84,6 +85,7 @@ const RECOMMEND_ITEMS: RecommendItem[] = [
 // hook
 export function useShoppingCart() {
   // states
+  const navigate = useNavigate();
   const [cartItems, setCartItems] =
     useState<DetailedCartItem[]>(INITIAL_CART_ITEMS);
   const [recommendations] = useState<RecommendItem[]>(RECOMMEND_ITEMS);
@@ -156,8 +158,7 @@ export function useShoppingCart() {
       toast.error("Giỏ hàng của bạn đang trống!");
       return;
     }
-    toast.info("Đang chuyển hướng đến trang thanh toán...");
-    console.log("Process to checkout with items:", cartItems);
+    navigate("/checkout");
   };
 
   // helpers

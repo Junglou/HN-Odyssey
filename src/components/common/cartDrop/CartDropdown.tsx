@@ -1,3 +1,4 @@
+// imports
 import { Link } from "react-router-dom";
 import { MinusIcon, PlusIcon } from "../../../assets/icons/CartIcons";
 import type { CartItem } from "../../../hooks/common/cartDrop/useCart";
@@ -15,6 +16,7 @@ interface CartDropdownProps {
   onCloseDeleteModal: () => void;
   onConfirmDelete: () => void;
   onCloseCart: () => void;
+  onProceedToCheckout: () => void;
 }
 
 // component
@@ -28,6 +30,7 @@ export default function CartDropdown({
   onCloseDeleteModal,
   onConfirmDelete,
   onCloseCart,
+  onProceedToCheckout,
 }: CartDropdownProps) {
   // render
   return (
@@ -71,7 +74,13 @@ export default function CartDropdown({
         <Link to="/cart" className="cart-btn-outline" onClick={onCloseCart}>
           GO TO SHOPPING CART
         </Link>
-        <button className="cart-btn-solid">PROCESS TO CHECKOUT</button>
+        <button
+          type="button"
+          className="cart-btn-solid"
+          onClick={onProceedToCheckout}
+        >
+          PROCESS TO CHECKOUT
+        </button>
       </div>
 
       <CartConfirmModal

@@ -1,3 +1,4 @@
+// imports
 import { useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useHeader } from "../../hooks/common/useHeader";
@@ -14,18 +15,21 @@ import {
 import "./Header.css";
 
 // component
-const Header = () => {
-  // hook
+export default function Header() {
+  // hooks
   const {
     isVisible,
     isSearchOpen,
     isMobileMenuOpen,
     hasWishlistItems,
+    searchQuery,
     searchInputRef,
+    setSearchQuery,
     handleOpenSearch,
     handleCloseSearch,
     toggleMobileMenu,
     closeMobileMenu,
+    handleSearchKeyDown,
     handleAccountClick,
     handleWishlistClick,
   } = useHeader();
@@ -41,12 +45,13 @@ const Header = () => {
     decreaseQuantity,
     closeDeleteModal,
     confirmDelete,
+    handleProceedToCheckout,
   } = useCart();
 
   const cartWrapperRef = useRef<HTMLDivElement>(null);
   const isModalOpenRef = useRef(isDeleteModalOpen);
 
-  // helper
+  // side effects
   useEffect(() => {
     isModalOpenRef.current = isDeleteModalOpen;
   }, [isDeleteModalOpen]);
@@ -60,19 +65,32 @@ const Header = () => {
   // render
   return (
     <div className={`hn-header-wrapper ${isVisible ? "visible" : "hidden"}`}>
+      {/* màng phủ mờ nền khi mở menu di động */}
+      <div
+        className={`mobile-menu-overlay ${isMobileMenuOpen ? "open" : ""}`}
+        onClick={closeMobileMenu}
+      />
+
+      {/* thanh chính */}
       <div className="header-main-bar">
+        {/* khối bên trái */}
         <div className="header-left">
-          <button className="mobile-menu-toggle" onClick={toggleMobileMenu}>
+          <button
+            type="button"
+            className="mobile-menu-toggle"
+            onClick={toggleMobileMenu}
+          >
             <span className={`bar ${isMobileMenuOpen ? "open" : ""}`}></span>
             <span className={`bar ${isMobileMenuOpen ? "open" : ""}`}></span>
             <span className={`bar ${isMobileMenuOpen ? "open" : ""}`}></span>
           </button>
 
-          <Link to="/" className="header-logo">
+          <Link to="/" className="header-logo" onClick={closeMobileMenu}>
             <img src={logoImage} alt="H&N Odyssey" />
           </Link>
         </div>
 
+        {/* khối giữa */}
         <nav className="header-nav">
           <Link to="/featured" className="nav-link">
             Featured
@@ -94,6 +112,7 @@ const Header = () => {
           </Link>
         </nav>
 
+        {/* khối bên phải */}
         <div className="header-actions">
           <div className="header-action-wrapper" onClick={handleWishlistClick}>
             <HeartIcon className="action-icon" />
@@ -111,6 +130,7 @@ const Header = () => {
                 <span className="action-badge">{cartItems.length}</span>
               )}
             </div>
+
             <CartDropdown
               isOpen={isCartOpen}
               items={cartItems}
@@ -120,7 +140,8 @@ const Header = () => {
               onDecrease={decreaseQuantity}
               onCloseDeleteModal={closeDeleteModal}
               onConfirmDelete={confirmDelete}
-              onCloseCart={closeCart} // truyền handler dọn dẹp ui
+              onCloseCart={closeCart}
+              onProceedToCheckout={handleProceedToCheckout}
             />
           </div>
 
@@ -133,12 +154,16 @@ const Header = () => {
               ref={searchInputRef}
               type="text"
               placeholder="Search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               onBlur={handleCloseSearch}
+              onKeyDown={handleSearchKeyDown}
             />
           </div>
         </div>
       </div>
 
+      {/* thanh trượt dọc menu di động */}
       <div className={`mobile-drawer ${isMobileMenuOpen ? "open" : ""}`}>
         <nav className="mobile-nav">
           <Link
@@ -179,6 +204,4 @@ const Header = () => {
       </div>
     </div>
   );
-};
-
-export default Header;
+}
