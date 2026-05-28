@@ -346,6 +346,76 @@
   cursor: not-allowed;
 }
 
+/* textarea styles */
+.cd-textarea {
+  min-height: 100px;
+  resize: vertical;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.cd-textarea:focus {
+  outline: none;
+  border-color: #000000;
+}
+
+/* utility classes */
+.cd-empty-space-16 {
+  width: 16px;
+  display: inline-block;
+}
+
+.cd-mr-8 {
+  margin-right: 8px;
+}
+
+.cd-status-warning {
+  font-size: 0.8rem;
+  color: #ef4444;
+}
+
+.cd-toggle-switch.disabled-toggle {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* category tree indentation */
+.cd-tree-node.cd-depth-0 {
+  padding-left: 8px;
+}
+.cd-tree-node.cd-depth-1 {
+  padding-left: 24px;
+}
+.cd-tree-node.cd-depth-2 {
+  padding-left: 40px;
+}
+.cd-tree-node.cd-depth-3 {
+  padding-left: 56px;
+}
+.cd-tree-node.cd-depth-4 {
+  padding-left: 72px;
+}
+.cd-tree-node.cd-depth-5 {
+  padding-left: 88px;
+}
+.cd-tree-node.cd-depth-6 {
+  padding-left: 104px;
+}
+.cd-tree-node.cd-depth-7 {
+  padding-left: 120px;
+}
+.cd-tree-node.cd-depth-8 {
+  padding-left: 136px;
+}
+
+/* root node override */
+.cd-tree-node.cd-root-node {
+  padding-left: 8px;
+}
+
 @keyframes cd-fadeIn {
   from {
     opacity: 0;

@@ -12,9 +12,11 @@ import type {
   CategoryStatus,
 } from "../../../../utils/portal/ProductCatalog/CategoryManagement/categoryTree.utils";
 
-// props
+// props và interface mở rộng
 export interface CategoryFormData {
   name: string;
+  slug?: string;
+  description?: string;
   parentId: string | null;
   status: CategoryStatus;
 }
@@ -40,10 +42,23 @@ export default function CategoryDrawer({
   onClose,
   onSave,
 }: CategoryDrawerProps) {
+  // states
   const [formData, setFormData] = useState<CategoryFormData>(
     initialData && mode === "edit"
-      ? initialData
-      : { name: "", parentId: null, status: "Active" },
+      ? {
+          name: initialData.name,
+          slug: initialData.slug || "",
+          description: initialData.description || "",
+          parentId: initialData.parentId,
+          status: initialData.status,
+        }
+      : {
+          name: "",
+          slug: "",
+          description: "",
+          parentId: null,
+          status: "Active",
+        },
   );
 
   const [isTreeOpen, setIsTreeOpen] = useState(false);
@@ -117,6 +132,33 @@ export default function CategoryDrawer({
     return path;
   };
 
+  // helpers hỗ trợ tạo slug tự động
+  const generateSlug = (text: string) => {
+    return text
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[\s_]+/g, "-")
+      .replace(/[^\w-]/g, "");
+  };
+
+  // handlers thay đổi dữ liệu form
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setFormData((prev) => {
+      const oldName = prev.name;
+      const oldSlug = prev.slug || "";
+      let newSlug = oldSlug;
+
+      // đồng bộ thông minh tạo slug từ tên
+      if (!oldSlug || oldSlug === generateSlug(oldName)) {
+        newSlug = generateSlug(val);
+      }
+
+      return { ...prev, name: val, slug: newSlug };
+    });
+  };
+
   if (!isOpen) return null;
 
   // lấy data danh mục cha
@@ -149,8 +191,7 @@ export default function CategoryDrawer({
       return (
         <div key={node.id}>
           <div
-            className={`cd-tree-node ${isSelected ? "selected" : ""}`}
-            style={{ paddingLeft: `${level * 16 + 8}px` }}
+            className={`cd-tree-node cd-depth-${level} ${isSelected ? "selected" : ""}`}
             onClick={(e) => {
               e.stopPropagation();
               const clickedNode = categoryMap.get(node.id);
@@ -182,10 +223,9 @@ export default function CategoryDrawer({
                 {hasChildren ? (
                   <ChevronDownIcon />
                 ) : (
-                  <span style={{ width: 16 }}></span>
+                  <span className="cd-empty-space-16"></span>
                 )}
               </div>
-              {/* sử dụng component icon folder dạng outline thay cho emoji */}
               <div className="cd-folder-icon">
                 <FolderIcon />
               </div>
@@ -215,7 +255,6 @@ export default function CategoryDrawer({
 
   return (
     <>
-      {/* tạo overlay và phần nội dung chính của ngăn kéo */}
       <div
         className="cd-overlay"
         onClick={!isSubmitting ? onClose : undefined}
@@ -244,11 +283,38 @@ export default function CategoryDrawer({
               type="text"
               className="cd-input"
               value={formData.name}
+              onChange={handleNameChange}
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="cd-form-group">
+            <label className="cd-label">Slug</label>
+            <input
+              type="text"
+              className="cd-input"
+              value={formData.slug || ""}
               onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
+                setFormData((prev) => ({ ...prev, slug: e.target.value }))
               }
               disabled={isSubmitting}
             />
+          </div>
+
+          <div className="cd-form-group">
+            <label className="cd-label">Description</label>
+            <textarea
+              className="cd-textarea"
+              placeholder="Enter category description..."
+              value={formData.description || ""}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  description: e.target.value,
+                }))
+              }
+              disabled={isSubmitting}
+            ></textarea>
           </div>
 
           <div className="cd-form-group">
@@ -261,7 +327,6 @@ export default function CategoryDrawer({
                 <span
                   className={formData.parentId ? "" : "cd-tree-placeholder"}
                 >
-                  {/* gọi hàm để hiển thị chuỗi đường dẫn đầy đủ */}
                   {getCategoryPath(formData.parentId)}
                 </span>
                 <FilterIcon />
@@ -273,19 +338,13 @@ export default function CategoryDrawer({
                     Select parent category
                   </div>
                   <div
-                    className={`cd-tree-node ${formData.parentId === null ? "selected" : ""}`}
-                    /* bỏ thụt lề cho mục không chọn danh mục cha để thẳng hàng với các mục cấp gốc khác */
-                    style={{ paddingLeft: "8px" }}
+                    className={`cd-tree-node cd-root-node ${formData.parentId === null ? "selected" : ""}`}
                     onClick={() => {
-                      setFormData({ ...formData, parentId: null });
+                      setFormData((prev) => ({ ...prev, parentId: null }));
                       setIsTreeOpen(false);
                     }}
                   >
-                    {/* loại bỏ thẻ bao bọc dư thừa và chỉ giữ lại icon folder để tránh bị đẩy lùi vào trong */}
-                    <div
-                      className="cd-folder-icon"
-                      style={{ marginRight: "8px" }}
-                    >
+                    <div className="cd-folder-icon cd-mr-8">
                       <FolderIcon />
                     </div>
 
@@ -306,15 +365,8 @@ export default function CategoryDrawer({
             <div className="cd-status-row">
               <button
                 type="button"
-                className={`cd-toggle-switch ${formData.status === "Active" ? "on" : ""}`}
-                style={{
-                  opacity: isParentInactive || isSubmitting ? 0.5 : 1,
-                  cursor:
-                    isParentInactive || isSubmitting
-                      ? "not-allowed"
-                      : "pointer",
-                }}
-                disabled={isSubmitting}
+                className={`cd-toggle-switch ${formData.status === "Active" ? "on" : ""} ${isParentInactive || isSubmitting ? "disabled-toggle" : ""}`}
+                disabled={isSubmitting || isParentInactive}
                 onClick={() => {
                   if (isParentInactive || isSubmitting) return;
                   setFormData((prev) => ({
@@ -325,9 +377,7 @@ export default function CategoryDrawer({
               ></button>
               <span className="cd-status-text">{formData.status}</span>
               {isParentInactive && (
-                <span style={{ fontSize: "0.8rem", color: "#ef4444" }}>
-                  (Parent is Inactive)
-                </span>
+                <span className="cd-status-warning">(Parent is Inactive)</span>
               )}
             </div>
           </div>

@@ -5,6 +5,7 @@ import { useCategory } from "../../../../hooks/portal/ProductCatalog/CategoryMan
 import "./CategoryManagementPage.css";
 
 export default function CategoryManagementPage() {
+  // hooks
   const {
     categories,
     visibleCategories,
@@ -25,7 +26,7 @@ export default function CategoryManagementPage() {
 
   return (
     <div className="cm-page-container">
-      {/* danh sách và thanh tìm kiếm */}
+      {/* components */}
       <CategoryManagement
         data={visibleCategories}
         searchQuery={searchQuery}
@@ -37,7 +38,6 @@ export default function CategoryManagementPage() {
         onMoveCategory={moveCategory}
       />
 
-      {/* Drawer thêm mới/chỉnh sửa danh mục */}
       <CategoryDrawer
         key={
           drawerConfig.isOpen
@@ -54,7 +54,7 @@ export default function CategoryManagementPage() {
         onSave={saveCategory}
       />
 
-      {/* Modal xác nhận xóa */}
+      {/* modals */}
       <ConfirmDeleteModal
         isOpen={deleteConfig.isOpen}
         message="Are you sure you want to delete this category?"

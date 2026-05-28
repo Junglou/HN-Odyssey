@@ -76,9 +76,9 @@ export default function CategoryManagement({
           <table className="cm-table">
             <thead>
               <tr>
-                <th style={{ width: "60%" }}>Category Name</th>
-                <th style={{ width: "20%" }}>Status</th>
-                <th style={{ width: "20%", textAlign: "center" }}>Actions</th>
+                <th className="cm-th-name">Category Name</th>
+                <th className="cm-th-status">Status</th>
+                <th className="cm-th-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -97,14 +97,7 @@ export default function CategoryManagement({
                 ))
               ) : (
                 <tr>
-                  <td
-                    colSpan={3}
-                    style={{
-                      textAlign: "center",
-                      padding: "40px",
-                      color: "#6b7280",
-                    }}
-                  >
+                  <td colSpan={3} className="cm-empty-state">
                     No categories found.
                   </td>
                 </tr>

@@ -99,7 +99,7 @@
 
 .vd-form-group input:focus,
 .vd-form-group textarea:focus {
-  border-color: #3b82f6;
+  border-color: #000000;
   background-color: #f9fafb;
 }
 
@@ -195,6 +195,198 @@
 .vd-btn-submit:hover {
   background-color: #111827;
   color: #ffffff;
+}
+
+.vd-hint-text {
+  font-size: 12px;
+  color: #666666;
+  margin-top: 4px;
+  display: block;
+}
+
+.vd-values-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vd-value-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+}
+
+.vd-value-row .vd-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.vd-color-picker {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  padding: 2px;
+  cursor: pointer;
+  border: 1px solid #dddddd;
+  border-radius: 4px;
+}
+
+.vd-btn-remove-val {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vd-btn-add-val {
+  background: transparent;
+  color: #000000;
+  border: 1px dashed #000000;
+  margin-top: 8px;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.vd-btn-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* xử lý viền đen khi focus/hover theo yêu cầu */
+.vd-input:focus,
+.vd-input:hover,
+.vd-color-picker:focus,
+.vd-color-picker:hover {
+  border-color: #111827;
+  outline: none;
+}
+
+.vd-btn-add-val:focus,
+.vd-btn-add-val:hover {
+  border-color: #111827;
+  color: #111827;
+  background-color: rgba(17, 24, 39, 0.05);
+}
+
+/* custom dropdown & animation */
+.vd-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.vd-dropdown-btn {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  color: #374151;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: 0.2s;
+}
+
+.vd-dropdown-btn:hover,
+.vd-dropdown-btn:focus,
+.vd-dropdown-btn.open {
+  border-color: #111827;
+  outline: none;
+}
+
+.vd-dropdown-btn:disabled {
+  background-color: #f3f4f6;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.vd-dropdown-icon {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.3s ease;
+  color: #6b7280;
+}
+
+.vd-dropdown-btn.open .vd-dropdown-icon {
+  transform: rotate(180deg);
+}
+
+.vd-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  z-index: 50;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.vd-dropdown-menu.open {
+  animation: vd-slideFadeDown 0.2s ease-out forwards;
+  pointer-events: auto;
+}
+
+.vd-dropdown-menu.close {
+  animation: vd-slideFadeUp 0.2s ease-in forwards;
+  pointer-events: none;
+}
+
+.vd-dropdown-item {
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  color: #374151;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.vd-dropdown-item:hover,
+.vd-dropdown-item.active {
+  background-color: #f3f4f6;
+  color: #111827;
+  font-weight: 500;
+}
+
+/* keyframes đóng mở */
+@keyframes vd-slideFadeDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes vd-slideFadeUp {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
 }
 
 /* animation */

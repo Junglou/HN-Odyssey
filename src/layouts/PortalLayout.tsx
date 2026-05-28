@@ -200,7 +200,7 @@ const PortalLayout = () => {
     <div className="portal-container">
       {/* Mobile Toggle */}
       <button
-        className="mobile-menu-toggle"
+        className="portal-mobile-menu-toggle"
         onClick={() => setIsMobileSidebarOpen(true)}
       >
         <HamburgerIcon />

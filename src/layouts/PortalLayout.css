@@ -365,7 +365,7 @@ button:focus,
 .submenu-item:focus,
 .logout-btn:focus,
 .notification-btn:focus,
-.mobile-menu-toggle:focus {
+.portal-mobile-menu-toggle:focus {
   outline: none;
 }
 
@@ -476,7 +476,7 @@ button:focus,
   }
 }
 
-.mobile-menu-toggle {
+.portal-mobile-menu-toggle {
   display: none;
 }
 .portal-backdrop {
@@ -484,7 +484,7 @@ button:focus,
 }
 
 @media screen and (max-width: 1024px) {
-  .mobile-menu-toggle {
+  .portal-mobile-menu-toggle {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -500,7 +500,7 @@ button:focus,
     cursor: pointer;
     transition: transform 0.2s;
   }
-  .mobile-menu-toggle:hover {
+  .portal-mobile-menu-toggle:hover {
     transform: scale(1.05);
   }
 

@@ -34,14 +34,16 @@ const CategoryTableRow = memo(function CategoryTableRow({
   onDeleteClick,
   onMoveCategory,
 }: CategoryTableRowProps) {
+  // states
   const [isDragOver, setIsDragOver] = useState(false);
-  // hàm sự kiện kéo thả
+
+  // handlers
   const handleDragStart = (e: React.DragEvent<HTMLSpanElement>) => {
     e.dataTransfer.setData("text/plain", node.id);
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLTableRowElement>) => {
-    e.preventDefault(); // gọi preventDefault để trình duyệt cho phép thả
+    e.preventDefault();
     setIsDragOver(true);
   };
 
@@ -54,19 +56,17 @@ const CategoryTableRow = memo(function CategoryTableRow({
     setIsDragOver(false);
 
     const draggedId = e.dataTransfer.getData("text/plain");
-    // logic chỉ thực hiện kéo thả nếu id kéo khác với id của dòng thả vào
     if (draggedId && draggedId !== node.id) {
       onMoveCategory(draggedId, node.id);
     }
   };
 
-  // hàm thu mở danh mục
   const handleExpandClick = () => {
     onToggleExpand(node.id);
   };
 
   const handleActionClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // ngăn click lan ra ngoài làm đóng menu
+    e.stopPropagation();
     onToggleDropdown(node.id);
   };
 
@@ -78,7 +78,6 @@ const CategoryTableRow = memo(function CategoryTableRow({
     onDeleteClick(node.id);
   };
 
-  // class css
   const rowClassName = `cm-row ${isDragOver ? "drag-over" : ""}`;
   const toggleClassName = `cm-toggle-btn ${node.isExpanded ? "expanded" : "collapsed"}`;
   const actionBtnClassName = `cm-action-btn ${isDropdownOpen ? "active" : ""}`;
@@ -91,10 +90,7 @@ const CategoryTableRow = memo(function CategoryTableRow({
       onDrop={handleDrop}
     >
       <td>
-        <div
-          className="cm-td-name-wrapper"
-          style={{ "--depth": node.depth } as React.CSSProperties}
-        >
+        <div className={`cm-td-name-wrapper cm-depth-${node.depth}`}>
           <span
             className="cm-drag-icon"
             draggable

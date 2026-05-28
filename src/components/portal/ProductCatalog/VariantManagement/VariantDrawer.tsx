@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import "./VariantDrawer.css";
 
+import { ChevronDownIcon } from "../../../../assets/icons/HeaderIcons";
 import {
   BackArrowIcon,
   CleanTrashIcon,
@@ -12,6 +13,13 @@ import type {
   AttributeValue,
 } from "../../../../hooks/portal/ProductCatalog/VariantManagement/useVariantManagement";
 
+// options
+const DISPLAY_TYPE_OPTIONS = [
+  { value: "BUTTON", label: "BUTTON (Text Swatch)" },
+  { value: "COLOR", label: "COLOR (Color Swatch)" },
+  { value: "DROPDOWN", label: "DROPDOWN (Select List)" },
+];
+
 interface VariantDrawerProps {
   isOpen: boolean;
   mode: "add" | "edit";
@@ -19,6 +27,80 @@ interface VariantDrawerProps {
   isSubmitting: boolean;
   onClose: () => void;
   onSubmit: (data: AttributeFormData) => void;
+}
+
+// custom dropdown
+function CustomDropdown({
+  value,
+  options,
+  onChange,
+  disabled = false,
+}: {
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (val: string) => void;
+  disabled?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [hasOpened, setHasOpened] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const selectedOption =
+    options.find((opt) => opt.value === value) || options[0];
+
+  return (
+    <div className="vd-dropdown" ref={dropdownRef}>
+      <button
+        type="button"
+        className={`vd-dropdown-btn ${isOpen ? "open" : ""}`}
+        onClick={() => {
+          if (disabled) return;
+          setIsOpen(!isOpen);
+          if (!hasOpened) setHasOpened(true);
+        }}
+        disabled={disabled}
+      >
+        <span className="vd-dropdown-label">{selectedOption.label}</span>
+        <ChevronDownIcon className="vd-dropdown-icon" />
+      </button>
+
+      <div
+        className={`vd-dropdown-menu ${
+          isOpen ? "open" : hasOpened ? "close" : ""
+        }`}
+      >
+        {options.map((opt) => (
+          <div
+            key={opt.value}
+            className={`vd-dropdown-item ${
+              value === opt.value ? "active" : ""
+            }`}
+            onClick={() => {
+              onChange(opt.value);
+              setIsOpen(false);
+            }}
+          >
+            {opt.label}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function VariantDrawer(props: VariantDrawerProps) {
@@ -72,6 +154,8 @@ function VariantDrawerContent({
   // helper
   const generateSlug = (text: string) => {
     return text
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase()
       .replace(/[\s_]+/g, "-")
       .replace(/[^\w-]/g, "");
@@ -100,11 +184,17 @@ function VariantDrawerContent({
   ) => {
     setFormData((prev) => {
       const newValues = [...prev.values];
+      const oldLabel = prev.values[index].label;
+      const oldValue = prev.values[index].value;
+
       newValues[index] = { ...newValues[index], [field]: val };
 
-      if (field === "label" && !newValues[index].value) {
-        newValues[index].value = generateSlug(val);
+      if (field === "label") {
+        if (!oldValue || oldValue === generateSlug(oldLabel)) {
+          newValues[index].value = generateSlug(val);
+        }
       }
+
       return { ...prev, values: newValues };
     });
   };
@@ -162,32 +252,21 @@ function VariantDrawerContent({
               }
               disabled={isSubmitting || mode === "edit"}
             />
-            <span
-              style={{
-                fontSize: "12px",
-                color: "#666",
-                marginTop: "4px",
-                display: "block",
-              }}
-            >
+            <span className="vd-hint-text">
               Letters, numbers, and hyphens only.
             </span>
           </div>
 
           <div className="vd-form-group">
             <label className="vd-label">Display Type</label>
-            <select
-              className="vd-input"
+            <CustomDropdown
               value={formData.display_type}
-              onChange={(e) =>
-                setFormData({ ...formData, display_type: e.target.value })
+              options={DISPLAY_TYPE_OPTIONS}
+              onChange={(val) =>
+                setFormData({ ...formData, display_type: val })
               }
               disabled={isSubmitting}
-            >
-              <option value="BUTTON">BUTTON (Text Swatch)</option>
-              <option value="COLOR">COLOR (Color Swatch)</option>
-              <option value="DROPDOWN">DROPDOWN (Select List)</option>
-            </select>
+            />
           </div>
 
           <div className="vd-form-group">
@@ -206,16 +285,9 @@ function VariantDrawerContent({
 
           <div className="vd-form-group">
             <label className="vd-label">Attribute Values</label>
-            <div
-              className="vd-values-container"
-              style={{ display: "flex", flexDirection: "column", gap: "10px" }}
-            >
+            <div className="vd-values-container">
               {formData.values.map((v, idx) => (
-                <div
-                  key={idx}
-                  className="vd-value-row"
-                  style={{ display: "flex", gap: "8px", alignItems: "center" }}
-                >
+                <div key={idx} className="vd-value-row">
                   <input
                     type="text"
                     className="vd-input"
@@ -239,14 +311,7 @@ function VariantDrawerContent({
                   {formData.display_type === "COLOR" && (
                     <input
                       type="color"
-                      style={{
-                        width: "40px",
-                        height: "40px",
-                        padding: "2px",
-                        cursor: "pointer",
-                        border: "1px solid #ddd",
-                        borderRadius: "4px",
-                      }}
+                      className="vd-color-picker"
                       value={v.meta || "#000000"}
                       onChange={(e) =>
                         handleUpdateValue(idx, "meta", e.target.value)
@@ -257,12 +322,7 @@ function VariantDrawerContent({
                   )}
                   <button
                     type="button"
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      color: "red",
-                    }}
+                    className="vd-btn-remove-val"
                     onClick={() => handleRemoveValue(idx)}
                     disabled={isSubmitting}
                   >
@@ -272,13 +332,7 @@ function VariantDrawerContent({
               ))}
               <button
                 type="button"
-                className="vd-btn-submit"
-                style={{
-                  background: "transparent",
-                  color: "#2563eb",
-                  border: "1px dashed #2563eb",
-                  marginTop: "8px",
-                }}
+                className="vd-btn-add-val"
                 onClick={handleAddValue}
                 disabled={isSubmitting}
               >
@@ -324,10 +378,6 @@ function VariantDrawerContent({
             className="vd-btn-submit"
             onClick={() => !isSubmitting && onSubmit(formData)}
             disabled={isSubmitting}
-            style={{
-              opacity: isSubmitting ? 0.7 : 1,
-              cursor: isSubmitting ? "not-allowed" : "pointer",
-            }}
           >
             {isSubmitting
               ? "Saving..."
