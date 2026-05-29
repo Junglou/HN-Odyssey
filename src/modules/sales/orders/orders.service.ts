@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
-import { Model, Connection, Types, FilterQuery } from 'mongoose';
+import { Model, Connection, Types, FilterQuery, PipelineStage } from 'mongoose';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { Order, OrderDocument } from './schemas/order.schema';
@@ -52,9 +52,13 @@ import {
   FlashSaleDiscountType,
   FlashSaleStatus,
 } from 'src/modules/marketing/promotions/schemas/flash-sale.schema';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { LoyaltyService } from 'src/modules/marketing/loyalty/loyalty.service';
-import { LoyaltyHistory } from 'src/modules/marketing/loyalty/schemas/loyalty-history.schema';
+import {
+  LoyaltyHistory,
+  PointStatus,
+} from 'src/modules/marketing/loyalty/schemas/loyalty-history.schema';
+import * as ExcelJS from 'exceljs';
+import type { Response } from 'express';
 
 // type OrderDocWithShipping = MongooseOrderDoc & {
 //   waybillCode?: string;
@@ -96,77 +100,106 @@ export class OrdersService {
     const limit = Number(query.limit) || 10;
     const { search, status, fromDate, toDate, sort } = query;
 
-    const pipeline: any[] = [];
+    // SỬ DỤNG PIPELINE STAGE CHUẨN ĐỂ LOẠI BỎ LỖI ESLINT 'ANY'
+    const pipeline: PipelineStage[] = [];
 
-    // 1. GIAI ĐOẠN SEARCH (Quan trọng: $search phải luôn đứng đầu pipeline)
+    // GIAI ĐOẠN 1: SEARCH
     if (search && search.trim().length > 0) {
       pipeline.push({
         $search: {
-          index: 'default', // Tên index tạo trên Atlas
+          index: 'default',
           compound: {
             should: [
               {
                 text: {
                   query: search,
                   path: 'order_code',
-                  score: { boost: { value: 5 } }, // Ưu tiên khớp mã đơn nhất
+                  score: { boost: { value: 5 } },
                 },
               },
               {
                 text: {
                   query: search,
                   path: ['shipping_info.phone', 'guest_info.phone'],
-                  score: { boost: { value: 3 } }, // Ưu tiên SĐT
+                  score: { boost: { value: 3 } },
                 },
               },
               {
                 text: {
                   query: search,
                   path: 'shipping_info.name',
-                  fuzzy: { maxEdits: 1 }, // Cho phép sai chính tả tên nhẹ
+                  fuzzy: { maxEdits: 1 },
                 },
               },
             ],
             minimumShouldMatch: 1,
           },
         },
-      });
+      } as PipelineStage);
     }
 
-    // 2. GIAI ĐOẠN MATCH (Lọc Status, Date...)
-    const matchStage: Record<string, any> = { status: { $ne: 'TEMPORARY' } };
+    // GIAI ĐOẠN 2: MATCH VÀ PHIÊN DỊCH STATUS (FE -> BE)
+    const matchStage: FilterQuery<Order> = { status: { $ne: 'TEMPORARY' } };
 
-    if (status) matchStage['status'] = status;
+    if (status && status !== 'all') {
+      const upperStatus = status.toUpperCase();
+      // Gom nhóm Status từ Backend để map đúng ý đồ của Frontend
+      if (upperStatus === 'PACKAGING') {
+        matchStage.status = { $in: ['PROCESSING', 'READY_TO_SHIP', 'ON_HOLD'] };
+      } else if (upperStatus === 'DELIVERED') {
+        matchStage.status = { $in: ['DELIVERED', 'COMPLETED'] };
+      } else if (upperStatus === 'REFUNDED') {
+        matchStage.status = {
+          $in: ['REFUND_PENDING', 'REFUND_NEEDED', 'REFUNDED', 'RETURNED'],
+        };
+      } else if (upperStatus === 'CONFIRMED') {
+        matchStage.status = {
+          $in: ['CONFIRMED', 'PRIORITY', 'TRADE_IN_REVIEW'],
+        };
+      } else {
+        matchStage.status = upperStatus;
+      }
+    }
 
     if (query.user_id) {
-      matchStage['user_id'] = new Types.ObjectId(query.user_id);
+      matchStage.user_id = new Types.ObjectId(query.user_id);
     }
 
+    // Xử lý an toàn cho bộ lọc ngày tháng
     if (fromDate || toDate) {
-      matchStage.createdAt = {};
-      if (fromDate)
-        (matchStage.createdAt as Record<string, any>).$gte = new Date(fromDate);
-      if (toDate)
-        (matchStage.createdAt as Record<string, any>).$lte = new Date(toDate);
+      const dateFilter: { $gte?: Date; $lte?: Date } = {};
+
+      if (fromDate && typeof fromDate === 'string' && fromDate.trim() !== '') {
+        const parsedFromDate = new Date(fromDate);
+        parsedFromDate.setHours(0, 0, 0, 0);
+        dateFilter.$gte = parsedFromDate;
+      }
+
+      if (toDate && typeof toDate === 'string' && toDate.trim() !== '') {
+        const parsedToDate = new Date(toDate);
+        parsedToDate.setHours(23, 59, 59, 999);
+        dateFilter.$lte = parsedToDate;
+      }
+
+      if (Object.keys(dateFilter).length > 0) {
+        matchStage.createdAt = dateFilter;
+      }
     }
 
-    // Nếu không search thì push matchStage bình thường
-    // Nếu có search, matchStage sẽ lọc TRÊN KẾT QUẢ search -> Hiệu năng cực cao
-    pipeline.push({ $match: matchStage });
+    pipeline.push({ $match: matchStage } as PipelineStage);
 
-    // 3. GIAI ĐOẠN SORT
-    let sortStage: Record<string, number> = {};
+    // GIAI ĐOẠN 3: SORT
+    let sortStage: Record<string, 1 | -1> = {};
     if (sort) {
       const [key, val] = sort.split(':');
       sortStage[key] = val === 'desc' ? -1 : 1;
     } else {
-      // Logic cũ: Priority lên đầu
       sortStage = { sort_weight: 1, createdAt: -1 };
     }
 
     const skip = (page - 1) * limit;
 
-    // 4. GIAI ĐOẠN FACET
+    // GIAI ĐOẠN 4: FACET
     pipeline.push({
       $facet: {
         data: [
@@ -188,11 +221,10 @@ export class OrdersService {
         ],
         totalCount: [{ $count: 'count' }],
       },
-    });
+    } as PipelineStage);
 
     const [result] =
       await this.orderModel.aggregate<AggregateResult<Order>>(pipeline);
-
     const data = result?.data ?? [];
     const total = result?.totalCount?.[0]?.count ?? 0;
 
@@ -204,6 +236,210 @@ export class OrdersService {
         last_page: Math.ceil(total / limit),
       },
     };
+  }
+
+  async exportExcel(adminId: string, queryDto: FilterOrderDto, res: Response) {
+    // 1. Ép kiểu an toàn (Safe Type Casting) để loại bỏ lỗi 'any' từ MongoDB
+    type ExporterDoc = {
+      email?: string;
+      first_Name?: string;
+      last_Name?: string;
+    };
+
+    const exporterRaw = await this.connection
+      .collection('users')
+      .findOne(
+        { _id: new Types.ObjectId(adminId) },
+        { projection: { email: 1, first_Name: 1, last_Name: 1 } },
+      );
+
+    const exporter = exporterRaw as ExporterDoc | null;
+
+    const exporterEmail = exporter?.email || 'N/A';
+    let exporterName = 'N/A';
+
+    if (exporter) {
+      if (exporter.first_Name && exporter.last_Name) {
+        exporterName = `${exporter.first_Name} ${exporter.last_Name}`;
+      } else if (exporter.email) {
+        exporterName = exporter.email.split('@')[0] || 'N/A';
+      }
+    }
+
+    // 2. Ép limit thật lớn để xuất toàn bộ data theo filter, bỏ qua phân trang
+    const fullQuery = { ...queryDto, limit: 50000, page: 1 };
+
+    // 3. Tận dụng lại chính hàm findAll đã được xử lý PipelineStage Strict Type ở trên
+    const result = await this.findAll(fullQuery);
+
+    // Nếu dữ liệu vượt quá 50,000 dòng, chặn lại để không làm sập RAM
+    if (result.meta.total > 50000) {
+      throw new BadRequestException(
+        'Lượng dữ liệu vượt quá 50.000 dòng. Vui lòng thu hẹp khoảng thời gian hoặc thêm bộ lọc.',
+      );
+    }
+
+    const orders = result.data;
+
+    // 4. Khởi tạo Excel Workbook
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Báo Cáo Đơn Hàng');
+
+    // 5. Thiết lập độ rộng cột
+    sheet.getColumn(1).width = 20; // Mã đơn
+    sheet.getColumn(2).width = 25; // Ngày tạo
+    sheet.getColumn(3).width = 30; // Khách hàng
+    sheet.getColumn(4).width = 18; // SĐT
+    sheet.getColumn(5).width = 20; // Trạng thái
+    sheet.getColumn(6).width = 20; // Thanh toán
+    sheet.getColumn(7).width = 20; // Tổng tiền
+
+    // 6. Tiêu đề báo cáo
+    sheet.mergeCells('A1:G1');
+    const titleCell = sheet.getCell('A1');
+    titleCell.value = 'BÁO CÁO TỔNG HỢP DANH SÁCH ĐƠN HÀNG';
+    titleCell.font = {
+      name: 'Arial',
+      size: 14,
+      bold: true,
+      color: { argb: 'FF1976D2' }, // Xanh dương đồng bộ với FE OrderManagement
+    };
+    titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    sheet.getRow(1).height = 30;
+
+    // 7. Thông tin phụ (Kỳ báo cáo)
+    sheet.mergeCells('A2:G2');
+    const infoCell = sheet.getCell('A2');
+
+    const startDateStr = queryDto.fromDate
+      ? new Date(queryDto.fromDate).toLocaleDateString('vi-VN')
+      : 'Từ trước tới nay';
+    const endDateStr = queryDto.toDate
+      ? new Date(queryDto.toDate).toLocaleDateString('vi-VN')
+      : 'Hiện tại';
+    const nowStr = new Date().toLocaleString('vi-VN');
+
+    // FIX LỖI "unused-vars": Nối tên và email người xuất vào chuỗi báo cáo
+    infoCell.value = `Kỳ báo cáo: ${startDateStr} - ${endDateStr}  |  Ngày xuất: ${nowStr}  |  Người xuất: ${exporterName} (${exporterEmail})`;
+    infoCell.font = { name: 'Arial', size: 10, italic: true };
+    infoCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    sheet.addRow([]);
+
+    // 8. Render Header Table
+    const headerRow = sheet.addRow([
+      'Mã Đơn Hàng',
+      'Ngày Đặt',
+      'Tên Khách Hàng',
+      'Số Điện Thoại',
+      'Trạng Thái',
+      'Thanh Toán',
+      'Tổng Tiền (VNĐ)',
+    ]);
+    headerRow.height = 25;
+    headerRow.eachCell((cell) => {
+      cell.font = {
+        name: 'Arial',
+        size: 11,
+        bold: true,
+        color: { argb: 'FFFFFFFF' },
+      };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF1976D2' },
+      };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      };
+    });
+
+    // 9. Đổ dữ liệu vào bảng
+    if (orders.length > 0) {
+      type ExportOrderDoc = {
+        order_code: string;
+        createdAt?: Date | string | number;
+        status: string;
+        total_amount: number;
+        shipping_info?: { name?: string; phone?: string };
+        guest_info?: { name?: string; phone?: string };
+        payment?: { status?: string };
+      };
+
+      orders.forEach((order) => {
+        const orderDoc = order as unknown as ExportOrderDoc;
+
+        const customerName =
+          orderDoc.shipping_info?.name || orderDoc.guest_info?.name || 'N/A';
+        const customerPhone =
+          orderDoc.shipping_info?.phone || orderDoc.guest_info?.phone || 'N/A';
+        const orderDate = orderDoc.createdAt
+          ? new Date(orderDoc.createdAt).toLocaleString('vi-VN')
+          : 'N/A';
+
+        const row = sheet.addRow([
+          orderDoc.order_code,
+          orderDate,
+          customerName,
+          customerPhone,
+          orderDoc.status,
+          orderDoc.payment?.status || 'PENDING',
+          orderDoc.total_amount || 0,
+        ]);
+
+        row.eachCell((cell, colNumber) => {
+          cell.font = { name: 'Arial', size: 10 };
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' },
+          };
+
+          let align: 'left' | 'center' | 'right' = 'left';
+          if (colNumber === 7) align = 'right';
+          if ([4, 5, 6].includes(colNumber)) align = 'center';
+
+          cell.alignment = {
+            vertical: 'middle',
+            horizontal: align,
+            wrapText: true,
+          };
+
+          if (colNumber === 7) {
+            cell.numFmt = '#,##0';
+          }
+
+          if (
+            colNumber === 5 &&
+            ['CANCELLED', 'REFUNDED', 'REFUND_PENDING'].includes(
+              String(orderDoc.status),
+            )
+          ) {
+            cell.font = {
+              name: 'Arial',
+              size: 10,
+              color: { argb: 'FFD32F2F' },
+            };
+          }
+        });
+      });
+    }
+
+    // 10. Cấu hình Header và Stream file về Frontend
+    const exportDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const fileName = `BaoCao_DonHang_${exportDate}.xlsx`;
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
+
+    return workbook.xlsx.write(res);
   }
 
   //US.122: CHI TIẾT ĐƠN HÀNG
@@ -929,6 +1165,18 @@ export class OrdersService {
 
         await order.save({ session }); // BẮT BUỘC TRUYỀN SESSION
 
+        // Tính số tiền dùng để cộng điểm (Tổng tiền đơn - Phí vận chuyển)
+        const pointEarnAmount = order.total_amount - (order.shipping_fee || 0);
+
+        // Nếu là khách hàng thành viên (không phải Guest) và tiền mua hàng > 0 thì ghi nhận điểm PENDING
+        if (order.user_id && !order.isGuest && pointEarnAmount > 0) {
+          await this.loyaltyService.addPendingPoints(
+            String(order.user_id),
+            String(order._id),
+            pointEarnAmount,
+          );
+        }
+
         if (userId && dto.pointsToUse && dto.pointsToUse > 0) {
           await this.connection
             .collection('users')
@@ -937,14 +1185,6 @@ export class OrdersService {
               { $inc: { 'loyalty.point': -dto.pointsToUse } },
               { session },
             );
-        }
-
-        if (userId) {
-          await this.loyaltyService.addPendingPoints(
-            userId,
-            String(order._id),
-            totalAfterVoucher - pointsDiscount,
-          );
         }
 
         // CHỐT TRANSACTION THÀNH CÔNG CHO LUỒNG MUA NGAY
@@ -1575,6 +1815,24 @@ export class OrdersService {
         order.waybill_code = '';
         order.actual_shipping_fee = 0;
         order.internal_note = `[OVERRIDE]: Admin khôi phục đơn hàng.`;
+
+        // Khôi phục lại trạng thái PENDING cho bản ghi điểm thưởng bị hủy trước đó
+        if (order.user_id && !order.isGuest) {
+          await this.loyaltyHistoryModel.updateMany(
+            {
+              customer_id: order.user_id,
+              order_id: order._id,
+              status: PointStatus.CANCELED,
+            },
+            {
+              $set: {
+                status: PointStatus.PENDING,
+                description: `Khôi phục điểm chờ duyệt do Admin khôi phục đơn ${order.order_code}`,
+              },
+            },
+            { session },
+          );
+        }
       }
 
       // 4. XỬ LÝ SHIPPING THỦ CÔNG
@@ -1592,6 +1850,16 @@ export class OrdersService {
       // 5. CẬP NHẬT TRẠNG THÁI & LƯU DB
       order.status = finalStatusToSave;
       if (dto.note) order.internal_note = dto.note;
+
+      if (
+        (finalStatusToSave === OrderStatus.DELIVERED ||
+          finalStatusToSave === OrderStatus.COMPLETED) &&
+        order.payment.method === 'COD' &&
+        order.payment.status === 'PENDING'
+      ) {
+        order.payment.status = 'PAID';
+        (order as unknown as OrderDocument).markModified('payment');
+      }
 
       this.stateMachine.addTimeline(
         order as unknown as MongooseOrderDoc,
@@ -1933,7 +2201,9 @@ export class OrdersService {
     waybillCode: string,
     status: OrderStatus,
   ): Promise<OrderData | void> {
-    const order = await this.orderModel.findOne({ waybill_code: waybillCode });
+    const order = await this.orderModel.findOne({
+      $or: [{ waybill_code: waybillCode }, { order_code: waybillCode }],
+    });
     if (!order) {
       this.logger.warn(
         `Webhook: Không tìm thấy đơn hàng với mã vận đơn ${waybillCode}`,
@@ -1966,62 +2236,14 @@ export class OrdersService {
       );
     }
 
-    const provider = (order.shipping_info?.provider || 'GHN').toUpperCase();
-    let url = '';
-
-    if (provider === 'GHTK') {
-      url = await this.ghtkService.getPrintLabel(order.waybill_code);
-    } else {
-      url = await this.ghnService.getPrintLabel(order.waybill_code);
-    }
+    // Lấy link in mã vận đơn trực tiếp từ ghn
+    const url = await this.ghnService.getPrintLabel(order.waybill_code);
 
     this.logger.log(
-      `Admin lấy link in cho đơn hàng: ${order.order_code} qua ${provider}`,
+      `Admin lấy link in cho đơn hàng: ${order.order_code} qua GHN`,
     );
 
     return { url };
-  }
-
-  // US/AC bổ sung: Tự động giải phóng giỏ hàng/đơn Mua Ngay bị treo quá 15 phút
-  @Cron(CronExpression.EVERY_MINUTE)
-  async releaseExpiredTemporaryOrders() {
-    const expiredOrders = await this.orderModel.find({
-      status: 'TEMPORARY',
-      hold_expires_at: { $lte: new Date() },
-    });
-
-    if (expiredOrders.length === 0) return;
-
-    for (const order of expiredOrders) {
-      const session = await this.connection.startSession();
-      session.startTransaction();
-      try {
-        // 1. Nhả tồn kho đã hold
-        for (const item of order.items) {
-          await this.stockService.restock(
-            {
-              product_id: item.product_id.toString(),
-              sku: item.sku,
-              quantity: item.quantity,
-            },
-            session,
-          );
-        }
-
-        // 2. Chuyển trạng thái sang Hủy để đánh dấu
-        order.status = 'CANCELLED';
-        order.cancel_reason =
-          'Hệ thống tự động hủy do quá hạn 15 phút giữ hàng';
-        await order.save({ session });
-
-        await session.commitTransaction();
-      } catch (error) {
-        await session.abortTransaction();
-        this.logger.error(`Lỗi giải phóng đơn tạm ${order.order_code}:`, error);
-      } finally {
-        await session.endSession();
-      }
-    }
   }
 
   // HÀM DÀNH RIÊNG CHO CHATBOT TRA CỨU
@@ -2050,5 +2272,44 @@ export class OrdersService {
     return this.orderModel
       .findOne({ order_code, 'shipping_info.phone': phone })
       .exec();
+  }
+
+  // THÊM HÀM NÀY VÀO ORDERS.SERVICE.TS
+  async downloadBulkPdf(
+    ids: string[],
+    type: 'INVOICE' | 'PACKING_SLIP',
+    res: Response,
+  ) {
+    // 1. Tìm tất cả đơn hàng theo danh sách ID
+    const orders = await this.orderModel
+      .find({ _id: { $in: ids } })
+      .lean()
+      .exec();
+
+    if (!orders || orders.length === 0) {
+      throw new NotFoundException('Không tìm thấy đơn hàng nào để in');
+    }
+
+    // 2. Nếu là Hóa Đơn (INVOICE), tăng biến đếm print_count theo Acceptance Criteria
+    if (type === 'INVOICE') {
+      await this.orderModel.updateMany(
+        { _id: { $in: ids } },
+        { $inc: { print_count: 1 } },
+      );
+    }
+
+    // 3. Gọi PdfService để vẽ file PDF tổng hợp (Nhiều trang)
+    const pdfBuffer = await this.pdfService.generateBulkDocument(
+      orders as unknown as OrderData[],
+      type,
+    );
+
+    // 4. Thiết lập Header để báo cho trình duyệt đây là file đính kèm
+    const fileName = `${type}_${Date.now()}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
+
+    // 5. Trả file về cho FE
+    res.send(pdfBuffer);
   }
 }

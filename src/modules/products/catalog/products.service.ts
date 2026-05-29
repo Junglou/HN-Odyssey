@@ -999,11 +999,16 @@ export class ProductsService {
       );
     }
 
-    product.price_request.status = isApproved
-      ? PriceRequestStatus.APPROVED
-      : PriceRequestStatus.REJECTED;
+    if (isApproved) {
+      product.price_request.status = PriceRequestStatus.APPROVED;
+      product.price = product.price_request.price;
+      product.currency = product.price_request.currency;
+    } else {
+      product.price_request.status = PriceRequestStatus.REJECTED;
+      if (reason) product.price_request.reject_reason = reason;
+    }
+
     product.price_request.approver_id = new Types.ObjectId(userId);
-    if (!isApproved && reason) product.price_request.reject_reason = reason;
 
     await product.save();
 

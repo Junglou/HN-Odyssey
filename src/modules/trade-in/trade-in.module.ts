@@ -12,6 +12,16 @@ import {
 } from '../products/categories/schemas/category.schema';
 import { ProductSchema } from '../products/catalog/schemas/product.schema';
 import { OrderSchema } from '../sales/orders/schemas/order.schema';
+import { OrdersModule } from '../sales/orders/orders.module';
+import { ShippingModule } from '../shipping/shipping.module';
+import { UsersModule } from '../users/users.module';
+import {
+  Coupon,
+  CouponSchema,
+} from '../marketing/promotions/schemas/coupon.schema';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { TradeInNotificationListener } from './trade-in-notification.listener';
+import { User, UserSchema } from '../users/schemas/user.schema';
 
 @Module({
   imports: [
@@ -20,10 +30,16 @@ import { OrderSchema } from '../sales/orders/schemas/order.schema';
       { name: Category.name, schema: CategorySchema },
       { name: 'Product', schema: ProductSchema },
       { name: 'Order', schema: OrderSchema },
+      { name: Coupon.name, schema: CouponSchema },
+      { name: User.name, schema: UserSchema },
     ]),
+    OrdersModule,
+    ShippingModule,
+    UsersModule,
+    NotificationsModule,
   ],
   controllers: [TradeInController],
-  providers: [TradeInService],
+  providers: [TradeInService, TradeInNotificationListener],
   exports: [TradeInService],
 })
 export class TradeInModule {}

@@ -16,10 +16,14 @@ interface IShippingOrderData {
   phone: string;
   address: string;
   weight: number;
+  length?: number;
+  width?: number;
+  height?: number;
   codAmount: number;
   wardCode: string;
   districtId: number;
   items: IShippingItem[];
+  isReverse?: boolean; // Cờ nhận diện đơn Trade-in (RMA)
 }
 
 interface IGhnResponse<T> {
@@ -56,23 +60,59 @@ export class GhnService {
   // AC1: Đẩy đơn sang GHN
   async createShippingOrder(orderData: IShippingOrderData) {
     console.log('=== CHECK TOKEN GHN ===', this.apiToken);
-    console.log('=== CHECK SHOP ID ===', this.shopId); // Kiểm tra xem lấy ShopID chưa
+    console.log('=== CHECK SHOP ID ===', this.shopId);
+
+    // XỬ LÝ ĐẢO CHIỀU ĐIỂM A VÀ ĐIỂM B
+    let senderReceiverPayload = {};
+
+    if (orderData.isReverse) {
+      // LUỒNG TRADE-IN: Khách hàng là người GỬI, Shop là người NHẬN
+      senderReceiverPayload = {
+        from_name: orderData.customerName,
+        from_phone: orderData.phone,
+        from_address: orderData.address,
+        from_ward_code: String(orderData.wardCode),
+        from_district_id: Number(orderData.districtId),
+
+        to_name: 'Kho H&N Odyssey (Trade-in)',
+        to_phone: this.configService.get<string>('SHOP_PHONE') || '0986023330',
+        to_address:
+          this.configService.get<string>('SHOP_ADDRESS') ||
+          '217 Đ. Đặng Thuỳ Trâm, Phường 13, Bình Thạnh, Thành phố Hồ Chí Minh',
+
+        // Bắt buộc cấu hình 2 biến này trong file .env để GHN nhận diện chính xác kho nhận hàng
+        to_ward_code:
+          this.configService.get<string>('GHN_SHOP_WARD_CODE') || '20211',
+        to_district_id:
+          Number(this.configService.get<string>('GHN_SHOP_DISTRICT_ID')) ||
+          1444,
+      };
+    } else {
+      // LUỒNG BÁN HÀNG BÌNH THƯỜNG: Shop là người GỬI (GHN tự nhận diện qua ShopId), Khách là người NHẬN
+      senderReceiverPayload = {
+        to_name: orderData.customerName,
+        to_phone: orderData.phone,
+        to_address: orderData.address,
+        to_ward_code: String(orderData.wardCode),
+        to_district_id: Number(orderData.districtId),
+      };
+    }
 
     try {
-      // Chỉ định kiểu trả về của Axios là IGhnResponse<GhnCreateOrderResponse>
       const response = await axios.post<IGhnResponse<GhnCreateOrderResponse>>(
         `${this.apiUrl}/shipping-order/create`,
         {
-          payment_type_id: 2,
-          service_type_id: 2,
+          payment_type_id: 2, // 2: Người gửi / Người tạo đơn trả phí
+          service_type_id: 2, // 2: Chuyển phát chuẩn
           note: orderData.note || 'Hàng dễ vỡ',
           required_note: 'CHOXEMHANGKHONGTHU',
-          to_name: orderData.customerName,
-          to_phone: orderData.phone,
-          to_address: orderData.address,
-          to_ward_code: orderData.wardCode,
-          to_district_id: orderData.districtId,
-          weight: Math.ceil(orderData.weight * 1000),
+
+          ...senderReceiverPayload, // Gắn object đã xử lý địa chỉ vào payload
+
+          weight: Math.ceil(orderData.weight),
+          length: orderData.length || 15,
+          width: orderData.width || 15,
+          height: orderData.height || 15,
           cod_amount: orderData.codAmount,
 
           items: orderData.items.map((item) => ({
@@ -80,7 +120,7 @@ export class GhnService {
             code: item.code,
             quantity: item.quantity,
             price: item.price,
-            weight: Math.ceil(item.weight * 1000) || 500, // Đổi kg ra gram
+            weight: Math.ceil(item.weight) || 500,
           })),
         },
         {
@@ -100,12 +140,10 @@ export class GhnService {
     } catch (err: unknown) {
       let errorMsg = 'Lỗi kết nối GHN';
 
-      // Kiểm tra thủ công thay vì dùng isAxiosError để tránh lỗi "Unsafe call"
       const isAxiosErr =
         typeof err === 'object' && err !== null && 'isAxiosError' in err;
 
       if (isAxiosErr) {
-        // Ép kiểu qua unknown rồi mới sang ISafeAxiosError (Duck-typing)
         const axiosErr = err as unknown as {
           message: string;
           response?: { data?: GhnErrorResponse };
@@ -129,20 +167,32 @@ export class GhnService {
       const response = await axios.post<IGhnResponse<{ token: string }>>(
         `${this.apiUrl}/a5/gen-token`,
         { order_codes: [orderCode] },
-        { headers: { Token: this.apiToken } },
+        {
+          headers: {
+            Token: this.apiToken,
+            ShopId: this.shopId,
+          },
+        },
       );
-      return `https://dev-online-gateway.ghn.vn/a5/public-api/print/${response.data.data.token}`;
+      return `https://dev-online-gateway.ghn.vn/a5/public-api/printA5?token=${response.data.data.token}`;
     } catch (err: unknown) {
+      let errorMsg = 'Lỗi kết nối GHN';
       const isAxiosErr =
         typeof err === 'object' && err !== null && 'isAxiosError' in err;
-      const errMsg = isAxiosErr
-        ? (err as unknown as { message: string }).message
-        : 'Unknown error';
 
-      this.logger.error(`GHN Error: ${errMsg}`);
+      if (isAxiosErr) {
+        const axiosErr = err as unknown as {
+          message: string;
+          response?: { data?: GhnErrorResponse };
+        };
+        errorMsg = axiosErr.response?.data?.message || axiosErr.message;
+      }
+
+      this.logger.error(`GHN Print Label Error: ${errorMsg}`);
+
       throw new HttpException(
-        'Không thể thực hiện thao tác với GHN',
-        HttpStatus.INTERNAL_SERVER_ERROR,
+        `Lỗi từ GHN: ${errorMsg}`,
+        HttpStatus.BAD_REQUEST,
       );
     }
   }
@@ -152,7 +202,7 @@ export class GhnService {
     return axios.post(
       `${this.apiUrl}/shipping-order/cancel`,
       { order_codes: [orderCode] },
-      { headers: { Token: this.apiToken, ShopId: this.shopId } }, // Nhớ truyền cả ShopId khi hủy đơn
+      { headers: { Token: this.apiToken, ShopId: this.shopId } },
     );
   }
 

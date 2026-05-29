@@ -49,6 +49,10 @@ export class UpdateProductPriceDto {
   @Min(1, { message: 'Giá bán phải là số dương (> 0)' }) // AC1 & AC7
   price: number;
 
+  @IsOptional()
+  @IsString()
+  currency?: string;
+
   @IsNotEmpty({ message: 'Ngày áp dụng không được để trống' })
   @IsDateString()
   effective_date: string; // AC1: Ngày bắt đầu có hiệu lực

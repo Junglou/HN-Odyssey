@@ -7,7 +7,6 @@ import {
   Param,
   Post,
   Req,
-  Query,
   Logger,
   UseGuards,
 } from '@nestjs/common';
@@ -172,13 +171,41 @@ export class ShippingController {
 
   @Get('print-label/:waybillCode')
   @ApiOperation({ summary: 'Lấy link in vận đơn' })
-  async printLabel(
-    @Param('waybillCode') waybillCode: string,
-    @Query('provider') provider: string = 'GHN',
-  ) {
-    if (provider.toUpperCase() === 'GHTK') {
-      return { url: await this.ghtkService.getPrintLabel(waybillCode) };
-    }
+  async printLabel(@Param('waybillCode') waybillCode: string) {
     return { url: await this.ghnService.getPrintLabel(waybillCode) };
+  }
+
+  @Get('locations/provinces')
+  @Public()
+  @ApiOperation({ summary: 'Lấy danh sách Tỉnh/Thành phố' })
+  async getProvinces() {
+    return this.shippingService.getProvinces();
+  }
+
+  @Get('locations/districts/:provinceCode')
+  @Public()
+  @ApiOperation({ summary: 'Lấy danh sách Quận/Huyện theo Tỉnh/Thành phố' })
+  async getDistricts(@Param('provinceCode') provinceCode: string) {
+    return this.shippingService.getDistricts(provinceCode);
+  }
+
+  @Get('locations/wards/:districtCode')
+  @Public()
+  @ApiOperation({ summary: 'Lấy danh sách Phường/Xã theo Quận/Huyện' })
+  async getWards(@Param('districtCode') districtCode: string) {
+    return this.shippingService.getWards(districtCode);
+  }
+
+  @Post('seed-locations')
+  @Public() // Đặt public để bạn test luôn, sau khi chạy xong nhớ XÓA API này đi cho an toàn
+  @ApiOperation({ summary: 'Seeder: Đồng bộ dữ liệu Tỉnh/Huyện/Xã từ GHN' })
+  async seedLocations() {
+    // Chạy ngầm để không bị timeout (tác vụ mất khoảng 20-40 giây)
+    await this.shippingService.seedGhnLocations();
+    return {
+      success: true,
+      message:
+        'Tiến trình đồng bộ đã được kích hoạt chạy ngầm. Vui lòng kiểm tra log Terminal của NestJS để xem tiến độ.',
+    };
   }
 }

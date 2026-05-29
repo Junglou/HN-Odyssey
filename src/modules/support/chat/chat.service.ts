@@ -28,9 +28,12 @@ interface ChatResponse {
   _id?: string;
   createdAt?: string;
   conversation_id: string;
+  session_id?: string; // Bổ sung để trả về FE
   sender_type: string;
   content: string;
   conversation_status: string;
+  message_type?: string;
+  metadata?: Record<string, unknown>;
 }
 
 interface SendMessageDto {
@@ -44,6 +47,8 @@ interface SendMessageDto {
 interface AiEngineResponse {
   reply: string;
   action?: string;
+  message_type?: 'TEXT' | 'IMAGE' | 'PRODUCT_CARD' | 'FILE';
+  metadata?: Record<string, unknown>;
 }
 
 // Định nghĩa kiểu dữ liệu con cho kết quả đếm
@@ -114,8 +119,9 @@ export class ChatService {
     });
 
     return {
-      is_new: true,
+      is_new: !conv,
       conversation_id: conv._id.toString(),
+      session_id: conv.session_id,
       status: conv.status,
     };
   }
@@ -447,7 +453,6 @@ export class ChatService {
       metadata: data.metadata || {},
     });
 
-    // Lấy trường createdAt thông qua hàm .get() của Mongoose và ép kiểu về Date
     const createdAt = savedMsg.get('createdAt') as Date;
 
     return {
@@ -457,7 +462,9 @@ export class ChatService {
       sender_type: senderType,
       content: cleanContent,
       conversation_status: status as string,
-    }; // Đã gỡ bỏ hoàn toàn "as any"
+      message_type: savedMsg.message_type,
+      metadata: savedMsg.metadata as Record<string, unknown>,
+    };
   }
 
   async getBotResponse(data: SendMessageDto): Promise<ChatResponse> {
@@ -469,23 +476,32 @@ export class ChatService {
 
     this.logger.debug(`AI raw response: ${JSON.stringify(aiResponse)}`);
 
-    // Bọc lót: Nếu aiResponse.reply bị undefined, dùng câu dự phòng
     const finalReply =
       aiResponse?.reply ||
       'Hệ thống đang quá tải, anh/chị vui lòng thử lại sau vài giây nhé!';
+    const msgType = aiResponse?.message_type || 'TEXT';
+    const msgMetadata = aiResponse?.metadata || {};
 
-    // Lưu nội dung chat của Bot vào database
-    await this.msgModel.create({
+    // Lưu nội dung chat của Bot vào database kèm theo loại tin nhắn
+    const savedMsg = await this.msgModel.create({
       conversation_id: new Types.ObjectId(data.conversationId),
       sender_type: 'BOT',
       content: finalReply,
+      message_type: msgType,
+      metadata: msgMetadata,
     });
 
+    const createdAt = savedMsg.get('createdAt') as Date;
+
     return {
+      _id: savedMsg._id.toString(),
+      createdAt: createdAt.toISOString(),
       conversation_id: data.conversationId,
       sender_type: 'BOT',
       content: finalReply,
       conversation_status: 'BOT',
+      message_type: msgType,
+      metadata: msgMetadata,
     };
   }
 

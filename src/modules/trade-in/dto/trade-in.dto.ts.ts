@@ -22,6 +22,8 @@ export class ShippingAddressDto {
   @IsString() @IsNotEmpty() city: string;
   @IsString() @IsNotEmpty() state: string;
   @IsString() @IsNotEmpty() zip_code: string;
+  @IsNumber() @IsNotEmpty() district_id: number;
+  @IsString() @IsNotEmpty() ward_code: string;
 }
 
 export class CreateTradeInRequestDto {
@@ -33,7 +35,6 @@ export class CreateTradeInRequestDto {
   @IsString() @IsOptional() product_name?: string;
   @IsArray() @IsString({ each: true }) @ArrayMinSize(3) media_urls: string[];
   @IsEnum(EvaluationMethod) @IsNotEmpty() evaluation_method: EvaluationMethod;
-
   @ValidateIf(
     (o: CreateTradeInRequestDto) =>
       o.evaluation_method === EvaluationMethod.SHIPPING,
@@ -68,4 +69,20 @@ export class FinalizeTradeInDto {
 
 export class CancelTradeInDto {
   @IsString() @IsOptional() cancel_note?: string;
+}
+
+export class GhnWebhookPayloadDto {
+  @IsString()
+  OrderCode: string;
+
+  @IsString()
+  Status: string;
+
+  @IsNumber()
+  @IsOptional()
+  TotalFee?: number;
+
+  @IsString()
+  @IsOptional()
+  Time?: string;
 }

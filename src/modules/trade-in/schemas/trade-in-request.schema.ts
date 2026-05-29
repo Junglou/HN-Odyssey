@@ -31,6 +31,8 @@ class ShippingAddress {
   @Prop({ required: true }) city: string;
   @Prop({ required: true }) state: string;
   @Prop({ required: true }) zip_code: string;
+  @Prop({ required: true }) district_id: number;
+  @Prop({ required: true }) ward_code: string;
 }
 
 @Schema({ timestamps: true, collection: 'trade_in_requests' })
@@ -106,6 +108,9 @@ export class TradeInRequest {
     points_earned?: number;
     expiry_date?: string;
   };
+
+  @Prop()
+  device_storage?: string;
 
   @Prop({ default: [] })
   timeline: TimelineItem[];

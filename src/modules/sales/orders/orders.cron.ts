@@ -6,7 +6,6 @@ import { Order } from './schemas/order.schema';
 import { OrdersService } from './orders.service';
 import { OrderStatus } from 'src/common/interfaces/order.interface';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
 
 @Injectable()
 export class OrdersCronService {
@@ -104,6 +103,7 @@ export class OrdersCronService {
     const ordersToComplete = await this.orderModel.find({
       status: OrderStatus.DELIVERED,
       updatedAt: { $lte: sevenDaysAgo },
+      'payment.status': 'PAID',
     });
 
     if (ordersToComplete.length === 0) return;
@@ -119,6 +119,9 @@ export class OrdersCronService {
           {
             status: OrderStatus.COMPLETED,
             note: 'Hệ thống tự động hoàn thành sau 7 ngày giao hàng thành công.',
+            is_override: true, // Bật cờ này lên để vượt qua runGuards
+            reason:
+              'Hệ thống tự động hoàn thành và ghi nhận dòng tiền đơn COD.',
           },
           'SYSTEM_ID',
           'SYSTEM_CRONJOB',

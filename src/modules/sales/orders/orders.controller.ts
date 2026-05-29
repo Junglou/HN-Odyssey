@@ -9,9 +9,10 @@ import {
   Get,
   Query,
   BadRequestException,
+  Res,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-
+import type { Response } from 'express';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { BuyNowDto } from './dto/buy-now.dto';
@@ -33,6 +34,7 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
+import { OrderStatus } from 'src/common/interfaces/order.interface';
 
 @ApiTags('Orders (Quản lý đơn hàng)')
 @Controller('orders')
@@ -87,19 +89,21 @@ export class OrdersController {
     return this.ordersService.previewOrder(dto);
   }
 
-  // 6. IN HÀNG LOẠT
+  // 6. IN HÀNG LOẠT (TRẢ VỀ FILE PDF)
   @Post('print-bulk')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @RequirePermissions(Resource.ORDERS, Action.READ)
-  @ApiOperation({ summary: 'In nhiều đơn hàng cùng lúc' })
+  @ApiOperation({ summary: 'In nhiều đơn hàng cùng lúc (Tải PDF)' })
   async printBulk(
     @Body('ids') ids: string[],
     @Query('type') type: 'INVOICE' | 'PACKING_SLIP',
-  ) {
+    @Res() res: Response, // Lấy Object Response để stream file
+  ): Promise<void> {
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       throw new BadRequestException('Danh sách ID không hợp lệ');
     }
-    return this.ordersService.generateBulkPrintData(ids, type);
+    // Chuyển giao toàn bộ Request cho Service xử lý File
+    await this.ordersService.downloadBulkPdf(ids, type || 'INVOICE', res);
   }
 
   // 7. LẤY DANH SÁCH (Query Params)
@@ -109,6 +113,19 @@ export class OrdersController {
   @ApiOperation({ summary: 'Lấy danh sách đơn hàng (Filter/Sort)' })
   async findAll(@Query() query: FilterOrderDto) {
     return this.ordersService.findAll(query);
+  }
+
+  @Get('export/excel')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @RequirePermissions(Resource.ORDERS, Action.READ)
+  @ApiOperation({ summary: 'Xuất dữ liệu đơn hàng ra Excel' })
+  async exportExcel(
+    @Query() query: FilterOrderDto,
+    @CurrentUser() user: IUser, // Bổ sung tham số lấy thông tin người dùng hiện tại
+    @Res() res: Response,
+  ): Promise<void> {
+    const adminId = user._id.toString();
+    await this.ordersService.exportExcel(adminId, query, res);
   }
 
   // NHÓM 2: CÁC ROUTE ĐỘNG (CÓ :id)
@@ -220,5 +237,30 @@ export class OrdersController {
     }));
 
     return { found: true, orders: ordersData };
+  }
+
+  // 12. LẤY LINK IN TEM VẬN CHUYỂN (GHN/GHTK)
+  @Get(':id/shipping-label')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @RequirePermissions(Resource.ORDERS, Action.READ)
+  @ApiOperation({ summary: 'Lấy link in tem vận chuyển từ ĐVVC (GHN/GHTK)' })
+  async getShippingLabel(@Param('id') id: string) {
+    return this.ordersService.getShippingLabel(id);
+  }
+
+  // 13. NHẬN WEBHOOK TỪ ĐƠN VỊ VẬN CHUYỂN
+  @Post('webhook/shipping')
+  @Public()
+  @ApiOperation({ summary: 'Webhook nhận cập nhật trạng thái từ ĐVVC' })
+  async handleShippingWebhook(
+    @Body('waybill_code') waybillCode: string,
+    @Body('status') status: OrderStatus,
+  ) {
+    if (!waybillCode || !status) {
+      throw new BadRequestException(
+        'Dữ liệu webhook không hợp lệ (thiếu waybill_code hoặc status)',
+      );
+    }
+    return this.ordersService.updateStatusByWaybill(waybillCode, status);
   }
 }

@@ -73,6 +73,16 @@ export class ContentController {
     return new BaseResponse(true, 'Lấy danh sách bài viết thành công', data);
   }
 
+  @Get('public/posts')
+  async getPublicPosts(@Query() query: QueryPostDto) {
+    const data = await this.contentService.findAllPosts(query);
+    return new BaseResponse(
+      true,
+      'Lấy danh sách bài viết public thành công',
+      data,
+    );
+  }
+
   @Delete('posts/:id')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions(Resource.BLOG, Action.DELETE)

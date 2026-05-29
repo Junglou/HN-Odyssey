@@ -28,24 +28,23 @@ export class OrderShippingListener {
   @OnEvent('order.ready_to_ship', { async: true })
   async handleReadyToShip(orderPlain: OrderData & { internal_note?: string }) {
     try {
-      // 1. Dùng kiểu ShippingConfig thay vì any
-      const config = await this.shippingService.getDefaultConfig();
-
-      // 2. Ép kiểu rõ ràng là string để ESLint không báo "unsafe"
-      const provider = (
-        orderPlain.shipping_info?.provider ||
-        config?.default_provider ||
-        'GHN'
-      ).toUpperCase();
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const config =
+        (await this.shippingService.getDefaultConfig()) as unknown as {
+          default_provider?: string;
+          box_length?: number;
+          box_width?: number;
+          box_height?: number;
+        };
 
       const sInfo = orderPlain.shipping_info;
 
       const shippingItems = (orderPlain.items || []).map((item: OrderItem) => ({
-        name: item.product_name,
-        code: item.sku,
-        quantity: item.quantity,
-        price: item.price,
-        weight: item.weight ?? 0.5,
+        name: String(item.product_name),
+        code: String(item.sku),
+        quantity: Number(item.quantity),
+        price: Number(item.price),
+        weight: Number(item.weight ?? 0.5),
       }));
 
       const totalWeightKg = shippingItems.reduce(
@@ -57,54 +56,35 @@ export class OrderShippingListener {
         String(sInfo.district_code),
       );
 
-      // Lấy mapping cho Phường (Thêm mới đoạn này)
       const wardMapping = await this.shippingService.getMappingCode(
         String(sInfo.ward_code),
       );
 
-      let shippingResult: { waybillCode: string; actualFee: number };
+      const mappedDistrictId = Number(
+        unitMapping?.mapping?.ghn_id || sInfo.district_code,
+      );
+      const mappedWardCode = String(
+        wardMapping?.mapping?.ghn_ward_code || sInfo.ward_code || '',
+      );
 
-      if (provider === 'GHTK') {
-        const cityMapping = await this.shippingService.getMappingCode(
-          String(sInfo.city_code),
-        );
-        shippingResult = await this.ghtkService.createShippingOrder({
-          orderCode: orderPlain.order_code,
-          customerName: sInfo.name,
-          phone: sInfo.phone,
-          address: sInfo.address,
-          city: cityMapping?.mapping?.ghtk_name || sInfo.city || '',
-          district: sInfo.district || unitMapping?.name_with_type || '',
-          ward: sInfo.ward || '',
-          codAmount:
-            orderPlain.payment?.method === 'COD' ? orderPlain.total_amount : 0,
-          totalValue: orderPlain.total_amount,
-          items: shippingItems,
-        });
-      } else {
-        const ghnDistrictId =
-          unitMapping?.mapping?.ghn_id || Number(sInfo.district_code);
-
-        // Ưu tiên lấy ghn_ward_code từ DB, nếu không có thì dùng fallback
-        const ghnWardCode =
-          wardMapping?.mapping?.ghn_ward_code || String(sInfo.ward_code || '');
-
-        shippingResult = await this.ghnService.createShippingOrder({
-          customerName: sInfo.name,
-          phone: sInfo.phone,
-          address: sInfo.address,
-          codAmount:
-            orderPlain.payment?.method === 'COD' ? orderPlain.total_amount : 0,
-          weight: totalWeightKg,
-          wardCode: ghnWardCode,
-          districtId: ghnDistrictId,
-          note: orderPlain.internal_note || 'H&N Odyssey Order',
-          items: shippingItems.map((i) => ({
-            ...i,
-            weight: Math.ceil(i.weight * 1000), // Convert to gram
-          })),
-        });
-      }
+      // Đẩy toàn bộ đơn hàng sang hệ thống của ghn
+      const shippingResult = await this.ghnService.createShippingOrder({
+        customerName: String(sInfo.name),
+        phone: String(sInfo.phone),
+        address: String(sInfo.address),
+        codAmount:
+          orderPlain.payment?.method === 'COD'
+            ? Number(orderPlain.total_amount)
+            : 0,
+        weight: totalWeightKg,
+        wardCode: mappedWardCode,
+        districtId: mappedDistrictId,
+        note: String(orderPlain.internal_note || 'H&N Odyssey Order'),
+        items: shippingItems.map((i) => ({
+          ...i,
+          weight: Math.ceil(i.weight * 1000),
+        })),
+      });
 
       await this.orderModel.findByIdAndUpdate(orderPlain._id, {
         $set: {
@@ -114,7 +94,7 @@ export class OrderShippingListener {
       });
 
       this.logger.log(
-        `Tạo vận đơn thành công cho đơn ${orderPlain.order_code} qua ${provider}`,
+        `Tạo vận đơn thành công cho đơn ${orderPlain.order_code} qua GHN`,
       );
     } catch (error: unknown) {
       const errorMsg =
@@ -125,14 +105,13 @@ export class OrderShippingListener {
 
       await this.orderModel.findByIdAndUpdate(orderPlain._id, {
         $set: {
-          // Đánh dấu để Admin lọc ra các đơn lỗi vận đơn
-          status: OrderStatus.CONFIRMED, // Đẩy ngược về Confirmed để Staff có thể bấm "Giao hàng" lại
+          status: OrderStatus.CONFIRMED,
           internal_note: `[LỖI VẬN CHUYỂN ${new Date().toLocaleString()}]: ${errorMsg}. Vui lòng thử lại.`,
         },
       });
 
       this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
-        severity: 'HIGH', // Hoặc CRITICAL nếu việc tạo đơn là cực kỳ trọng yếu
+        severity: 'HIGH',
         error_code: `SHIPPING_API_ERROR`,
         message: `Mất kết nối hoặc lỗi API từ ĐVVC khi tạo vận đơn cho đơn ${orderPlain.order_code}. Chi tiết: ${errorMsg}`,
         stack_trace: error instanceof Error ? error.stack : undefined,
@@ -142,30 +121,23 @@ export class OrderShippingListener {
 
   @OnEvent('order.cancelled_shipping', { async: true })
   async handleCancelShipping(orderPlain: OrderData) {
-    const provider = (
-      orderPlain.shipping_info?.provider || 'GHN'
-    ).toUpperCase();
-
     try {
       if (orderPlain.waybill_code) {
-        if (provider === 'GHTK') {
-          await this.ghtkService.cancelOrder(orderPlain.waybill_code);
-        } else {
-          await this.ghnService.cancelOrder(orderPlain.waybill_code);
-        }
+        // Chỉ gửi yêu cầu hủy vận đơn qua ghn
+        await this.ghnService.cancelOrder(orderPlain.waybill_code);
         this.logger.log(
-          `Đã hủy vận đơn ${orderPlain.waybill_code} trên hệ thống ${provider}`,
+          `Đã hủy vận đơn ${orderPlain.waybill_code} trên hệ thống GHN`,
         );
       }
     } catch (error: unknown) {
       const errMsg = error instanceof Error ? error.message : String(error);
       this.logger.warn(
-        `Không thể hủy vận đơn ${orderPlain.waybill_code} trên ${provider}: ${errMsg}`,
+        `Không thể hủy vận đơn ${orderPlain.waybill_code} trên GHN: ${errMsg}`,
       );
       this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
-        severity: 'MEDIUM', // Lỗi hủy đơn thì độ ưu tiên thấp hơn tạo đơn
+        severity: 'MEDIUM',
         error_code: `SHIPPING_CANCEL_ERROR`,
-        message: `Lỗi API khi yêu cầu ĐVVC (${provider}) hủy vận đơn ${orderPlain.waybill_code}. Chi tiết: ${errMsg}`,
+        message: `Lỗi API khi yêu cầu ĐVVC (GHN) hủy vận đơn ${orderPlain.waybill_code}. Chi tiết: ${errMsg}`,
       });
     }
   }

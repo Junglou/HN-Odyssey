@@ -7,6 +7,8 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { OnEvent } from '@nestjs/event-emitter';
+import type { TradeInSocketPayload } from './listeners/notification.listener';
 
 // Định nghĩa Interface cho Payload để tránh dùng 'any'
 interface JwtPayload {
@@ -85,5 +87,17 @@ export class NotificationsGateway
   // AC8: Gửi tin nhắn tới room cụ thể
   sendToRoom(room: string, event: string, data: unknown) {
     this.server.to(room).emit(event, data);
+  }
+
+  @OnEvent('trade_in.status_updated', { async: true })
+  handleTradeInStatusUpdated(payload: TradeInSocketPayload): void {
+    this.server.emit('trade_in_status_updated', {
+      requestCode: payload.requestCode,
+      status: payload.status,
+    });
+
+    this.logger.log(
+      `Đã broadcast cập nhật trạng thái Trade-in qua Socket: ${payload.requestCode}`,
+    );
   }
 }

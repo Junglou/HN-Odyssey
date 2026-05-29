@@ -71,6 +71,9 @@ export enum PriceRequestStatus {
 export class PriceRequest {
   @Prop({ required: true }) price: number;
 
+  @Prop({ default: 'VND' })
+  currency: string;
+
   @Prop({ type: [PendingVariantPrice], default: [] })
   variants?: PendingVariantPrice[];
 
@@ -186,6 +189,9 @@ export class Product {
   //GIÁ & KHUYẾN MÃI (US.75)
   @Prop({ required: true, default: 0 })
   price: number;
+
+  @Prop({ default: 'VND' })
+  currency: string;
 
   @Prop({ default: 0 })
   sale_price: number;

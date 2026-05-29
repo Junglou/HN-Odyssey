@@ -11,6 +11,7 @@ import { Order } from 'src/modules/sales/orders/schemas/order.schema';
 import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
 import { WebhookService } from '../channels/webhook.service';
 import { UsersService } from 'src/modules/users/user.Service';
+import { TradeInStatus } from 'src/common/enums/trade-in.enum';
 
 interface StockAlertPayload {
   product: { _id: string; name: string; warehouse_id: string };
@@ -32,6 +33,11 @@ interface TradeInAcceptedPayload {
   product_name: string;
   final_value: number;
   rma_order_code: string;
+}
+
+export interface TradeInSocketPayload {
+  requestCode: string;
+  status: TradeInStatus;
 }
 
 interface TicketCreatedPayload {
@@ -400,12 +406,12 @@ export class NotificationListener {
 
     // 1. Bắn thông báo In-app (Qua Socket/DB) cho nhân viên CSKH hoặc Admin
     await this.notificationsService.createAndSend({
-      recipient_role: 'SUPPORT_STAFF', // Hoặc 'SUPER_ADMIN' tùy thuộc vào logic phân quyền của bạn
+      recipient_role: 'SUPPORT_STAFF',
       title: 'Có yêu cầu hỗ trợ mới (Offline Ticket)',
       message: `Khách hàng (${data.email}) vừa gửi lời nhắn: "${data.content.substring(0, 50)}..."`,
-      type: NotificationType.SYSTEM, // Nếu bạn có NotificationType.SUPPORT trong enum thì thay vào nhé
+      type: NotificationType.SYSTEM,
       priority: NotificationPriority.HIGH,
-      metadata: { target_url: `/crm/support/chats/${data.ticketId}` }, // Dẫn link trực tiếp tới Portal
+      metadata: { target_url: `/crm/support/chats/${data.ticketId}` },
     });
 
     // 2. (Tùy chọn) Gửi Email thông báo cho Trưởng bộ phận CSKH / Email dùng chung

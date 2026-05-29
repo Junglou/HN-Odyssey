@@ -61,6 +61,6 @@ import { OrderSeederService } from './SeedOrder/order-seeder.service';
     OrderSeederService,
     OrderSeederCommand,
   ],
-  exports: [OrdersService],
+  exports: [OrdersService, PdfService],
 })
 export class OrdersModule {}

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { AnyBulkWriteOperation, Model } from 'mongoose';
 import {
   INNER_DISTRICTS,
   SHIPPING_FEES,
@@ -10,12 +10,36 @@ import { ShippingConfig } from './schemas/shipping-config.schema';
 import {
   AdministrativeUnit,
   AdministrativeUnitDocument,
+  UnitType,
 } from './schemas/administrative-unit.schema';
 
 export interface IShippingConfig {
   default_provider: string;
   ghn_config?: { token: string; shop_id: number; is_active: boolean };
   ghtk_config?: { token: string; is_active: boolean };
+}
+
+// BƯỚC 1: ĐỊNH NGHĨA INTERFACE CHO DỮ LIỆU GHN ĐỂ XÓA LỖI ANY VÀ ESLINT
+interface GhnProvince {
+  ProvinceID: number;
+  ProvinceName: string;
+}
+
+interface GhnDistrict {
+  DistrictID: number;
+  DistrictName: string;
+}
+
+interface GhnWard {
+  WardCode: string;
+  WardName: string;
+}
+
+// BỔ SUNG KHUÔN (GENERIC INTERFACE) CHO RESPONSE CỦA FETCH ĐỂ FIX LỖI 2552
+interface GhnResponse<T> {
+  code: number;
+  message: string;
+  data: T;
 }
 
 @Injectable()
@@ -31,11 +55,10 @@ export class ShippingService {
   async getDefaultConfig(): Promise<IShippingConfig | null> {
     return await this.shippingConfigModel
       .findOne({ code: 'DEFAULT_CONFIG' })
-      .lean<IShippingConfig>() // Ép kiểu ngay tại đây để Mongoose trả về đúng Interface
+      .lean<IShippingConfig>()
       .exec();
   }
 
-  // Nên thêm kiểu trả về cho hàm này luôn để các biến unitMapping bên kia không bị lỗi 'any'
   async getMappingCode(gsoCode: string): Promise<AdministrativeUnit | null> {
     return this.unitModel.findOne({ code: gsoCode }).lean().exec();
   }
@@ -54,12 +77,10 @@ export class ShippingService {
       );
     }
 
-    // 1. Lấy Config từ DB (Ưu tiên config động)
     const config = await this.shippingConfigModel
       .findOne({ code: 'DEFAULT_CONFIG' })
       .lean();
 
-    // 2. Định nghĩa Fallback & Merge Type an toàn
     const defaultFees = {
       inner_city: SHIPPING_FEES.INNER_CITY,
       outer_city: SHIPPING_FEES.OUTER_CITY,
@@ -70,14 +91,12 @@ export class ShippingService {
       max_weight_standard: SHIPPING_FEES.MAX_WEIGHT_STANDARD,
     };
 
-    // Ép kiểu config.fees về dạng đầy đủ
     const fees = config?.fees
       ? { ...defaultFees, ...config.fees }
       : defaultFees;
 
     const innerDistrictsMap = config?.inner_districts || INNER_DISTRICTS;
 
-    // 3. Tính trọng lượng tổng
     const totalWeight = items.reduce((w, i) => {
       const itemWithWeight = i as unknown as {
         weight?: number;
@@ -95,18 +114,15 @@ export class ShippingService {
       return w + weightPerItem * i.quantity;
     }, 0);
 
-    // Validate trọng lượng tối đa
     if (totalWeight > fees.max_weight_standard) {
       throw new BadRequestException(
         `Đơn hàng quá nặng (> ${fees.max_weight_standard}kg). Vui lòng liên hệ hotline.`,
       );
     }
 
-    // 4. Logic Vùng miền
     let baseFee = fees.other_province;
     let isInnerCity = false;
 
-    // Kiểm tra TP.HCM (79) hoặc Hà Nội (01)
     if (['79', '01'].includes(cityCode)) {
       const districtList =
         innerDistrictsMap[cityCode as keyof typeof innerDistrictsMap] || [];
@@ -119,7 +135,6 @@ export class ShippingService {
       }
     }
 
-    // 5. Logic Hỏa tốc
     if (isInstant) {
       if (!['79', '01'].includes(cityCode)) {
         throw new BadRequestException(
@@ -139,17 +154,177 @@ export class ShippingService {
         timeZone: 'Asia/Ho_Chi_Minh',
       });
       const currentHour = new Date(vnTime).getHours();
-      // Giờ hành chính: 8h - 16h
       if (currentHour < 8 || currentHour >= 16) {
         throw new BadRequestException('Hỏa tốc chỉ hoạt động 08:00 - 16:00.');
       }
     }
 
-    // 6. Tổng phí
     let totalFee = baseFee;
-    if (totalWeight > 30) totalFee += fees.bulky_surcharge; // Phụ phí cồng kềnh
-    if (isInstant) totalFee += fees.instant_surcharge; // Phụ phí hỏa tốc
+    if (totalWeight > 30) totalFee += fees.bulky_surcharge;
+    if (isInstant) totalFee += fees.instant_surcharge;
 
     return totalFee;
+  }
+
+  async getProvinces(): Promise<AdministrativeUnit[]> {
+    return this.unitModel
+      .find({ type: UnitType.PROVINCE, is_active: true })
+      .sort({ name: 1 })
+      .lean()
+      .exec();
+  }
+
+  async getDistricts(provinceCode: string): Promise<AdministrativeUnit[]> {
+    return this.unitModel
+      .find({
+        type: UnitType.DISTRICT,
+        parent_code: provinceCode,
+        is_active: true,
+      })
+      .sort({ name: 1 })
+      .lean()
+      .exec();
+  }
+
+  async getWards(districtCode: string): Promise<AdministrativeUnit[]> {
+    return this.unitModel
+      .find({ type: UnitType.WARD, parent_code: districtCode, is_active: true })
+      .sort({ name: 1 })
+      .lean()
+      .exec();
+  }
+
+  async seedGhnLocations() {
+    this.logger.log('Bắt đầu đồng bộ dữ liệu địa giới từ hệ thống GHN...');
+
+    const config = await this.shippingConfigModel
+      .findOne({ code: 'DEFAULT_CONFIG' })
+      .lean<IShippingConfig>()
+      .exec();
+
+    // 1. Đã sửa lại đúng tên biến GHN_TOKEN theo file .env của bạn
+    const token = config?.ghn_config?.token || process.env.GHN_TOKEN;
+
+    if (!token) {
+      this.logger.error('Thiếu cấu hình Token GHN.');
+      throw new Error('Chưa cấu hình GHN_TOKEN trong hệ thống.');
+    }
+
+    // 2. CẤU HÌNH MÔI TRƯỜNG GHN (QUAN TRỌNG)
+    // Nếu token của bạn lấy từ khachhang.dev.ghn.vn -> Mở comment dòng DEV, đóng dòng PROD
+    const GHN_BASE_URL =
+      'https://dev-online-gateway.ghn.vn/shiip/public-api/master-data';
+
+    // Nếu token của bạn lấy từ khachhang.ghn.vn (Làm thật) -> Mở comment dòng PROD, đóng dòng DEV
+    // const GHN_BASE_URL = 'https://online-gateway.ghn.vn/shiip/public-api/master-data';
+
+    const headers = {
+      Token: token,
+      'Content-Type': 'application/json',
+    };
+
+    try {
+      // 1. Lấy danh sách Tỉnh/Thành
+      const provRes = await fetch(`${GHN_BASE_URL}/province`, { headers });
+      const provJson = (await provRes.json()) as GhnResponse<GhnProvince[]>;
+
+      if (provJson.code !== 200) {
+        throw new Error(
+          provJson.message || 'Lấy danh sách Tỉnh thất bại từ GHN',
+        );
+      }
+
+      const provinces = provJson.data || [];
+
+      for (const prov of provinces) {
+        const provCode = String(prov.ProvinceID);
+
+        await this.unitModel.findOneAndUpdate(
+          { code: provCode },
+          {
+            code: provCode,
+            name: prov.ProvinceName,
+            name_with_type: prov.ProvinceName,
+            type: UnitType.PROVINCE,
+            parent_code: '',
+            mapping: { ghn_id: prov.ProvinceID, ghtk_name: prov.ProvinceName },
+            is_active: true,
+          },
+          { upsert: true, new: true },
+        );
+        this.logger.log(`[GHN Sync] Đã lưu Tỉnh/Thành: ${prov.ProvinceName}`);
+
+        // 2. Lấy danh sách Quận/Huyện của Tỉnh này
+        const distRes = await fetch(
+          `${GHN_BASE_URL}/district?province_id=${prov.ProvinceID}`,
+          { headers },
+        );
+        const distJson = (await distRes.json()) as GhnResponse<GhnDistrict[]>;
+        const districts = distJson.data || [];
+
+        for (const dist of districts) {
+          const distCode = String(dist.DistrictID);
+
+          await this.unitModel.findOneAndUpdate(
+            { code: distCode },
+            {
+              code: distCode,
+              name: dist.DistrictName,
+              name_with_type: dist.DistrictName,
+              type: UnitType.DISTRICT,
+              parent_code: provCode,
+              mapping: {
+                ghn_id: dist.DistrictID,
+                ghtk_name: dist.DistrictName,
+              },
+              is_active: true,
+            },
+            { upsert: true, new: true },
+          );
+
+          // 3. Lấy danh sách Phường/Xã của Quận/Huyện này
+          const wardRes = await fetch(
+            `${GHN_BASE_URL}/ward?district_id=${dist.DistrictID}`,
+            { headers },
+          );
+          const wardJson = (await wardRes.json()) as GhnResponse<GhnWard[]>;
+          const wards = wardJson.data || [];
+
+          if (wards.length > 0) {
+            const wardOps: AnyBulkWriteOperation<AdministrativeUnitDocument>[] =
+              wards.map((ward) => ({
+                updateOne: {
+                  filter: { code: String(ward.WardCode) },
+                  update: {
+                    $set: {
+                      code: String(ward.WardCode),
+                      name: ward.WardName,
+                      name_with_type: ward.WardName,
+                      type: UnitType.WARD,
+                      parent_code: distCode,
+                      mapping: {
+                        ghn_ward_code: String(ward.WardCode),
+                        ghtk_name: ward.WardName,
+                      },
+                      is_active: true,
+                    },
+                  },
+                  upsert: true,
+                },
+              }));
+            await this.unitModel.bulkWrite(wardOps);
+          }
+        }
+      }
+
+      this.logger.log('Hoàn tất 100% đồng bộ dữ liệu địa giới từ GHN!');
+      return { success: true, message: 'Đồng bộ dữ liệu thành công' };
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error('Lỗi khi đồng bộ dữ liệu từ GHN:', err.message);
+      throw new Error(
+        'Đồng bộ thất bại, kiểm tra lại cấu hình mạng hoặc Token.',
+      );
+    }
   }
 }

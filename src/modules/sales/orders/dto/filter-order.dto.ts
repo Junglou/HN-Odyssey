@@ -5,6 +5,7 @@ import {
   IsInt,
   Min,
   IsMongoId,
+  ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 
@@ -19,11 +20,14 @@ export class FilterOrderDto {
   @IsString()
   status?: string;
 
+  // Khai báo rõ kiểu dữ liệu (o: FilterOrderDto) để qua mặt ESLint strict mode
   @IsOptional()
+  @ValidateIf((o: FilterOrderDto) => o.fromDate !== '')
   @IsDateString()
   fromDate?: string;
 
   @IsOptional()
+  @ValidateIf((o: FilterOrderDto) => o.toDate !== '')
   @IsDateString()
   toDate?: string;
 

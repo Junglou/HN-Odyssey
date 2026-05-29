@@ -130,6 +130,8 @@ export class CreateProductDto {
   // US.75: Giá & Khuyến mãi (Giá chung cho SP đơn giản)
   @IsOptional() @IsNumber() @Min(0) price?: number;
 
+  @IsOptional() @IsString() currency?: string;
+
   @IsOptional()
   @IsNumber()
   @Min(0)

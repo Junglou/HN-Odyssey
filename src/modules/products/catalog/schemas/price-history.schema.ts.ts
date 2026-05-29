@@ -20,6 +20,9 @@ export class PriceHistory {
   @Prop({ required: true })
   new_price: number;
 
+  @Prop({ default: 'VND' })
+  currency: string;
+
   @Prop({ required: true })
   reason: string; // VD: 'Khuyến mãi tháng 10', 'Cập nhật giá gốc'
 
