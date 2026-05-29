@@ -1,0 +1,203 @@
+/* src/pages/blogNews/BlogDetailPage.css */
+
+.blog-detail-page-wrapper {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #fafafa; /* Khớp màu nền của BlogNewsPage */
+  padding: clamp(20px, 4vw, 40px) clamp(16px, 6vw, 120px);
+  box-sizing: border-box;
+}
+
+/* Căn giữa nội dung đọc cho chuẩn báo chí */
+.blog-detail-container {
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  padding: clamp(20px, 4vw, 48px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.blog-detail-loading,
+.blog-detail-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(40px, 8vw, 100px) 20px;
+  font-family: "Lexend Deca", sans-serif;
+  color: #6b7280;
+  text-align: center;
+  flex-grow: 1;
+}
+
+/* Breadcrumb */
+.blog-detail-breadcrumb {
+  font-family: "Lexend Deca", sans-serif;
+  font-size: clamp(12px, 1vw, 14px);
+  font-weight: 500;
+  color: #9ca3af;
+  margin-bottom: clamp(16px, 2vw, 24px);
+}
+
+.blog-detail-breadcrumb a {
+  color: #4b5563;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.blog-detail-breadcrumb a:hover {
+  color: #111827;
+}
+
+.blog-detail-breadcrumb span {
+  color: #111827;
+}
+
+/* Meta Data */
+.blog-detail-header {
+  margin-bottom: clamp(24px, 3vw, 32px);
+}
+
+.blog-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  font-family: "Lexend Deca", sans-serif;
+}
+
+.blog-detail-category {
+  font-size: clamp(12px, 1vw, 14px);
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background-color: #e8f0fe; /* Có thể inline style động giống thẻ card nếu cần */
+  color: #1a73e8;
+}
+
+.blog-detail-date-author {
+  font-size: clamp(13px, 1.1vw, 14px);
+  color: #6b7280;
+}
+
+/* Title */
+.blog-detail-title {
+  font-family: "Lexend Exa", sans-serif;
+  font-size: clamp(24px, 3vw, 36px);
+  font-weight: 700;
+  line-height: 1.3;
+  color: #111827;
+  margin: 0;
+}
+
+/* Thumbnail */
+.blog-detail-thumbnail-wrap {
+  width: 100%;
+  margin-bottom: clamp(24px, 4vw, 40px);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.blog-detail-thumbnail {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+  max-height: 500px;
+}
+
+/* NỘI DUNG CHÍNH (RICH TEXT TỪ BACKEND) */
+.blog-detail-content {
+  font-family: "Ledger", serif; /* Dùng font có chân cho phần đọc */
+  font-size: clamp(15px, 1.3vw, 17px);
+  line-height: 1.8;
+  color: #374151;
+}
+
+.blog-detail-content p {
+  margin-bottom: 1.6em;
+}
+
+/* Headers trong bài viết */
+.blog-detail-content h1,
+.blog-detail-content h2,
+.blog-detail-content h3,
+.blog-detail-content h4 {
+  font-family: "Lexend Deca", sans-serif; /* Tiêu đề phụ dùng font không chân */
+  color: #111827;
+  margin-top: 1.8em;
+  margin-bottom: 0.8em;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.blog-detail-content h2 {
+  font-size: clamp(20px, 2vw, 24px);
+}
+.blog-detail-content h3 {
+  font-size: clamp(18px, 1.5vw, 20px);
+}
+
+.blog-detail-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 1.5em 0;
+  display: block;
+  border: 1px solid #e5e7eb;
+}
+
+.blog-detail-content ul,
+.blog-detail-content ol {
+  margin-bottom: 1.6em;
+  padding-left: 2em;
+}
+
+.blog-detail-content li {
+  margin-bottom: 0.5em;
+}
+
+.blog-detail-content blockquote {
+  border-left: 4px solid #111827;
+  padding: 16px 20px;
+  margin: 2em 0;
+  font-style: italic;
+  background: #f3f4f6;
+  border-radius: 0 8px 8px 0;
+  color: #4b5563;
+}
+
+/* Footer Action */
+.blog-detail-footer {
+  margin-top: clamp(40px, 6vw, 60px);
+  padding-top: clamp(16px, 2vw, 24px);
+  border-top: 1px solid #e5e7eb;
+  text-align: center;
+}
+
+.blog-detail-back-btn {
+  display: inline-block;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 10px 24px;
+  font-family: "Lexend Deca", sans-serif;
+  font-size: clamp(14px, 1.2vw, 15px);
+  font-weight: 500;
+  color: #374151;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.blog-detail-back-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+  border-color: #9ca3af;
+}

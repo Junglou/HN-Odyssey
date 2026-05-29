@@ -10,7 +10,7 @@ import type {
   OrderStatus,
 } from "../../../../hooks/portal/OrderManagement/OrderManagement/useOrderManagement";
 
-// options
+// Danh sách các tùy chọn cho bộ lọc trạng thái đơn hàng
 const STATUS_OPTIONS = [
   { value: "all", label: "All Statuses" },
   { value: "Pending", label: "Pending" },
@@ -22,7 +22,7 @@ const STATUS_OPTIONS = [
   { value: "Refunded", label: "Refunded" },
 ];
 
-// custom dropdown
+// Component dropdown tùy chỉnh để thay thế thẻ select mặc định của html
 function CustomDropdown({
   value,
   options,
@@ -34,12 +34,11 @@ function CustomDropdown({
   onChange: (val: string) => void;
   className?: string;
 }) {
-  // states
   const [isOpen, setIsOpen] = useState(false);
-  const [hasOpened, setHasOpened] = useState(false); // Thêm state này
+  const [hasOpened, setHasOpened] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // effects
+  // Xử lý sự kiện click ra ngoài để tự động đóng dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -90,7 +89,7 @@ function CustomDropdown({
   );
 }
 
-// props
+// Định nghĩa kiểu dữ liệu truyền vào cho component chính
 interface OrderManagementProps {
   data: OrderRow[];
   filters: {
@@ -121,33 +120,67 @@ interface OrderManagementProps {
     exportExcel: () => void;
     printInvoice: (selectedIds?: string[]) => void;
     printDeliverySlip: (selectedIds?: string[]) => void;
+    printShippingLabel: (orderId: string) => void;
     refreshData: () => void;
   };
 }
 
-// component
+// Hàm tính toán logic hiển thị các nút phân trang có giới hạn số lượng và sử dụng dấu ba chấm
+const getPageNumbers = (
+  currentPage: number,
+  totalPages: number,
+): (number | string)[] => {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, "...", totalPages];
+  }
+
+  if (currentPage >= totalPages - 3) {
+    return [
+      1,
+      "...",
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ];
+  }
+
+  return [
+    1,
+    "...",
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    "...",
+    totalPages,
+  ];
+};
+
+// Component chính quản lý giao diện màn hình danh sách đơn hàng
 export default function OrderManagement({
   data,
   filters,
   pagination,
   actions,
 }: OrderManagementProps) {
-  // states
   const [isLimitOpen, setIsLimitOpen] = useState(false);
   const [hasLimitOpened, setHasLimitOpened] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [prevData, setPrevData] = useState<OrderRow[]>(data);
   const limitRef = useRef<HTMLDivElement>(null);
 
-  // So sánh data trong Render Phase để reset checkbox (Sạch sẽ, không dính lỗi ESLint)
-  if (data !== prevData) {
-    setPrevData(data);
+  // Đặt lại danh sách các dòng được chọn khi dữ liệu bảng thay đổi mới
+  useEffect(() => {
+    //eslint-disable-next-line react-hooks/exhaustive-deps
     setSelectedIds([]);
-  }
+  }, [data]);
 
-  // effects
+  // Xử lý đóng dropdown của phần chọn số lượng bản ghi trên một trang khi người dùng click ra ngoài
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -161,7 +194,6 @@ export default function OrderManagement({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // handlers
   const handleRefresh = () => {
     if (isRefreshing) return;
     setIsRefreshing(true);
@@ -185,10 +217,9 @@ export default function OrderManagement({
     );
   };
 
-  // main render
   return (
     <div className="om-container">
-      {/* header */}
+      {/* Phần header của trang quản lý */}
       <div className="om-header">
         <div>
           <h1 className="om-title">Order Management</h1>
@@ -199,9 +230,8 @@ export default function OrderManagement({
         </button>
       </div>
 
-      {/* card */}
       <div className="om-card">
-        {/* toolbar */}
+        {/* Thanh công cụ chứa các bộ lọc tìm kiếm và các nút thao tác nhanh */}
         <div className="om-filters-row">
           <input
             type="text"
@@ -303,7 +333,7 @@ export default function OrderManagement({
           </button>
         </div>
 
-        {/* table */}
+        {/* Khu vực bảng hiển thị danh sách đơn hàng */}
         <div className="om-table-container">
           <table className="om-table">
             <thead>
@@ -335,11 +365,8 @@ export default function OrderManagement({
                 </tr>
               ) : (
                 data.map((order) => {
-                  /* TODO (Backend Integration - 24h Grace Period):
-                    Sau này BE sẽ trả về cờ `isEditable: boolean` cho từng dòng.
-                    Cờ này được BE tính dựa trên: Nếu cập nhật thủ công < 24h thì true, ngược lại false.
-                    FE lúc đó chỉ cần lấy: const canUpdate = order.isEditable;
-                  */
+                  // Cờ này sẽ được tích hợp từ backend sau để kiểm tra điều kiện được phép chỉnh sửa dưới hai mươi bốn giờ
+                  // Tạm thời giao diện tự tính toán quyền được cập nhật trạng thái đơn
                   const isTerminal = [
                     "Delivered",
                     "Cancelled",
@@ -398,6 +425,7 @@ export default function OrderManagement({
                             <EyeIcon />
                           </button>
 
+                          {/* Nút thực hiện chức năng duyệt xác nhận đơn hàng */}
                           {order.orderStatus === "Pending" && (
                             <button
                               type="button"
@@ -414,6 +442,7 @@ export default function OrderManagement({
                             </button>
                           )}
 
+                          {/* Nút dùng để chuyển trạng thái đơn hàng sang tiến hành đóng gói */}
                           {order.orderStatus === "Confirmed" && (
                             <button
                               type="button"
@@ -430,6 +459,43 @@ export default function OrderManagement({
                             </button>
                           )}
 
+                          {/* Nút yêu cầu tạo đơn phía đơn vị vận chuyển chỉ hiển thị khi đơn đang đóng gói và chưa có mã vận đơn */}
+                          {order.orderStatus === "Packaging" &&
+                            !order.waybillCode && (
+                              <button
+                                type="button"
+                                className="om-btn-outline-primary"
+                                onClick={(e) => {
+                                  actions.advanceOrderStatus(
+                                    order.id,
+                                    "READY_TO_SHIP",
+                                  );
+                                  e.currentTarget.blur();
+                                }}
+                              >
+                                Tạo Đơn GHN
+                              </button>
+                            )}
+
+                          {/* Nút chuyển trạng thái giao hàng hiển thị khi đã có mã vận đơn */}
+                          {order.orderStatus === "Packaging" &&
+                            order.waybillCode && (
+                              <button
+                                type="button"
+                                className="om-btn-outline-primary"
+                                onClick={(e) => {
+                                  actions.advanceOrderStatus(
+                                    order.id,
+                                    "Shipping",
+                                  );
+                                  e.currentTarget.blur();
+                                }}
+                              >
+                                Giao Cho ĐVVC
+                              </button>
+                            )}
+
+                          {/* Nút mở modal để cập nhật thay đổi trạng thái thủ công */}
                           {canUpdate && (
                             <button
                               type="button"
@@ -445,6 +511,23 @@ export default function OrderManagement({
                               Update Status
                             </button>
                           )}
+
+                          {/* Nút bấm in tem của đơn vị vận chuyển được phép hiển thị khi quá trình giao hàng đã bắt đầu */}
+                          {["Shipping", "Delivered"].includes(
+                            order.orderStatus,
+                          ) && (
+                            <button
+                              type="button"
+                              className="om-btn-outline-primary"
+                              title="In Tem Giao Hàng GHN/GHTK"
+                              onClick={(e) => {
+                                actions.printShippingLabel(order.id);
+                                e.currentTarget.blur();
+                              }}
+                            >
+                              Tem ĐVVC
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -455,7 +538,7 @@ export default function OrderManagement({
           </table>
         </div>
 
-        {/* pagination */}
+        {/* Khu vực điều khiển việc phân trang ở bên dưới bảng danh sách */}
         <div className="om-pagination">
           <span>
             Showing {pagination.startIndex} - {pagination.endIndex} of{" "}
@@ -475,20 +558,39 @@ export default function OrderManagement({
               &lt;
             </button>
 
-            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(
-              (num) => (
-                <button
-                  type="button"
-                  key={num}
-                  className={`om-btn-page ${pagination.page === num ? "active" : ""}`}
-                  onClick={(e) => {
-                    actions.changePage(num);
-                    e.currentTarget.blur();
-                  }}
-                >
-                  {num}
-                </button>
-              ),
+            {/* Render các nút số trang đã được xử lý để thu gọn khi số lượng trang quá nhiều */}
+            {getPageNumbers(pagination.page, pagination.totalPages).map(
+              (item, index) => {
+                if (item === "...") {
+                  return (
+                    <span
+                      key={`ellipsis-${index}`}
+                      style={{
+                        padding: "0 4px",
+                        color: "#6b7280",
+                        alignSelf: "center",
+                      }}
+                    >
+                      ...
+                    </span>
+                  );
+                }
+
+                const num = item as number;
+                return (
+                  <button
+                    type="button"
+                    key={`page-${num}`}
+                    className={`om-btn-page ${pagination.page === num ? "active" : ""}`}
+                    onClick={(e) => {
+                      actions.changePage(num);
+                      e.currentTarget.blur();
+                    }}
+                  >
+                    {num}
+                  </button>
+                );
+              },
             )}
 
             <button

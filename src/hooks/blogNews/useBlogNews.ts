@@ -1,9 +1,10 @@
-// imports
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import axiosClient from "../../api/axiosClient";
 
 // types
 export interface BlogNewsPost {
   id: string;
+  slug: string;
   title: string;
   summary: string;
   thumbnail: string;
@@ -12,95 +13,122 @@ export interface BlogNewsPost {
   published_at: string;
 }
 
-// mock data
-const MOCK_POSTS: BlogNewsPost[] = [
-  {
-    id: "1",
-    title: "Holiday Gift Guide 2024",
-    summary:
-      "Explore our curated selection of the best gifts for everyone on your list this holiday season.",
-    thumbnail: "https://via.placeholder.com/600x400?text=Gift+Guide",
-    category_id: { _id: "c1", name: "Promotions" },
-    author_id: { _id: "a1", full_name: "Alex Johnson" },
-    published_at: "Nov 15, 2024",
-  },
-  {
-    id: "2",
-    title: "Solo Survivor",
-    summary:
-      "Survive on your own terms. Discover trends, company updates and Guides.",
-    thumbnail: "https://via.placeholder.com/600x400?text=Solo+Survivor",
-    category_id: { _id: "c2", name: "Company News" },
-    author_id: { _id: "a1", full_name: "Alex Johnson" },
-    published_at: "Nov 14, 2024",
-  },
-  {
-    id: "3",
-    title: "Winter Collection Reveal",
-    summary: "Get ready for the cold season with our new winter lineup.",
-    thumbnail: "https://via.placeholder.com/600x400?text=Winter",
-    category_id: { _id: "c3", name: "Product Guides" },
-    author_id: { _id: "a2", full_name: "Sarah Lee" },
-    published_at: "Nov 10, 2024",
-  },
-  {
-    id: "4",
-    title: "Tech Innovations in Retail",
-    summary: "How AI is changing the shopping experience.",
-    thumbnail: "https://via.placeholder.com/600x400?text=Tech",
-    category_id: { _id: "c4", name: "Industry Trends" },
-    author_id: { _id: "a3", full_name: "Mike Ross" },
-    published_at: "Nov 05, 2024",
-  },
-  {
-    id: "5",
-    title: "Black Friday Early Access",
-    summary: "Exclusive early access deals for VIP members.",
-    thumbnail: "https://via.placeholder.com/600x400?text=Black+Friday",
-    category_id: { _id: "c1", name: "Promotions" },
-    author_id: { _id: "a1", full_name: "Alex Johnson" },
-    published_at: "Nov 01, 2024",
-  },
-  {
-    id: "6",
-    title: "New Year Updates",
-    summary: "Look forward to exciting things coming this year.",
-    thumbnail: "https://via.placeholder.com/600x400?text=New+Year",
-    category_id: { _id: "c2", name: "Company News" },
-    author_id: { _id: "a2", full_name: "Sarah Lee" },
-    published_at: "Oct 28, 2024",
-  },
-];
+// Định nghĩa chuẩn Type từ Backend trả về để fix lỗi Eslint no-explicit-any
+export interface BEPostResponse {
+  _id: string;
+  slug?: string;
+  title?: string;
+  meta_description?: string;
+  summary?: string;
+  thumbnail?: string;
+  category_id?: { _id: string; name: string } | null;
+  author_id?: { _id: string; full_name?: string; name?: string } | null;
+  published_at?: string;
+  created_at?: string;
+}
 
 const SORT_OPTIONS = ["Latest", "Oldest", "Most Popular"];
 
+// Helper xử lý chuẩn hóa link ảnh gốc của backend
+export const getFullImageUrl = (path: string) => {
+  if (!path) return "";
+  if (path.startsWith("http") || path.startsWith("data:image")) return path;
+
+  const baseUrl = import.meta.env.VITE_API_URL
+    ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, "")
+    : "http://localhost:8080";
+
+  return `${baseUrl}${path.startsWith("/") ? "" : "/"}${path}`;
+};
+
 // hook
 export function useBlogNews() {
-  // states
+  // states Data gốc từ API
+  const [fetchedPosts, setFetchedPosts] = useState<BlogNewsPost[]>([]);
+
+  // states UI hiện tại (Giữ nguyên không đổi để đảm bảo logic render)
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("All articles");
   const [sortBy, setSortBy] = useState("Latest");
   const [currentPage, setCurrentPage] = useState(1);
 
-  // lấy danh mục
-  const categories = useMemo(() => {
-    const uniqueCats = Array.from(
-      new Set(MOCK_POSTS.map((p) => p.category_id.name)),
-    );
-    return ["All articles", ...uniqueCats];
+  // Fetch dữ liệu thật từ Backend
+  useEffect(() => {
+    const fetchPublicPosts = async () => {
+      try {
+        const res = await axiosClient.get("/marketing/content/public/posts", {
+          params: {
+            status: "PUBLISHED",
+            limit: 1000,
+          },
+        });
+
+        if (res.data?.success && Array.isArray(res.data.data?.data)) {
+          // Mapping dữ liệu từ BE về format giao diện FE đang dùng
+          // Đã thay 'any' bằng 'BEPostResponse' để chiều lòng ESLint
+          const mappedPosts: BlogNewsPost[] = res.data.data.data.map(
+            (post: BEPostResponse) => ({
+              id: post._id,
+              slug: post.slug || "",
+              title: post.title || "",
+              summary: post.meta_description || post.summary || "",
+              thumbnail: getFullImageUrl(post.thumbnail || ""),
+              category_id:
+                typeof post.category_id === "object" &&
+                post.category_id !== null
+                  ? { _id: post.category_id._id, name: post.category_id.name }
+                  : { _id: "", name: "Uncategorized" },
+              author_id:
+                typeof post.author_id === "object" && post.author_id !== null
+                  ? {
+                      _id: post.author_id._id,
+                      full_name:
+                        post.author_id.full_name ||
+                        post.author_id.name ||
+                        "Admin",
+                    }
+                  : { _id: "", full_name: "Admin" },
+              published_at:
+                post.published_at ||
+                post.created_at ||
+                new Date().toISOString(),
+            }),
+          );
+
+          setFetchedPosts(mappedPosts);
+        }
+      } catch (error) {
+        console.error("Failed to fetch public posts:", error);
+      }
+    };
+
+    fetchPublicPosts();
   }, []);
 
-  // lọc
+  // Lấy danh mục tự động từ danh sách bài viết thật
+  const categories = useMemo(() => {
+    const uniqueCats = Array.from(
+      new Set(fetchedPosts.map((p) => p.category_id?.name || "Uncategorized")),
+    );
+    return ["All articles", ...uniqueCats];
+  }, [fetchedPosts]);
+
+  // Bộ lọc logic (Dùng data thật đã fetch)
   const filteredPosts = useMemo(() => {
-    let result = [...MOCK_POSTS];
+    let result = [...fetchedPosts];
+
     if (search) {
       result = result.filter((p) =>
         p.title.toLowerCase().includes(search.toLowerCase()),
       );
     }
+
     if (activeCategory !== "All articles") {
-      result = result.filter((p) => p.category_id.name === activeCategory);
+      result = result.filter(
+        (p) => (p.category_id?.name || "Uncategorized") === activeCategory,
+      );
     }
+
     if (sortBy === "Latest") {
       result.sort(
         (a, b) =>
@@ -115,16 +143,18 @@ export function useBlogNews() {
       );
     }
     return result;
-  }, [search, activeCategory, sortBy]);
+  }, [search, activeCategory, sortBy, fetchedPosts]);
 
-  // nhóm danh mục
+  // Nhóm danh mục để render các Section (Giữ nguyên logic)
   const allCategorySections = useMemo(() => {
     if (activeCategory !== "All articles") return [];
+
     const targetCats = categories.filter((c) => c !== "All articles");
+
     return targetCats
       .map((catName) => {
-        const postsInCat = [...MOCK_POSTS]
-          .filter((p) => p.category_id.name === catName)
+        const postsInCat = [...fetchedPosts]
+          .filter((p) => (p.category_id?.name || "Uncategorized") === catName)
           .sort(
             (a, b) =>
               new Date(b.published_at).getTime() -
@@ -133,7 +163,9 @@ export function useBlogNews() {
         return { title: catName, posts: postsInCat };
       })
       .filter((section) => section.posts.length > 0);
-  }, [activeCategory, categories]);
+  }, [activeCategory, categories, fetchedPosts]);
+
+  // === TỪ ĐÂY TRỞ XUỐNG CÁC PHÉP TOÁN PHÂN TRANG HOẠT ĐỘNG AUTO THEO DATA MỚI ===
 
   const totalPages = useMemo(() => {
     if (activeCategory !== "All articles") {
@@ -167,7 +199,8 @@ export function useBlogNews() {
     return filteredPosts.slice(startIndex, endIndex);
   }, [activeCategory, currentPage, filteredPosts]);
 
-  // handlers
+  // === HANDLERS ===
+
   const handleSearchChange = (val: string) => {
     setSearch(val);
     setCurrentPage(1);
@@ -187,6 +220,7 @@ export function useBlogNews() {
     setCurrentPage(page);
   };
 
+  // Trả về exactly 100% properties mà file TSX đang chờ
   return {
     categories,
     sortOptions: SORT_OPTIONS,

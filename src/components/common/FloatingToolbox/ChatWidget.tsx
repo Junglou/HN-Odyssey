@@ -1,6 +1,6 @@
 // imports
 import { useState, useRef, useEffect } from "react";
-import EmojiPicker, { type EmojiClickData } from "emoji-picker-react";
+import EmojiPicker, { EmojiStyle, type EmojiClickData } from "emoji-picker-react";
 import {
   CloseIcon,
   PaperClipIcon,
@@ -9,6 +9,7 @@ import {
   SmileIcon,
 } from "../../../assets/icons/FloatingToolboxIcons";
 import { useChatSupport } from "../../../hooks/common/useChatSupport";
+import axiosClient from "../../../api/axiosClient";
 import "./ChatWidget.css";
 
 // props
@@ -50,27 +51,44 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const uploadRes = await axiosClient.post("/upload/single", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      const baseUrl = import.meta.env.VITE_API_URL.replace("/api", "");
+      const fileUrl = `${baseUrl}${uploadRes.data.path}`;
+
       if (file.type.startsWith("image/")) {
-        // gửi ảnh
-        sendMessage(result, "IMAGE");
+        sendMessage(fileUrl, "IMAGE");
       } else {
-        // gửi file
         const sizeInMB = (file.size / (1024 * 1024)).toFixed(2) + "mb";
-        sendMessage("File đính kèm", "FILE", {
+        sendMessage(fileUrl, "FILE", {
           fileName: file.name,
           fileSize: sizeInMB,
         });
       }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
+    } catch (error) {
+      console.error(error);
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  // xử lý markdown in đậm cho text
+  const formatText = (text: string) => {
+    // tìm các chuỗi nằm trong 2 dấu sao và chuyển thành thẻ strong
+    const htmlText = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    return { __html: htmlText };
   };
 
   // render
@@ -79,7 +97,20 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
       {/* header */}
       <div className="cw-header">
         <div className="cw-header-info">
-          <div className="cw-avatar"></div>
+          <div className="cw-avatar">
+            {/* Thay thế div trống bằng ảnh logo để tránh ô trắng */}
+            <img
+              src="/Logo.png"
+              alt="H&N Odyssey"
+              style={{
+                width: "100%",
+                height: "100%",
+                borderRadius: "50%",
+                objectFit: "cover",
+                display: "block",
+              }}
+            />
+          </div>
           <span className="cw-title">Support</span>
         </div>
         <button className="cw-close-btn" onClick={onClose}>
@@ -96,7 +127,9 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
           >
             <div className="cw-bubble">
               {/* text type */}
-              {msg.message_type === "TEXT" && <p>{msg.content}</p>}
+              {msg.message_type === "TEXT" && (
+                <p dangerouslySetInnerHTML={formatText(msg.content)}></p>
+              )}
 
               {/* image type */}
               {msg.message_type === "IMAGE" && (
@@ -121,6 +154,35 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
                   </div>
                 </div>
               )}
+
+              {/* hiển thị thẻ thông tin sản phẩm có kèm hình ảnh và liên kết chi tiết */}
+              {msg.message_type === "PRODUCT_CARD" && msg.metadata && (
+                <div className="cw-product-card">
+                  {msg.metadata.imageUrl && (
+                    <img
+                      src={msg.metadata.imageUrl}
+                      alt={msg.metadata.name || "Product"}
+                      className="cw-product-img"
+                    />
+                  )}
+                  <div className="cw-product-info">
+                    <h4 className="cw-product-name">{msg.metadata.name}</h4>
+                    <p className="cw-product-desc">
+                      {msg.metadata.description}
+                    </p>
+                    {msg.metadata.link && (
+                      <a
+                        href={msg.metadata.link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="cw-product-link"
+                      >
+                        Xem chi tiết sản phẩm
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -135,6 +197,8 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
             onEmojiClick={onEmojiClick}
             width="100%"
             height="300px"
+            searchDisabled={false}
+            emojiStyle={EmojiStyle.NATIVE}
           />
         </div>
       )}

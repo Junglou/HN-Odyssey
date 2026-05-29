@@ -183,6 +183,7 @@
 /* device column (Dùng style om-item-card) */
 .tim-device-card {
   display: flex;
+  flex-direction: column;
   gap: 16px;
   padding-bottom: 16px;
   border-bottom: 1px solid #e5e7eb;

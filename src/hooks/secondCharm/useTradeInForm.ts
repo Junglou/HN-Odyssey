@@ -1,8 +1,43 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
-// TODO: import axiosClient from "../../api/axiosClient";
+import axiosClient from "../../api/axiosClient";
 
-// Dữ liệu khởi tạo cho form trade-in
+interface TradeInPayload {
+  full_name: string;
+  email: string;
+  phone_number: string;
+  category_id: string;
+  condition_description: string;
+  media_urls: string[];
+  evaluation_method: string;
+  agreed_to_terms: boolean;
+  shipping_address?: {
+    street_address: string;
+    apt_suite: string;
+    city: string;
+    state: string;
+    zip_code: string;
+    district_id: number;
+    ward_code: string;
+  };
+}
+
+interface CategoryNode {
+  _id: string;
+  name: string;
+  children?: CategoryNode[];
+}
+
+// Bổ sung Interface cho dữ liệu Địa giới hành chính
+export interface LocationNode {
+  code: string;
+  name_with_type: string;
+  mapping?: {
+    ghn_id?: number;
+    ghn_ward_code?: string;
+  };
+}
+
 export function useTradeInForm() {
   const [formData, setFormData] = useState({
     fullName: "",
@@ -15,14 +50,158 @@ export function useTradeInForm() {
     aptSuite: "",
     city: "",
     state: "",
-    zipCode: "",
+    zipCode: "700000", // Mặc định zip code
+    districtId: 0,
+    wardCode: "",
     agreeTerms: false,
     photos: [] as File[],
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Hàm xử lý khi người dùng nhập liệu vào input/textarea
+  // --- STATES CHO CATEGORY ---
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>(
+    [],
+  );
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+
+  // --- STATES CHO LOCATION ---
+  const [locations, setLocations] = useState({
+    provinces: [] as LocationNode[],
+    districts: [] as LocationNode[],
+    wards: [] as LocationNode[],
+  });
+
+  // Lưu mã GSO cục bộ để quản lý cấp bậc Dropdown
+  const [selectedLocationCodes, setSelectedLocationCodes] = useState({
+    province: "",
+    district: "",
+    ward: "",
+  });
+
+  // Gọi API lấy Danh mục và danh sách Tỉnh/Thành phố khi khởi tạo
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      setIsLoadingCategories(true);
+      try {
+        // 1. Fetch Categories
+        const catRes = await axiosClient.get("/categories/tree-view");
+        const catData: CategoryNode[] = catRes.data?.data || catRes.data || [];
+        const flatList: { id: string; name: string }[] = [];
+
+        const flatten = (nodes: CategoryNode[], depth = 0) => {
+          nodes.forEach((node) => {
+            const prefix =
+              depth > 0 ? "\u00A0\u00A0\u00A0\u00A0".repeat(depth) : "";
+            flatList.push({ id: node._id, name: `${prefix}${node.name}` });
+            if (node.children && node.children.length > 0) {
+              flatten(node.children, depth + 1);
+            }
+          });
+        };
+        flatten(catData);
+        setCategories(flatList);
+
+        // 2. Fetch Provinces
+        const provRes = await axiosClient.get("/shipping/locations/provinces");
+        const provData = provRes.data?.data || provRes.data || [];
+        setLocations((prev) => ({ ...prev, provinces: provData }));
+      } catch (error) {
+        console.error("Lỗi khi tải dữ liệu khởi tạo:", error);
+        toast.error("Không thể tải một số dữ liệu hệ thống.");
+      } finally {
+        setIsLoadingCategories(false);
+      }
+    };
+
+    fetchInitialData();
+  }, []);
+
+  // --- LOCATION HANDLERS ---
+  const handleProvinceChange = async (
+    e: React.ChangeEvent<HTMLSelectElement>,
+  ) => {
+    const provinceCode = e.target.value;
+    const provinceName = e.target.options[e.target.selectedIndex].text;
+
+    // Reset cấp dưới
+    setSelectedLocationCodes({
+      province: provinceCode,
+      district: "",
+      ward: "",
+    });
+    setFormData((prev) => ({
+      ...prev,
+      city: provinceName,
+      state: provinceName,
+      districtId: 0,
+      wardCode: "",
+    }));
+    setLocations((prev) => ({ ...prev, districts: [], wards: [] }));
+
+    if (provinceCode) {
+      try {
+        const res = await axiosClient.get(
+          `/shipping/locations/districts/${provinceCode}`,
+        );
+        setLocations((prev) => ({
+          ...prev,
+          districts: res.data?.data || res.data || [],
+        }));
+      } catch (error) {
+        console.error("Lỗi tải Quận/Huyện", error);
+      }
+    }
+  };
+
+  const handleDistrictChange = async (
+    e: React.ChangeEvent<HTMLSelectElement>,
+  ) => {
+    const districtCode = e.target.value;
+    const selectedDistrict = locations.districts.find(
+      (d) => d.code === districtCode,
+    );
+
+    // Lưu ghn_id vào districtId để gọi GHN sau này
+    setSelectedLocationCodes((prev) => ({
+      ...prev,
+      district: districtCode,
+      ward: "",
+    }));
+    setFormData((prev) => ({
+      ...prev,
+      districtId: selectedDistrict?.mapping?.ghn_id || 0,
+      wardCode: "",
+    }));
+    setLocations((prev) => ({ ...prev, wards: [] }));
+
+    if (districtCode) {
+      try {
+        const res = await axiosClient.get(
+          `/shipping/locations/wards/${districtCode}`,
+        );
+        setLocations((prev) => ({
+          ...prev,
+          wards: res.data?.data || res.data || [],
+        }));
+      } catch (error) {
+        console.error("Lỗi tải Phường/Xã", error);
+      }
+    }
+  };
+
+  const handleWardChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const wardCode = e.target.value;
+    const selectedWard = locations.wards.find((w) => w.code === wardCode);
+
+    // Lưu ghn_ward_code vào wardCode
+    setSelectedLocationCodes((prev) => ({ ...prev, ward: wardCode }));
+    setFormData((prev) => ({
+      ...prev,
+      wardCode: selectedWard?.mapping?.ghn_ward_code || "",
+    }));
+  };
+
   const handleInputChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
@@ -37,7 +216,6 @@ export function useTradeInForm() {
     }
   };
 
-  // Hàm xử lý chọn phương thức đánh giá (store/shipping)
   const setEvaluationMethod = (method: string) => {
     setFormData((prev) => ({ ...prev, evaluationMethod: method }));
   };
@@ -63,9 +241,8 @@ export function useTradeInForm() {
     }));
   };
 
-  // Hàm xử lý Submit Form gửi xuống Backend
   const submitTradeInRequest = async () => {
-    // 1. Validate cơ bản
+    // Validate Client
     if (!formData.agreeTerms) {
       toast.error("Bạn cần đồng ý với điều khoản dịch vụ trước khi gửi.");
       return false;
@@ -75,45 +252,101 @@ export function useTradeInForm() {
       return false;
     }
 
+    let formattedPhone = formData.phone.trim();
+    if (formattedPhone.startsWith("+84")) {
+      formattedPhone = "0" + formattedPhone.slice(3);
+    } else if (
+      formattedPhone.startsWith("84") &&
+      formattedPhone.length === 11
+    ) {
+      formattedPhone = "0" + formattedPhone.slice(2);
+    }
+
+    const phoneRegex = /^0[3|5|7|8|9][0-9]{8}$/;
+    if (!phoneRegex.test(formattedPhone)) {
+      toast.error(
+        "Số điện thoại không hợp lệ. Vui lòng nhập chuẩn 10 số của Việt Nam.",
+      );
+      return false;
+    }
+
+    if (formData.photos.length < 3) {
+      toast.error("Hệ thống yêu cầu cung cấp tối thiểu 3 hình ảnh thiết bị.");
+      return false;
+    }
+
+    // GHN Validation
+    if (formData.evaluationMethod === "shipping") {
+      if (
+        !formData.streetAddress ||
+        !formData.city ||
+        !formData.districtId ||
+        Number(formData.districtId) === 0 ||
+        !formData.wardCode ||
+        formData.wardCode.trim() === ""
+      ) {
+        toast.error(
+          "Vui lòng chọn đầy đủ Tỉnh/Thành phố, Quận/Huyện và Phường/Xã từ danh sách.",
+        );
+        return false;
+      }
+    }
+
     setIsSubmitting(true);
 
     try {
-      // 2. Vì có chứa file ảnh, phải dùng FormData thay vì JSON thuần
-      const payload = new FormData();
-      payload.append("fullName", formData.fullName);
-      payload.append("email", formData.email);
-      payload.append("phone", formData.phone);
-      payload.append("category", formData.category);
-      payload.append("description", formData.description);
-      payload.append("evaluationMethod", formData.evaluationMethod);
-
-      // Nếu chọn shipping thì append thêm địa chỉ
-      if (formData.evaluationMethod === "shipping") {
-        payload.append("streetAddress", formData.streetAddress);
-        payload.append("aptSuite", formData.aptSuite);
-        payload.append("city", formData.city);
-        payload.append("state", formData.state);
-        payload.append("zipCode", formData.zipCode);
-      }
-
-      // Append từng file ảnh vào payload
+      const uploadPayload = new FormData();
       formData.photos.forEach((file) => {
-        payload.append("photos", file);
+        uploadPayload.append("files", file);
       });
 
-      // TODO: Mở comment khi BE đã sẵn sàng API
-      // await axiosClient.post("/trade-ins/requests", payload, {
-      //   headers: {
-      //     "Content-Type": "multipart/form-data",
-      //   },
-      // });
+      const uploadRes = await axiosClient.post(
+        "/upload/multiple",
+        uploadPayload,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        },
+      );
 
-      // Giả lập delay gọi API
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const uploadedImages = uploadRes.data?.data || [];
+      const mediaUrls = uploadedImages.map((img: { path: string }) => img.path);
+
+      if (mediaUrls.length < 3) {
+        toast.error("Tải ảnh thất bại, vui lòng thử lại.");
+        setIsSubmitting(false);
+        return false;
+      }
+
+      const evalMethodBE =
+        formData.evaluationMethod === "shipping" ? "SHIPPING" : "VISIT_STORE";
+
+      const tradeInPayload: TradeInPayload = {
+        full_name: formData.fullName,
+        email: formData.email,
+        phone_number: formattedPhone,
+        category_id: formData.category,
+        condition_description: formData.description,
+        media_urls: mediaUrls,
+        evaluation_method: evalMethodBE,
+        agreed_to_terms: formData.agreeTerms,
+      };
+
+      if (evalMethodBE === "SHIPPING") {
+        tradeInPayload.shipping_address = {
+          street_address: formData.streetAddress,
+          apt_suite: formData.aptSuite || "",
+          city: formData.city,
+          state: formData.state || formData.city,
+          zip_code: formData.zipCode || "700000",
+          district_id: Number(formData.districtId),
+          ward_code: String(formData.wardCode),
+        };
+      }
+
+      await axiosClient.post("/trade-in/request", tradeInPayload);
 
       toast.success("Yêu cầu Trade-in của bạn đã được gửi thành công!");
 
-      // 3. Reset form sau khi gửi thành công
       setFormData({
         fullName: "",
         email: "",
@@ -125,14 +358,29 @@ export function useTradeInForm() {
         aptSuite: "",
         city: "",
         state: "",
-        zipCode: "",
+        zipCode: "700000",
+        districtId: 0,
+        wardCode: "",
         agreeTerms: false,
         photos: [],
       });
+      setSelectedLocationCodes({ province: "", district: "", ward: "" });
+
       return true;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Lỗi khi gửi yêu cầu Trade-in:", error);
-      toast.error("Đã có lỗi xảy ra. Vui lòng thử lại sau.");
+      const err = error as {
+        response?: { data?: { message?: string | string[] } };
+        message?: string;
+      };
+      const errMsg =
+        err?.response?.data?.message || err?.message || "Đã có lỗi xảy ra.";
+      const finalMsg = Array.isArray(errMsg) ? errMsg[0] : errMsg;
+      toast.error(
+        typeof finalMsg === "string"
+          ? finalMsg
+          : "Lỗi xác thực dữ liệu từ máy chủ.",
+      );
       return false;
     } finally {
       setIsSubmitting(false);
@@ -141,6 +389,13 @@ export function useTradeInForm() {
 
   return {
     formData,
+    categories,
+    isLoadingCategories,
+    locations, // Export thêm cục này
+    selectedLocationCodes, // Export thêm cục này
+    handleProvinceChange, // Export
+    handleDistrictChange, // Export
+    handleWardChange, // Export
     isSubmitting,
     handleInputChange,
     setEvaluationMethod,

@@ -1,14 +1,19 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { toast } from "react-toastify";
+import axiosClient from "../../../../api/axiosClient";
 
-// types
+// 1. FE TYPES (GIỮ NGUYÊN THEO COMPONENT YÊU CẦU)
+
 export type OrderStatus =
   | "Pending"
   | "Confirmed"
   | "Packaging"
+  | "READY_TO_SHIP"
   | "Shipping"
   | "Delivered"
   | "Cancelled"
   | "Refunded";
+
 export type PaymentStatus = "Unpaid" | "Paid" | "Refunded";
 
 export interface OrderItem {
@@ -46,124 +51,113 @@ export interface OrderRow {
   items: OrderItem[];
   timeline: OrderTimeline[];
   note?: string;
+  waybillCode?: string;
 }
 
-// mock data
-const MOCK_ORDERS: OrderRow[] = [
-  {
-    id: "1",
-    orderCode: "ORD-123-001",
-    customerName: "Nguyen Van A",
-    customerPhone: "0901234567",
-    email: "nguyenvana@gmail.com",
-    shippingAddress: "123 Le Loi, D1, HCM",
-    orderDate: "2024-05-26T10:30:00Z",
-    shipDate: "2024-05-28T00:00:00Z",
-    subtotal: 45.99,
-    shipFee: 5.0,
-    totalAmount: 50.99,
-    paymentStatus: "Unpaid",
-    orderStatus: "Pending",
-    createdBy: "Customer",
-    items: [
-      {
-        id: "i1",
-        sku: "SKU01",
-        productName: "Ration 1",
-        description: "Instant energy supply with no cooking required.",
-        quantity: 1,
-        price: 45.99,
-        image: "https://via.placeholder.com/120x80",
-      },
-    ],
-    timeline: [
-      {
-        status: "Order Placed",
-        date: "2024-05-26T10:30:00Z",
-        description: "Customer placed order",
-        isCompleted: true,
-      },
-    ],
-  },
-  {
-    id: "2",
-    orderCode: "ORD-123-002",
-    customerName: "Tran Thi B",
-    customerPhone: "0987654321",
-    email: "tranthib@gmail.com",
-    shippingAddress: "456 Nguyen Van Linh, D7, HCM",
-    orderDate: "2024-05-25T14:15:00Z",
-    subtotal: 90.99,
-    shipFee: 10.0,
-    totalAmount: 100.99,
-    paymentStatus: "Paid",
-    orderStatus: "Confirmed",
-    createdBy: "Sales Staff",
-    items: [
-      {
-        id: "i2",
-        sku: "SKU02",
-        productName: "Mechanical Keyboard",
-        quantity: 2,
-        price: 45.495,
-        image: "https://via.placeholder.com/40",
-      },
-    ],
-    timeline: [
-      {
-        status: "Order Placed",
-        date: "2024-05-25T14:00:00Z",
-        description: "Sales staff created order",
-        isCompleted: true,
-      },
-      {
-        status: "Confirmed",
-        date: "2024-05-25T14:15:00Z",
-        description: "Admin confirmed",
-        isCompleted: true,
-      },
-    ],
-  },
-  {
-    id: "3",
-    orderCode: "ORD-123-003",
-    customerName: "Le Van C",
-    customerPhone: "0933444555",
-    email: "levanc@hotmail.com",
-    shippingAddress: "789 Tran Hung Dao, D5, HCM",
-    orderDate: "2024-05-24T09:00:00Z",
-    subtotal: 65.99,
-    shipFee: 10.0,
-    totalAmount: 75.99,
-    paymentStatus: "Paid",
-    orderStatus: "Shipping",
-    createdBy: "Customer",
-    items: [],
-    timeline: [],
-  },
-  {
-    id: "4",
-    orderCode: "ORD-123-004",
-    customerName: "Pham Thi D",
-    customerPhone: "0911222333",
-    email: "phamthid@company.com",
-    shippingAddress: "111 Nguyen Trai, D1, HCM",
-    orderDate: "2024-05-23T16:45:00Z",
-    subtotal: 114.99,
-    shipFee: 0.0,
-    totalAmount: 114.99,
-    paymentStatus: "Paid",
-    orderStatus: "Delivered",
-    createdBy: "Sales Staff",
-    items: [],
-    timeline: [],
-  },
-];
+// 2. BE TYPES (STRICT TYPING ĐỂ KHÔNG DÙNG 'ANY')
 
-// hook
+interface BeOrderItem {
+  product_id: string;
+  sku: string;
+  product_name: string;
+  price: number;
+  quantity: number;
+  image: string;
+  variant_name?: string;
+}
+
+interface BeTimeline {
+  status: string;
+  timestamp: string;
+  actor: string;
+  note?: string;
+}
+
+interface BeOrderData {
+  _id: string;
+  order_code: string;
+  createdAt: string;
+  total_amount: number;
+  discount_amount: number;
+  shipping_fee?: number;
+  actual_shipping_fee?: number;
+  status: string;
+  payment: {
+    method: string;
+    status: string;
+  };
+  shipping_info?: {
+    name: string;
+    phone: string;
+    email?: string;
+    address: string;
+    district_code?: string;
+    city_code?: string;
+    tracking_code?: string;
+  };
+  guest_info?: {
+    name: string;
+    phone: string;
+    email?: string;
+  };
+  user_id?: string | null;
+  isGuest: boolean;
+  items: BeOrderItem[];
+  timeline: BeTimeline[];
+  internal_note?: string;
+  waybill_code?: string;
+}
+
+interface BeApiResponse {
+  data: BeOrderData[];
+  meta: {
+    total: number;
+    page: number;
+    last_page: number;
+  };
+}
+
+// 3. MAPPERS (DỊCH DATA TỪ BE SANG FE)
+
+const mapPaymentStatus = (beStatus?: string): PaymentStatus => {
+  if (beStatus === "PAID") return "Paid";
+  if (beStatus === "REFUNDED") return "Refunded";
+  return "Unpaid";
+};
+
+// Hàm gom nhóm 17 trạng thái của BE về 7 trạng thái hiển thị của FE
+const mapBeToFeStatus = (beStatus: string): OrderStatus => {
+  const s = beStatus.toUpperCase();
+  if (s === "PENDING" || s === "TEMPORARY") return "Pending";
+  if (["CONFIRMED", "PRIORITY", "TRADE_IN_REVIEW"].includes(s))
+    return "Confirmed";
+  if (["PROCESSING", "ON_HOLD", "READY_TO_SHIP"].includes(s))
+    return "Packaging";
+  if (["SHIPPING", "DELIVERY_FAILED"].includes(s)) return "Shipping";
+  if (["DELIVERED", "COMPLETED"].includes(s)) return "Delivered";
+  if (["CANCELLED"].includes(s)) return "Cancelled";
+  if (["REFUND_PENDING", "REFUND_NEEDED", "REFUNDED", "RETURNED"].includes(s))
+    return "Refunded";
+  return "Pending";
+};
+
+// THÊM MAPPER MỚI: Dịch trạng thái từ UI về chuẩn Backend
+const mapFeToBeStatus = (feStatus: string): string => {
+  if (feStatus === "Packaging") return "PROCESSING";
+  if (feStatus === "Confirmed") return "CONFIRMED";
+  if (feStatus === "Shipping") return "SHIPPING";
+  if (feStatus === "Delivered") return "DELIVERED";
+  if (feStatus === "Cancelled") return "CANCELLED";
+  if (feStatus === "Refunded") return "REFUNDED";
+  if (feStatus === "READY_TO_SHIP") return "READY_TO_SHIP";
+  return "PENDING";
+};
+
+// 4. MAIN HOOK
+
 export function useOrderManagement() {
-  // states
-  const [data, setData] = useState<OrderRow[]>(MOCK_ORDERS);
+  const [data, setData] = useState<OrderRow[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const [filters, setFilters] = useState({
     search: "",
@@ -175,6 +169,8 @@ export function useOrderManagement() {
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
+    total: 0,
+    totalPages: 1,
   });
 
   const [detailDrawer, setDetailDrawer] = useState<{
@@ -195,45 +191,103 @@ export function useOrderManagement() {
     currentStatus: null,
   });
 
-  // derived data
-  const filteredData = useMemo(() => {
-    return data.filter((item) => {
-      const matchSearch =
-        item.orderCode.toLowerCase().includes(filters.search.toLowerCase()) ||
-        item.customerName.toLowerCase().includes(filters.search.toLowerCase());
-      const matchStatus =
-        filters.status === "all" || item.orderStatus === filters.status;
+  const fetchOrders = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Chuẩn bị params để gửi lên BE
+      const params: Record<string, string | number> = {
+        page: pagination.page,
+        limit: pagination.limit,
+      };
 
-      let matchDate = true;
-      if (filters.fromDate || filters.toDate) {
-        const orderDateObj = new Date(item.orderDate);
+      if (filters.search) params.search = filters.search;
+      if (filters.status !== "all") params.status = filters.status;
+      if (filters.fromDate) params.fromDate = filters.fromDate;
+      if (filters.toDate) params.toDate = filters.toDate;
 
-        if (filters.fromDate) {
-          const fromDateObj = new Date(filters.fromDate);
-          fromDateObj.setHours(0, 0, 0, 0);
-          if (orderDateObj < fromDateObj) matchDate = false;
-        }
+      // Gọi API GET /orders
+      const response = await axiosClient.get<BeApiResponse>("/orders", {
+        params,
+      });
 
-        if (filters.toDate) {
-          const toDateObj = new Date(filters.toDate);
-          toDateObj.setHours(23, 59, 59, 999);
-          if (orderDateObj > toDateObj) matchDate = false;
-        }
-      }
+      const beData = response.data.data;
+      const meta = response.data.meta;
 
-      return matchSearch && matchStatus && matchDate;
-    });
-  }, [data, filters]);
+      // Xử lý Map data BE -> FE an toàn
+      const mappedData: OrderRow[] = beData.map((order) => {
+        // Hứng thông tin khách hàng an toàn
+        const customerName =
+          order.shipping_info?.name ||
+          order.guest_info?.name ||
+          "Khách vãng lai";
+        const customerPhone =
+          order.shipping_info?.phone || order.guest_info?.phone || "N/A";
+        const email =
+          order.shipping_info?.email || order.guest_info?.email || "N/A";
+        const address = order.shipping_info?.address || "Nhận tại cửa hàng";
 
-  const totalItems = filteredData.length;
-  const totalPages = Math.ceil(totalItems / pagination.limit) || 1;
+        // Xử lý toán học cho Subtotal (Tổng giá trị item trước giảm giá và ship)
+        const shipFee = order.actual_shipping_fee || order.shipping_fee || 0;
+        const totalAmount = order.total_amount;
+        const subtotal = totalAmount + (order.discount_amount || 0) - shipFee;
 
-  const currentData = useMemo(() => {
-    const start = (pagination.page - 1) * pagination.limit;
-    return filteredData.slice(start, start + pagination.limit);
-  }, [filteredData, pagination]);
+        return {
+          id: order._id,
+          orderCode: order.order_code,
+          customerName: customerName,
+          customerPhone: customerPhone,
+          email: email,
+          shippingAddress: address,
+          orderDate: order.createdAt,
+          subtotal: subtotal > 0 ? subtotal : totalAmount, // Ngừa số âm
+          shipFee: shipFee,
+          totalAmount: totalAmount,
+          paymentStatus: mapPaymentStatus(order.payment?.status),
+          orderStatus: mapBeToFeStatus(order.status),
+          createdBy: order.isGuest ? "Customer" : "Sales Staff",
+          note: order.internal_note,
+          waybillCode:
+            order.waybill_code || order.shipping_info?.tracking_code || "",
 
-  // actions
+          items: order.items.map((item) => ({
+            id: item.sku + item.product_id,
+            sku: item.sku,
+            productName: item.product_name,
+            description: item.variant_name || `SKU: ${item.sku}`,
+            quantity: item.quantity,
+            price: item.price,
+            image: item.image || "",
+          })),
+
+          timeline: order.timeline.map((t) => ({
+            status: mapBeToFeStatus(t.status), // Phiên dịch cả trong timeline
+            date: t.timestamp,
+            description: t.note || t.actor || "Hệ thống cập nhật",
+            isCompleted: true,
+          })),
+        };
+      });
+
+      setData(mappedData);
+      setPagination((prev) => ({
+        ...prev,
+        total: meta.total,
+        totalPages: meta.last_page || 1,
+      }));
+    } catch (error) {
+      console.error("Lỗi khi fetch đơn hàng:", error);
+      // Hiển thị thông báo khi không lấy được dữ liệu
+      toast.error("Không thể tải danh sách đơn hàng từ hệ thống.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [filters, pagination.page, pagination.limit]);
+
+  // Tự động gọi API mỗi khi filter hoặc pagination thay đổi
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
   const actions = {
     changeFilter: (key: keyof typeof filters, val: string) => {
       setFilters((prev) => ({ ...prev, [key]: val }));
@@ -250,7 +304,7 @@ export function useOrderManagement() {
       setPagination((prev) => ({ ...prev, limit, page: 1 }));
     },
 
-    // drawer logic
+    // View Drawer
     openDetail: (orderId: string) => {
       setDetailDrawer({ isOpen: true, orderId });
     },
@@ -258,90 +312,203 @@ export function useOrderManagement() {
       setDetailDrawer({ isOpen: false, orderId: null });
     },
 
-    // status update modal logic
+    // Update Status Modal
     openStatusModal: (orderId: string, currentStatus: OrderStatus) => {
       setStatusModal({ isOpen: true, orderId, currentStatus });
     },
     closeStatusModal: () => {
       setStatusModal({ isOpen: false, orderId: null, currentStatus: null });
     },
-    confirmUpdateStatus: (
+
+    confirmUpdateStatus: async (
       orderId: string,
       newStatus: OrderStatus,
       reason: string,
     ) => {
-      setData((prev) =>
-        prev.map((order) => {
-          if (order.id === orderId) {
-            const newTimelineItem: OrderTimeline = {
-              status: newStatus,
-              date: new Date().toISOString(),
-              description: reason,
-              isCompleted: true,
-            };
-            return {
-              ...order,
-              orderStatus: newStatus,
-              timeline: [...order.timeline, newTimelineItem],
-            };
-          }
-          return order;
-        }),
-      );
-      setStatusModal({ isOpen: false, orderId: null, currentStatus: null });
-    },
-    advanceOrderStatus: (orderId: string, nextStatus: OrderStatus) => {
-      setData((prev) =>
-        prev.map((order) => {
-          if (order.id === orderId) {
-            const newTimelineItem: OrderTimeline = {
-              status: nextStatus,
-              date: new Date().toISOString(),
-              description: "system auto updated",
-              isCompleted: true,
-            };
-            return {
-              ...order,
-              orderStatus: nextStatus,
-              timeline: [...order.timeline, newTimelineItem],
-            };
-          }
-          return order;
-        }),
-      );
+      try {
+        const beStatus = mapFeToBeStatus(newStatus); // Dịch trước khi gửi
+        await axiosClient.patch(`/orders/${orderId}/status-advanced`, {
+          status: beStatus,
+          reason: reason,
+          is_override: false,
+        });
+
+        toast.success(
+          `Đã cập nhật trạng thái đơn hàng thành: ${newStatus} thành công!`,
+        );
+
+        fetchOrders();
+        setStatusModal({ isOpen: false, orderId: null, currentStatus: null });
+      } catch (error: unknown) {
+        console.error("Lỗi cập nhật trạng thái:", error);
+        const errMsg =
+          (error as { response?: { data?: { message?: string } } }).response
+            ?.data?.message || "Lỗi cập nhật trạng thái!";
+        toast.error(errMsg);
+      }
     },
 
-    // global actions
-    exportExcel: () => {
-      alert("Tính năng tải file Excel (Mock)");
+    // Đổi type của nextStatus thành string để hỗ trợ truyền "READY_TO_SHIP"
+    advanceOrderStatus: async (orderId: string, nextStatus: string) => {
+      try {
+        const beStatus = mapFeToBeStatus(nextStatus); // Dịch trước khi gửi
+        await axiosClient.patch(`/orders/${orderId}/status-advanced`, {
+          status: beStatus,
+          note: `Staff auto advanced to ${beStatus}`,
+        });
+
+        if (nextStatus === "READY_TO_SHIP") {
+          // Do BE tạo đơn GHN chạy ngầm (async event), cần dặn nhân viên đợi
+          toast.info(
+            "Đã gửi yêu cầu tạo đơn sang ĐVVC thành công! Vui lòng đợi vài giây và bấm 'Refresh' để thấy mã vận đơn.",
+          );
+        } else {
+          toast.success("Chuyển trạng thái tiếp theo thành công!");
+        }
+
+        fetchOrders();
+      } catch (error: unknown) {
+        console.error("Lỗi chuyển tiếp trạng thái:", error);
+        const errMsg =
+          (error as { response?: { data?: { message?: string } } }).response
+            ?.data?.message || "Không thể chuyển tiếp trạng thái.";
+        toast.error(errMsg);
+      }
     },
-    printInvoice: (selectedIds?: string[]) => {
-      alert(
-        `Tính năng in Hóa đơn (Mock)\nCác đơn đã chọn: ${selectedIds?.join(", ")}`,
-      );
+
+    // Global Actions
+    exportExcel: async () => {
+      try {
+        toast.info("Đang xử lý xuất dữ liệu Excel, vui lòng đợi...");
+
+        // Cấu hình responseType là blob để nhận luồng nhị phân từ BE
+        const response = await axiosClient.get("/orders/export/excel", {
+          params: {
+            search: filters.search,
+            status: filters.status,
+            fromDate: filters.fromDate || undefined,
+            toDate: filters.toDate || undefined,
+          },
+          responseType: "blob",
+        });
+
+        // Khởi tạo URL nhị phân cục bộ và kích hoạt tải về
+        const url = window.URL.createObjectURL(
+          new Blob([response.data], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          }),
+        );
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", `BaoCao_DonHang_${Date.now()}.xlsx`);
+        document.body.appendChild(link);
+        link.click();
+
+        // Dọn dẹp bộ nhớ sau khi tải xong
+        link.remove();
+        window.URL.revokeObjectURL(url);
+
+        toast.success("Xuất dữ liệu Excel thành công!");
+      } catch (error) {
+        console.error("Lỗi xuất Excel:", error);
+        toast.error("Lỗi xuất dữ liệu Excel. Vui lòng thử lại.");
+      }
     },
-    printDeliverySlip: (selectedIds?: string[]) => {
-      alert(
-        `Tính năng in Phiếu giao hàng (Mock)\nCác đơn đã chọn: ${selectedIds?.join(", ")}`,
-      );
+
+    printInvoice: async (selectedIds?: string[]) => {
+      if (!selectedIds || selectedIds.length === 0) {
+        toast.warning("Vui lòng chọn ít nhất một đơn hàng để in hóa đơn.");
+        return;
+      }
+      await downloadPdf(selectedIds, "INVOICE");
     },
+
+    printDeliverySlip: async (selectedIds?: string[]) => {
+      if (!selectedIds || selectedIds.length === 0) {
+        toast.warning("Vui lòng chọn ít nhất một đơn hàng để in phiếu giao.");
+        return;
+      }
+      await downloadPdf(selectedIds, "PACKING_SLIP");
+    },
+
+    // BỔ SUNG HÀM LẤY LINK IN TEM GHN/GHTK
+    printShippingLabel: async (orderId: string) => {
+      try {
+        const response = await axiosClient.get<{ url: string }>(
+          `/orders/${orderId}/shipping-label`,
+        );
+        if (response.data && response.data.url) {
+          // Mở URL in tem nguyên bản của GHN/GHTK sang một Tab mới
+          window.open(response.data.url, "_blank");
+        }
+      } catch (error) {
+        console.error("Lỗi lấy tem vận chuyển:", error);
+        toast.error(
+          "Không thể lấy tem giao hàng! Đơn hàng có thể chưa được đẩy sang ĐVVC (Chưa có mã vận đơn).",
+        );
+      }
+    },
+
     refreshData: () => {
-      setData(MOCK_ORDERS);
-      setFilters({ search: "", status: "all", fromDate: "", toDate: "" });
-      setPagination((prev) => ({ ...prev, page: 1 }));
+      fetchOrders();
     },
   };
 
+  // HELPER XỬ LÝ DOWNLOAD BLOB CHO AXIOS
+  const downloadPdf = async (
+    ids: string[],
+    type: "INVOICE" | "PACKING_SLIP",
+  ) => {
+    try {
+      const fileTypeName = type === "INVOICE" ? "Hóa đơn" : "Phiếu giao hàng";
+      toast.info(`Đang xử lý tải file ${fileTypeName}, vui lòng đợi...`);
+
+      // 1. Gọi API với responseType: 'blob' để Axios không parse data thành JSON
+      const response = await axiosClient.post(
+        `/orders/print-bulk?type=${type}`,
+        { ids },
+        { responseType: "blob" },
+      );
+
+      // 2. Tạo URL ảo (ObjectURL) từ Blob nhị phân
+      const url = window.URL.createObjectURL(
+        new Blob([response.data], { type: "application/pdf" }),
+      );
+
+      // 3. Giả lập thẻ <a> để tự động click tải file
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `${type}_${Date.now()}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+
+      // 4. Dọn dẹp bộ nhớ
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success(`Tải file ${fileTypeName} thành công!`);
+    } catch (error) {
+      console.error(`Lỗi tải file ${type}:`, error);
+      toast.error("Đã xảy ra lỗi khi tải file PDF. Vui lòng thử lại!");
+    }
+  };
+
+  // Tính toán Index hiển thị UI
+  const startIndex =
+    pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1;
+  const endIndex = Math.min(
+    pagination.page * pagination.limit,
+    pagination.total,
+  );
+
   return {
-    data: currentData,
+    data, // Data này đã được map chuẩn Type OrderRow
+    isLoading,
     filters,
     pagination: {
       ...pagination,
-      total: totalItems,
-      totalPages,
-      startIndex:
-        totalItems === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1,
-      endIndex: Math.min(pagination.page * pagination.limit, totalItems),
+      startIndex,
+      endIndex,
     },
     detailDrawer,
     selectedOrder: data.find((o) => o.id === detailDrawer.orderId) || null,
