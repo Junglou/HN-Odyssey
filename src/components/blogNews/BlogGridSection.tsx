@@ -32,7 +32,7 @@ export default function BlogGridSection({
           <h2 className="blog-grid-title">{title}</h2>
           {onReadMore && (
             <button className="blog-grid-read-more" onClick={onReadMore}>
-              Read more &rarr;
+              View All &rarr;
             </button>
           )}
         </div>

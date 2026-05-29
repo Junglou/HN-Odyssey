@@ -8,6 +8,7 @@
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
+  color: var(--tim-color-primary);
 }
 
 .tim-container * {
@@ -37,7 +38,7 @@
 
 /* export button */
 .tim-btn-export {
-  background-color: #3b82f6;
+  background-color: #16a34a;
   color: white;
   border: none;
   padding: clamp(8px, 1.5vw, 12px) clamp(16px, 2vw, 24px);
@@ -51,7 +52,7 @@
   justify-content: center;
 }
 .tim-btn-export:hover {
-  background-color: #2563eb;
+  background-color: #15803d;
 }
 
 /* card */
@@ -208,12 +209,12 @@
 }
 
 .tim-table th {
-  background-color: #f9fafb;
+  background-color: var(--tim-color-background);
   padding: 14px 16px;
   font-size: 0.85rem;
   font-weight: 600;
   color: #4b5563;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--tim-color-border);
   white-space: nowrap;
 }
 

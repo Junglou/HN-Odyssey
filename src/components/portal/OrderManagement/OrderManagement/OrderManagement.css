@@ -37,7 +37,7 @@
 
 /* nut export xanh duong dong bo */
 .om-btn-export {
-  background-color: #3b82f6;
+  background-color: #10b981;
   color: white;
   border: none;
   padding: clamp(8px, 1.5vw, 12px) clamp(16px, 2vw, 24px);
@@ -51,7 +51,7 @@
   justify-content: center;
 }
 .om-btn-export:hover {
-  background-color: #2563eb;
+  background-color: #059669;
 }
 
 /* card */

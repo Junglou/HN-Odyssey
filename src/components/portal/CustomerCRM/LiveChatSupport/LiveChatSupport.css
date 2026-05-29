@@ -378,6 +378,7 @@
 }
 .lcs-message-content p {
   margin: 0;
+  white-space: pre-wrap;
 }
 
 .customer-bg {

@@ -64,6 +64,7 @@ import StockManagementPage from "../pages/portal/Warehouse/StockManagementPage";
 
 import OrderManagementPage from "../pages/portal/OrderManagement/OrderManagement/OrderManagementPage";
 import TradeInManagementPage from "../pages/portal/OrderManagement/TradeInManagement/TradeInManagementPage";
+import BlogDetailPage from "../pages/blogNews/BlogDetailPage";
 
 export const router = createBrowserRouter([
   // route auth
@@ -120,6 +121,10 @@ export const router = createBrowserRouter([
       {
         path: "blog",
         element: <BlogNewsPage />,
+      },
+      {
+        path: "blog/:slug",
+        element: <BlogDetailPage />,
       },
       {
         path: "cart",

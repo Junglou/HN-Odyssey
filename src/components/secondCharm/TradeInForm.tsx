@@ -12,24 +12,25 @@ import "./TradeInForm.css";
 export default function TradeInForm() {
   const {
     formData,
+    categories, // Lấy mảng danh mục thật từ API
+    isLoadingCategories, // Lấy trạng thái loading của danh mục
+    locations, // Lấy dữ liệu Tỉnh/Huyện/Xã
+    selectedLocationCodes, // Lấy mã GSO đang được chọn
+    handleProvinceChange, // Hàm xử lý khi chọn Tỉnh
+    handleDistrictChange, // Hàm xử lý khi chọn Huyện
+    handleWardChange, // Hàm xử lý khi chọn Xã
     handleInputChange,
     setEvaluationMethod,
     setCategory,
     handleFileChange,
     removePhoto,
-    submitTradeInRequest, // Lấy hàm submit ra
-    isSubmitting, // Lấy trạng thái loading ra
+    submitTradeInRequest,
+    isSubmitting,
   } = useTradeInForm();
 
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const categories = [
-    { value: "equipment", label: "Equipment" },
-    { value: "apparel", label: "Apparel" },
-    { value: "footwear", label: "Footwear" },
-  ];
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -132,13 +133,13 @@ export default function TradeInForm() {
               <input
                 type="tel"
                 name="phone"
-                placeholder="+1 (555) 123-4567"
+                placeholder="+84 987 654 321"
                 value={formData.phone}
                 onChange={handleInputChange}
               />
             </div>
 
-            {/* custom dropdown thay cho select */}
+            {/* Dropdown danh mục đã được map với dữ liệu thật từ API */}
             <div className="sc-input-group" ref={dropdownRef}>
               <label>Product Category *</label>
               <div
@@ -147,9 +148,13 @@ export default function TradeInForm() {
               >
                 <div className="sc-select-value">
                   {formData.category ? (
-                    categories.find((c) => c.value === formData.category)?.label
+                    categories.find((c) => c.id === formData.category)?.name
                   ) : (
-                    <span className="sc-placeholder">Select category</span>
+                    <span className="sc-placeholder">
+                      {isLoadingCategories
+                        ? "Loading categories..."
+                        : "Select category"}
+                    </span>
                   )}
                 </div>
                 <ChevronDownSolidIcon
@@ -161,14 +166,14 @@ export default function TradeInForm() {
                 >
                   {categories.map((cat) => (
                     <div
-                      key={cat.value}
-                      className={`sc-select-option ${formData.category === cat.value ? "selected" : ""}`}
+                      key={cat.id}
+                      className={`sc-select-option ${formData.category === cat.id ? "selected" : ""}`}
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleCategorySelect(cat.value);
+                        handleCategorySelect(cat.id);
                       }}
                     >
-                      {cat.label}
+                      {cat.name}
                     </div>
                   ))}
                 </div>
@@ -191,7 +196,6 @@ export default function TradeInForm() {
             <div className="sc-input-group sc-col-span-2">
               <label>Upload Photos * (Min 3 photos)</label>
 
-              {/* the input an chua file he thong */}
               <input
                 type="file"
                 multiple
@@ -203,7 +207,6 @@ export default function TradeInForm() {
 
               <div className="sc-upload-dropzone" onClick={triggerFileInput}>
                 <div className="sc-upload-icon-large">
-                  {/* Sử dụng component Icon ở đây */}
                   <UploadDropzoneIcon />
                 </div>
                 <p className="sc-upload-text">
@@ -269,11 +272,11 @@ export default function TradeInForm() {
                 <h4 className="sc-shipping-title">Shipping Address</h4>
                 <div className="sc-form-grid sc-shipping-grid">
                   <div className="sc-input-group">
-                    <label>Street Address</label>
+                    <label>Street Address *</label>
                     <input
                       type="text"
                       name="streetAddress"
-                      placeholder="123 Main Street"
+                      placeholder="Ex: 65 Đường Lê Lợi"
                       value={formData.streetAddress}
                       onChange={handleInputChange}
                     />
@@ -283,39 +286,111 @@ export default function TradeInForm() {
                     <input
                       type="text"
                       name="aptSuite"
-                      placeholder="Apt 4B"
+                      placeholder="Ex: Tầng 2, Tòa nhà Saigon Centre"
                       value={formData.aptSuite}
                       onChange={handleInputChange}
                     />
                   </div>
+
+                  {/* DROP DOWN TỈNH/THÀNH PHỐ */}
                   <div className="sc-input-group">
-                    <label>City</label>
-                    <input
-                      type="text"
-                      name="city"
-                      placeholder="New York"
-                      value={formData.city}
-                      onChange={handleInputChange}
-                    />
+                    <label>City / Province *</label>
+                    <select
+                      style={{
+                        width: "100%",
+                        padding: "12px",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "8px",
+                        outline: "none",
+                        backgroundColor: "#fff",
+                        fontSize: "15px",
+                        color: "#334155",
+                      }}
+                      value={selectedLocationCodes.province}
+                      onChange={handleProvinceChange}
+                    >
+                      <option value="">-- Select Province/City --</option>
+                      {locations.provinces.map((prov) => (
+                        <option key={prov.code} value={prov.code}>
+                          {prov.name_with_type}
+                        </option>
+                      ))}
+                    </select>
                   </div>
+
+                  {/* DROP DOWN QUẬN/HUYỆN */}
                   <div className="sc-input-group">
-                    <label>State</label>
-                    <input
-                      type="text"
-                      name="state"
-                      placeholder="NY"
-                      value={formData.state}
-                      onChange={handleInputChange}
-                    />
+                    <label>District *</label>
+                    <select
+                      style={{
+                        width: "100%",
+                        padding: "12px",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "8px",
+                        outline: "none",
+                        backgroundColor: !selectedLocationCodes.province
+                          ? "#f8fafc"
+                          : "#fff",
+                        fontSize: "15px",
+                        color: "#334155",
+                        cursor: !selectedLocationCodes.province
+                          ? "not-allowed"
+                          : "pointer",
+                      }}
+                      value={selectedLocationCodes.district}
+                      onChange={handleDistrictChange}
+                      disabled={!selectedLocationCodes.province}
+                    >
+                      <option value="">-- Select District --</option>
+                      {locations.districts.map((dist) => (
+                        <option key={dist.code} value={dist.code}>
+                          {dist.name_with_type}
+                        </option>
+                      ))}
+                    </select>
                   </div>
+
+                  {/* DROP DOWN PHƯỜNG/XÃ */}
+                  <div className="sc-input-group">
+                    <label>Ward *</label>
+                    <select
+                      style={{
+                        width: "100%",
+                        padding: "12px",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "8px",
+                        outline: "none",
+                        backgroundColor: !selectedLocationCodes.district
+                          ? "#f8fafc"
+                          : "#fff",
+                        fontSize: "15px",
+                        color: "#334155",
+                        cursor: !selectedLocationCodes.district
+                          ? "not-allowed"
+                          : "pointer",
+                      }}
+                      value={selectedLocationCodes.ward}
+                      onChange={handleWardChange}
+                      disabled={!selectedLocationCodes.district}
+                    >
+                      <option value="">-- Select Ward --</option>
+                      {locations.wards.map((ward) => (
+                        <option key={ward.code} value={ward.code}>
+                          {ward.name_with_type}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* ZIP Code (Disabled) */}
                   <div className="sc-input-group">
                     <label>ZIP Code</label>
                     <input
                       type="text"
                       name="zipCode"
-                      placeholder="10001"
                       value={formData.zipCode}
                       onChange={handleInputChange}
+                      placeholder="Ex: 700000"
                     />
                   </div>
                 </div>

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { toast } from "react-toastify";
 import type {
   TicketType,
   TicketItem,
@@ -257,7 +258,7 @@ function CreateTicketDrawerContent({
           );
 
           if (!variant) {
-            alert(
+            toast.warning(
               "Vui lòng nhập SKU của Biến thể (Size/Màu cụ thể), không nhập SKU Sản phẩm cha!",
             );
             setAvailableQty(null);
@@ -272,7 +273,7 @@ function CreateTicketDrawerContent({
         throw new Error("Không tìm thấy");
       }
     } catch {
-      alert("SKU không tồn tại hoặc đã bị xóa!");
+      toast.error("SKU không tồn tại hoặc đã bị xóa!");
       setFormName("");
       setAvailableQty(null);
     }
@@ -343,7 +344,7 @@ function CreateTicketDrawerContent({
       const previewItems: PreviewItem[] = responseData.data || [];
 
       if (!previewItems || previewItems.length === 0) {
-        alert("File Excel trống hoặc không đúng định dạng!");
+        toast.error("File Excel trống hoặc không đúng định dạng!");
         return;
       }
 
@@ -358,7 +359,7 @@ function CreateTicketDrawerContent({
         const errorDetails = invalidItems
           .map((i) => `Dòng ${i.row} (SKU: ${i.sku}): ${i.errors.join(", ")}`)
           .join("\n");
-        alert(
+        toast.warning(
           `Phát hiện ${invalidItems.length} dòng lỗi, các dòng này sẽ bị bỏ qua:\n\n${errorDetails}`,
         );
       }
@@ -382,7 +383,7 @@ function CreateTicketDrawerContent({
         err.response?.data?.message ||
         err.message ||
         "Lỗi khi tải file lên hệ thống!";
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       // Reset input để có thể up lại cùng 1 file nếu cần
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -425,7 +426,7 @@ function CreateTicketDrawerContent({
       window.URL.revokeObjectURL(url);
     } catch (error: unknown) {
       console.error("Lỗi khi tải file mẫu:", error);
-      alert("Có lỗi xảy ra khi tải file mẫu từ hệ thống!");
+      toast.error("Có lỗi xảy ra khi tải file mẫu từ hệ thống!");
     }
   };
 

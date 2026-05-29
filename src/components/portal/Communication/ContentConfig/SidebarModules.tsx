@@ -1,5 +1,5 @@
-// imports
 import { useRef } from "react";
+import { toast } from "react-toastify";
 import "./SidebarModules.css";
 import { useSidebarModule } from "../../../../hooks/portal/Communication/ContentConfig/useSidebarModule";
 import {
@@ -24,7 +24,7 @@ import {
 import type { ElementType } from "../../../../hooks/portal/Communication/ContentConfig/useContentConfig";
 import axiosClient from "../../../../api/axiosClient";
 
-// props
+// Định nghĩa kiểu dữ liệu cho props
 interface SidebarModulesProps {
   actions: {
     addElement: (
@@ -36,7 +36,7 @@ interface SidebarModulesProps {
   };
 }
 
-// Helper Func để handle URL ảnh được Backend trả về (Tránh lỗi Path Relative)
+// Hàm xử lý đường dẫn media trả về từ Backend để tránh lỗi đường dẫn tương đối
 const getFullMediaUrl = (path: string) => {
   if (path.startsWith("/")) {
     const baseUrl = import.meta.env.VITE_API_URL.replace("/api", "");
@@ -45,9 +45,9 @@ const getFullMediaUrl = (path: string) => {
   return path;
 };
 
-// component
+// Component SidebarModules
 export default function SidebarModules({ actions }: SidebarModulesProps) {
-  // hook & refs
+  // Khởi tạo các hooks và refs
   const {
     searchQuery,
     setSearchQuery,
@@ -59,7 +59,7 @@ export default function SidebarModules({ actions }: SidebarModulesProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
-  // helpers
+  // Hàm hỗ trợ render icon dựa trên id
   const renderIcon = (iconId: string) => {
     switch (iconId) {
       case "heading":
@@ -97,18 +97,20 @@ export default function SidebarModules({ actions }: SidebarModulesProps) {
     }
   };
 
-  // handlers
+  // Các hàm xử lý sự kiện
   const handleDragStartNew = (e: React.DragEvent, type: ElementType) => {
     e.dataTransfer.setData("application/new-element", type);
   };
 
-  // FETCH API KHI UPLOAD ẢNH TỪ MÁY
+  // Hàm xử lý gọi API upload ảnh từ thiết bị lên server
   const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      toast.info("Đang tải ảnh lên, vui lòng đợi...");
       try {
         const formData = new FormData();
         formData.append("file", file);
+
         const res = await axiosClient.post(
           "/marketing/content/page-configs/upload",
           formData,
@@ -116,23 +118,29 @@ export default function SidebarModules({ actions }: SidebarModulesProps) {
             headers: { "Content-Type": "multipart/form-data" },
           },
         );
+
         const url = getFullMediaUrl(res.data.data.url);
         actions.addElement("image", 0, 0, url);
+        toast.success("Tải ảnh lên thành công!");
       } catch (err) {
         console.error("Upload error", err);
-        alert("Có lỗi xảy ra khi Upload Ảnh.");
+        toast.error("Có lỗi xảy ra khi tải ảnh lên. Vui lòng thử lại sau.");
       }
+
+      // Xóa giá trị input để có thể chọn lại cùng một file trong lần tiếp theo
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  // FETCH API KHI UPLOAD VIDEO TỪ MÁY
+  // Hàm xử lý gọi API upload video từ thiết bị lên server
   const handleUploadVideo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      toast.info("Đang tải video lên, vui lòng đợi...");
       try {
         const formData = new FormData();
         formData.append("file", file);
+
         const res = await axiosClient.post(
           "/marketing/content/page-configs/upload",
           formData,
@@ -140,22 +148,26 @@ export default function SidebarModules({ actions }: SidebarModulesProps) {
             headers: { "Content-Type": "multipart/form-data" },
           },
         );
+
         const url = getFullMediaUrl(res.data.data.url);
         actions.addElement("video-upload", 0, 0, url);
+        toast.success("Tải video lên thành công!");
       } catch (err) {
         console.error("Upload error", err);
-        alert("Có lỗi xảy ra khi Upload Video.");
+        toast.error("Có lỗi xảy ra khi tải video lên. Vui lòng thử lại sau.");
       }
+
+      // Xóa giá trị input để tránh bị cache thao tác chọn file
       if (videoInputRef.current) videoInputRef.current.value = "";
     }
   };
 
-  // render
+  // Render giao diện component
   return (
     <div className="sbm-sidebar">
       <h3 className="sbm-sidebar-title">Modules</h3>
 
-      {/* search bar */}
+      {/* Thanh tìm kiếm module */}
       <div className="sbm-sidebar-search">
         <span className="sbm-search-icon">
           <SearchIcon />
@@ -169,7 +181,7 @@ export default function SidebarModules({ actions }: SidebarModulesProps) {
         />
       </div>
 
-      {/* module categories */}
+      {/* Danh sách các chuyên mục module */}
       <div className="sbm-sidebar-content">
         {filteredCategories.length === 0 ? (
           <div className="sbm-empty-state">No modules found.</div>
@@ -230,7 +242,7 @@ export default function SidebarModules({ actions }: SidebarModulesProps) {
         )}
       </div>
 
-      {/* hidden upload input */}
+      {/* Input file ẩn dùng để trigger hộp thoại tải tệp */}
       <input
         type="file"
         ref={fileInputRef}
@@ -246,7 +258,7 @@ export default function SidebarModules({ actions }: SidebarModulesProps) {
         onChange={handleUploadVideo}
       />
 
-      {/* shortcuts */}
+      {/* Thông tin phím tắt hỗ trợ */}
       <div className="sbm-sidebar-shortcuts">
         <div className="sbm-shortcuts-title">Shortcuts:</div>
         <div className="sbm-shortcuts-list">

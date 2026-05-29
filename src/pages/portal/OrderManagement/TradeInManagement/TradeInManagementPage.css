@@ -7,7 +7,21 @@
   max-width: 100%;
   box-sizing: border-box;
   padding: clamp(12px, 3vw, 32px);
-  background-color: #f9fafb;
-  min-height: 100dvh;
-  overflow-x: hidden;
+  background-color: var(--tim-color-background);
+
+  /* Đã điều chỉnh để tự động khớp với chiều cao của Layout Admin tổng */
+  height: 100%;
+}
+
+:root {
+  --tim-color-primary: #111827;
+  --tim-color-border: #e5e7eb;
+  --tim-color-background: #f9fafb;
+  --tim-color-danger: #dc2626;
+  --tim-color-success: #16a34a;
+
+  --tim-z-overlay: 1040;
+  --tim-z-modal: 1050;
+  --tim-z-drawer: 1001;
+  --tim-z-dropdown: 100;
 }

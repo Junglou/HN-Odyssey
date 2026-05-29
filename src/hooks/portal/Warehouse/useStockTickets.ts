@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
+import { toast } from "react-toastify";
 import axiosClient from "../../../api/axiosClient";
 
-// ----------------------
 // 1. FE TYPES
-// ----------------------
+
 export type TicketType = "import" | "export";
 export type TicketStatus = "PROCESSING" | "COMPLETED" | "CANCELLED";
 
@@ -30,9 +30,8 @@ export interface StockTicketRow {
   cancelReason?: string;
 }
 
-// ----------------------
 // 2. BE RESPONSE INTERFACES
-// ----------------------
+
 interface BackendActor {
   email?: string;
 }
@@ -68,9 +67,8 @@ interface ErrorResponse {
   message?: string;
 }
 
-// ----------------------
 // 3. MAIN HOOK
-// ----------------------
+
 export function useStockTickets() {
   // states
   const [data, setData] = useState<StockTicketRow[]>([]);
@@ -145,6 +143,7 @@ export function useStockTickets() {
       }));
     } catch (error: unknown) {
       console.error("Lỗi tải danh sách phiếu:", error);
+      toast.error("Không thể tải danh sách phiếu kho từ hệ thống.");
     } finally {
       setLoading(false);
     }
@@ -219,24 +218,24 @@ export function useStockTickets() {
 
         await axiosClient.post(endpoint, requestBody);
 
-        alert("Tạo phiếu nháp thành công!");
+        toast.success("Tạo phiếu nháp thành công!");
         setRefetchTrigger((prev) => prev + 1);
         setPagination((prev) => ({ ...prev, page: 1 }));
       } catch (error: unknown) {
         console.error(error);
         const err = error as ErrorResponse;
-        alert(err.message || "Có lỗi xảy ra khi tạo phiếu!");
+        toast.error(err.message || "Có lỗi xảy ra khi tạo phiếu!");
       }
     },
     completeTicket: async (ticketId: string) => {
       try {
         await axiosClient.patch(`/inventory/transactions/${ticketId}/complete`);
-        alert("Đã hoàn tất phiếu và cập nhật tồn kho!");
+        toast.success("Đã hoàn tất phiếu và cập nhật tồn kho!");
         setRefetchTrigger((prev) => prev + 1);
       } catch (error: unknown) {
         console.error(error);
         const err = error as ErrorResponse;
-        alert(err.message || "Lỗi hoàn thành phiếu!");
+        toast.error(err.message || "Lỗi hoàn thành phiếu!");
       }
     },
     cancelTicket: async (ticketId: string, reason: string) => {
@@ -244,12 +243,12 @@ export function useStockTickets() {
         await axiosClient.patch(`/inventory/transactions/${ticketId}/cancel`, {
           reason,
         });
-        alert("Đã hủy phiếu!");
+        toast.success("Đã hủy phiếu thành công!");
         setRefetchTrigger((prev) => prev + 1);
       } catch (error: unknown) {
         console.error(error);
         const err = error as ErrorResponse;
-        alert(err.message || "Lỗi hủy phiếu!");
+        toast.error(err.message || "Lỗi hủy phiếu!");
       }
     },
 
@@ -259,6 +258,8 @@ export function useStockTickets() {
       ticketCode: string,
     ) => {
       try {
+        toast.info("Đang xử lý xuất file PDF, vui lòng đợi...");
+
         // Cập nhật endpoint tự động chọn API tương ứng với type
         const endpoint =
           type === "import"
@@ -287,9 +288,11 @@ export function useStockTickets() {
 
         link.parentNode?.removeChild(link);
         window.URL.revokeObjectURL(url);
+
+        toast.success("Xuất file PDF thành công!");
       } catch (error: unknown) {
         console.error(error);
-        alert("Lỗi khi tải PDF từ hệ thống!");
+        toast.error("Lỗi khi tải PDF từ hệ thống!");
       }
     },
   };

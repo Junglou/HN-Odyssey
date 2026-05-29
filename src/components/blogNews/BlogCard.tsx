@@ -1,10 +1,11 @@
 // imports
+import { useNavigate } from "react-router-dom";
 import "./BlogCard.css";
 import type { BlogNewsPost } from "../../hooks/blogNews/useBlogNews";
 
 // types
 interface BlogCardProps {
-  post: BlogNewsPost;
+  post: BlogNewsPost & { slug?: string };
   variant?: "standard" | "featured";
 }
 
@@ -31,6 +32,9 @@ export default function BlogCard({
   post,
   variant = "standard",
 }: BlogCardProps) {
+  // Khởi tạo hàm chuyển trang của React Router
+  const navigate = useNavigate();
+
   if (!post) return null;
 
   const isFeatured = variant === "featured";
@@ -54,7 +58,14 @@ export default function BlogCard({
         </div>
 
         <div className="blog-card-footer">
-          <button className="blog-card-read-more">Read More</button>
+          {/* Gắn sự kiện chuyển trang vào nút Read More */}
+          <button
+            className="blog-card-read-more"
+            onClick={() => navigate(`/blog/${post.slug || post.id}`)}
+          >
+            Read More
+          </button>
+
           <span
             className="blog-card-badge"
             style={{

@@ -99,6 +99,7 @@
 
 .cw-bubble p {
   margin: 0;
+  white-space: pre-wrap;
 }
 
 /* attachments */
@@ -177,6 +178,39 @@
   width: 100%;
   z-index: 100;
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* Bảo vệ Emoji Picker khỏi Global CSS của trang web Client */
+.cw-emoji-picker-container .EmojiPickerReact svg {
+  display: block;
+  vertical-align: baseline;
+}
+
+.cw-emoji-picker-container .EmojiPickerReact button {
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  border-radius: 0;
+  min-width: auto;
+  min-height: auto;
+  line-height: normal;
+}
+
+.cw-emoji-picker-container .EmojiPickerReact .epr-icn-clear-search {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cw-emoji-picker-container .EmojiPickerReact button:focus,
+.cw-emoji-picker-container .EmojiPickerReact button:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.cw-emoji-picker-container .EmojiPickerReact button:hover {
+  border-color: transparent;
+  background-color: transparent;
 }
 
 /* responsive */

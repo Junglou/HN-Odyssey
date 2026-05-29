@@ -354,6 +354,12 @@ export default function LiveChatSupport({
     }
   };
 
+  // chuyển đổi cú pháp markdown in đậm thành thẻ strong HTML
+  const formatText = (text: string) => {
+    const htmlText = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    return { __html: htmlText };
+  };
+
   return (
     <div className="lcs-page-wrapper">
       <div className="lcs-page-header">
@@ -588,7 +594,9 @@ export default function LiveChatSupport({
                         className={`lcs-message-content ${isCustomer ? "customer-bg" : "consultant-bg"}`}
                       >
                         {msg.type === "text" && !isImageUrl(msg.content) && (
-                          <p>{msg.content}</p>
+                          <p
+                            dangerouslySetInnerHTML={formatText(msg.content)}
+                          ></p>
                         )}
 
                         {(msg.type === "image" ||

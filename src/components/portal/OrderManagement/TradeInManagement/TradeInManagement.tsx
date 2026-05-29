@@ -15,6 +15,7 @@ const STATUS_OPTIONS = [
   { value: "Received", label: "Received" },
   { value: "Completed", label: "Completed" },
   { value: "Rejected", label: "Rejected" },
+  { value: "Cancelled", label: "Cancelled" },
 ];
 
 // custom dropdown
@@ -30,7 +31,7 @@ function CustomDropdown({
   className?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [hasOpened, setHasOpened] = useState(false); // Thêm state này
+  const [hasOpened, setHasOpened] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -112,13 +113,14 @@ interface TradeInManagementProps {
     openDetail: (id: string) => void;
     approveTradeIn: (id: string) => void;
     openRejectModal: (id: string) => void;
+    receiveItem: (id: string) => void;
     createOrder: (id: string) => void;
-    simulateScanReceive: (id: string) => void; // Hàm giả lập
     openFinalizeModal: (id: string) => void;
     exportExcel: () => void;
     printInvoice: (selectedIds?: string[]) => void;
     printDeliverySlip: (selectedIds?: string[]) => void;
     refreshData: () => void;
+    markShippingAsReceived: (id: string) => void; // Thêm hàm này
   };
 }
 
@@ -400,30 +402,47 @@ export default function TradeInManagement({
                         )}
 
                         {row.status === "Approved" && (
-                          <button
-                            type="button"
-                            className="tim-btn-outline-primary"
-                            onClick={(e) => {
-                              actions.createOrder(row.id);
-                              e.currentTarget.blur();
-                            }}
-                          >
-                            Create Order
-                          </button>
+                          <>
+                            {row.evaluationMethod === "SHIPPING" && (
+                              <button
+                                type="button"
+                                className="tim-btn-outline-primary"
+                                onClick={(e) => {
+                                  actions.createOrder(row.id);
+                                  e.currentTarget.blur();
+                                }}
+                              >
+                                Create Order
+                              </button>
+                            )}
+
+                            {row.evaluationMethod === "VISIT_STORE" && (
+                              <button
+                                type="button"
+                                className="tim-btn-outline-primary"
+                                onClick={(e) => {
+                                  actions.receiveItem(row.id);
+                                  e.currentTarget.blur();
+                                }}
+                              >
+                                Receive at Store
+                              </button>
+                            )}
+                          </>
                         )}
 
+                        {/* HÀM MỚI: Bổ sung nút bấm dành riêng cho đơn đang Shipping ở môi trường Sandbox */}
                         {row.status === "Shipping" && (
                           <button
                             type="button"
                             className="tim-btn-outline-primary"
-                            style={{ borderStyle: "dashed" }}
-                            title="Mock Scanner: Simulate warehouse receiving"
+                            title="Mock Sandbox Webhook"
                             onClick={(e) => {
-                              actions.simulateScanReceive(row.id);
+                              actions.markShippingAsReceived(row.id);
                               e.currentTarget.blur();
                             }}
                           >
-                            [Mock Scan]
+                            Manual Receive
                           </button>
                         )}
 

@@ -1,6 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { toast } from "react-toastify";
+import { io } from "socket.io-client";
+import axiosClient from "../../../../api/axiosClient";
 
-// types
 export type TradeInStatus =
   | "Pending"
   | "Approved"
@@ -14,7 +16,7 @@ export interface TradeInDevice {
   productName: string;
   storage: string;
   condition: string;
-  image: string;
+  images: string[];
 }
 
 export interface TradeInTimeline {
@@ -38,97 +40,73 @@ export interface TradeInRow {
   createdAt: string;
   timeline: TradeInTimeline[];
   note?: string;
+  evaluationMethod: string;
 }
 
-// mock data
-const MOCK_TRADE_INS: TradeInRow[] = [
-  {
-    id: "1",
-    tradeInCode: "TIR-123-001",
-    customerName: "Nguyen Van A",
-    customerPhone: "0903111245",
-    email: "nva@example.com",
-    device: {
-      productName: "Grey Jacket",
-      storage: "L",
-      condition: "New",
-      image: "https://via.placeholder.com/120x80",
-    },
-    expectedValue: 50.99,
-    status: "Pending",
-    createdAt: "2024-05-26T10:30:00Z",
-    timeline: [
-      {
-        status: "Request Submitted",
-        date: "2024-05-26T10:30:00Z",
-        description: "Customer submitted trade-in request.",
-        isCompleted: true,
-      },
-    ],
-  },
-  {
-    id: "2",
-    tradeInCode: "TIR-123-002",
-    customerName: "Tran Thi B",
-    customerPhone: "0903121245",
-    email: "ttb@example.com",
-    device: {
-      productName: "Grey Jacket",
-      storage: "M",
-      condition: "Used",
-      image: "https://via.placeholder.com/120x80",
-    },
-    expectedValue: 100.99,
-    status: "Approved",
-    createdAt: "2024-05-25T14:15:00Z",
-    timeline: [
-      {
-        status: "Approved",
-        date: "2024-05-25T16:00:00Z",
-        description: "Staff approved preliminary condition.",
-        isCompleted: true,
-      },
-    ],
-  },
-  {
-    id: "3",
-    tradeInCode: "TIR-123-003",
-    customerName: "Le Van C",
-    customerPhone: "0903114125",
-    email: "lvc@example.com",
-    device: {
-      productName: "Grey Jacket",
-      storage: "XL",
-      condition: "Good",
-      image: "https://via.placeholder.com/120x80",
-    },
-    expectedValue: 75.99,
-    status: "Received",
-    createdAt: "2024-05-24T14:15:00Z",
-    timeline: [],
-  },
-  {
-    id: "4",
-    tradeInCode: "TIR-123-004",
-    customerName: "Pham Thi D",
-    customerPhone: "0951211245",
-    email: "ptd@example.com",
-    device: {
-      productName: "Grey Jacket",
-      storage: "S",
-      condition: "Fair",
-      image: "https://via.placeholder.com/120x80",
-    },
-    expectedValue: 114.99,
-    status: "Completed",
-    createdAt: "2024-05-23T14:15:00Z",
-    timeline: [],
-  },
-];
+interface PopulatedCustomer {
+  _id: string;
+  fullName?: string;
+  email: string;
+  phone: string;
+}
+
+interface PopulatedCategory {
+  _id: string;
+  name: string;
+}
+
+interface TimelineItemBE {
+  status: string;
+  timestamp: string;
+  note?: string;
+  actor_id?: string;
+}
+
+interface TradeInRequestBE {
+  _id: string;
+  request_code: string;
+  customer_id?: PopulatedCustomer;
+  full_name: string;
+  email: string;
+  phone_number: string;
+  category_id?: PopulatedCategory;
+  product_name?: string;
+  condition_description: string;
+  media_urls: string[];
+  estimated_value: number;
+  final_value: number;
+  status: TradeInStatus;
+  payout_method: string;
+  timeline: TimelineItemBE[];
+  device_storage?: string;
+  evaluation_method?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// SỬA LỖI 1: Đổi metadata thành meta để đồng bộ với BaseResponse của Backend
+interface FetchResponse {
+  success: boolean;
+  message: string;
+  data: TradeInRequestBE[];
+  meta?: {
+    totalItems: number;
+    totalPages: number;
+    currentPage: number;
+  };
+}
+
+const formatStatusToFE = (beStatus: string): TradeInStatus => {
+  if (!beStatus) return "Pending";
+  const formatted =
+    beStatus.charAt(0).toUpperCase() + beStatus.slice(1).toLowerCase();
+  return formatted as TradeInStatus;
+};
 
 export function useTradeInManagement() {
-  // states
-  const [data, setData] = useState<TradeInRow[]>(MOCK_TRADE_INS);
+  const [data, setData] = useState<TradeInRow[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isMutating, setIsMutating] = useState<boolean>(false);
 
   const [filters, setFilters] = useState({
     search: "",
@@ -140,9 +118,9 @@ export function useTradeInManagement() {
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
+    totalItems: 0,
   });
 
-  // drawer & modal states
   const [detailDrawer, setDetailDrawer] = useState<{
     isOpen: boolean;
     tradeInId: string | null;
@@ -158,57 +136,154 @@ export function useTradeInManagement() {
     tradeInId: string | null;
   }>({ isOpen: false, tradeInId: null });
 
-  // logic: filter
-  const filteredData = useMemo(() => {
-    return data.filter((item) => {
-      const term = filters.search.toLowerCase();
-      const matchSearch =
-        !term ||
-        item.tradeInCode.toLowerCase().includes(term) ||
-        item.customerName.toLowerCase().includes(term) ||
-        item.customerPhone.includes(term) ||
-        item.email.toLowerCase().includes(term);
+  const rawApiUrl = import.meta.env.VITE_API_URL || "http://localhost:8080/api";
+  const serverBaseUrl = rawApiUrl.replace(/\/api\/?$/, "");
 
-      const matchStatus =
-        filters.status === "all" || item.status === filters.status;
+  const fetchTradeIns = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const params: Record<string, string | number> = {
+        page: pagination.page,
+        limit: pagination.limit,
+      };
 
-      let matchDate = true;
-      if (filters.fromDate || filters.toDate) {
-        const itemDateObj = new Date(item.createdAt);
+      if (filters.status !== "all") params.status = filters.status;
+      if (filters.search) params.search = filters.search;
+      if (filters.fromDate) params.fromDate = filters.fromDate;
+      if (filters.toDate) params.toDate = filters.toDate;
 
-        if (filters.fromDate) {
-          const fromDateObj = new Date(filters.fromDate);
-          fromDateObj.setHours(0, 0, 0, 0);
-          if (itemDateObj < fromDateObj) matchDate = false;
-        }
+      const response = await axiosClient.get<FetchResponse>(
+        "/trade-in/admin/requests",
+        { params },
+      );
 
-        if (filters.toDate) {
-          const toDateObj = new Date(filters.toDate);
-          toDateObj.setHours(23, 59, 59, 999);
-          if (itemDateObj > toDateObj) matchDate = false;
-        }
-      }
+      // 1. Ép kiểu qua unknown rồi thành Record để vượt qua ESLint Strict Mode mà không dùng 'any'
+      const resUnknown = response as unknown as Record<string, unknown>;
 
-      return matchSearch && matchStatus && matchDate;
+      // 2. Ép kiểu tường minh (Explicit Type) để TypeScript hiểu rõ cấu trúc của payload
+      const payload: FetchResponse =
+        "success" in resUnknown
+          ? (response as unknown as FetchResponse)
+          : response.data;
+
+      // 3. Khẳng định items là một mảng TradeInRequestBE để hàm .map() không báo lỗi 2339
+      const items: TradeInRequestBE[] = Array.isArray(payload?.data)
+        ? payload.data
+        : [];
+
+      // 4. TS đã hiểu payload là FetchResponse nên truy xuất .meta sẽ hợp lệ
+      const meta = payload?.meta || {
+        totalItems: 0,
+        totalPages: 1,
+        currentPage: 1,
+      };
+      const mappedData: TradeInRow[] = items.map((item: TradeInRequestBE) => ({
+        id: item._id,
+        tradeInCode: item.request_code,
+        customerName: item.customer_id?.fullName || item.full_name,
+        customerPhone: item.customer_id?.phone || item.phone_number,
+        email: item.customer_id?.email || item.email,
+        device: {
+          productName: item.product_name || item.category_id?.name || "",
+          storage: item.device_storage || "",
+          condition: item.condition_description || "",
+          images: (item.media_urls || []).map((url) =>
+            url.startsWith("http") ? url : `${serverBaseUrl}${url}`,
+          ),
+        },
+        expectedValue: item.estimated_value || 0,
+        finalValue: item.final_value || 0,
+        payoutMethod: item.payout_method,
+        status: formatStatusToFE(item.status),
+        createdAt: item.createdAt,
+        evaluationMethod: item.evaluation_method || "SHIPPING",
+        timeline: (item.timeline || []).map((tl) => ({
+          status: formatStatusToFE(tl.status),
+          date: tl.timestamp,
+          description: tl.note || "",
+          isCompleted: true,
+        })),
+        note:
+          item.timeline?.length > 0
+            ? item.timeline[item.timeline.length - 1].note
+            : undefined,
+      }));
+
+      setData(mappedData);
+      setPagination((prev) => ({ ...prev, totalItems: meta.totalItems }));
+    } catch (error: unknown) {
+      console.error("Fetch trade-ins error:", error);
+      toast.error("Không thể tải danh sách Trade-in.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [
+    pagination.page,
+    pagination.limit,
+    filters.status,
+    filters.search,
+    filters.fromDate,
+    filters.toDate,
+  ]);
+
+  //... Phần code còn lại giữ nguyên 100% không ảnh hưởng ...
+  // Socket.io effect
+  useEffect(() => {
+    fetchTradeIns();
+  }, [fetchTradeIns]);
+
+  useEffect(() => {
+    const rawApiUrl =
+      import.meta.env.VITE_API_URL || "http://localhost:8080/api";
+    const socketBaseUrl = rawApiUrl.replace(/\/api\/?$/, "");
+
+    const token = localStorage.getItem("access_token") || "";
+
+    const socket = io(`${socketBaseUrl}/notifications`, {
+      transports: ["websocket"],
+      autoConnect: true,
+      auth: {
+        token: token,
+      },
     });
-  }, [data, filters]);
 
-  // logic: pagination
-  const totalItems = filteredData.length;
-  const totalPages = Math.ceil(totalItems / pagination.limit) || 1;
+    socket.on(
+      "trade_in_status_updated",
+      (payload: { requestCode: string; status: string }) => {
+        toast.info(`Hệ thống vừa cập nhật tự động đơn ${payload.requestCode}`);
+        fetchTradeIns();
+      },
+    );
 
-  const currentData = useMemo(() => {
-    const start = (pagination.page - 1) * pagination.limit;
-    return filteredData.slice(start, start + pagination.limit);
-  }, [filteredData, pagination]);
+    socket.on("connect_error", (err: Error) => {
+      console.error("Lỗi kết nối Socket.io:", err.message);
+    });
 
+    return () => {
+      socket.off("trade_in_status_updated");
+      socket.off("connect_error");
+      socket.disconnect();
+    };
+  }, [fetchTradeIns]);
+
+  const totalPages = Math.ceil(pagination.totalItems / pagination.limit) || 1;
   const selectedTradeIn = useMemo(() => {
     return data.find((item) => item.id === detailDrawer.tradeInId) || null;
   }, [data, detailDrawer.tradeInId]);
 
-  // actions
+  const mapPayoutMethodToEnum = (feMethod: string): string => {
+    switch (feMethod) {
+      case "Reward Points":
+        return "Reward Points";
+      case "Service Promotion":
+        return "Service Promotion";
+      case "Store Credit / Voucher":
+      default:
+        return "Store Credit / Voucher";
+    }
+  };
+
   const actions = {
-    // filter & pagination
     changeFilter: (key: keyof typeof filters, value: string) => {
       setFilters((prev) => ({ ...prev, [key]: value }));
       setPagination((prev) => ({ ...prev, page: 1 }));
@@ -224,7 +299,6 @@ export function useTradeInManagement() {
       setPagination((prev) => ({ ...prev, limit, page: 1 }));
     },
 
-    // drawer & modals
     openDetail: (id: string) =>
       setDetailDrawer({ isOpen: true, tradeInId: id }),
     closeDetail: () => setDetailDrawer({ isOpen: false, tradeInId: null }),
@@ -238,166 +312,224 @@ export function useTradeInManagement() {
     closeFinalizeModal: () =>
       setFinalizeModal({ isOpen: false, tradeInId: null }),
 
-    // business actions
-    approveTradeIn: (id: string) => {
-      setData((prev) =>
-        prev.map((t) => {
-          if (t.id === id) {
-            return {
-              ...t,
-              status: "Approved",
-              timeline: [
-                ...t.timeline,
-                {
-                  status: "Approved",
-                  date: new Date().toISOString(),
-                  description: "Request approved by staff.",
-                  isCompleted: true,
-                },
-              ],
-            };
-          }
-          return t;
-        }),
-      );
+    approveTradeIn: async (id: string) => {
+      if (isMutating) return;
+      setIsMutating(true);
+      try {
+        await axiosClient.patch(`/trade-in/admin/request/${id}/approve`);
+        toast.success("Đã phê duyệt yêu cầu Trade-in.");
+        fetchTradeIns();
+      } catch (error: unknown) {
+        console.error("Approve trade-in error:", error);
+        toast.error("Lỗi khi phê duyệt yêu cầu.");
+      } finally {
+        setIsMutating(false);
+      }
     },
-    createOrder: (id: string) => {
-      setData((prev) =>
-        prev.map((t) => {
-          if (t.id === id) {
-            return {
-              ...t,
-              status: "Shipping",
-              timeline: [
-                ...t.timeline,
-                {
-                  status: "Order Created",
-                  date: new Date().toISOString(),
-                  description:
-                    "Pickup order has been created. Waiting for logistics.",
-                  isCompleted: true,
-                },
-              ],
-            };
-          }
-          return t;
-        }),
-      );
+
+    createOrder: async (id: string) => {
+      if (isMutating) return;
+      setIsMutating(true);
+      try {
+        await axiosClient.patch(`/trade-in/admin/request/${id}/create-order`);
+        toast.success("Đã tạo vận đơn thu hồi sản phẩm.");
+        fetchTradeIns();
+      } catch (error: unknown) {
+        console.error("Create order error:", error);
+        toast.error("Lỗi khi tạo vận đơn.");
+      } finally {
+        setIsMutating(false);
+      }
     },
-    // Mock API kho bắn mã vạch
-    simulateScanReceive: (id: string) => {
-      setData((prev) =>
-        prev.map((t) => {
-          if (t.id === id) {
-            return {
-              ...t,
-              status: "Received",
-              timeline: [
-                ...t.timeline,
-                {
-                  status: "Received",
-                  date: new Date().toISOString(),
-                  description: "Warehouse scanned and received the item.",
-                  isCompleted: true,
-                },
-              ],
-            };
-          }
-          return t;
-        }),
-      );
+
+    receiveItem: async (id: string) => {
+      if (isMutating) return;
+      setIsMutating(true);
+      try {
+        await axiosClient.patch(`/trade-in/admin/request/${id}/receive`);
+        toast.success("Xác nhận đã nhận thiết bị tại quầy thành công.");
+        fetchTradeIns();
+      } catch (error: unknown) {
+        console.error("Receive item error:", error);
+        toast.error("Lỗi khi xác nhận nhận hàng.");
+      } finally {
+        setIsMutating(false);
+      }
     },
-    confirmReject: (id: string, reason: string) => {
-      setData((prev) =>
-        prev.map((t) => {
-          if (t.id === id) {
-            return {
-              ...t,
-              status: "Rejected",
-              note: reason,
-              timeline: [
-                ...t.timeline,
-                {
-                  status: "Rejected",
-                  date: new Date().toISOString(),
-                  description: `Rejected. Reason: ${reason}`,
-                  isCompleted: true,
-                },
-              ],
-            };
-          }
-          return t;
-        }),
-      );
-      actions.closeRejectModal();
+
+    markShippingAsReceived: async (id: string) => {
+      if (isMutating) return;
+      setIsMutating(true);
+      try {
+        await axiosClient.patch(
+          `/trade-in/admin/request/${id}/sandbox-receive`,
+        );
+        toast.success("Đã chuyển trạng thái Đã nhận (Môi trường Sandbox).");
+        fetchTradeIns();
+      } catch (error: unknown) {
+        console.error("Sandbox receive error:", error);
+        toast.error("Lỗi khi cập nhật trạng thái Sandbox.");
+      } finally {
+        setIsMutating(false);
+      }
     },
-    confirmFinalize: (
+
+    confirmReject: async (id: string, reason: string) => {
+      if (isMutating) return;
+      setIsMutating(true);
+      try {
+        await axiosClient.patch(`/trade-in/admin/request/${id}/reject`, {
+          reason,
+        });
+        toast.success("Đã từ chối yêu cầu Trade-in.");
+        actions.closeRejectModal();
+        fetchTradeIns();
+      } catch (error: unknown) {
+        console.error("Reject trade-in error:", error);
+        toast.error("Từ chối thất bại.");
+      } finally {
+        setIsMutating(false);
+      }
+    },
+
+    confirmFinalize: async (
       id: string,
       finalValue: number,
       method: string,
       note: string,
     ) => {
-      setData((prev) =>
-        prev.map((t) => {
-          if (t.id === id) {
-            return {
-              ...t,
-              status: "Completed",
-              finalValue,
-              payoutMethod: method,
-              timeline: [
-                ...t.timeline,
-                {
-                  status: "Completed",
-                  date: new Date().toISOString(),
-                  description: `Finalized: $${finalValue} via ${method}. Note: ${note}`,
-                  isCompleted: true,
-                },
-              ],
-            };
-          }
-          return t;
-        }),
-      );
-      actions.closeFinalizeModal();
+      if (isMutating) return;
+      setIsMutating(true);
+      try {
+        const payoutEnum = mapPayoutMethodToEnum(method);
+        await axiosClient.patch(`/trade-in/admin/request/${id}/finalize`, {
+          finalValue: finalValue,
+          method: payoutEnum,
+          note: note,
+        });
+        toast.success("Hoàn tất quy trình thẩm định giá thành công.");
+        actions.closeFinalizeModal();
+        fetchTradeIns();
+      } catch (error: unknown) {
+        console.error("Finalize trade-in error:", error);
+        toast.error("Lỗi khi lưu kết quả thẩm định.");
+      } finally {
+        setIsMutating(false);
+      }
     },
 
-    // global actions
-    exportExcel: () => {
-      alert("Tính năng tải file Excel (Mock)");
+    exportExcel: async () => {
+      try {
+        toast.info("Đang xuất file Excel...");
+
+        // CẢI TIẾN 1: Đẩy toàn bộ dữ liệu bộ lọc thời gian hiện tại từ UI lên Server
+        const params: Record<string, string> = {};
+        if (filters.status !== "all") params.status = filters.status;
+        if (filters.search) params.search = filters.search;
+        if (filters.fromDate) params.fromDate = filters.fromDate;
+        if (filters.toDate) params.toDate = filters.toDate;
+
+        const response = await axiosClient.get("/trade-in/admin/export/excel", {
+          params,
+          responseType: "blob",
+        });
+
+        // CẢI TIẾN 2: Trích xuất Blob an toàn tương thích với mọi cấu hình Axios Interceptor
+        const resUnknown = response as unknown as Record<string, unknown>;
+        const blobPayload =
+          "data" in resUnknown && resUnknown.data !== undefined
+            ? resUnknown.data
+            : response;
+
+        const url = window.URL.createObjectURL(
+          new Blob([blobPayload as BlobPart]),
+        );
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", `TradeIn_Report_${Date.now()}.xlsx`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        toast.success("Xuất file Excel thành công!");
+      } catch (error: unknown) {
+        console.error("Export Excel error:", error);
+        toast.error("Lỗi khi kết xuất dữ liệu Excel.");
+      }
     },
-    printInvoice: (selectedIds?: string[]) => {
-      alert(
-        `Tính năng in Hóa đơn (Mock)\nCác đơn đã chọn: ${selectedIds?.join(", ")}`,
-      );
+
+    printInvoice: async (selectedIds?: string[]) => {
+      if (!selectedIds || selectedIds.length === 0) {
+        toast.warning("Vui lòng chọn ít nhất một đơn để in Hóa đơn.");
+        return;
+      }
+      try {
+        toast.info("Đang khởi tạo file PDF Hóa đơn...");
+        const response = await axiosClient.post(
+          "/trade-in/admin/print-bulk",
+          { ids: selectedIds },
+          { params: { type: "INVOICE" }, responseType: "blob" },
+        );
+
+        const url = window.URL.createObjectURL(
+          new Blob([response.data as BlobPart], { type: "application/pdf" }),
+        );
+        window.open(url, "_blank");
+      } catch (error: unknown) {
+        console.error("Print Invoice error:", error);
+        toast.error("Lỗi khi xuất Hóa đơn PDF.");
+      }
     },
-    printDeliverySlip: (selectedIds?: string[]) => {
-      alert(
-        `Tính năng in Phiếu giao hàng (Mock)\nCác đơn đã chọn: ${selectedIds?.join(", ")}`,
-      );
+
+    printDeliverySlip: async (selectedIds?: string[]) => {
+      if (!selectedIds || selectedIds.length === 0) {
+        toast.warning("Vui lòng chọn ít nhất một đơn để in Phiếu giao.");
+        return;
+      }
+      try {
+        toast.info("Đang khởi tạo file PDF Phiếu giao...");
+        const response = await axiosClient.post(
+          "/trade-in/admin/print-bulk",
+          { ids: selectedIds },
+          { params: { type: "PACKING_SLIP" }, responseType: "blob" },
+        );
+
+        const url = window.URL.createObjectURL(
+          new Blob([response.data as BlobPart], { type: "application/pdf" }),
+        );
+        window.open(url, "_blank");
+      } catch (error: unknown) {
+        console.error("Print Delivery Slip error:", error);
+        toast.error("Lỗi khi xuất Phiếu giao hàng PDF.");
+      }
     },
+
     refreshData: () => {
-      setData(MOCK_TRADE_INS);
-      setFilters({ search: "", status: "all", fromDate: "", toDate: "" });
-      setPagination((prev) => ({ ...prev, page: 1 }));
+      fetchTradeIns();
     },
   };
 
   return {
-    data: currentData,
+    data,
     filters,
     pagination: {
       ...pagination,
-      total: totalItems,
+      total: pagination.totalItems,
       totalPages,
       startIndex:
-        totalItems === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1,
-      endIndex: Math.min(pagination.page * pagination.limit, totalItems),
+        pagination.totalItems === 0
+          ? 0
+          : (pagination.page - 1) * pagination.limit + 1,
+      endIndex: Math.min(
+        pagination.page * pagination.limit,
+        pagination.totalItems,
+      ),
     },
     detailDrawer,
     selectedTradeIn,
     rejectModal,
     finalizeModal,
     actions,
+    isLoading,
+    isMutating,
   };
 }

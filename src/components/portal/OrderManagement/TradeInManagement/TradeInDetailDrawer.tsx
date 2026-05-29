@@ -143,23 +143,46 @@ export default function TradeInDetailDrawer({
               <div className="tim-col-device">
                 <h3 className="tim-drawer-section-title">Device Details</h3>
                 <div className="tim-device-card">
-                  <img
-                    src={tradeInData.device.image}
-                    alt={tradeInData.device.productName}
-                    className="tim-device-img"
-                  />
+                  {/* Bắt đầu phần thay đổi: Lặp qua mảng images */}
+                  <div
+                    className="tim-device-images-container"
+                    style={{
+                      display: "flex",
+                      gap: "8px",
+                      overflowX: "auto",
+                      paddingBottom: "8px",
+                      width:
+                        "100%" /* Thêm dòng này để khung ảnh chiếm hết chiều ngang */,
+                    }}
+                  >
+                    {tradeInData.device.images &&
+                    tradeInData.device.images.length > 0 ? (
+                      tradeInData.device.images.map((imgUrl, index) => (
+                        <img
+                          key={index}
+                          src={imgUrl}
+                          alt={`${tradeInData.device.productName} - ${index + 1}`}
+                          className="tim-device-img"
+                          style={{ flexShrink: 0, objectFit: "cover" }}
+                        />
+                      ))
+                    ) : (
+                      <span style={{ color: "#6b7280", fontSize: "14px" }}>
+                        Không có hình ảnh
+                      </span>
+                    )}
+                  </div>
+
                   <div className="tim-device-details">
                     <p className="tim-device-name">
                       {tradeInData.device.productName}
                     </p>
-
                     <div className="tim-device-spec-row">
                       <span className="tim-device-label">Storage:</span>
                       <span className="tim-device-spec-text">
                         {tradeInData.device.storage}
                       </span>
                     </div>
-
                     <div className="tim-device-spec-row">
                       <span className="tim-device-label">Condition:</span>
                       <span className="tim-device-spec-text">
