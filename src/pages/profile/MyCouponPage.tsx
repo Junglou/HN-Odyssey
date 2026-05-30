@@ -6,10 +6,7 @@ import { productList } from "../../hooks/profile/productData";
 import type { Product } from "../../types/product";
 
 const MyCouponPage = () => {
-  const {
-    coupons,
-    loading,
-  } = useCouponManagement();
+  const { coupons, loading } = useCouponManagement();
 
   const getRandomProducts = (count: number = 3): Product[] => {
     const shuffled = [...productList].sort(() => 0.5 - Math.random());
@@ -31,10 +28,7 @@ const MyCouponPage = () => {
 
       {/* Content (Nội dung phải) */}
       <div className="content-wrapper">
-        <MyCoupon
-          recommendations={recommendations}
-          coupons={coupons}
-          />
+        <MyCoupon recommendations={recommendations} coupons={coupons} />
       </div>
     </div>
   );

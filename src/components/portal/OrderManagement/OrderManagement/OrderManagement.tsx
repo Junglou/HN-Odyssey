@@ -10,7 +10,7 @@ import type {
   OrderStatus,
 } from "../../../../hooks/portal/OrderManagement/OrderManagement/useOrderManagement";
 
-// Danh sách các tùy chọn cho bộ lọc trạng thái đơn hàng
+// options
 const STATUS_OPTIONS = [
   { value: "all", label: "All Statuses" },
   { value: "Pending", label: "Pending" },
@@ -22,7 +22,7 @@ const STATUS_OPTIONS = [
   { value: "Refunded", label: "Refunded" },
 ];
 
-// Component dropdown tùy chỉnh để thay thế thẻ select mặc định của html
+// components
 function CustomDropdown({
   value,
   options,
@@ -34,11 +34,12 @@ function CustomDropdown({
   onChange: (val: string) => void;
   className?: string;
 }) {
+  // states
   const [isOpen, setIsOpen] = useState(false);
   const [hasOpened, setHasOpened] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Xử lý sự kiện click ra ngoài để tự động đóng dropdown
+  // effects
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -55,6 +56,7 @@ function CustomDropdown({
   const selectedOption =
     options.find((opt) => opt.value === value) || options[0];
 
+  // render
   return (
     <div className={`om-custom-dropdown ${className}`} ref={dropdownRef}>
       <div
@@ -89,7 +91,7 @@ function CustomDropdown({
   );
 }
 
-// Định nghĩa kiểu dữ liệu truyền vào cho component chính
+// props
 interface OrderManagementProps {
   data: OrderRow[];
   filters: {
@@ -125,7 +127,7 @@ interface OrderManagementProps {
   };
 }
 
-// Hàm tính toán logic hiển thị các nút phân trang có giới hạn số lượng và sử dụng dấu ba chấm
+// helpers
 const getPageNumbers = (
   currentPage: number,
   totalPages: number,
@@ -161,26 +163,47 @@ const getPageNumbers = (
   ];
 };
 
-// Component chính quản lý giao diện màn hình danh sách đơn hàng
+// component
 export default function OrderManagement({
   data,
   filters,
   pagination,
   actions,
 }: OrderManagementProps) {
+  // states
   const [isLimitOpen, setIsLimitOpen] = useState(false);
   const [hasLimitOpened, setHasLimitOpened] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [localSearch, setLocalSearch] = useState(filters.search);
   const limitRef = useRef<HTMLDivElement>(null);
 
-  // Đặt lại danh sách các dòng được chọn khi dữ liệu bảng thay đổi mới
-  useEffect(() => {
-    //eslint-disable-next-line react-hooks/exhaustive-deps
-    setSelectedIds([]);
-  }, [data]);
+  const [prevData, setPrevData] = useState<OrderRow[]>(data);
+  const [prevSearch, setPrevSearch] = useState(filters.search);
 
-  // Xử lý đóng dropdown của phần chọn số lượng bản ghi trên một trang khi người dùng click ra ngoài
+  // logic
+  if (data !== prevData) {
+    setPrevData(data);
+    setSelectedIds([]);
+  }
+
+  if (filters.search !== prevSearch) {
+    setPrevSearch(filters.search);
+    if (filters.search === "") {
+      setLocalSearch("");
+    }
+  }
+
+  // effects
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (filters.search !== localSearch) {
+        actions.changeFilter("search", localSearch);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [localSearch, filters.search, actions]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -194,6 +217,7 @@ export default function OrderManagement({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // handlers
   const handleRefresh = () => {
     if (isRefreshing) return;
     setIsRefreshing(true);
@@ -217,9 +241,9 @@ export default function OrderManagement({
     );
   };
 
+  // render
   return (
     <div className="om-container">
-      {/* Phần header của trang quản lý */}
       <div className="om-header">
         <div>
           <h1 className="om-title">Order Management</h1>
@@ -231,14 +255,13 @@ export default function OrderManagement({
       </div>
 
       <div className="om-card">
-        {/* Thanh công cụ chứa các bộ lọc tìm kiếm và các nút thao tác nhanh */}
         <div className="om-filters-row">
           <input
             type="text"
             className="om-filter-input"
             placeholder="Search by Order Code or Customer..."
-            value={filters.search}
-            onChange={(e) => actions.changeFilter("search", e.target.value)}
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
           />
 
           <CustomDropdown
@@ -333,7 +356,6 @@ export default function OrderManagement({
           </button>
         </div>
 
-        {/* Khu vực bảng hiển thị danh sách đơn hàng */}
         <div className="om-table-container">
           <table className="om-table">
             <thead>
@@ -365,8 +387,6 @@ export default function OrderManagement({
                 </tr>
               ) : (
                 data.map((order) => {
-                  // Cờ này sẽ được tích hợp từ backend sau để kiểm tra điều kiện được phép chỉnh sửa dưới hai mươi bốn giờ
-                  // Tạm thời giao diện tự tính toán quyền được cập nhật trạng thái đơn
                   const isTerminal = [
                     "Delivered",
                     "Cancelled",
@@ -425,7 +445,6 @@ export default function OrderManagement({
                             <EyeIcon />
                           </button>
 
-                          {/* Nút thực hiện chức năng duyệt xác nhận đơn hàng */}
                           {order.orderStatus === "Pending" && (
                             <button
                               type="button"
@@ -442,7 +461,6 @@ export default function OrderManagement({
                             </button>
                           )}
 
-                          {/* Nút dùng để chuyển trạng thái đơn hàng sang tiến hành đóng gói */}
                           {order.orderStatus === "Confirmed" && (
                             <button
                               type="button"
@@ -459,7 +477,6 @@ export default function OrderManagement({
                             </button>
                           )}
 
-                          {/* Nút yêu cầu tạo đơn phía đơn vị vận chuyển chỉ hiển thị khi đơn đang đóng gói và chưa có mã vận đơn */}
                           {order.orderStatus === "Packaging" &&
                             !order.waybillCode && (
                               <button
@@ -477,7 +494,6 @@ export default function OrderManagement({
                               </button>
                             )}
 
-                          {/* Nút chuyển trạng thái giao hàng hiển thị khi đã có mã vận đơn */}
                           {order.orderStatus === "Packaging" &&
                             order.waybillCode && (
                               <button
@@ -495,7 +511,6 @@ export default function OrderManagement({
                               </button>
                             )}
 
-                          {/* Nút mở modal để cập nhật thay đổi trạng thái thủ công */}
                           {canUpdate && (
                             <button
                               type="button"
@@ -512,7 +527,6 @@ export default function OrderManagement({
                             </button>
                           )}
 
-                          {/* Nút bấm in tem của đơn vị vận chuyển được phép hiển thị khi quá trình giao hàng đã bắt đầu */}
                           {["Shipping", "Delivered"].includes(
                             order.orderStatus,
                           ) && (
@@ -538,7 +552,6 @@ export default function OrderManagement({
           </table>
         </div>
 
-        {/* Khu vực điều khiển việc phân trang ở bên dưới bảng danh sách */}
         <div className="om-pagination">
           <span>
             Showing {pagination.startIndex} - {pagination.endIndex} of{" "}
@@ -558,7 +571,6 @@ export default function OrderManagement({
               &lt;
             </button>
 
-            {/* Render các nút số trang đã được xử lý để thu gọn khi số lượng trang quá nhiều */}
             {getPageNumbers(pagination.page, pagination.totalPages).map(
               (item, index) => {
                 if (item === "...") {

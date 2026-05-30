@@ -5,14 +5,13 @@ export interface Coupon {
   description: string;
   image: string;
 
-  discountType: 'percentage' | 'fixed'; 
-  discountValue: number; 
+  discountType: "percentage" | "fixed";
+  discountValue: number;
 
-  startDate: string; 
-  endDate: string; 
-  isActive: boolean; 
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
 
-  minimumPurchase: number; 
-  couponCode: string; 
+  minimumPurchase: number;
+  couponCode: string;
 }
-

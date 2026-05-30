@@ -7,7 +7,6 @@ import { productList } from "../../hooks/profile/productData";
 import type { Product } from "../../types/product";
 
 const AddressMangementPage = () => {
-
   const {
     addresses,
     modalConfig,
@@ -15,15 +14,15 @@ const AddressMangementPage = () => {
     openEditModal,
     deleteAddress,
     closeModal,
-    handleModalSubmit
+    handleModalSubmit,
   } = useAddressManagement();
 
   const getRandomProducts = (count: number = 3): Product[] => {
-      const shuffled = [...productList].sort(() => 0.5 - Math.random());
-      return shuffled.slice(0, count);
-    };
+    const shuffled = [...productList].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
+  };
 
-  const recommendations = getRandomProducts();  
+  const recommendations = getRandomProducts();
 
   return (
     <div className="my-profile-page-container">

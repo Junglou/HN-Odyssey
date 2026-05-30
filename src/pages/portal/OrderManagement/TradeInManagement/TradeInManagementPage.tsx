@@ -1,10 +1,12 @@
 import TradeInManagement from "../../../../components/portal/OrderManagement/TradeInManagement/TradeInManagement";
 import TradeInDetailDrawer from "../../../../components/portal/OrderManagement/TradeInManagement/TradeInDetailDrawer";
+import ApproveValueModal from "../../../../components/portal/OrderManagement/TradeInManagement/ApproveValueModal";
 import RejectTradeInModal from "../../../../components/portal/OrderManagement/TradeInManagement/RejectTradeInModal";
 import FinalizeValueModal from "../../../../components/portal/OrderManagement/TradeInManagement/FinalizeValueModal";
 import { useTradeInManagement } from "../../../../hooks/portal/OrderManagement/TradeInManagement/useTradeInManagement";
 import "./TradeInManagementPage.css";
 
+// component
 export default function TradeInManagementPage() {
   const {
     data,
@@ -12,6 +14,7 @@ export default function TradeInManagementPage() {
     pagination,
     detailDrawer,
     selectedTradeIn,
+    approveModal,
     rejectModal,
     finalizeModal,
     actions,
@@ -19,7 +22,6 @@ export default function TradeInManagementPage() {
 
   return (
     <div className="tim-page-container">
-      {/* Component hiển thị bảng chính */}
       <TradeInManagement
         data={data}
         filters={filters}
@@ -27,14 +29,19 @@ export default function TradeInManagementPage() {
         actions={actions}
       />
 
-      {/* Drawer trượt hiển thị chi tiết */}
       <TradeInDetailDrawer
         isOpen={detailDrawer.isOpen}
         onClose={actions.closeDetail}
         tradeInData={selectedTradeIn}
       />
 
-      {/* Modal từ chối yêu cầu Trade-in */}
+      <ApproveValueModal
+        isOpen={approveModal.isOpen}
+        tradeInId={approveModal.tradeInId}
+        onClose={actions.closeApproveModal}
+        onConfirm={actions.confirmApprove}
+      />
+
       <RejectTradeInModal
         isOpen={rejectModal.isOpen}
         tradeInId={rejectModal.tradeInId}
@@ -42,7 +49,6 @@ export default function TradeInManagementPage() {
         onConfirm={actions.confirmReject}
       />
 
-      {/* Modal chốt giá và hình thức quy đổi */}
       <FinalizeValueModal
         isOpen={finalizeModal.isOpen}
         tradeInId={finalizeModal.tradeInId}

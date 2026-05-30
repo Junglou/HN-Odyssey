@@ -28,10 +28,7 @@ const PurchaseHistoryPage = () => {
 
       {/* Content (Nội dung phải) */}
       <div className="content-wrapper">
-        <PurchaseHistory
-          recommendations={recommendations}
-          order={orders}
-        />
+        <PurchaseHistory recommendations={recommendations} order={orders} />
       </div>
     </div>
   );

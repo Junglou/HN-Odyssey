@@ -1,16 +1,13 @@
-/* src/pages/blogNews/BlogDetailPage.css */
-
 .blog-detail-page-wrapper {
   width: 100%;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: #fafafa; /* Khớp màu nền của BlogNewsPage */
+  background-color: #fafafa;
   padding: clamp(20px, 4vw, 40px) clamp(16px, 6vw, 120px);
   box-sizing: border-box;
 }
 
-/* Căn giữa nội dung đọc cho chuẩn báo chí */
 .blog-detail-container {
   max-width: 800px;
   margin: 0 auto;
@@ -35,7 +32,7 @@
   flex-grow: 1;
 }
 
-/* Breadcrumb */
+/* cấu trúc thanh điều hướng breadcrumb */
 .blog-detail-breadcrumb {
   font-family: "Lexend Deca", sans-serif;
   font-size: clamp(12px, 1vw, 14px);
@@ -58,7 +55,7 @@
   color: #111827;
 }
 
-/* Meta Data */
+/* thông tin ngày đăng và danh mục bài viết */
 .blog-detail-header {
   margin-bottom: clamp(24px, 3vw, 32px);
 }
@@ -76,7 +73,7 @@
   font-weight: 600;
   padding: 6px 14px;
   border-radius: 20px;
-  background-color: #e8f0fe; /* Có thể inline style động giống thẻ card nếu cần */
+  background-color: #e8f0fe;
   color: #1a73e8;
 }
 
@@ -85,9 +82,13 @@
   color: #6b7280;
 }
 
-/* Title */
 .blog-detail-title {
-  font-family: "Lexend Exa", sans-serif;
+  font-family:
+    "Lexend Exa",
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
   font-size: clamp(24px, 3vw, 36px);
   font-weight: 700;
   line-height: 1.3;
@@ -95,7 +96,7 @@
   margin: 0;
 }
 
-/* Thumbnail */
+/* khung chứa ảnh đại diện bài viết */
 .blog-detail-thumbnail-wrap {
   width: 100%;
   margin-bottom: clamp(24px, 4vw, 40px);
@@ -112,24 +113,34 @@
   max-height: 500px;
 }
 
-/* NỘI DUNG CHÍNH (RICH TEXT TỪ BACKEND) */
 .blog-detail-content {
-  font-family: "Ledger", serif; /* Dùng font có chân cho phần đọc */
+  font-family: "Inter", sans-serif;
   font-size: clamp(15px, 1.3vw, 17px);
   line-height: 1.8;
   color: #374151;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.blog-detail-content * {
+  font-family: inherit;
 }
 
 .blog-detail-content p {
   margin-bottom: 1.6em;
 }
 
-/* Headers trong bài viết */
 .blog-detail-content h1,
 .blog-detail-content h2,
 .blog-detail-content h3,
 .blog-detail-content h4 {
-  font-family: "Lexend Deca", sans-serif; /* Tiêu đề phụ dùng font không chân */
+  font-family:
+    "Lexend Deca",
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
   color: #111827;
   margin-top: 1.8em;
   margin-bottom: 0.8em;
@@ -140,6 +151,7 @@
 .blog-detail-content h2 {
   font-size: clamp(20px, 2vw, 24px);
 }
+
 .blog-detail-content h3 {
   font-size: clamp(18px, 1.5vw, 20px);
 }
@@ -173,7 +185,68 @@
   color: #4b5563;
 }
 
-/* Footer Action */
+.blog-detail-content iframe,
+.blog-detail-content .se-video-container,
+.blog-detail-content video {
+  max-width: 100%;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  border-radius: 8px;
+  margin: 1.5em 0;
+  border: 1px solid #e5e7eb;
+}
+
+.blog-detail-content table {
+  max-width: 100%;
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 1.5em 0;
+}
+
+.blog-detail-content table th,
+.blog-detail-content table td {
+  border: 1px solid #e5e7eb;
+  padding: 10px 14px;
+  min-width: 120px;
+}
+
+.blog-detail-content table th {
+  background-color: #f9fafb;
+  font-family:
+    "Lexend Deca",
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-weight: 600;
+}
+
+.blog-detail-content figure {
+  margin: 1.5em 0;
+  max-width: 100%;
+}
+
+.blog-detail-content figure img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.blog-detail-content pre {
+  background-color: #111827;
+  color: #f3f4f6;
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-family: monospace;
+  font-size: 14px;
+  margin: 1.5em 0;
+}
+
 .blog-detail-footer {
   margin-top: clamp(40px, 6vw, 60px);
   padding-top: clamp(16px, 2vw, 24px);

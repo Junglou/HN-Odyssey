@@ -385,14 +385,16 @@
 
 .tim-btn-page:focus {
   outline: none;
+  border-color: #111827;
 }
+
 .tim-btn-page:hover:not(:disabled),
 .tim-btn-page.active {
   background-color: #f3f4f6;
   font-weight: 700;
   color: #111827;
+  border-color: #111827;
 }
-
 .tim-btn-page:disabled {
   opacity: 0.5;
   cursor: not-allowed;

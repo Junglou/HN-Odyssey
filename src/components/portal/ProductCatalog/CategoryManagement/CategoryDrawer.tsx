@@ -1,9 +1,10 @@
-import { useState, useRef, useMemo, useEffect } from "react";
+import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import "./CategoryDrawer.css";
 import {
   BackArrowIcon,
   FilterIcon,
   FolderIcon,
+  SearchIcon,
 } from "../../../../assets/icons/CategoryIcons";
 import { ChevronDownIcon } from "../../../../assets/icons/HeaderIcons";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
@@ -12,7 +13,6 @@ import type {
   CategoryStatus,
 } from "../../../../utils/portal/ProductCatalog/CategoryManagement/categoryTree.utils";
 
-// props và interface mở rộng
 export interface CategoryFormData {
   name: string;
   slug?: string;
@@ -62,13 +62,17 @@ export default function CategoryDrawer({
   );
 
   const [isTreeOpen, setIsTreeOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const treeRef = useRef<HTMLDivElement>(null);
   const [expandedDropdownIds, setExpandedDropdownIds] = useState<Set<string>>(
     new Set(categories.map((c) => c.id)),
   );
 
-  // hook đóng khi click ra ngoài
-  useClickOutside(treeRef, () => setIsTreeOpen(false));
+  // hooks
+  useClickOutside(treeRef, () => {
+    setIsTreeOpen(false);
+    setSearchTerm("");
+  });
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -80,7 +84,7 @@ export default function CategoryDrawer({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose, isSubmitting]);
 
-  // tạo map dữ liệu giúp tối ưu tìm kiếm
+  // memos
   const { categoryMap, parentMap } = useMemo(() => {
     const cMap = new Map<string, CategoryNode>();
     const pMap = new Map<string, string | null>();
@@ -95,7 +99,6 @@ export default function CategoryDrawer({
     return { categoryMap: cMap, parentMap: pMap };
   }, [categories]);
 
-  // logic ẩn danh mục con của danh mục đang được edit
   const hiddenNodeIds = useMemo(() => {
     const ids = new Set<string>();
     if (mode === "edit" && editingId) {
@@ -114,25 +117,49 @@ export default function CategoryDrawer({
     return ids;
   }, [mode, editingId, categoryMap]);
 
-  // hàm hỗ trợ lấy ra đường dẫn đầy đủ của danh mục cha
-  const getCategoryPath = (id: string | null): string => {
-    if (!id) return "None (Root Category)";
+  // helpers
+  const getCategoryPath = useCallback(
+    (id: string | null): string => {
+      if (!id) return "None (Root Category)";
 
-    let path = "";
-    let currentId: string | null = id;
+      let path = "";
+      let currentId: string | null = id;
 
-    // duyệt ngược lên gốc để lấy chuỗi đường dẫn
-    while (currentId) {
-      const node = categoryMap.get(currentId);
-      if (!node) break;
-      path = path ? `${node.name} > ${path}` : node.name;
-      currentId = parentMap.get(currentId) || null;
-    }
+      while (currentId) {
+        const node = categoryMap.get(currentId);
+        if (!node) break;
+        path = path ? `${node.name} > ${path}` : node.name;
+        currentId = parentMap.get(currentId) || null;
+      }
 
-    return path;
-  };
+      return path;
+    },
+    [categoryMap, parentMap],
+  );
 
-  // helpers hỗ trợ tạo slug tự động
+  // memos
+  const filteredSearchNodes = useMemo(() => {
+    if (!searchTerm.trim()) return [];
+
+    const results: { id: string; node: CategoryNode; path: string }[] = [];
+    const searchLower = searchTerm.toLowerCase();
+
+    categoryMap.forEach((node, id) => {
+      if (hiddenNodeIds.has(id)) return;
+
+      if (node.name.toLowerCase().includes(searchLower)) {
+        results.push({
+          id,
+          node,
+          path: getCategoryPath(id),
+        });
+      }
+    });
+
+    return results;
+  }, [searchTerm, categoryMap, hiddenNodeIds, getCategoryPath]);
+
+  // helpers
   const generateSlug = (text: string) => {
     return text
       .normalize("NFD")
@@ -142,7 +169,7 @@ export default function CategoryDrawer({
       .replace(/[^\w-]/g, "");
   };
 
-  // handlers thay đổi dữ liệu form
+  // handlers
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setFormData((prev) => {
@@ -150,7 +177,6 @@ export default function CategoryDrawer({
       const oldSlug = prev.slug || "";
       let newSlug = oldSlug;
 
-      // đồng bộ thông minh tạo slug từ tên
       if (!oldSlug || oldSlug === generateSlug(oldName)) {
         newSlug = generateSlug(val);
       }
@@ -159,24 +185,27 @@ export default function CategoryDrawer({
     });
   };
 
+  const handleSave = () => {
+    if (!formData.name.trim() || isSubmitting) return;
+    onSave(formData);
+  };
+
   if (!isOpen) return null;
 
-  // lấy data danh mục cha
+  // variables
   const selectedParentNode = formData.parentId
     ? (categoryMap.get(formData.parentId) ?? null)
     : null;
-
-  // kiểm tra trạng thái danh mục cha
   const isParentInactive = selectedParentNode?.status === "Inactive";
+  const isFormValid = formData.name.trim().length > 0;
 
-  // hàm đệ quy cây danh mục
+  // render
   const renderTreeNodes = (
     nodes: CategoryNode[],
     level: number = 0,
     parentPath: string = "",
   ) => {
     return nodes.map((node) => {
-      // ẩn danh mục đang được chỉnh sửa
       if (hiddenNodeIds.has(node.id)) return null;
 
       const hasChildren = !!node.children && node.children.length > 0;
@@ -184,8 +213,6 @@ export default function CategoryDrawer({
       const currentPath = parentPath
         ? `${parentPath} > ${node.name}`
         : node.name;
-
-      // kiểm tra trạng thái danh mục
       const isExpanded = expandedDropdownIds.has(node.id);
 
       return (
@@ -195,8 +222,6 @@ export default function CategoryDrawer({
             onClick={(e) => {
               e.stopPropagation();
               const clickedNode = categoryMap.get(node.id);
-
-              // nếu danh mục cha inactive con inactive
               const forceInactive = clickedNode?.status === "Inactive";
               setFormData((prev) => ({
                 ...prev,
@@ -204,6 +229,7 @@ export default function CategoryDrawer({
                 status: forceInactive ? "Inactive" : prev.status,
               }));
               setIsTreeOpen(false);
+              setSearchTerm("");
             }}
           >
             <div className="cd-tree-toggle-wrapper">
@@ -233,7 +259,6 @@ export default function CategoryDrawer({
 
             <span className="cd-tree-path">{currentPath}</span>
 
-            {/* hiển thị dấu tích nếu danh mục này đang được chọn */}
             {isSelected && <span className="cd-check-icon">✓</span>}
           </div>
           {hasChildren &&
@@ -243,15 +268,6 @@ export default function CategoryDrawer({
       );
     });
   };
-
-  // logic nút submit
-  const handleSave = () => {
-    if (!formData.name.trim() || isSubmitting) return;
-    onSave(formData);
-  };
-
-  // kiểm tra điều kiện để tắt hoặc kích hoạt nút submit
-  const isFormValid = formData.name.trim().length > 0;
 
   return (
     <>
@@ -334,27 +350,80 @@ export default function CategoryDrawer({
 
               {isTreeOpen && !isSubmitting && (
                 <div className="cd-tree-dropdown">
-                  <div className="cd-tree-header-text">
-                    Select parent category
+                  <div className="cd-tree-search-box">
+                    <SearchIcon />
+                    <input
+                      type="text"
+                      placeholder="Tìm kiếm danh mục..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      autoFocus
+                    />
                   </div>
-                  <div
-                    className={`cd-tree-node cd-root-node ${formData.parentId === null ? "selected" : ""}`}
-                    onClick={() => {
-                      setFormData((prev) => ({ ...prev, parentId: null }));
-                      setIsTreeOpen(false);
-                    }}
-                  >
-                    <div className="cd-folder-icon cd-mr-8">
-                      <FolderIcon />
-                    </div>
 
-                    <span className="cd-tree-path">None (Root Category)</span>
+                  <div className="cd-tree-header-text">
+                    {searchTerm.trim()
+                      ? "Kết quả tìm kiếm"
+                      : "Select parent category"}
+                  </div>
 
-                    {formData.parentId === null && (
-                      <span className="cd-check-icon">✓</span>
+                  <div className="cd-tree-dropdown-list">
+                    {!searchTerm.trim() ? (
+                      <>
+                        <div
+                          className={`cd-tree-node cd-root-node ${formData.parentId === null ? "selected" : ""}`}
+                          onClick={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              parentId: null,
+                            }));
+                            setIsTreeOpen(false);
+                            setSearchTerm("");
+                          }}
+                        >
+                          <div className="cd-folder-icon cd-mr-8">
+                            <FolderIcon />
+                          </div>
+                          <span className="cd-tree-path">
+                            None (Root Category)
+                          </span>
+                          {formData.parentId === null && (
+                            <span className="cd-check-icon">✓</span>
+                          )}
+                        </div>
+                        {renderTreeNodes(categories)}
+                      </>
+                    ) : filteredSearchNodes.length > 0 ? (
+                      filteredSearchNodes.map(({ id, node, path }) => (
+                        <div
+                          key={id}
+                          className={`cd-tree-node ${formData.parentId === id ? "selected" : ""}`}
+                          onClick={() => {
+                            const forceInactive = node.status === "Inactive";
+                            setFormData((prev) => ({
+                              ...prev,
+                              parentId: id,
+                              status: forceInactive ? "Inactive" : prev.status,
+                            }));
+                            setIsTreeOpen(false);
+                            setSearchTerm("");
+                          }}
+                        >
+                          <div className="cd-folder-icon cd-mr-8">
+                            <FolderIcon />
+                          </div>
+                          <span className="cd-tree-path">{path}</span>
+                          {formData.parentId === id && (
+                            <span className="cd-check-icon">✓</span>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="cd-empty-search">
+                        Không tìm thấy danh mục nào
+                      </div>
                     )}
                   </div>
-                  {renderTreeNodes(categories)}
                 </div>
               )}
             </div>

@@ -11,7 +11,7 @@ export function useHeader() {
   const [searchQuery, setSearchQuery] = useState("");
 
   // mock data states
-  const [isAuthenticated] = useState(false);
+  const [isAuthenticated] = useState(true);
   const [hasWishlistItems] = useState(true);
 
   // refs

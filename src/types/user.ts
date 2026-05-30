@@ -4,7 +4,7 @@ import type { Coupon } from "./coupon";
 // UserProfile
 export interface UserProfile {
   id: string;
-  avatar: string; 
+  avatar: string;
   firstName: string;
   lastName: string;
   gender: "Male" | "Female" | "Other";

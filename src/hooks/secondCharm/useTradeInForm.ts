@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../api/axiosClient";
 
+// interfaces
 interface TradeInPayload {
   full_name: string;
   email: string;
@@ -28,7 +29,6 @@ interface CategoryNode {
   children?: CategoryNode[];
 }
 
-// Bổ sung Interface cho dữ liệu Địa giới hành chính
 export interface LocationNode {
   code: string;
   name_with_type: string;
@@ -38,7 +38,9 @@ export interface LocationNode {
   };
 }
 
+// hooks
 export function useTradeInForm() {
+  // states
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -50,7 +52,7 @@ export function useTradeInForm() {
     aptSuite: "",
     city: "",
     state: "",
-    zipCode: "700000", // Mặc định zip code
+    zipCode: "700000",
     districtId: 0,
     wardCode: "",
     agreeTerms: false,
@@ -59,32 +61,28 @@ export function useTradeInForm() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // --- STATES CHO CATEGORY ---
   const [categories, setCategories] = useState<{ id: string; name: string }[]>(
     [],
   );
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
 
-  // --- STATES CHO LOCATION ---
   const [locations, setLocations] = useState({
     provinces: [] as LocationNode[],
     districts: [] as LocationNode[],
     wards: [] as LocationNode[],
   });
 
-  // Lưu mã GSO cục bộ để quản lý cấp bậc Dropdown
   const [selectedLocationCodes, setSelectedLocationCodes] = useState({
     province: "",
     district: "",
     ward: "",
   });
 
-  // Gọi API lấy Danh mục và danh sách Tỉnh/Thành phố khi khởi tạo
+  // effects
   useEffect(() => {
     const fetchInitialData = async () => {
       setIsLoadingCategories(true);
       try {
-        // 1. Fetch Categories
         const catRes = await axiosClient.get("/categories/tree-view");
         const catData: CategoryNode[] = catRes.data?.data || catRes.data || [];
         const flatList: { id: string; name: string }[] = [];
@@ -102,7 +100,6 @@ export function useTradeInForm() {
         flatten(catData);
         setCategories(flatList);
 
-        // 2. Fetch Provinces
         const provRes = await axiosClient.get("/shipping/locations/provinces");
         const provData = provRes.data?.data || provRes.data || [];
         setLocations((prev) => ({ ...prev, provinces: provData }));
@@ -114,17 +111,16 @@ export function useTradeInForm() {
       }
     };
 
-    fetchInitialData();
+    void fetchInitialData();
   }, []);
 
-  // --- LOCATION HANDLERS ---
-  const handleProvinceChange = async (
-    e: React.ChangeEvent<HTMLSelectElement>,
-  ) => {
-    const provinceCode = e.target.value;
-    const provinceName = e.target.options[e.target.selectedIndex].text;
+  // handlers
+  const handleProvinceChange = async (provinceCode: string) => {
+    const selectedProvince = locations.provinces.find(
+      (p) => p.code === provinceCode,
+    );
+    const provinceName = selectedProvince?.name_with_type || "";
 
-    // Reset cấp dưới
     setSelectedLocationCodes({
       province: provinceCode,
       district: "",
@@ -154,15 +150,11 @@ export function useTradeInForm() {
     }
   };
 
-  const handleDistrictChange = async (
-    e: React.ChangeEvent<HTMLSelectElement>,
-  ) => {
-    const districtCode = e.target.value;
+  const handleDistrictChange = async (districtCode: string) => {
     const selectedDistrict = locations.districts.find(
       (d) => d.code === districtCode,
     );
 
-    // Lưu ghn_id vào districtId để gọi GHN sau này
     setSelectedLocationCodes((prev) => ({
       ...prev,
       district: districtCode,
@@ -190,11 +182,9 @@ export function useTradeInForm() {
     }
   };
 
-  const handleWardChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const wardCode = e.target.value;
+  const handleWardChange = (wardCode: string) => {
     const selectedWard = locations.wards.find((w) => w.code === wardCode);
 
-    // Lưu ghn_ward_code vào wardCode
     setSelectedLocationCodes((prev) => ({ ...prev, ward: wardCode }));
     setFormData((prev) => ({
       ...prev,
@@ -242,7 +232,6 @@ export function useTradeInForm() {
   };
 
   const submitTradeInRequest = async () => {
-    // Validate Client
     if (!formData.agreeTerms) {
       toast.error("Bạn cần đồng ý với điều khoản dịch vụ trước khi gửi.");
       return false;
@@ -391,11 +380,11 @@ export function useTradeInForm() {
     formData,
     categories,
     isLoadingCategories,
-    locations, // Export thêm cục này
-    selectedLocationCodes, // Export thêm cục này
-    handleProvinceChange, // Export
-    handleDistrictChange, // Export
-    handleWardChange, // Export
+    locations,
+    selectedLocationCodes,
+    handleProvinceChange,
+    handleDistrictChange,
+    handleWardChange,
     isSubmitting,
     handleInputChange,
     setEvaluationMethod,

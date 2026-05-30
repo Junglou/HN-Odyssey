@@ -18,7 +18,8 @@ interface ModalConfig {
 
 export function useAddressManagement() {
   // Các state chính
-  const [addresses, setAddresses] = useState<UserAddress[]>(INITIAL_MOCK_ADDRESS);
+  const [addresses, setAddresses] =
+    useState<UserAddress[]>(INITIAL_MOCK_ADDRESS);
 
   // Các state điều khiển popup modal
   const [modalConfig, setModalConfig] = useState<ModalConfig>({
@@ -80,7 +81,10 @@ export function useAddressManagement() {
       };
       setAddresses([newAddress, ...addresses]);
       toast.success("Thêm địa chỉ mới thành công!");
-    } else if (modalConfig.mode === "edit" && modalConfig.editingIndex !== null) {
+    } else if (
+      modalConfig.mode === "edit" &&
+      modalConfig.editingIndex !== null
+    ) {
       const updatedAddress: UserAddress = {
         receiverName: data.receiverName,
         address: data.address,
@@ -89,8 +93,8 @@ export function useAddressManagement() {
       };
       setAddresses(
         addresses.map((address, index) =>
-          index === modalConfig.editingIndex ? updatedAddress : address
-        )
+          index === modalConfig.editingIndex ? updatedAddress : address,
+        ),
       );
       toast.success("Cập nhật địa chỉ thành công!");
     }

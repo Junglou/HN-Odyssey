@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import { io } from "socket.io-client";
 import axiosClient from "../../../../api/axiosClient";
 
+// types
 export type TradeInStatus =
   | "Pending"
   | "Approved"
@@ -84,7 +85,6 @@ interface TradeInRequestBE {
   updatedAt: string;
 }
 
-// SỬA LỖI 1: Đổi metadata thành meta để đồng bộ với BaseResponse của Backend
 interface FetchResponse {
   success: boolean;
   message: string;
@@ -96,6 +96,7 @@ interface FetchResponse {
   };
 }
 
+// helpers
 const formatStatusToFE = (beStatus: string): TradeInStatus => {
   if (!beStatus) return "Pending";
   const formatted =
@@ -103,7 +104,9 @@ const formatStatusToFE = (beStatus: string): TradeInStatus => {
   return formatted as TradeInStatus;
 };
 
+// hook
 export function useTradeInManagement() {
+  // states
   const [data, setData] = useState<TradeInRow[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isMutating, setIsMutating] = useState<boolean>(false);
@@ -126,6 +129,11 @@ export function useTradeInManagement() {
     tradeInId: string | null;
   }>({ isOpen: false, tradeInId: null });
 
+  const [approveModal, setApproveModal] = useState<{
+    isOpen: boolean;
+    tradeInId: string | null;
+  }>({ isOpen: false, tradeInId: null });
+
   const [rejectModal, setRejectModal] = useState<{
     isOpen: boolean;
     tradeInId: string | null;
@@ -139,6 +147,7 @@ export function useTradeInManagement() {
   const rawApiUrl = import.meta.env.VITE_API_URL || "http://localhost:8080/api";
   const serverBaseUrl = rawApiUrl.replace(/\/api\/?$/, "");
 
+  // callbacks
   const fetchTradeIns = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -157,26 +166,23 @@ export function useTradeInManagement() {
         { params },
       );
 
-      // 1. Ép kiểu qua unknown rồi thành Record để vượt qua ESLint Strict Mode mà không dùng 'any'
       const resUnknown = response as unknown as Record<string, unknown>;
 
-      // 2. Ép kiểu tường minh (Explicit Type) để TypeScript hiểu rõ cấu trúc của payload
       const payload: FetchResponse =
         "success" in resUnknown
           ? (response as unknown as FetchResponse)
           : response.data;
 
-      // 3. Khẳng định items là một mảng TradeInRequestBE để hàm .map() không báo lỗi 2339
       const items: TradeInRequestBE[] = Array.isArray(payload?.data)
         ? payload.data
         : [];
 
-      // 4. TS đã hiểu payload là FetchResponse nên truy xuất .meta sẽ hợp lệ
       const meta = payload?.meta || {
         totalItems: 0,
         totalPages: 1,
         currentPage: 1,
       };
+
       const mappedData: TradeInRow[] = items.map((item: TradeInRequestBE) => ({
         id: item._id,
         tradeInCode: item.request_code,
@@ -224,27 +230,21 @@ export function useTradeInManagement() {
     filters.search,
     filters.fromDate,
     filters.toDate,
+    serverBaseUrl,
   ]);
 
-  //... Phần code còn lại giữ nguyên 100% không ảnh hưởng ...
-  // Socket.io effect
+  // effects
   useEffect(() => {
     fetchTradeIns();
   }, [fetchTradeIns]);
 
   useEffect(() => {
-    const rawApiUrl =
-      import.meta.env.VITE_API_URL || "http://localhost:8080/api";
-    const socketBaseUrl = rawApiUrl.replace(/\/api\/?$/, "");
-
     const token = localStorage.getItem("access_token") || "";
 
-    const socket = io(`${socketBaseUrl}/notifications`, {
+    const socket = io(`${serverBaseUrl}/notifications`, {
       transports: ["websocket"],
       autoConnect: true,
-      auth: {
-        token: token,
-      },
+      auth: { token: token },
     });
 
     socket.on(
@@ -264,8 +264,9 @@ export function useTradeInManagement() {
       socket.off("connect_error");
       socket.disconnect();
     };
-  }, [fetchTradeIns]);
+  }, [fetchTradeIns, serverBaseUrl]);
 
+  // logic
   const totalPages = Math.ceil(pagination.totalItems / pagination.limit) || 1;
   const selectedTradeIn = useMemo(() => {
     return data.find((item) => item.id === detailDrawer.tradeInId) || null;
@@ -283,6 +284,7 @@ export function useTradeInManagement() {
     }
   };
 
+  // actions
   const actions = {
     changeFilter: (key: keyof typeof filters, value: string) => {
       setFilters((prev) => ({ ...prev, [key]: value }));
@@ -303,6 +305,11 @@ export function useTradeInManagement() {
       setDetailDrawer({ isOpen: true, tradeInId: id }),
     closeDetail: () => setDetailDrawer({ isOpen: false, tradeInId: null }),
 
+    openApproveModal: (id: string) =>
+      setApproveModal({ isOpen: true, tradeInId: id }),
+    closeApproveModal: () =>
+      setApproveModal({ isOpen: false, tradeInId: null }),
+
     openRejectModal: (id: string) =>
       setRejectModal({ isOpen: true, tradeInId: id }),
     closeRejectModal: () => setRejectModal({ isOpen: false, tradeInId: null }),
@@ -312,12 +319,16 @@ export function useTradeInManagement() {
     closeFinalizeModal: () =>
       setFinalizeModal({ isOpen: false, tradeInId: null }),
 
-    approveTradeIn: async (id: string) => {
+    confirmApprove: async (id: string, estimateValue: number, note: string) => {
       if (isMutating) return;
       setIsMutating(true);
       try {
-        await axiosClient.patch(`/trade-in/admin/request/${id}/approve`);
+        await axiosClient.patch(`/trade-in/admin/request/${id}/approve`, {
+          estimateValue,
+          note,
+        });
         toast.success("Đã phê duyệt yêu cầu Trade-in.");
+        actions.closeApproveModal();
         fetchTradeIns();
       } catch (error: unknown) {
         console.error("Approve trade-in error:", error);
@@ -422,7 +433,6 @@ export function useTradeInManagement() {
       try {
         toast.info("Đang xuất file Excel...");
 
-        // CẢI TIẾN 1: Đẩy toàn bộ dữ liệu bộ lọc thời gian hiện tại từ UI lên Server
         const params: Record<string, string> = {};
         if (filters.status !== "all") params.status = filters.status;
         if (filters.search) params.search = filters.search;
@@ -434,7 +444,6 @@ export function useTradeInManagement() {
           responseType: "blob",
         });
 
-        // CẢI TIẾN 2: Trích xuất Blob an toàn tương thích với mọi cấu hình Axios Interceptor
         const resUnknown = response as unknown as Record<string, unknown>;
         const blobPayload =
           "data" in resUnknown && resUnknown.data !== undefined
@@ -526,6 +535,7 @@ export function useTradeInManagement() {
     },
     detailDrawer,
     selectedTradeIn,
+    approveModal,
     rejectModal,
     finalizeModal,
     actions,

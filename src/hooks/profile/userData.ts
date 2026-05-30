@@ -33,7 +33,7 @@ const addresses: UserAddress[] = [
 const getRandomAddress = (): UserAddress => {
   const addressesList = [...addresses].sort(() => 0.5 - Math.random());
   return addressesList[0];
-}
+};
 
 const getRandomProducts = (count: number = 3): Product[] => {
   const shuffled = [...productList].sort(() => 0.5 - Math.random());
@@ -41,72 +41,72 @@ const getRandomProducts = (count: number = 3): Product[] => {
 };
 
 const order: UserOrder[] = [
-    {
-      address: getRandomAddress(),
-      product: getRandomProducts(),
-      orderDate: "26/12/2025",
-      shipDate: "28/12/2025",
-      shipFee: "10.00$",
-      status: "Confirming",
-    },
-    {
-      address: getRandomAddress(),
-      product: getRandomProducts(),
-      orderDate: "26/12/2025",
-      shipDate: "28/12/2025",
-      shipFee: "10.00$",
-      status: "Confirming",
-    },
-    {
-      address: getRandomAddress(),
-      product: getRandomProducts(),
-      orderDate: "28/12/2025",
-      shipDate: "30/12/2025",
-      shipFee: "15.00$",
-      status: "Shipping",
-    },
-    {
-      address: getRandomAddress(),
-      product: getRandomProducts(),
-      orderDate: "01/01/2026",
-      shipDate: "03/01/2026",
-      shipFee: "20.00$",
-      status: "Completed",
-    },
+  {
+    address: getRandomAddress(),
+    product: getRandomProducts(),
+    orderDate: "26/12/2025",
+    shipDate: "28/12/2025",
+    shipFee: "10.00$",
+    status: "Confirming",
+  },
+  {
+    address: getRandomAddress(),
+    product: getRandomProducts(),
+    orderDate: "26/12/2025",
+    shipDate: "28/12/2025",
+    shipFee: "10.00$",
+    status: "Confirming",
+  },
+  {
+    address: getRandomAddress(),
+    product: getRandomProducts(),
+    orderDate: "28/12/2025",
+    shipDate: "30/12/2025",
+    shipFee: "15.00$",
+    status: "Shipping",
+  },
+  {
+    address: getRandomAddress(),
+    product: getRandomProducts(),
+    orderDate: "01/01/2026",
+    shipDate: "03/01/2026",
+    shipFee: "20.00$",
+    status: "Completed",
+  },
 ];
 const finishedOrder: UserOrder[] = [
-    {
-      address: getRandomAddress(),
-      product: getRandomProducts(),
-      orderDate: "26/12/2025",
-      shipDate: "28/12/2025",
-      shipFee: "10.00$",
-      status: "Confirming",
-    },
-    {
-      address: getRandomAddress(),
-      product: getRandomProducts(),
-      orderDate: "26/12/2025",
-      shipDate: "28/12/2025",
-      shipFee: "10.00$",
-      status: "Confirming",
-    },
-    {
-      address: getRandomAddress(),
-      product: getRandomProducts(),
-      orderDate: "28/12/2025",
-      shipDate: "30/12/2025",
-      shipFee: "15.00$",
-      status: "Shipping",
-    },
-    {
-      address: getRandomAddress(),
-      product: getRandomProducts(),
-      orderDate: "01/01/2026",
-      shipDate: "03/01/2026",
-      shipFee: "20.00$",
-      status: "Completed",
-    },
+  {
+    address: getRandomAddress(),
+    product: getRandomProducts(),
+    orderDate: "26/12/2025",
+    shipDate: "28/12/2025",
+    shipFee: "10.00$",
+    status: "Confirming",
+  },
+  {
+    address: getRandomAddress(),
+    product: getRandomProducts(),
+    orderDate: "26/12/2025",
+    shipDate: "28/12/2025",
+    shipFee: "10.00$",
+    status: "Confirming",
+  },
+  {
+    address: getRandomAddress(),
+    product: getRandomProducts(),
+    orderDate: "28/12/2025",
+    shipDate: "30/12/2025",
+    shipFee: "15.00$",
+    status: "Shipping",
+  },
+  {
+    address: getRandomAddress(),
+    product: getRandomProducts(),
+    orderDate: "01/01/2026",
+    shipDate: "03/01/2026",
+    shipFee: "20.00$",
+    status: "Completed",
+  },
 ];
 
 export const INITIAL_MOCK_USERS: UserProfile = {

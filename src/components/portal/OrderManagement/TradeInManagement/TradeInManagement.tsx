@@ -111,7 +111,7 @@ interface TradeInManagementProps {
     changePage: (page: number) => void;
     changeLimit: (limit: number) => void;
     openDetail: (id: string) => void;
-    approveTradeIn: (id: string) => void;
+    openApproveModal: (id: string) => void;
     openRejectModal: (id: string) => void;
     receiveItem: (id: string) => void;
     createOrder: (id: string) => void;
@@ -382,7 +382,7 @@ export default function TradeInManagement({
                               type="button"
                               className="tim-btn-outline-primary"
                               onClick={(e) => {
-                                actions.approveTradeIn(row.id);
+                                actions.openApproveModal(row.id);
                                 e.currentTarget.blur();
                               }}
                             >

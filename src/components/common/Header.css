@@ -88,10 +88,6 @@
   white-space: nowrap;
 }
 
-.nav-link:hover {
-  color: #666666;
-}
-
 /* khối phải */
 .header-actions {
   display: flex;

@@ -9,16 +9,88 @@ import {
 import "./TradeInForm.css";
 
 // component
+function LocationDropdown({
+  value,
+  options,
+  onChange,
+  placeholder = "Select...",
+  disabled = false,
+}: {
+  value: string;
+  options: { label: string; value: string }[];
+  onChange: (val: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+}) {
+  // states
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // effects
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedLabel =
+    options.find((opt) => opt.value === value)?.label || placeholder;
+
+  return (
+    <div
+      className={`sc-custom-select-wrapper ${disabled ? "disabled" : ""}`}
+      ref={dropdownRef}
+    >
+      <div
+        className={`sc-custom-select-trigger ${isOpen ? "active" : ""}`}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+      >
+        <span className={value ? "selected-text" : "placeholder-text"}>
+          {selectedLabel}
+        </span>
+        <ChevronDownSolidIcon
+          className={`sc-custom-select-icon ${isOpen ? "rotate" : ""}`}
+        />
+      </div>
+
+      <div
+        className={`sc-custom-select-menu ${isOpen && !disabled ? "show" : ""}`}
+      >
+        {options.map((opt) => (
+          <div
+            key={opt.value}
+            className={`sc-custom-select-item ${value === opt.value ? "selected" : ""}`}
+            onClick={() => {
+              onChange(opt.value);
+              setIsOpen(false);
+            }}
+          >
+            {opt.label}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// component chính
 export default function TradeInForm() {
   const {
     formData,
-    categories, // Lấy mảng danh mục thật từ API
-    isLoadingCategories, // Lấy trạng thái loading của danh mục
-    locations, // Lấy dữ liệu Tỉnh/Huyện/Xã
-    selectedLocationCodes, // Lấy mã GSO đang được chọn
-    handleProvinceChange, // Hàm xử lý khi chọn Tỉnh
-    handleDistrictChange, // Hàm xử lý khi chọn Huyện
-    handleWardChange, // Hàm xử lý khi chọn Xã
+    categories,
+    isLoadingCategories,
+    locations,
+    selectedLocationCodes,
+    handleProvinceChange,
+    handleDistrictChange,
+    handleWardChange,
     handleInputChange,
     setEvaluationMethod,
     setCategory,
@@ -28,10 +100,13 @@ export default function TradeInForm() {
     isSubmitting,
   } = useTradeInForm();
 
+  // states
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const [categorySearchTerm, setCategorySearchTerm] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // effects
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -45,14 +120,20 @@ export default function TradeInForm() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // handlers
   const handleCategorySelect = (value: string) => {
     setCategory(value);
     setIsCategoryOpen(false);
+    setCategorySearchTerm(""); // reset thanh tìm kiếm sau khi chọn
   };
 
   const triggerFileInput = () => {
     fileInputRef.current?.click();
   };
+
+  const filteredCategories = categories.filter((cat) =>
+    cat.name.toLowerCase().includes(categorySearchTerm.toLowerCase()),
+  );
 
   const renderPhotoBoxes = () => {
     const boxes = [];
@@ -139,7 +220,7 @@ export default function TradeInForm() {
               />
             </div>
 
-            {/* Dropdown danh mục đã được map với dữ liệu thật từ API */}
+            {/* Dropdown danh mục */}
             <div className="sc-input-group" ref={dropdownRef}>
               <label>Product Category *</label>
               <div
@@ -164,18 +245,38 @@ export default function TradeInForm() {
                 <div
                   className={`sc-select-dropdown ${isCategoryOpen ? "show" : ""}`}
                 >
-                  {categories.map((cat) => (
-                    <div
-                      key={cat.id}
-                      className={`sc-select-option ${formData.category === cat.id ? "selected" : ""}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCategorySelect(cat.id);
-                      }}
-                    >
-                      {cat.name}
+                  {/* thanh tìm kiếm chặn click lan truyền */}
+                  <div
+                    className="sc-select-search-box"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <input
+                      type="text"
+                      placeholder="Search category..."
+                      value={categorySearchTerm}
+                      onChange={(e) => setCategorySearchTerm(e.target.value)}
+                      className="sc-category-search-input"
+                    />
+                  </div>
+
+                  {filteredCategories.length > 0 ? (
+                    filteredCategories.map((cat) => (
+                      <div
+                        key={cat.id}
+                        className={`sc-select-option ${formData.category === cat.id ? "selected" : ""}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCategorySelect(cat.id);
+                        }}
+                      >
+                        {cat.name}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="sc-select-option-empty">
+                      No categories found
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             </div>
@@ -266,7 +367,7 @@ export default function TradeInForm() {
               </div>
             </div>
 
-            {/* Row 6 - Shipping Address (Conditional) */}
+            {/* Row 6 - Shipping Address */}
             {formData.evaluationMethod === "shipping" && (
               <div className="sc-shipping-address-box sc-col-span-2">
                 <h4 className="sc-shipping-title">Shipping Address</h4>
@@ -295,94 +396,48 @@ export default function TradeInForm() {
                   {/* DROP DOWN TỈNH/THÀNH PHỐ */}
                   <div className="sc-input-group">
                     <label>City / Province *</label>
-                    <select
-                      style={{
-                        width: "100%",
-                        padding: "12px",
-                        border: "1px solid #e2e8f0",
-                        borderRadius: "8px",
-                        outline: "none",
-                        backgroundColor: "#fff",
-                        fontSize: "15px",
-                        color: "#334155",
-                      }}
+                    <LocationDropdown
                       value={selectedLocationCodes.province}
+                      options={locations.provinces.map((prov) => ({
+                        label: prov.name_with_type,
+                        value: prov.code,
+                      }))}
                       onChange={handleProvinceChange}
-                    >
-                      <option value="">-- Select Province/City --</option>
-                      {locations.provinces.map((prov) => (
-                        <option key={prov.code} value={prov.code}>
-                          {prov.name_with_type}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder="-- Select Province/City --"
+                    />
                   </div>
 
                   {/* DROP DOWN QUẬN/HUYỆN */}
                   <div className="sc-input-group">
                     <label>District *</label>
-                    <select
-                      style={{
-                        width: "100%",
-                        padding: "12px",
-                        border: "1px solid #e2e8f0",
-                        borderRadius: "8px",
-                        outline: "none",
-                        backgroundColor: !selectedLocationCodes.province
-                          ? "#f8fafc"
-                          : "#fff",
-                        fontSize: "15px",
-                        color: "#334155",
-                        cursor: !selectedLocationCodes.province
-                          ? "not-allowed"
-                          : "pointer",
-                      }}
+                    <LocationDropdown
                       value={selectedLocationCodes.district}
+                      options={locations.districts.map((dist) => ({
+                        label: dist.name_with_type,
+                        value: dist.code,
+                      }))}
                       onChange={handleDistrictChange}
+                      placeholder="-- Select District --"
                       disabled={!selectedLocationCodes.province}
-                    >
-                      <option value="">-- Select District --</option>
-                      {locations.districts.map((dist) => (
-                        <option key={dist.code} value={dist.code}>
-                          {dist.name_with_type}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
 
                   {/* DROP DOWN PHƯỜNG/XÃ */}
                   <div className="sc-input-group">
                     <label>Ward *</label>
-                    <select
-                      style={{
-                        width: "100%",
-                        padding: "12px",
-                        border: "1px solid #e2e8f0",
-                        borderRadius: "8px",
-                        outline: "none",
-                        backgroundColor: !selectedLocationCodes.district
-                          ? "#f8fafc"
-                          : "#fff",
-                        fontSize: "15px",
-                        color: "#334155",
-                        cursor: !selectedLocationCodes.district
-                          ? "not-allowed"
-                          : "pointer",
-                      }}
+                    <LocationDropdown
                       value={selectedLocationCodes.ward}
+                      options={locations.wards.map((ward) => ({
+                        label: ward.name_with_type,
+                        value: ward.code,
+                      }))}
                       onChange={handleWardChange}
+                      placeholder="-- Select Ward --"
                       disabled={!selectedLocationCodes.district}
-                    >
-                      <option value="">-- Select Ward --</option>
-                      {locations.wards.map((ward) => (
-                        <option key={ward.code} value={ward.code}>
-                          {ward.name_with_type}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
 
-                  {/* ZIP Code (Disabled) */}
+                  {/* ZIP Code */}
                   <div className="sc-input-group">
                     <label>ZIP Code</label>
                     <input

@@ -17,7 +17,6 @@ interface ModalConfig {
 }
 
 export function useProfileManagement() {
-
   const [user, setUser] = useState<UserProfile>(INITIAL_MOCK_USERS);
 
   const [modalConfig, setModalConfig] = useState<ModalConfig>({

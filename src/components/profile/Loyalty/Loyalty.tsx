@@ -5,9 +5,7 @@ interface LoyaltyProps {
   user: UserProfile;
 }
 
-const Loyalty = ({
-  user
-}: LoyaltyProps) => {
+const Loyalty = ({ user }: LoyaltyProps) => {
   const tierLevels = [
     { label: "Bronze", range: "$0 - $999" },
     { label: "Silver", range: "$1,000 - $2,499" },
@@ -22,9 +20,24 @@ const Loyalty = ({
   ];
 
   const recentActivities = [
-    { points: "+150 points", description: "Purchase #ORD-001234", time: "2 days ago", positive: true },
-    { points: "-200 points", description: "Redeemed for discount", time: "1 week ago", positive: false },
-    { points: "+300 points", description: "Purchase #ORD-001189", time: "2 weeks ago", positive: true },
+    {
+      points: "+150 points",
+      description: "Purchase #ORD-001234",
+      time: "2 days ago",
+      positive: true,
+    },
+    {
+      points: "-200 points",
+      description: "Redeemed for discount",
+      time: "1 week ago",
+      positive: false,
+    },
+    {
+      points: "+300 points",
+      description: "Purchase #ORD-001189",
+      time: "2 weeks ago",
+      positive: true,
+    },
   ];
 
   return (
@@ -35,7 +48,6 @@ const Loyalty = ({
 
       <div className="loyalty-internal-grid">
         <div className="grid-section section-loyalty">
-
           <div className="loyalty-hero-card">
             <div className="loyalty-hero-header">
               <div className="loyalty-badge-row">
@@ -57,12 +69,16 @@ const Loyalty = ({
             <section className="loyalty-card progress-card">
               <div className="loyalty-card-head">
                 <div className="loyalty-card-title">Progress to Platinum</div>
-                <div className="loyalty-card-subtitle">$2,400 of $5,000 spent</div>
+                <div className="loyalty-card-subtitle">
+                  $2,400 of $5,000 spent
+                </div>
               </div>
               <div className="progress-track">
                 <div className="progress-fill" style={{ width: "48%" }} />
               </div>
-              <div className="progress-summary">Spend $2,600 more to reach Platinum tier</div>
+              <div className="progress-summary">
+                Spend $2,600 more to reach Platinum tier
+              </div>
             </section>
 
             <section className="loyalty-card points-expiring-card">
@@ -71,8 +87,8 @@ const Loyalty = ({
                 <div className="loyalty-card-value">150 points</div>
               </div>
               <div className="loyalty-card-meta">Expire on March 15, 2024</div>
-            </section>  
-          </div> 
+            </section>
+          </div>
 
           <section className="loyalty-card benefits-card">
             <div className="section-title">Your Current Benefits</div>
@@ -88,7 +104,6 @@ const Loyalty = ({
               ))}
             </div>
           </section>
-
         </div>
 
         <div className="grid-section section-progress">
@@ -96,7 +111,10 @@ const Loyalty = ({
             <div className="section-title">Tier Levels</div>
             <div className="tier-list">
               {tierLevels.map((tier) => (
-                <div key={tier.label} className={`tier-row ${tier.active ? "active" : ""}`}>
+                <div
+                  key={tier.label}
+                  className={`tier-row ${tier.active ? "active" : ""}`}
+                >
                   <div className="tier-name">{tier.label}</div>
                   <div className="tier-range">{tier.range}</div>
                 </div>
@@ -108,7 +126,9 @@ const Loyalty = ({
             <div className="activity-list">
               {recentActivities.map((item) => (
                 <div key={item.description} className="activity-item">
-                  <div className={`activity-points ${item.positive ? "positive" : "negative"}`}>
+                  <div
+                    className={`activity-points ${item.positive ? "positive" : "negative"}`}
+                  >
                     {item.points}
                   </div>
                   <div className="activity-details">
@@ -120,9 +140,7 @@ const Loyalty = ({
             </div>
           </section>
         </div>
-
       </div>
-
     </div>
   );
 };
