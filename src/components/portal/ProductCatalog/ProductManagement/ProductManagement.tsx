@@ -42,14 +42,14 @@ interface ProductManagementProps {
     clearFilter: () => void;
     changePage: (page: number) => void;
     changeLimit: (limit: number) => void;
-    selectProduct: (id: number) => void;
+    selectProduct: (id: string) => void; // Đã đổi thành string
     selectAll: (isAll: boolean) => void;
-    toggleStatus: (id: number, status: string) => void;
+    toggleStatus: (id: string, status: string) => void; // Đã đổi thành string
     bulk: (action: BulkAction) => void;
     addProduct: () => void;
-    viewProduct: (id: number) => void;
-    editProduct: (id: number) => void;
-    deleteSingle: (id: number) => void;
+    viewProduct: (id: string) => void; // Đã đổi thành string
+    editProduct: (id: string) => void; // Đã đổi thành string
+    deleteSingle: (id: string) => void; // Đã đổi thành string
   };
 }
 
@@ -122,7 +122,8 @@ export default function ProductManagement({
   pagination,
   actions,
 }: ProductManagementProps) {
-  const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
+  // Đã sửa lỗi TypeScript: Đổi number thành string
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
   const limitRef = useRef<HTMLDivElement>(null);
   useClickOutside(limitRef, () => setIsLimitDropdownOpen(false));
@@ -275,14 +276,46 @@ export default function ProductManagement({
                           aria-label={`Select product ${prod.name}`}
                         />
                         <div className="pm-img-placeholder" aria-hidden="true">
-                          <div className="pm-img-mock"></div>
+                          {/* KIỂM TRA NẾU CÓ ẢNH THÌ RENDER THẺ IMG, KHÔNG THÌ RENDER MOCK XÁM */}
+                          {prod.image ? (
+                            <img
+                              // Nếu ảnh là link nội bộ (/uploads/...), tự động nối thêm domain của Backend vào
+                              src={
+                                prod.image.startsWith("http")
+                                  ? prod.image
+                                  : `${import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:8080"}${prod.image}`
+                              }
+                              alt={prod.name}
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                                borderRadius: "8px",
+                              }}
+                              onError={(e) => {
+                                // Nếu link ảnh bị lỗi (404), tự động fallback về ô xám
+                                (e.target as HTMLImageElement).style.display =
+                                  "none";
+                                (
+                                  e.target as HTMLImageElement
+                                ).nextElementSibling?.removeAttribute("style");
+                              }}
+                            />
+                          ) : (
+                            <div className="pm-img-mock"></div>
+                          )}
+                          <div
+                            className="pm-img-mock"
+                            style={{ display: prod.image ? "none" : "block" }}
+                          ></div>
                         </div>
                       </div>
                     </td>
                     <td data-label="SKU">{prod.sku}</td>
+                    {/* Đã gỡ bỏ khoảng trắng {" "} dư thừa gây lỗi Hydration ở dưới đây */}
                     <td className="pm-td-name" data-label="Product Name">
                       {prod.name}
-                    </td>{" "}
+                    </td>
                     <td data-label="Status">
                       <span className={`pm-status-badge status-${prod.status}`}>
                         <span className="pm-dot" aria-hidden="true"></span>{" "}

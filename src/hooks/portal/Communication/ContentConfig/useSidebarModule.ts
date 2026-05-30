@@ -1,8 +1,5 @@
-// imports
 import { useState, useMemo } from "react";
 import type { ElementType } from "./useContentConfig";
-
-// types
 export type ModuleActionType = "drag" | "click";
 
 export interface SidebarModule {
@@ -19,7 +16,6 @@ export interface SidebarCategory {
   modules: SidebarModule[];
 }
 
-// config data
 const SIDEBAR_DATA: SidebarCategory[] = [
   {
     id: "cat-typography",
@@ -146,7 +142,6 @@ const SIDEBAR_DATA: SidebarCategory[] = [
   },
 ];
 
-// hook
 export function useSidebarModule() {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedCategories, setExpandedCategories] = useState<string[]>([

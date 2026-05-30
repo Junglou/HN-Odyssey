@@ -13,9 +13,6 @@ import {
   type PricingItem,
   type CategoryNode,
   type VariantAttribute,
-  AVAILABLE_TAGS,
-  MOCK_AVAILABLE_ATTRIBUTES,
-  MOCK_CATEGORIES,
 } from "../../../../../hooks/portal/ProductCatalog/ProductManagement/useProductForm";
 
 // interface props
@@ -27,6 +24,9 @@ interface ProductFormProps {
   productVariants: VariantAttribute[];
   categoryError: string;
   userRole?: "admin" | "employee";
+  availableTags: string[]; // Được thêm vào để nhận data thật từ API
+  availableAttributes: VariantAttribute[]; // Được thêm vào để nhận data thật từ API
+  availableCategories: CategoryNode[];
   actions: {
     changeInput: (name: keyof ProductData, value: string) => void;
     changeCategory: (categoryId: string) => void;
@@ -41,7 +41,7 @@ interface ProductFormProps {
     approveSinglePrice: (id: string) => void;
     rejectSinglePrice: (id: string) => void;
     viewApproval: () => void;
-    saveProduct: () => boolean;
+    saveProduct: () => boolean | Promise<boolean>;
     cancel: () => void;
   };
 }
@@ -142,6 +142,9 @@ export default function ProductForm({
   productVariants,
   categoryError,
   userRole = "admin",
+  availableTags,
+  availableAttributes,
+  availableCategories,
   actions,
 }: ProductFormProps) {
   const navigate = useNavigate();
@@ -178,7 +181,7 @@ export default function ProductForm({
 
   const hasPendingApproval = pricingList.some((p) => p.status === "pending");
   const categoryPath = formData.categoryId
-    ? findCategoryPath(MOCK_CATEGORIES, formData.categoryId)?.join(" > ")
+    ? findCategoryPath(availableCategories, formData.categoryId)?.join(" > ") // Thay MOCK_CATEGORIES bằng availableCategories
     : "";
 
   // check các trường bắt buộc trước khi lưu
@@ -313,7 +316,7 @@ export default function ProductForm({
         <h3 className="pf-section-title">Category Selection</h3>
         <div className="pf-input-group">
           <label>
-            Category Hierarchy <span style={{ color: "red" }}>*</span>
+            Category Hierarchy<span style={{ color: "red" }}>*</span>
           </label>
           <div className="pf-tree-select" ref={treeRef}>
             <div
@@ -346,7 +349,7 @@ export default function ProductForm({
             )}
             {isTreeOpen && !isViewMode && (
               <div className="pf-tree-dropdown">
-                {renderTreeNodes(MOCK_CATEGORIES)}
+                {renderTreeNodes(availableCategories)}{" "}
               </div>
             )}
           </div>
@@ -358,7 +361,6 @@ export default function ProductForm({
         <section className="pf-section">
           <div className="pf-section-header-row">
             <h3 className="pf-section-title">Pricing & Approval</h3>
-            {/* Hiển thị badge vàng bên cạnh title nếu có dòng đang chờ duyệt */}
             {hasPendingApproval && (
               <span className="pf-badge pending">pending Approval</span>
             )}
@@ -629,7 +631,7 @@ export default function ProductForm({
           <TagModal
             isOpen={isTagModalOpen}
             onClose={() => setIsTagModalOpen(false)}
-            availableTags={AVAILABLE_TAGS}
+            availableTags={availableTags}
             selectedTags={tags}
             onConfirm={(newTags) => actions.updateTags(newTags)}
           />
@@ -638,7 +640,7 @@ export default function ProductForm({
             isOpen={isVariantModalOpen}
             onClose={() => setIsVariantModalOpen(false)}
             initialAttribute={editingVariant}
-            availableAttributes={MOCK_AVAILABLE_ATTRIBUTES}
+            availableAttributes={availableAttributes}
             existingVariants={productVariants}
             onConfirm={(updatedAttributes) => {
               actions.confirmVariant(updatedAttributes, editingVariant?.id);

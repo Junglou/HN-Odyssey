@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { io, Socket } from "socket.io-client";
+import { useNavigate } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
 import { toast } from "react-toastify";
 
-// types
 export interface PortalNotification {
   _id: string;
   title: string;
@@ -19,14 +19,50 @@ export interface PortalNotification {
     area_code?: string;
   };
 }
+export interface RawNotificationPayload extends Omit<
+  PortalNotification,
+  "_id" | "is_read"
+> {
+  id?: string;
+  _id?: string;
+  is_read?: boolean;
+}
 
-// hook
 export function usePortalNotifications() {
   const [notifications, setNotifications] = useState<PortalNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
 
-  // handlers
-  const markAsRead = async (id: string) => {
+  const loadMore = async () => {
+    if (isLoading || !hasMore) return;
+    setIsLoading(true);
+
+    const nextPage = page + 1;
+    try {
+      const res = await axiosClient.get(
+        `/notifications/my-notifications?page=${nextPage}&limit=20`,
+      );
+      if (res.data && res.data.success) {
+        const newItems = res.data.data;
+        setNotifications((prev) => [...prev, ...newItems]);
+        setPage(nextPage);
+
+        // khóa trạng thái tải thêm nếu dữ liệu trả về không đủ limit
+        if (newItems.length < 20) {
+          setHasMore(false);
+        }
+      }
+    } catch (error) {
+      console.error("lỗi khi tải thêm thông báo:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const markAsReadAndNavigate = async (id: string, targetUrl?: string) => {
     try {
       const res = await axiosClient.patch(`/notifications/${id}/read`);
       if (res.data && res.data.success) {
@@ -36,17 +72,21 @@ export function usePortalNotifications() {
           ),
         );
         setUnreadCount((prev) => Math.max(0, prev - 1));
+
+        // thực thi chuyển trang nếu dữ liệu metadata có định tuyến
+        if (targetUrl) {
+          navigate(targetUrl);
+        }
       }
     } catch (error) {
       console.error("lỗi khi cập nhật trạng thái đã đọc:", error);
     }
   };
 
-  // effects
   useEffect(() => {
     let isMounted = true;
 
-    const loadInitialNotifications = async () => {
+    const loadInitialData = async () => {
       try {
         const [res, countRes] = await Promise.all([
           axiosClient.get("/notifications/my-notifications?page=1&limit=20"),
@@ -56,36 +96,48 @@ export function usePortalNotifications() {
         if (isMounted) {
           if (res.data && res.data.success) {
             setNotifications(res.data.data);
+            if (res.data.data.length < 20) {
+              setHasMore(false);
+            }
           }
           if (countRes.data && countRes.data.success) {
             setUnreadCount(countRes.data.data.count);
           }
         }
       } catch (error) {
-        console.error("lỗi khi tải danh sách thông báo:", error);
+        console.error("lỗi khi tải dữ liệu khởi tạo:", error);
       }
     };
 
-    loadInitialNotifications();
+    loadInitialData();
 
     return () => {
       isMounted = false;
     };
   }, []);
 
-  // effect
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     if (!token) return;
 
-    const socketUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
+    const socketUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
     const socket: Socket = io(`${socketUrl}/notifications`, {
       auth: { token },
       transports: ["websocket"],
     });
 
-    socket.on("new_notification", (data: PortalNotification) => {
+    // map lại raw payload để lấy id đồng bộ với logic _id của frontend
+    socket.on("new_notification", (rawPayload: RawNotificationPayload) => {
+      // trích xuất id an toàn bằng toán tử nullish coalescing
+      const safeId = rawPayload.id ?? rawPayload._id;
+
+      const data: PortalNotification = {
+        ...rawPayload,
+        _id: safeId ? String(safeId) : "",
+        is_read: Boolean(rawPayload.is_read),
+      };
+
       setNotifications((prev) => [data, ...prev]);
       setUnreadCount((prev) => prev + 1);
       toast.info(`thông báo mới: ${data.title}`);
@@ -99,6 +151,9 @@ export function usePortalNotifications() {
   return {
     notifications,
     unreadCount,
-    markAsRead,
+    hasMore,
+    isLoading,
+    loadMore,
+    markAsReadAndNavigate,
   };
 }

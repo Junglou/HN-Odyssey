@@ -1,10 +1,7 @@
 // imports
 import { useState } from "react";
 import { PlusSquareIcon } from "../../assets/icons/CheckoutIcons";
-import {
-  MOCK_PROMO_CODES,
-  type CheckoutItem,
-} from "../../hooks/checkout/useCheckout";
+import { type CheckoutItem } from "../../hooks/checkout/useCheckout";
 import "./CheckoutSummary.css";
 
 // interfaces
@@ -12,13 +9,15 @@ interface CheckoutSummaryProps {
   items: CheckoutItem[];
   promoCode: string;
   subtotal: number;
-  shippingFee: string;
+  shippingFee: string | number;
   taxes: number;
+  discountAmount?: number;
   total: number;
   onPromoCodeChange: (val: string) => void;
   onPlaceOrder: () => void;
   loading: boolean;
   submitButtonText?: string;
+  availablePromos?: string[]; // Thêm prop này để thay thế mock data
 }
 
 // component
@@ -28,17 +27,19 @@ export default function CheckoutSummary({
   subtotal,
   shippingFee,
   taxes,
+  discountAmount,
   total,
   onPromoCodeChange,
   onPlaceOrder,
   loading,
   submitButtonText,
+  availablePromos = [], // Mặc định mảng rỗng để không hiển thị dropdown giả
 }: CheckoutSummaryProps) {
   // hooks/states
   const [isPromoOpen, setIsPromoOpen] = useState(false);
 
-  // helpers: lọc mã giảm giá theo từ khóa người dùng gõ
-  const filteredCodes = MOCK_PROMO_CODES.filter((code) =>
+  // helpers: lọc mã giảm giá theo từ khóa người dùng gõ từ prop truyền vào
+  const filteredCodes = availablePromos.filter((code) =>
     code.toLowerCase().includes(promoCode.toLowerCase()),
   );
 
@@ -102,7 +103,7 @@ export default function CheckoutSummary({
             <PlusSquareIcon />
           </button>
 
-          {/* hiển thị dropdown danh sách mã code khi mở */}
+          {/* hiển thị dropdown danh sách mã code khi có dữ liệu truyền vào */}
           {isPromoOpen && filteredCodes.length > 0 && (
             <div className="checkout-promo-dropdown-list">
               {filteredCodes.map((code) => (
@@ -127,22 +128,34 @@ export default function CheckoutSummary({
       <div className="checkout-summary-pricing-block">
         <div className="checkout-summary-pricing-row">
           <span>Subtotal:</span>
-          <span>{subtotal}$</span>
+          {/* Thêm toLocaleString() và đổi $ thành đ */}
+          <span>{subtotal.toLocaleString()}đ</span>
         </div>
 
         <div className="checkout-summary-pricing-row">
           <span>Shipping fee:</span>
+          {/* shippingFee vốn dĩ đã là string có sẵn chữ đ từ hook nên giữ nguyên */}
           <span>{shippingFee}</span>
         </div>
 
+        {discountAmount !== undefined && discountAmount > 0 && (
+          <div
+            className="checkout-summary-pricing-row"
+            style={{ color: "#d32f2f", fontWeight: 500 }}
+          >
+            <span>Discount (Voucher):</span>
+            <span>-{discountAmount.toLocaleString()}đ</span>
+          </div>
+        )}
+
         <div className="checkout-summary-pricing-row">
           <span>Taxes:</span>
-          <span>{taxes}$</span>
+          <span>{taxes.toLocaleString()}đ</span>
         </div>
 
         <div className="checkout-summary-pricing-row checkout-summary-total-row">
           <span>Total:</span>
-          <span>{total}$</span>
+          <span>{total.toLocaleString()}đ</span>
         </div>
       </div>
 

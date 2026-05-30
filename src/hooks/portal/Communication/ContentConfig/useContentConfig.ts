@@ -1,8 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { toast } from "react-toastify"; // THÊM IMPORT TOASTIFY
-import axiosClient from "../../../../api/axiosClient"; // Sửa lại đường dẫn nếu cần
+import { toast } from "react-toastify";
+import axiosClient from "../../../../api/axiosClient";
 
-// --- THÊM LẠI VÀ EXPORT CÁC TYPE BỊ THIẾU ---
 export type PageType =
   | "homepage"
   | "about_us"
@@ -62,7 +61,6 @@ export interface SectionConfig {
   backgroundUrl: string;
   elements: EditorElement[];
 }
-// --------------------------------------------
 
 export function useContentConfig() {
   const [selectedPage, setSelectedPage] = useState<PageType>("homepage");
@@ -74,9 +72,9 @@ export function useContentConfig() {
 
   const [history, setHistory] = useState<SectionConfig[][]>([]);
   const [historyIndex, setHistoryIndex] = useState(0);
-  const [isSaving, setIsSaving] = useState(false); // Thêm state tracking việc lưu
+  const [isSaving, setIsSaving] = useState(false);
 
-  // FETCH DATA TỪ BACKEND ĐỂ RENDER (KHÔNG DÙNG MOCK)
+  // FETCH DATA TỪ BACKEND ĐỂ RENDER
   useEffect(() => {
     const fetchConfig = async () => {
       try {
@@ -91,7 +89,6 @@ export function useContentConfig() {
           setHistoryIndex(0);
           setSelectedSectionId(data.sections[0].id);
         } else {
-          // Khởi tạo 1 section trắng mặc định nếu BE trả về rỗng (Bắt buộc để UI builder có chỗ vẽ)
           const defaultSection: SectionConfig = {
             id: `sec-${Date.now()}`,
             pageId: selectedPage,
@@ -472,6 +469,6 @@ export function useContentConfig() {
     availableSections,
     activeElementData,
     actions,
-    isSaving, // Trả ra ngoài để nếu thích bạn có thể dùng disable nút Save khi đang call API
+    isSaving,
   };
 }

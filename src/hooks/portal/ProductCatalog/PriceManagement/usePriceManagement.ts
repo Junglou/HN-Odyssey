@@ -2,11 +2,11 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
 
-// types
 export type PriceStatus = "APPROVED" | "PENDING" | "REJECTED" | "DRAFT";
 
 export interface PriceRecord {
   id: string;
+  productId: string; // ID gốc của Product để call API
   productName: string;
   sku: string;
   variant: string;
@@ -29,9 +29,29 @@ export interface ApiError {
   };
 }
 
-// hook
+export interface ApiVariant {
+  sku: string;
+  price: number;
+  attributes: { code: string; value: string }[];
+}
+
+export interface ApiProduct {
+  _id: string;
+  name: string;
+  sku: string;
+  has_variants?: boolean;
+  price: number;
+  currency?: string;
+  price_request?: {
+    status?: string;
+    price?: number;
+    currency?: string;
+    variants?: { sku: string; price: number }[];
+  };
+  variants?: ApiVariant[];
+}
+
 export function usePriceManagement() {
-  // states
   const [records, setRecords] = useState<PriceRecord[]>([]);
   const [search, setSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<PriceStatus | "All">("All");
@@ -45,42 +65,77 @@ export function usePriceManagement() {
     isSubmitting: boolean;
   }>({ isOpen: false, editingRecord: null, isSubmitting: false });
 
-  // api
   const fetchProductsData = async () => {
     const res = await axiosClient.get("/products");
-    const products = res.data?.data || res.data || [];
+    const products: ApiProduct[] = res.data?.data || res.data || [];
+    const flatRecords: PriceRecord[] = [];
 
-    return products.map(
-      (p: {
-        _id: string;
-        name: string;
-        sku: string;
-        has_variants?: boolean;
-        price: number;
-        currency?: string;
-        price_request?: {
-          status?: string;
-          price?: number;
-          currency?: string;
-        };
-      }) => {
-        const status = p.price_request?.status || "APPROVED";
-        const displayPrice = p.price_request?.price || p.price;
+    products.forEach((p) => {
+      // Bóc tách variants ra thành từng dòng hiển thị
+      if (p.has_variants && p.variants && p.variants.length > 0) {
+        p.variants.forEach((v, index) => {
+          let currentStatus = "APPROVED";
+          let displayPrice = v.price;
+          const displayCurrency =
+            p.price_request?.currency || p.currency || "VND";
+
+          if (p.price_request) {
+            const reqVar = p.price_request.variants?.find(
+              (rv) => rv.sku === v.sku,
+            );
+            if (reqVar) {
+              currentStatus = p.price_request.status || "PENDING";
+              displayPrice = reqVar.price;
+            } else if (v.price === 0) {
+              currentStatus = "DRAFT";
+            }
+          } else if (v.price === 0) {
+            currentStatus = "DRAFT";
+          }
+
+          const variantText =
+            v.attributes?.map((a) => a.value).join(" / ") ||
+            `Variant ${index + 1}`;
+
+          flatRecords.push({
+            id: v.sku || `${p._id}-${index}`,
+            productId: p._id,
+            productName: p.name,
+            sku: v.sku,
+            variant: variantText,
+            status: currentStatus.toUpperCase() as PriceStatus,
+            price: displayPrice,
+            currency: displayCurrency,
+          });
+        });
+      } else {
+        // Render mặc định cho sản phẩm đơn lẻ
+        let currentStatus = "APPROVED";
+        let displayPrice = p.price;
         const displayCurrency =
           p.price_request?.currency || p.currency || "VND";
-        const variantText = p.has_variants ? "Multiple Variants" : "Single";
 
-        return {
+        if (p.price_request) {
+          currentStatus = p.price_request.status || "PENDING";
+          displayPrice = p.price_request.price || p.price;
+        } else if (p.price === 0) {
+          currentStatus = "DRAFT";
+        }
+
+        flatRecords.push({
           id: p._id,
+          productId: p._id,
           productName: p.name,
           sku: p.sku,
-          variant: variantText,
-          status: status as PriceStatus,
+          variant: "Single",
+          status: currentStatus.toUpperCase() as PriceStatus,
           price: displayPrice,
           currency: displayCurrency,
-        } as PriceRecord;
-      },
-    );
+        });
+      }
+    });
+
+    return flatRecords;
   };
 
   const refreshData = useCallback(() => {
@@ -90,8 +145,9 @@ export function usePriceManagement() {
       })
       .catch((error) => {
         const err = error as ApiError;
+        const msg = err.response?.data?.message;
         toast.error(
-          (err.response?.data?.message as string) ||
+          (Array.isArray(msg) ? msg.join(", ") : msg) ||
             "Lỗi tải danh sách sản phẩm",
         );
       });
@@ -101,7 +157,6 @@ export function usePriceManagement() {
     refreshData();
   }, [refreshData]);
 
-  // helper
   const filteredRecords = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
@@ -134,7 +189,6 @@ export function usePriceManagement() {
     startIndex + pagination.limit,
   );
 
-  // handle
   const actions = {
     changeSearch: (val: string) => setSearch(val),
     changeStatusFilter: (status: PriceStatus | "All") =>
@@ -188,61 +242,110 @@ export function usePriceManagement() {
     setModalConfig((prev) => ({ ...prev, isSubmitting: true }));
 
     try {
-      await axiosClient.post(`/products/${targetRecord.id}/price-request`, {
-        price: data.priceAmount,
+      const baseRecord = records.find(
+        (r) => r.productId === targetRecord.productId && r.variant === "Single",
+      );
+      let basePrice = baseRecord ? baseRecord.price : targetRecord.price;
+
+      if (!basePrice || basePrice <= 0) {
+        basePrice = data.priceAmount;
+      }
+
+      const payload: {
+        price: number;
+        currency: string;
+        effective_date: string;
+        variants?: { sku: string; price: number }[];
+      } = {
+        price: targetRecord.variant === "Single" ? data.priceAmount : basePrice,
         currency: data.currency,
-        effective_date: data.effectiveDate,
-      });
+        // lấy thời điểm hiện tại thực tế để tránh lỗi chênh lệch múi giờ với backend
+        effective_date: new Date().toISOString(),
+      };
+
+      if (targetRecord.variant !== "Single") {
+        payload.variants = [
+          {
+            sku: targetRecord.sku,
+            price: data.priceAmount,
+          },
+        ];
+      }
+
+      await axiosClient.post(
+        `/products/${targetRecord.productId}/price-request`,
+        payload,
+      );
       toast.success("Đã tạo yêu cầu giá (Draft)!");
       refreshData();
       actions.closeSetPriceModal();
     } catch (error) {
       const err = error as ApiError;
-      toast.error((err.response?.data?.message as string) || "Lỗi lưu giá");
+      const errorMsg = err.response?.data?.message;
+      toast.error(
+        Array.isArray(errorMsg)
+          ? errorMsg.join(", ")
+          : errorMsg || "Lỗi lưu giá",
+      );
       setModalConfig((prev) => ({ ...prev, isSubmitting: false }));
     }
   };
 
+  const getUniqueProductIds = () => {
+    const ids = Array.from(selectedIds);
+    const productIds = records
+      .filter((r) => ids.includes(r.id))
+      .map((r) => r.productId);
+    return Array.from(new Set(productIds));
+  };
+
   const rowActions = {
-    submitPrice: async (id: string) => {
+    submitPrice: async (productId: string) => {
       try {
-        await axiosClient.patch(`/products/${id}/price-request/submit`);
+        await axiosClient.patch(`/products/${productId}/price-request/submit`);
         toast.success("Đã gửi yêu cầu duyệt giá!");
         refreshData();
       } catch (error) {
         const err = error as ApiError;
-        toast.error((err.response?.data?.message as string) || "Lỗi gửi duyệt");
+        const msg = err.response?.data?.message;
+        toast.error(
+          Array.isArray(msg) ? msg.join(", ") : msg || "Lỗi gửi duyệt",
+        );
       }
     },
-    approvePrice: async (id: string) => {
+    approvePrice: async (productId: string) => {
       try {
-        await axiosClient.patch(`/products/${id}/price-approval`, {
+        await axiosClient.patch(`/products/${productId}/price-approval`, {
           action: "approve",
         });
         toast.success("Đã duyệt giá thành công!");
         refreshData();
       } catch (error) {
         const err = error as ApiError;
-        toast.error((err.response?.data?.message as string) || "Lỗi duyệt giá");
+        const msg = err.response?.data?.message;
+        toast.error(
+          Array.isArray(msg) ? msg.join(", ") : msg || "Lỗi duyệt giá",
+        );
       }
     },
-    rejectPrice: async (id: string) => {
+    rejectPrice: async (productId: string) => {
       try {
-        await axiosClient.patch(`/products/${id}/price-approval`, {
+        await axiosClient.patch(`/products/${productId}/price-approval`, {
           action: "reject",
         });
         toast.warning("Đã từ chối giá!");
         refreshData();
       } catch (error) {
         const err = error as ApiError;
-        toast.error((err.response?.data?.message as string) || "Lỗi từ chối");
+        const msg = err.response?.data?.message;
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg || "Lỗi từ chối");
       }
     },
   };
 
   const bulkActions = {
     bulkApprove: async () => {
-      const targets = Array.from(selectedIds);
+      const targets = getUniqueProductIds();
       if (targets.length === 0) return;
       try {
         await axiosClient.patch(`/products/price-requests/bulk-action`, {
@@ -254,13 +357,14 @@ export function usePriceManagement() {
         refreshData();
       } catch (error) {
         const err = error as ApiError;
+        const msg = err.response?.data?.message;
         toast.error(
-          (err.response?.data?.message as string) || "Lỗi duyệt hàng loạt",
+          Array.isArray(msg) ? msg.join(", ") : msg || "Lỗi duyệt hàng loạt",
         );
       }
     },
     bulkReject: async () => {
-      const targets = Array.from(selectedIds);
+      const targets = getUniqueProductIds();
       if (targets.length === 0) return;
       try {
         await axiosClient.patch(`/products/price-requests/bulk-action`, {
@@ -272,8 +376,9 @@ export function usePriceManagement() {
         refreshData();
       } catch (error) {
         const err = error as ApiError;
+        const msg = err.response?.data?.message;
         toast.error(
-          (err.response?.data?.message as string) || "Lỗi từ chối hàng loạt",
+          Array.isArray(msg) ? msg.join(", ") : msg || "Lỗi từ chối hàng loạt",
         );
       }
     },

@@ -1,8 +1,5 @@
 // imports
-import {
-  useCheckout,
-  MOCK_RECOMMENDATIONS,
-} from "../../hooks/checkout/useCheckout";
+import { useCheckout } from "../../hooks/checkout/useCheckout";
 import CheckoutForm from "../../components/checkout/CheckoutForm";
 import CheckoutPaymentForm from "../../components/checkout/CheckoutPaymentForm";
 import CheckoutSummary from "../../components/checkout/CheckoutSummary";
@@ -16,6 +13,12 @@ export default function CheckoutPage() {
   const {
     step,
     items,
+    recommendations,
+    provinces,
+    districts,
+    wards,
+    savedAddresses,
+    isLogged,
     formData,
     paymentData,
     promoCode,
@@ -26,11 +29,14 @@ export default function CheckoutPage() {
     subtotal,
     shippingFee,
     taxes,
+    discountAmount,
     total,
+    availablePromos,
     setPromoCode,
     setIsSubscribed,
     setIsGift,
     handleChange,
+    handleSelectAddress,
     handlePaymentChange,
     handleSendOtp,
     handlePlaceOrder,
@@ -41,7 +47,6 @@ export default function CheckoutPage() {
   return (
     <div className="checkout-page-wrapper">
       <div className="checkout-grid">
-        {/* cột trái: form hoặc thẻ thành công */}
         <div className="checkout-left-col">
           {step !== 3 && (
             <h1 className="checkout-page-title">
@@ -51,12 +56,18 @@ export default function CheckoutPage() {
 
           {step === 1 && (
             <CheckoutForm
+              provinces={provinces}
+              districts={districts}
+              wards={wards}
+              savedAddresses={savedAddresses}
+              isLogged={isLogged}
               formData={formData}
               isSubscribed={isSubscribed}
               isGift={isGift}
               otpTimer={otpTimer}
               loading={loading}
               onChange={handleChange}
+              onSelectAddress={handleSelectAddress}
               onSubscribeChange={setIsSubscribed}
               onGiftChange={setIsGift}
               onSendOtp={handleSendOtp}
@@ -86,7 +97,9 @@ export default function CheckoutPage() {
                 subtotal={subtotal}
                 shippingFee={shippingFee}
                 taxes={taxes}
+                discountAmount={discountAmount}
                 total={total}
+                availablePromos={availablePromos}
                 onPromoCodeChange={setPromoCode}
                 onPlaceOrder={handlePlaceOrder}
                 loading={loading}
@@ -95,7 +108,7 @@ export default function CheckoutPage() {
                 }
               />
             ) : (
-              <CheckoutRecommendations items={MOCK_RECOMMENDATIONS} />
+              <CheckoutRecommendations items={recommendations} />
             )}
           </div>
         </div>

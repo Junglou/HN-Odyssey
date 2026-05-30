@@ -12,6 +12,9 @@ export default function ProductFormPage() {
     productVariants,
     categoryError,
     actions,
+    AVAILABLE_TAGS, // Lấy mảng tag đã fetch từ backend trong Hook
+    MOCK_AVAILABLE_ATTRIBUTES, // Lấy mảng attribute đã fetch từ backend trong Hook
+    AVAILABLE_CATEGORIES,
   } = useProductForm();
 
   return (
@@ -24,6 +27,9 @@ export default function ProductFormPage() {
         productVariants={productVariants}
         categoryError={categoryError}
         actions={actions}
+        availableTags={AVAILABLE_TAGS} // Truyền xuống
+        availableAttributes={MOCK_AVAILABLE_ATTRIBUTES} // Truyền xuống
+        availableCategories={AVAILABLE_CATEGORIES}
       />
     </div>
   );
