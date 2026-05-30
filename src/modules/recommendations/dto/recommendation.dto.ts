@@ -30,6 +30,10 @@ export class GetCartRecommendationsDto {
   @IsNumber()
   @Min(0)
   current_cart_total: number; // Để tính Freeship Gap (AC2)
+
+  @IsOptional()
+  @IsString()
+  exclude_ids?: string;
 }
 
 export class GetPersonalizedDto {

@@ -63,8 +63,6 @@ export class PersonalizationController {
     );
   }
 
-  // API: Lấy Sản phẩm mới ra mắt (Ưu tiên Brand đang Follow / VIP)
-
   //@Public()
   @Get('new-arrivals')
   async getNewArrivals(@Req() req: RequestWithOptionalUser) {

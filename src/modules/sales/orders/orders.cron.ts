@@ -21,10 +21,12 @@ export class OrdersCronService {
   @Cron(CronExpression.EVERY_MINUTE)
   async handleExpiredOrders() {
     const now = new Date();
-    const expiredOrders = await this.orderModel.find({
-      status: { $in: [OrderStatus.PENDING, OrderStatus.TEMPORARY] },
-      hold_expires_at: { $lte: now },
-    });
+    const expiredOrders = await this.orderModel
+      .find({
+        status: { $in: [OrderStatus.PENDING, OrderStatus.TEMPORARY] },
+        hold_expires_at: { $lte: now },
+      })
+      .limit(50);
 
     for (const order of expiredOrders) {
       const MAX_RETRIES = 3;

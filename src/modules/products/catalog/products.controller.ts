@@ -9,8 +9,6 @@ import {
   Query,
   Ip,
   Headers as HttpHeaders,
-  UploadedFiles,
-  UseInterceptors,
   Res,
   HttpStatus,
   HttpException,
@@ -26,7 +24,6 @@ import {
   UpdateProductStatusDto,
 } from './dto/update-product.dto';
 import { Public } from '../../../common/decorators/public.decorator';
-import { FilesInterceptor } from '@nestjs/platform-express';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
@@ -34,9 +31,9 @@ import type { IUser } from 'src/common/interfaces/user.interface';
 import { FilterProductDto } from './dto/filter-product.dto';
 import { FilterOutput, ProductFilterService } from '../products-filter.service';
 import type { ProductQueryParam } from 'src/common/interfaces/product.interface';
-import { ContentService } from 'src/modules/marketing/content/content.service';
 import { ApiOperation } from '@nestjs/swagger';
 import { AlgoliaService } from 'src/modules/search/algolia.service';
+import { ProductStatus } from 'src/common/enums/product-status.enum';
 
 interface RequestWithOptionalUser extends ExpressRequest {
   user?: {
@@ -50,7 +47,6 @@ export class ProductsController {
   constructor(
     private readonly productsService: ProductsService,
     private readonly productFilterService: ProductFilterService,
-    private readonly contentService: ContentService,
     private readonly algoliaService: AlgoliaService,
   ) {}
 
@@ -61,8 +57,7 @@ export class ProductsController {
   }
 
   // PUBLIC API (STOREFRONT)
-
-  @Public() // Vẫn là Public vì Guest được gọi
+  @Public()
   @Get('filters')
   async getFilters(
     @Query() query: FilterProductDto,
@@ -89,15 +84,12 @@ export class ProductsController {
       const product = await this.productsService.findBySlug(slug);
       return res.status(HttpStatus.OK).json(product);
     } catch (error) {
-      // Bắt lỗi 301 để Redirect
       if (error instanceof HttpException) {
         if (
           (error.getStatus() as HttpStatus) === HttpStatus.MOVED_PERMANENTLY
         ) {
           const response = error.getResponse() as { new_slug: string };
           const newSlug = response.new_slug;
-
-          // Trả về Header Location (Quan trọng cho Google SEO)
           return res.redirect(
             HttpStatus.MOVED_PERMANENTLY,
             `/api/products/store/details/${newSlug}`,
@@ -115,7 +107,6 @@ export class ProductsController {
   }
 
   // ADMIN / STAFF API (DASHBOARD)
-
   @Post()
   @RequirePermissions(Resource.PRODUCTS, Action.CREATE)
   create(
@@ -143,6 +134,40 @@ export class ProductsController {
   @RequirePermissions(Resource.PRODUCTS, Action.READ)
   findPendingPriceRequests(@Query() query: ProductQueryParam) {
     return this.productsService.findPendingPriceRequests(query);
+  }
+
+  @Patch('bulk/status')
+  @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
+  bulkUpdateStatus(
+    @Body() body: { product_ids: string[]; status: ProductStatus },
+    @CurrentUser() user: IUser,
+    @Ip() ip: string,
+    @HttpHeaders('user-agent') userAgent: string,
+  ) {
+    return this.productsService.bulkUpdateStatus(
+      body.product_ids,
+      body.status,
+      user._id,
+      user.roles,
+      ip,
+      userAgent,
+    );
+  }
+
+  @Delete('bulk/delete')
+  @RequirePermissions(Resource.PRODUCTS, Action.DELETE)
+  bulkRemove(
+    @Body() body: { product_ids: string[] },
+    @CurrentUser() user: IUser,
+    @Ip() ip: string,
+    @HttpHeaders('user-agent') userAgent: string,
+  ) {
+    return this.productsService.bulkRemove(
+      body.product_ids,
+      user._id,
+      ip,
+      userAgent,
+    );
   }
 
   @Get(':id')
@@ -237,15 +262,6 @@ export class ProductsController {
     return this.productsService.remove(id, user._id, ip, userAgent);
   }
 
-  @Post('upload')
-  @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
-  @UseInterceptors(
-    FilesInterceptor('files', 15, {
-      // Tối đa 15 file 1 lần
-      // Set limit tổng ở mức cao nhất là 200MB (để Multer không chặn video)
-      limits: { fileSize: 200 * 1024 * 1024 },
-    }),
-  )
   @Patch(':id/tags')
   @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
   async updateTags(
@@ -276,18 +292,10 @@ export class ProductsController {
         ) {
           const response = error.getResponse() as { new_slug: string };
           const newSlug = response.new_slug;
-
-          // Set Header Location để Google Bot biết đường link mới
           return res.redirect(
             HttpStatus.MOVED_PERMANENTLY,
             `/products/${newSlug}`,
           );
-
-          // Nếu làm SPA (React/Next), trả về JSON để FE tự push router:
-          // return res.status(HttpStatus.MOVED_PERMANENTLY).json({
-          //    redirect: true,
-          //    new_url: `/products/${newSlug}`
-          // });
         }
         throw error;
       }
@@ -330,24 +338,6 @@ export class ProductsController {
     );
   }
 
-  @Post('upload')
-  @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
-  @UseInterceptors(
-    FilesInterceptor('files', 15, {
-      limits: { fileSize: 200 * 1024 * 1024 }, // Vẫn chặn giới hạn ở mức server Multer
-    }),
-  )
-  async uploadFiles(@UploadedFiles() files: Array<Express.Multer.File>) {
-    // Chỉ cần gọi hàm từ ContentService và truyền Options cấu hình cho Product
-    return this.contentService.processAndSaveFiles(files, {
-      subFolder: 'products',
-      maxImageSize: 50 * 1024 * 1024, // 50MB
-      maxVideoSize: 200 * 1024 * 1024, // 200MB
-      generateThumbnail: true, // Product thì cần thumbnail
-      generateMedium: true, // Product thì cần size vừa
-    });
-  }
-
   // INTERNAL API CHO AI AGENT (n8n) SỬ DỤNG
   @Get('internal/chatbot/search')
   @Public()
@@ -367,11 +357,9 @@ export class ProductsController {
       return { found: false, message: 'Không tìm thấy sản phẩm nào.' };
     }
 
-    // Format lại dữ liệu, gom Specs (Thuộc tính) thành chuỗi cho AI dễ đọc
     const productsData = products.map((p) => {
       let options = 'Sản phẩm đơn (Không phân loại)';
 
-      // Nếu có biến thể, map cấu trúc specs: "Màu: Đỏ, Xanh | Size: M, L"
       if (p.has_variants && p.specs && p.specs.length > 0) {
         options = p.specs
           .map((spec) => `${spec.name}: ${spec.values.join(', ')}`)
@@ -383,7 +371,7 @@ export class ProductsController {
         price: p.price,
         sale_price: p.sale_price,
         stock: p.stock,
-        available_options: options, // Cung cấp cho AI biết để tư vấn
+        available_options: options,
         url: `https://your-domain.com/products/${p.slug}`,
       };
     });
@@ -391,7 +379,6 @@ export class ProductsController {
     return { found: true, products: productsData };
   }
 
-  // Trong products.controller.ts
   @Get('trigger-algolia-setup')
   @RequirePermissions(Resource.SYSTEM, Action.UPDATE)
   async triggerAlgoliaSetup() {

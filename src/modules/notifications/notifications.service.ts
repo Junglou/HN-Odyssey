@@ -109,7 +109,7 @@ export class NotificationsService {
       metadata: {
         order_id: String(order._id),
         order_code: order.order_code,
-        target_url: `/admin/orders/${String(order._id)}`,
+        target_url: `/portal/orders/${String(order._id)}`,
       },
     });
   }
@@ -127,7 +127,7 @@ export class NotificationsService {
       metadata: {
         is_batch: true,
         order_ids: orderIds,
-        target_url: `/admin/orders`,
+        target_url: `/portal/orders`,
       },
     });
   }

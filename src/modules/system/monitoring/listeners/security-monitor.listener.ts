@@ -76,7 +76,7 @@ export class SecurityMonitorListener {
         priority: NotificationPriority.CRITICAL,
         metadata: {
           error_code: payload.error_code,
-          target_url: `/admin/settings/payment-gateways?provider=${provider}`, // Link khắc phục nhanh
+          target_url: `/portal/settings/payment-gateways?provider=${provider}`, // Link khắc phục nhanh
         },
       });
     }
@@ -159,7 +159,7 @@ export class SecurityMonitorListener {
         type: NotificationType.SECURITY,
         priority: NotificationPriority.CRITICAL,
         metadata: {
-          target_url: '/admin/system/audit-logs?action=LOGIN_FAILED',
+          target_url: '/portal/system/audit-logs?action=LOGIN_FAILED',
         },
       });
     }

@@ -94,6 +94,7 @@ export class RecommendationsController {
       dto.session_id,
       dto.user_id,
       Number(dto.current_cart_total),
+      dto.exclude_ids, // <--- THÊM DÒNG NÀY VÀO
     );
   }
 

@@ -64,10 +64,6 @@ export class Customer extends User {
     last_filters?: Record<string, any>;
     last_sort?: string;
   };
-
-  // THÊM MỚI: Các thương hiệu khách hàng đang theo dõi
-  @Prop({ type: [{ type: String }], default: [] })
-  followed_brands: string[];
 }
 
 export type CustomerDocument = Customer & Document;

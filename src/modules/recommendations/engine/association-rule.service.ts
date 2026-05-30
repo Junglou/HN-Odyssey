@@ -10,7 +10,6 @@ import { ProductStatus } from 'src/common/enums/product-status.enum';
 import { ConfigService } from '@nestjs/config';
 
 interface SafeProductData {
-  brand?: string;
   price?: number;
 }
 
@@ -47,17 +46,6 @@ export class AssociationRuleService {
     'dao-sinh-ton',
     'gas-cam-trai',
   ];
-
-  // [FIX AC9]: Khai báo danh sách các tập đoàn/brand đối thủ không đội trời chung
-  private readonly COMPETITOR_MAP: Record<string, string[]> = {
-    patagonia: ['the north face', 'columbia', 'arcteryx', 'marmot'],
-    'the north face': ['patagonia', 'columbia', 'arcteryx', 'marmot'],
-    columbia: ['patagonia', 'the north face', 'marmot'],
-    arcteryx: ['patagonia', 'the north face', 'mammut'],
-    marmot: ['patagonia', 'the north face', 'columbia'],
-    osprey: ['gregory', 'deuter'], // Dành cho mảng balo leo núi
-    salomon: ['merrell', 'la sportiva', 'hoka'], // Dành cho mảng giày trail/trekking
-  };
 
   // 2. Sử dụng Interface tự định nghĩa thay vì ReturnType<typeof recommend>
   private recommendClient: IRecommendClient;
@@ -137,7 +125,7 @@ export class AssociationRuleService {
 
     const baseProduct = await this.productModel
       .findById(objectId)
-      .select('price categories tags brand')
+      .select('price categories tags')
       .lean();
 
     if (!baseProduct) return [];
@@ -179,11 +167,7 @@ export class AssociationRuleService {
 
     // 3. TÍNH TOÁN CÁC ĐIỀU KIỆN CHẶN (AC9, AC16)
     const productData = baseProduct as unknown as SafeProductData;
-    let competitorBrands: string[] = [];
-    if (typeof productData.brand === 'string') {
-      competitorBrands =
-        this.COMPETITOR_MAP[productData.brand.toLowerCase()] || [];
-    }
+
     const safePrice =
       typeof productData.price === 'number' ? productData.price : 0;
 
@@ -197,7 +181,6 @@ export class AssociationRuleService {
         rating_average: { $gte: 3 }, // AC18: Lọc rating xấu
         tags: { $nin: ['pre-order', 'bulky', 'single-only'] }, // AC19: Restricted
         price: { $lte: safePrice * 3 }, // AC16: Lọc chênh lệch giá
-        brand: { $nin: competitorBrands }, // AC9: Chặn đối thủ
       })
       .populate('categories', 'name slug')
       .lean();
@@ -294,12 +277,6 @@ export class AssociationRuleService {
     limit: number,
   ): Promise<IFBTRecommendation[]> {
     const productData = baseProduct as unknown as SafeProductData;
-    let competitorBrands: string[] = [];
-
-    if (typeof productData.brand === 'string') {
-      const baseBrand = productData.brand.toLowerCase();
-      competitorBrands = this.COMPETITOR_MAP[baseBrand] || [];
-    }
 
     const safePrice =
       typeof productData.price === 'number' ? productData.price : 0;
@@ -312,7 +289,6 @@ export class AssociationRuleService {
         is_deleted: false,
         stock: { $gt: 0 },
         price: { $lte: safePrice * 1.5 },
-        brand: { $nin: competitorBrands }, // <-- [FIX AC9] Áp dụng cả ở Fallback
       })
       .sort({ sold_count: -1, rating_average: -1 })
       .limit(limit)

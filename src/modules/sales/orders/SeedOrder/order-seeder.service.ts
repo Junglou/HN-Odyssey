@@ -13,7 +13,6 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 
-//  THÊM TYPE ĐỂ FIX LỖI ESLINT
 interface IVariantAttribute {
   code: string;
   value: string;
@@ -27,12 +26,9 @@ interface IProductVariant {
   attributes: IVariantAttribute[];
 }
 
-// FIX TS2430: Dùng Omit để giữ nguyên 100% Schema gốc (gồm cả gallery), chỉ ghi đè mảng variants
 type IProductWithVariants = Omit<ProductDocument, 'variants'> & {
   variants: IProductVariant[];
 };
-
-//
 
 export interface IMockOrderItem {
   product_id: Types.ObjectId;
@@ -61,9 +57,6 @@ export interface IMockOrder {
   total_amount: number;
   status: string;
   discount_amount: number;
-  voucher_code?: string;
-  cancel_reason?: string;
-  hold_expires_at?: Date;
   session_id: string;
   shipping_info: {
     name: string;
@@ -79,7 +72,6 @@ export interface IMockOrder {
   waybill_code: string;
   actual_shipping_fee: number;
   timeline: IMockOrderTimeline[];
-  internal_note?: string;
   print_count: number;
   points_used: number;
   createdAt: Date;
@@ -100,7 +92,6 @@ export class OrderSeederService {
     this.logger.log('Đang dọn dẹp Orders cũ...');
     await this.orderModel.deleteMany({});
 
-    // Ép kiểu an toàn (Safe type assertion) thay vì dùng "any"
     const dbProducts = (await this.productModel
       .find()
       .lean()
@@ -108,24 +99,12 @@ export class OrderSeederService {
 
     if (dbProducts.length === 0) {
       this.logger.error(
-        '❌ Không tìm thấy Product nào! Hãy chạy lệnh seed:products trước.',
+        'Không tìm thấy Product. Hãy chạy seed:products trước.',
       );
       return;
     }
 
-    this.logger.log(
-      `Đã tải ${dbProducts.length} sản phẩm. Bắt đầu tạo ${count} đơn hàng chuẩn AI...`,
-    );
     const mockOrders: IMockOrder[] = [];
-    const orderStatuses: string[] = [
-      'PENDING',
-      'CONFIRMED',
-      'PROCESSING',
-      'SHIPPING',
-      'DELIVERED',
-      'COMPLETED',
-      'CANCELLED',
-    ];
 
     for (let i = 0; i < count; i++) {
       let total_amount = 0;
@@ -138,21 +117,19 @@ export class OrderSeederService {
 
       const items: IMockOrderItem[] = selectedProducts.map((prod) => {
         const quantity = faker.number.int({ min: 1, max: 2 });
-
-        let itemSku = String(prod.sku); // Đảm bảo luôn là string
+        let itemSku = String(prod.sku);
         let itemPrice = Number(
           prod.sale_price > 0 ? prod.sale_price : prod.price,
         );
         let variantName: string | undefined = undefined;
 
+        // Xử lý lấy thông tin Variant đồng nhất 100% với tệp sản phẩm gốc để loại bỏ đứt gãy biến thể
         if (
           prod.has_variants &&
-          prod.variants &&
           Array.isArray(prod.variants) &&
           prod.variants.length > 0
         ) {
           const randomVariant = faker.helpers.arrayElement(prod.variants);
-
           if (randomVariant && randomVariant.sku) {
             itemSku = String(randomVariant.sku);
             itemPrice = Number(
@@ -162,7 +139,6 @@ export class OrderSeederService {
             );
 
             if (
-              randomVariant.attributes &&
               Array.isArray(randomVariant.attributes) &&
               randomVariant.attributes.length > 0
             ) {
@@ -174,22 +150,10 @@ export class OrderSeederService {
         }
 
         total_amount += itemPrice * quantity;
-
-        let itemImage = '';
-        if (
-          prod.gallery &&
-          Array.isArray(prod.gallery) &&
-          prod.gallery.length > 0 &&
-          prod.gallery[0].url
-        ) {
-          itemImage = String(prod.gallery[0].url);
-        } else if (
-          prod.images &&
-          Array.isArray(prod.images) &&
-          prod.images.length > 0
-        ) {
-          itemImage = String(prod.images[0]);
-        }
+        const itemImage =
+          Array.isArray(prod.gallery) && prod.gallery.length > 0
+            ? String(prod.gallery[0].url)
+            : '';
 
         return {
           product_id: new Types.ObjectId(prod._id as unknown as Types.ObjectId),
@@ -212,9 +176,16 @@ export class OrderSeederService {
         : undefined;
 
       const userId = !isGuest ? new Types.ObjectId() : undefined;
-      const currentStatus = faker.helpers.arrayElement(orderStatuses);
+      // Tăng tỷ lệ đơn thành công để tạo mẫu đối chứng chất lượng
+      const currentStatus = faker.helpers.weightedArrayElement([
+        { weight: 60, value: 'COMPLETED' },
+        { weight: 20, value: 'DELIVERED' },
+        { weight: 10, value: 'CANCELLED' },
+        { weight: 10, value: 'PENDING' },
+      ]);
 
       const createdAt = faker.date.recent({ days: 29 });
+      const timestamp = new Date(createdAt).getTime();
 
       const timeline: IMockOrderTimeline[] = [
         {
@@ -230,19 +201,21 @@ export class OrderSeederService {
           status: currentStatus,
           timestamp: faker.date.recent({ days: 30, refDate: new Date() }),
           actor: 'ADMIN_SYSTEM',
-          note: 'Cập nhật trạng thái tự động',
+          note: 'Cập nhật trạng thái',
         });
       }
 
-      const order: IMockOrder = {
-        order_code: `HN${faker.string.alphanumeric(8).toUpperCase()}`,
+      mockOrders.push({
+        order_code: `ORD-${timestamp}-${faker.string.alphanumeric(4).toUpperCase()}`,
         user_id: userId,
         guest_info: guestInfo,
         isGuest: isGuest,
         items: items,
         payment: {
           method: faker.helpers.arrayElement(['COD', 'VNPay']),
-          status: faker.helpers.arrayElement(['PENDING', 'PAID']),
+          status: ['COMPLETED', 'DELIVERED'].includes(currentStatus)
+            ? 'PAID'
+            : 'PENDING',
           transaction_id: faker.string.uuid(),
         },
         total_amount: total_amount,
@@ -267,59 +240,53 @@ export class OrderSeederService {
         points_used: 0,
         createdAt: createdAt,
         updatedAt: new Date(),
-      };
-
-      mockOrders.push(order);
+      });
     }
 
-    try {
-      await this.orderModel.insertMany(mockOrders);
-      this.logger.log(
-        `✅ Đã đồng bộ và insert thành công ${count} đơn hàng vào Database (Đã xử lý đúng SKU Variants).`,
-      );
-    } catch (error) {
-      this.logger.error('❌ Lỗi khi insert order mock data:', error);
-    }
+    await this.orderModel.insertMany(mockOrders);
+    this.logger.log(`Đã insert ${count} đơn hàng vào Database.`);
   }
 
   async exportToAlgoliaCSV(): Promise<void> {
-    const orders = await this.orderModel
-      .find({ status: { $ne: 'CANCELLED' } })
-      .exec();
-
-    this.logger.log(
-      `Bắt đầu lọc và chuyển đổi ${orders.length} đơn hàng sang định dạng CSV chuẩn Algolia...`,
-    );
-
+    const orders = await this.orderModel.find().exec();
     let csvContent = 'userToken,timestamp,objectID,eventType,eventName\n';
     let validRowsCount = 0;
 
     for (const order of orders) {
-      if (order.items.length < 2) continue;
-
       const userToken =
         order.user_id?.toString() || order.session_id || 'guest-user';
-      const timestamp = order.createdAt
+      const orderTimestamp = order.createdAt
         ? new Date(order.createdAt).getTime()
         : Date.now();
-      const eventType = 'conversion';
-      const eventName = 'Order Completed';
 
+      // Phân tách hành vi tương tác cho thuật toán học (view -> add_to_cart -> purchase)
       for (const item of order.items) {
-        const objectID = item.product_id.toString();
-        csvContent += `${userToken},${timestamp},${objectID},${eventType},${eventName}\n`;
+        const objectID = item.product_id.toString(); // Ép kiểu chuỗi để loại bỏ ObjectID BSON
+
+        // 1. Luôn ghi nhận hành vi xem sản phẩm (khám phá)
+        const viewTimestamp =
+          orderTimestamp - faker.number.int({ min: 300000, max: 3600000 });
+        csvContent += `${userToken},${viewTimestamp},${objectID},view,Product Viewed\n`;
         validRowsCount++;
+
+        // 2. Luôn ghi nhận hành vi thêm vào giỏ hàng
+        const cartTimestamp =
+          orderTimestamp - faker.number.int({ min: 60000, max: 290000 });
+        csvContent += `${userToken},${cartTimestamp},${objectID},click,Added To Cart\n`;
+        validRowsCount++;
+
+        // 3. Chỉ ghi nhận sự kiện chuyển đổi (conversion) nếu đơn hàng đã thành công (Loại bỏ nhiễu)
+        if (['COMPLETED', 'DELIVERED', 'SHIPPING'].includes(order.status)) {
+          csvContent += `${userToken},${orderTimestamp},${objectID},conversion,Order Completed\n`;
+          validRowsCount++;
+        }
       }
     }
 
     const filePath = path.join(process.cwd(), 'algolia_events.csv');
     fs.writeFileSync(filePath, csvContent, 'utf8');
-
     this.logger.log(
-      `✅ Đã xuất thành công ${validRowsCount} dòng dữ liệu vào file: ${filePath}`,
-    );
-    this.logger.log(
-      `⚠️ Lưu ý: File này giờ đã có cột 'objectID' đúng chuẩn Dashboard yêu cầu.`,
+      `Đã xuất ${validRowsCount} dòng sự kiện (views/clicks/conversions) ra file: ${filePath}`,
     );
   }
 }

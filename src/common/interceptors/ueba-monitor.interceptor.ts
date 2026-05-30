@@ -86,8 +86,8 @@ export class UebaMonitorInterceptor implements NestInterceptor {
         '/export',
         '/download',
         '/reports',
-        '/admin/users',
-        '/admin/revenue',
+        '/portal/users',
+        '/portal/revenue',
       ];
       const isSensitive = sensitivePatterns.some((pattern) =>
         url.includes(pattern),

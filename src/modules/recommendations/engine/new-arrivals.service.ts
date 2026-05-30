@@ -55,7 +55,6 @@ export class NewArrivalsService {
     };
 
     let userTierRank = 0;
-    let followedBrands: string[] = [];
     let preferredCategory: string | null = null; // [BỔ SUNG FIX AC1]
     const excludedCategories: string[] = [];
 
@@ -63,10 +62,8 @@ export class NewArrivalsService {
       const user = await this.customerModel.findById(userId).lean();
       if (user) {
         const userData = user as unknown as {
-          followed_brands?: string[];
           search_preferences?: { last_filters?: { category?: string } };
         };
-        followedBrands = userData.followed_brands || [];
 
         if (userData.search_preferences?.last_filters?.category) {
           preferredCategory = String(
@@ -139,12 +136,6 @@ export class NewArrivalsService {
       let score = 50; // Điểm cơ sở
       let reason = 'Sản phẩm mới ra mắt';
 
-      // AC2: Ưu tiên theo Follow (Tín hiệu mạnh nhất)
-      if (followedBrands.includes(product.brand)) {
-        score += 40;
-        reason = `Từ thương hiệu bạn theo dõi: ${product.brand}`;
-      }
-
       // [BỔ SUNG FIX AC1]: Điểm phù hợp theo Danh mục quan tâm nhất
       const prodCategories = product.categories as unknown as Types.ObjectId[];
       if (
@@ -153,7 +144,6 @@ export class NewArrivalsService {
         prodCategories.some((c) => String(c) === preferredCategory)
       ) {
         score += 30; // Tăng điểm do khớp category
-        // Chỉ đổi reason nếu chưa bị chiếm bởi Brand (ưu tiên Brand hơn)
         if (reason === 'Sản phẩm mới ra mắt') {
           reason = 'Thuộc danh mục bạn quan tâm';
         }
@@ -254,109 +244,77 @@ export class NewArrivalsService {
     return { success: true };
   }
 
-  // BỔ SUNG US2 - AC4: BATCHING & PROACTIVE NOTIFICATION (Chạy thứ 6 hàng tuần)
-  // HOÀN THIỆN 100%: Tích hợp cả Email và Push Notification
-
   @Cron(CronExpression.EVERY_WEEKDAY, { timeZone: 'Asia/Ho_Chi_Minh' })
   async sendBatchedNewArrivalsNotification() {
     this.logger.log(
-      '[NEW ARRIVALS] Đang gom nhóm sản phẩm mới để gửi Email và Push chủ động...',
+      '[NEW ARRIVALS] Đang lấy sản phẩm mới để gửi Email và Push...',
     );
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    // 1. Lấy tất cả SP mới trong tuần
     const newProducts = await this.productModel
       .find({
         created_at: { $gte: sevenDaysAgo },
         status: 'ACTIVE',
         is_deleted: false,
       })
-      .select('name brand thumbnail')
+      .select('name thumbnail')
       .lean();
 
     if (newProducts.length === 0) return;
 
-    // 2. Gom nhóm sản phẩm theo Brand (Batching)
-    const brandMap = new Map<
-      string,
-      Array<{ name: string; thumbnail: string }>
-    >();
-    for (const p of newProducts) {
-      const doc = p as unknown as {
-        brand: string;
-        name: string;
-        thumbnail: string;
-      };
-      if (!doc.brand) continue;
-
-      const items = brandMap.get(doc.brand) || [];
-      items.push({ name: doc.name, thumbnail: doc.thumbnail });
-      brandMap.set(doc.brand, items);
-    }
-
-    // 3. Tìm khách hàng đang Follow các Brand này và bắn Email + Push
     const customers = await this.customerModel
-      .find({ is_deleted: false })
-      .select('_id email first_Name followed_brands') // Thêm _id để bắn push
+      .find({ is_deleted: false, is_subscribed: true })
+      .select('_id email first_Name')
       .lean();
 
+    // Khai báo giao diện định kiểu để loại bỏ hoàn toàn "any"
+    interface ICustomerData {
+      _id: Types.ObjectId;
+      email: string;
+      first_Name: string;
+    }
+
+    interface INewProductData {
+      name: string;
+      thumbnail: string;
+    }
+
     for (const customer of customers) {
-      const userData = customer as unknown as {
-        _id: Types.ObjectId; // Định nghĩa thêm _id để truyền vào recipient_id
-        first_Name: string;
-        email: string;
-        followed_brands?: string[];
-      };
-      if (!userData.followed_brands || userData.followed_brands.length === 0)
-        continue;
+      // Ép kiểu an toàn chuẩn TS
+      const userData = customer as unknown as ICustomerData;
 
-      let emailHtml = `<div style="font-family: sans-serif; padding: 20px;"><h2>Chào ${userData.first_Name},</h2><p>Các thương hiệu bạn yêu thích vừa ra mắt sản phẩm mới tuần này!</p>`;
-      let hasContent = false;
-      let totalNewItems = 0; // Đếm tổng SP để hiển thị trên Push Notification
+      let emailHtml = `<div style="font-family: sans-serif; padding: 20px;"><h2>Chào ${userData.first_Name},</h2><p>Hệ thống vừa ra mắt các sản phẩm mới trong tuần này!</p>`;
 
-      for (const brand of userData.followed_brands) {
-        if (brandMap.has(brand)) {
-          hasContent = true;
-          const items = brandMap.get(brand)!;
-          totalNewItems += items.length;
+      emailHtml += `<h3>🔥 ${newProducts.length} sản phẩm mới</h3>`;
 
-          emailHtml += `<h3>🔥 ${items.length} sản phẩm mới từ ${brand.toUpperCase()}</h3>`;
-          items.slice(0, 3).forEach((item) => {
-            emailHtml += `<div style="display: flex; margin-bottom: 10px;"><img src="${item.thumbnail}" width="50" style="margin-right: 10px;"/><span>${item.name}</span></div>`;
-          });
-        }
-      }
+      newProducts.slice(0, 5).forEach((rawItem) => {
+        // Ép kiểu an toàn cho phần tử trong mảng sản phẩm
+        const item = rawItem as unknown as INewProductData;
+        emailHtml += `<div style="display: flex; margin-bottom: 10px;"><img src="${item.thumbnail}" width="50" style="margin-right: 10px;"/><span>${item.name}</span></div>`;
+      });
 
-      if (hasContent) {
-        emailHtml += `<a href="https://hn-odyssey.com/new-arrivals" style="display: inline-block; padding: 10px 20px; background: black; color: white; text-decoration: none; margin-top: 20px;">KHÁM PHÁ NGAY</a></div>`;
+      emailHtml += `<a href="https://hn-odyssey.com/new-arrivals" style="display: inline-block; padding: 10px 20px; background: black; color: white; text-decoration: none; margin-top: 20px;">KHÁM PHÁ NGAY</a></div>`;
 
-        // Gửi Email
-        await this.emailService.sendRaw(
-          userData.email,
-          '[H&N Odyssey] Điểm tin sản phẩm mới từ thương hiệu bạn yêu thích!',
-          emailHtml,
+      await this.emailService.sendRaw(
+        userData.email,
+        'Sản phẩm mới tuần này đã có mặt!',
+        emailHtml,
+      );
+
+      try {
+        await this.notificationsService.createAndSend({
+          recipient_role: 'CUSTOMER',
+          recipient_id: userData._id.toString(),
+          title: 'Sản phẩm mới đã lên kệ! 🔥',
+          message: `Hệ thống vừa cập nhật ${newProducts.length} sản phẩm mới. Khám phá ngay!`,
+          type: NotificationType.PROMOTION,
+          priority: NotificationPriority.HIGH,
+          metadata: { target_url: '/new-arrivals' },
+        });
+      } catch (error) {
+        this.logger.error(
+          `[NEW ARRIVALS] Lỗi gửi push: ${(error as Error).message}`,
         );
-
-        // Gửi Push Notification / Badge
-        try {
-          await this.notificationsService.createAndSend({
-            recipient_role: 'CUSTOMER',
-            recipient_id: userData._id.toString(),
-            title: 'Sản phẩm mới từ thương hiệu bạn theo dõi! 🔥',
-            message: `Hệ thống vừa cập nhật ${totalNewItems} sản phẩm mới từ các thương hiệu bạn yêu thích. Khám phá ngay!`,
-            type: NotificationType.PROMOTION,
-            priority: NotificationPriority.HIGH,
-            metadata: {
-              target_url: '/new-arrivals', // Điều hướng đến trang SP mới
-            },
-          });
-        } catch (error) {
-          const err = error as Error;
-          // [FIX ESLINT]: Đã chuyển userData._id thành dạng String qua hàm toString()
-          this.logger.error(
-            `[NEW ARRIVALS] Lỗi gửi push cho user ${userData._id.toString()}: ${err.message}`,
-          );
-        }
       }
     }
   }

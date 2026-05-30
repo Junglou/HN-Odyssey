@@ -94,7 +94,6 @@ export class CreateProductDto {
   @IsOptional() @IsString() slug?: string;
   @IsOptional() @IsString() description?: string;
   @IsOptional() @IsString() short_description?: string;
-  @IsOptional() @IsString() brand?: string;
 
   // US.72 AC1: Danh mục & Tags
   @IsNotEmpty({ message: 'Sản phẩm phải thuộc ít nhất 1 danh mục' })
@@ -153,10 +152,11 @@ export class CreateProductDto {
   variants?: CreateProductVariantDto[];
 
   // US.78: Tồn kho & Cấu hình
+  @IsOptional()
   @IsNumber({}, { message: 'Cân nặng phải là số (kg)' })
   @Min(0.01, { message: 'Cân nặng tối thiểu là 0.01kg (10g)' })
   @Max(50, { message: 'Cân nặng không được vượt quá 50kg' })
-  weight: number;
+  weight?: number;
 
   @IsOptional() @IsNumber() @Min(0) stock?: number; // Tổng tồn kho (nếu là sp đơn giản)
   @IsOptional() @IsNumber() @Min(0) min_stock?: number;

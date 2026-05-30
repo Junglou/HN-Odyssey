@@ -7,7 +7,6 @@ import {
   ProductDocument,
 } from 'src/modules/products/catalog/schemas/product.schema';
 import { ProductStatus } from '../../../../common/enums/product-status.enum';
-
 import {
   Category,
   CategoryDocument,
@@ -24,7 +23,6 @@ interface IMockProduct {
   slug: string;
   description: string;
   short_description: string;
-  brand: string;
   warehouse_id: Types.ObjectId;
   gallery: any[];
   images: string[];
@@ -67,6 +65,7 @@ interface IMockProduct {
 @Injectable()
 export class ProductSeederService {
   private readonly logger = new Logger(ProductSeederService.name);
+  private readonly MY_BRAND = 'HN-Odyssey';
 
   constructor(
     @InjectModel(Product.name)
@@ -79,16 +78,12 @@ export class ProductSeederService {
 
   async seedProducts(count: number = 50): Promise<void> {
     this.logger.log('Bắt đầu dọn dẹp toàn bộ dữ liệu Catalog...');
-
     await Promise.all([
       this.productModel.deleteMany({}),
       this.categoryModel.deleteMany({}),
       this.attributeModel.deleteMany({}),
     ]);
 
-    // 2. SEED CATEGORIES
-
-    this.logger.log('Đang tạo Categories đồng bộ...');
     const categoryData = [
       {
         name: 'Áo Khoác Nam',
@@ -124,22 +119,14 @@ export class ProductSeederService {
     await this.categoryModel.insertMany(categoryData);
     const dbCategories = await this.categoryModel.find().exec();
 
-    // 3. SEED ATTRIBUTES
-
-    this.logger.log('Đang tạo Attributes đồng bộ...');
-
     const attributeData = [
       {
         name: 'Màu sắc',
         code: 'color',
         display_type: AttributeType.COLOR_SWATCH,
-        description: 'Màu sắc sản phẩm',
-        is_filterable: true,
-        sort_order: 1,
         values: [
           { label: 'Đen Obsidian', value: 'black', meta: '#000000' },
           { label: 'Xanh Navy', value: 'navy', meta: '#000080' },
-          { label: 'Xanh Rêu', value: 'olive', meta: '#556B2F' },
           { label: 'Cam Cứu Hộ', value: 'orange', meta: '#FFA500' },
         ],
       },
@@ -147,26 +134,18 @@ export class ProductSeederService {
         name: 'Kích cỡ',
         code: 'size',
         display_type: AttributeType.BUTTON,
-        description: 'Kích cỡ chuẩn quốc tế',
-        is_filterable: true,
-        sort_order: 2,
         values: [
           { label: 'Size S', value: 's' },
           { label: 'Size M', value: 'm' },
           { label: 'Size L', value: 'l' },
-          { label: 'Size XL', value: 'xl' },
         ],
       },
       {
         name: 'Chất liệu',
         code: 'material',
         display_type: AttributeType.BUTTON,
-        description: 'Chất liệu vải/cấu tạo',
-        is_filterable: true,
-        sort_order: 3,
         values: [
           { label: 'Gore-Tex', value: 'gore-tex' },
-          { label: 'NetPlus®', value: 'netplus' },
           { label: 'Merino Wool', value: 'merino' },
         ],
       },
@@ -174,18 +153,7 @@ export class ProductSeederService {
     await this.attributeModel.insertMany(attributeData);
     const dbAttributes = await this.attributeModel.find().exec();
 
-    // 4. SEED PRODUCTS
-
-    this.logger.log(`Đang tạo ${count} Products chủ đề Patagonia...`);
     const mockProducts: IMockProduct[] = [];
-    const brands = [
-      'Patagonia',
-      'The North Face',
-      "Arc'teryx",
-      'Columbia',
-      'Osprey',
-      'Salomon',
-    ];
     const itemTypes = [
       'Jacket',
       'Backpack',
@@ -194,10 +162,8 @@ export class ProductSeederService {
       'Tent',
       'Fleece',
     ];
-    const specialTags = ['bulky', 'fragile', 'Trending', 'single-only'];
 
     for (let i = 0; i < count; i++) {
-      const brand = faker.helpers.arrayElement(brands);
       const type = faker.helpers.arrayElement(itemTypes);
       const activity = faker.helpers.arrayElement([
         'Alpine',
@@ -205,89 +171,57 @@ export class ProductSeederService {
         'Camping',
         'Expedition',
       ]);
-
       const randomCategory =
         faker.helpers.arrayElement(dbCategories) || dbCategories[0];
 
-      const colorAttr =
-        dbAttributes.find((a) => a.code === 'color') || dbAttributes[0];
-      const sizeAttr =
-        dbAttributes.find((a) => a.code === 'size') || dbAttributes[0];
-      const materialAttr =
-        dbAttributes.find((a) => a.code === 'material') || dbAttributes[0];
+      const colorAttr = dbAttributes.find((a) => a.code === 'color')!;
+      const sizeAttr = dbAttributes.find((a) => a.code === 'size')!;
+      const materialAttr = dbAttributes.find((a) => a.code === 'material')!;
 
-      const randomColor =
-        faker.helpers.arrayElement(colorAttr.values) || colorAttr.values[0];
-      const randomSize =
-        faker.helpers.arrayElement(sizeAttr.values) || sizeAttr.values[0];
-      const randomMaterial =
-        faker.helpers.arrayElement(materialAttr.values) ||
-        materialAttr.values[0];
+      const randomColor = faker.helpers.arrayElement(colorAttr.values);
+      const randomSize = faker.helpers.arrayElement(sizeAttr.values);
+      const randomMaterial = faker.helpers.arrayElement(materialAttr.values);
 
-      let name = `${brand} ${randomMaterial.label} ${activity} ${type}`;
-      const baseSku = `${brand.substring(0, 3).toUpperCase()}-${faker.string.alphanumeric(6).toUpperCase()}`;
-
-      let price = faker.number.int({ min: 1200000, max: 25000000 });
+      let name = `${this.MY_BRAND} ${randomMaterial.label} ${activity} ${type}`;
+      const baseSku = `HNO-${faker.string.alphanumeric(6).toUpperCase()}`;
+      const price = faker.number.int({ min: 1200000, max: 25000000 });
       let forcedTags: string[] = [];
 
-      // Ép 5 sản phẩm đầu tiên thành các trường hợp đặc biệt để Test AI
       if (i === 0) {
-        // SP 1: Móc khóa/Vớ rẻ để lấp Freeship (High-end)
-        name = `${brand} Merino Wool Hiking Socks`;
-        price = faker.number.int({ min: 450000, max: 750000 });
-        forcedTags = ['phu-kien', 'Trending', 'vo-merino'];
+        name = `${this.MY_BRAND} Merino Wool Hiking Socks`;
+        forcedTags = ['phu-kien', 'Trending'];
       } else if (i === 1) {
-        // SP 2: Gói dịch vụ bảo hành/gói quà
         name = `Gói bảo hành rách vải mở rộng 12 tháng`;
-        price = 250000;
         forcedTags = ['service', 'warranty'];
-      } else if (i === 2) {
-        // SP 3: Lều cắm trại để test tương thích giỏ hàng (AC18)
-        name = `${brand} 4-Person Camping Tent`;
-        forcedTags = ['tent', 'cam-trai', 'leu', 'Trending'];
-      } else if (i === 3) {
-        // SP 4: Phụ kiện lều để gợi ý đi kèm Lều (AC18)
-        name = `${brand} Heavy Duty Tent Pegs`;
-        forcedTags = ['phu-kien-cam-trai', 'coc-leu', 'den-pin'];
-      } else if (i === 4) {
-        // SP 5: Chắc chắn có tag Trending để test Fallback giỏ hàng rỗng
-        forcedTags = ['Trending'];
       }
 
-      // Nối tag random với tag ép buộc
+      // Đẩy text thô của danh mục vào thuộc tính tag để tăng hiệu quả máy học không gian vector
+      const categorySemanticText = randomCategory.name.toLowerCase();
       const currentTags = [
         'Outdoor',
         'Trekking',
-        brand,
+        this.MY_BRAND,
         randomMaterial.value,
+        categorySemanticText,
         ...forcedTags,
       ];
-      if (faker.datatype.boolean({ probability: 0.15 })) {
-        currentTags.push(faker.helpers.arrayElement(specialTags));
-      }
 
-      // LOGIC TẠO VARIANT
-      const hasVariants = faker.datatype.boolean(); // Random 50% cơ hội có biến thể
+      const hasVariants = faker.datatype.boolean();
       const variants: any[] = [];
       let totalStock = 0;
 
       if (hasVariants) {
         const numVariants = faker.number.int({ min: 2, max: 4 });
         for (let v = 0; v < numVariants; v++) {
-          const vColor =
-            faker.helpers.arrayElement(colorAttr.values) || colorAttr.values[0];
-          const vSize =
-            faker.helpers.arrayElement(sizeAttr.values) || sizeAttr.values[0];
+          const vColor = faker.helpers.arrayElement(colorAttr.values);
+          const vSize = faker.helpers.arrayElement(sizeAttr.values);
           const vStock = faker.number.int({ min: 5, max: 50 });
           totalStock += vStock;
 
           variants.push({
             sku: `${baseSku}-${vColor.value.toUpperCase()}-${vSize.value.toUpperCase()}`,
-            price: price + faker.number.int({ min: 0, max: 500000 }),
-            sale_price:
-              faker.helpers.maybe(() => Math.round(price * 0.8), {
-                probability: 0.25,
-              }) || 0,
+            price: price,
+            sale_price: 0,
             stock: vStock,
             thumbnail: `https://picsum.photos/seed/${faker.string.uuid()}/400/400`,
             attributes: [
@@ -300,16 +234,15 @@ export class ProductSeederService {
         totalStock = faker.number.int({ min: 10, max: 150 });
       }
 
-      const productData: IMockProduct = {
+      mockProducts.push({
         name: name,
         sku: baseSku,
         slug:
           faker.helpers.slugify(name).toLowerCase() +
           '-' +
           faker.string.alphanumeric(4),
-        description: `Trang bị ${name} sinh ra để chịu đựng thời tiết khắc nghiệt. Sản phẩm chính hãng ${brand}.`,
+        description: `Trang bị ${name} sinh ra để chịu đựng thời tiết khắc nghiệt. Sản phẩm chính hãng ${this.MY_BRAND}.`,
         short_description: `Hiệu suất tối đa cho ${activity}.`,
-        brand: brand,
         warehouse_id: new Types.ObjectId(),
         gallery: [
           {
@@ -318,10 +251,7 @@ export class ProductSeederService {
             display_order: 0,
           },
         ],
-        images: [
-          `https://picsum.photos/seed/${faker.string.uuid()}/800/800`,
-          `https://picsum.photos/seed/${faker.string.uuid()}/800/800`,
-        ],
+        images: [`https://picsum.photos/seed/${faker.string.uuid()}/800/800`],
         thumbnail: `https://picsum.photos/seed/${faker.string.uuid()}/400/400`,
         video: '',
         min_purchase_qty: 1,
@@ -330,20 +260,14 @@ export class ProductSeederService {
         member_prices: { GOLD: Math.round(price * 0.9) },
         rank_required: 0,
         allowed_tiers: [],
-
         categories: [randomCategory._id],
-
         attributes: [
           { code: colorAttr.code, value: randomColor.value },
           { code: sizeAttr.code, value: randomSize.value },
           { code: materialAttr.code, value: randomMaterial.value },
         ],
-
         tags: currentTags,
-        specs: [
-          { name: 'Hoạt động', values: [activity] },
-          { name: 'Bảo hành', values: ['Trọn đời'] },
-        ],
+        specs: [{ name: 'Hoạt động', values: [activity] }],
         price: price,
         sale_price:
           faker.helpers.maybe(() => Math.round(price * 0.8), {
@@ -351,25 +275,21 @@ export class ProductSeederService {
           }) || 0,
         sale_start_date: null,
         sale_end_date: null,
-
-        // TRƯỜNG MỚI CHO AI/SUGGESTION
         is_flash_sale: faker.datatype.boolean({ probability: 0.1 }),
         margin_tier: faker.number.int({ min: 1, max: 5 }),
-
         variants: variants,
         has_variants: hasVariants,
         stock: totalStock,
-
         stock_on_hold: 0,
         min_stock: 5,
         max_stock: 300,
-        allow_backorder: faker.datatype.boolean({ probability: 0.2 }),
+        allow_backorder: false,
         weight: faker.number.int({ min: 250, max: 3500 }),
         status: ProductStatus.ACTIVE,
         seo_config: {
           meta_title: name,
           meta_description: `Mua ${name}`,
-          meta_keywords: `${brand}, outdoor`,
+          meta_keywords: `${this.MY_BRAND}, outdoor`,
         },
         view_count: faker.number.int({ min: 50, max: 3000 }),
         sold_count: faker.number.int({ min: 5, max: 500 }),
@@ -380,21 +300,11 @@ export class ProductSeederService {
         }),
         review_count: faker.number.int({ min: 1, max: 80 }),
         is_deleted: false,
-
-        // TRƯỜNG MỚI CHO ALGOLIA RANKING NEWEST
         created_at: faker.date.past({ years: 0.5 }),
-      };
-
-      mockProducts.push(productData);
+      });
     }
 
-    try {
-      await this.productModel.insertMany(mockProducts);
-      this.logger.log(
-        `✅ Thành công! Đã nạp 5 Categories, 3 Attributes và ${count} Products chuẩn AI (Đã bao gồm FlashSale, Margin Tier, và Variants).`,
-      );
-    } catch (error) {
-      this.logger.error('❌ Lỗi Seeder:', error);
-    }
+    await this.productModel.insertMany(mockProducts);
+    this.logger.log(`Đã nạp ${count} Products vào Database.`);
   }
 }

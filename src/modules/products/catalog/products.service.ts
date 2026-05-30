@@ -28,7 +28,6 @@ import defaultSlugify from 'slugify';
 import { ProductStatus } from 'src/common/enums/product-status.enum';
 import { AuditLogsService } from '../../system/audit-logs/audit-logs.service';
 import { TagsService } from '../tags/tags.service';
-import { Role } from 'src/common/enums/role.enum';
 import sanitizeHtml from 'sanitize-html';
 import {
   Category,
@@ -59,7 +58,6 @@ import {
   MemberTierDocument,
 } from 'src/modules/marketing/loyalty/schemas/member-tier.schema';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { ContentService } from 'src/modules/marketing/content/content.service';
 import { AlgoliaService } from 'src/modules/search/algolia.service';
 import { MediaService } from 'src/modules/marketing/content/media.service';
 
@@ -83,20 +81,17 @@ export class ProductsService {
     private readonly loyaltyService: LoyaltyService,
     @InjectModel(Customer.name) private customerModel: Model<CustomerDocument>,
     @InjectModel(MemberTier.name) private tierModel: Model<MemberTierDocument>,
-    private readonly contentService: ContentService,
     private readonly algoliaService: AlgoliaService,
     private readonly mediaService: MediaService,
   ) {}
 
   async syncToSearchEngine(product: ProductDocument) {
-    // Sửa lỗi bằng cách truyền Generic vào hàm populate để định nghĩa kiểu dữ liệu sau khi populate
     const populatedProduct = await this.productModel
       .findById(product._id)
       .populate<{ categories: PopulatedCategory[] }>('categories', 'name slug')
       .lean()
       .exec();
 
-    // Kiểm tra an toàn
     if (!populatedProduct || !populatedProduct.categories) {
       console.warn(
         `[Algolia] Sản phẩm ${product.sku} không có danh mục hợp lệ.`,
@@ -104,12 +99,10 @@ export class ProductsService {
       return;
     }
 
-    // Khai báo kiểu string[] rõ ràng cho categoryHierarchy
     const categoryHierarchy: string[] = populatedProduct.categories.map(
       (c) => c.name,
     );
 
-    // Truyền categoryHierarchy (kiểu string[]) vào hàm syncProduct một cách an toàn
     await this.algoliaService.syncProduct(product, categoryHierarchy);
 
     console.log(
@@ -118,11 +111,9 @@ export class ProductsService {
     );
   }
 
-  // HELPER METHODS
   private async validateAttributesExist(variants: CreateProductVariantDto[]) {
     if (!variants || variants.length === 0) return;
 
-    // 1. Lấy tất cả code và value từ input
     const inputAttributes = new Map<string, Set<string>>();
     variants.forEach((v) => {
       v.attributes.forEach((attr) => {
@@ -135,7 +126,6 @@ export class ProductsService {
       });
     });
 
-    // 2. Query DB để check
     const codes = Array.from(inputAttributes.keys());
     const dbAttributes = await this.attributeModel
       .find({ code: { $in: codes } })
@@ -149,7 +139,6 @@ export class ProductsService {
       );
     }
 
-    // 3. Check kỹ hơn xem Value có nằm trong danh sách cho phép không
     for (const dbAttr of dbAttributes) {
       if (
         dbAttr.display_type === AttributeType.BUTTON ||
@@ -157,12 +146,14 @@ export class ProductsService {
         dbAttr.display_type === AttributeType.COLOR_SWATCH
       ) {
         const inputValues = inputAttributes.get(dbAttr.code);
-        const validValues = dbAttr.values.map((v) => v.value);
 
-        // Kiểm tra tồn tại trước khi loop (Optional Chaining hoặc If)
+        const validValuesLower = dbAttr.values.map((v) =>
+          v.value.toLowerCase(),
+        );
+
         if (inputValues) {
           inputValues.forEach((iv) => {
-            if (!validValues.includes(iv)) {
+            if (!validValuesLower.includes(iv.toLowerCase())) {
               throw new BadRequestException(
                 `Giá trị '${iv}' không hợp lệ cho thuộc tính '${dbAttr.name}'`,
               );
@@ -173,16 +164,14 @@ export class ProductsService {
     }
   }
 
-  // Helper: Làm phẳng danh sách thuộc tính từ Biến thể -> Product cha
-  private flattenAttributes(variants: VariantInput[]): any[] {
+  private flattenAttributes(variants: VariantInput[]): unknown[] {
     if (!variants || variants.length === 0) return [];
 
-    const attrMap = new Map<string, any>();
+    const attrMap = new Map<string, unknown>();
 
     variants.forEach((variant) => {
       if (variant.attributes) {
         variant.attributes.forEach((attr) => {
-          // Tạo key unique để tránh trùng lặp
           const key = `${attr.code}_${attr.value}`;
           if (!attrMap.has(key)) {
             attrMap.set(key, {
@@ -202,8 +191,6 @@ export class ProductsService {
     return defaultSlugify(name, { lower: true, strict: true, locale: 'vi' });
   }
 
-  //Check SKU toàn hệ thống (kể cả active hay deleted) để đảm bảo an toàn tuyệt đối
-  // Nếu đã Soft Delete và đổi tên SKU rồi thì check này vẫn pass.
   private async checkSkuExists(sku: string, excludeId?: string): Promise<void> {
     const query: FilterQuery<ProductDocument> = {
       $or: [{ sku: sku }, { 'variants.sku': sku }],
@@ -261,8 +248,6 @@ export class ProductsService {
     });
   }
 
-  // MAIN FEATURES
-
   async create(
     createProductDto: CreateProductDto,
     userId: string,
@@ -270,32 +255,21 @@ export class ProductsService {
     ip: string,
     userAgent: string,
   ) {
-    // 1. Kiểm tra trùng SKU
     await this.checkSkuExists(createProductDto.sku);
 
     const variants = createProductDto.variants || [];
 
-    // Logic: Nếu KHÔNG PHẢI Super Admin -> Bắt buộc Giá = 0
-    // Bất kể là Trưởng kho hay Nhân viên kho, tạo mới đều cần bước duyệt giá sau này.
-    const isSuperAdmin = userRoles.includes(Role.SUPER_ADMIN);
+    createProductDto.price = 0;
+    createProductDto.sale_price = 0;
 
-    if (!isSuperAdmin) {
-      // Ép giá sản phẩm cha về 0
-      createProductDto.price = 0;
-      createProductDto.sale_price = 0;
-
-      // Ép giá toàn bộ biến thể về 0
-      if (variants.length > 0) {
-        variants.forEach((v) => {
-          v.price = 0;
-          v.sale_price = 0;
-        });
-      }
+    if (variants.length > 0) {
+      variants.forEach((v) => {
+        v.price = 0;
+        v.sale_price = 0;
+      });
     }
 
-    // 2. VALIDATION BIẾN THỂ
     if (variants.length > 0) {
-      // Check trùng SKU nội bộ
       const variantSkus = variants.map((v) => v.sku);
       if (new Set(variantSkus).size !== variantSkus.length) {
         throw new BadRequestException(
@@ -303,7 +277,6 @@ export class ProductsService {
         );
       }
 
-      // Check Max 3 thuộc tính
       const firstVariantAttrs = variants[0].attributes;
       if (firstVariantAttrs.length > 3) {
         throw new BadRequestException(
@@ -311,14 +284,12 @@ export class ProductsService {
         );
       }
 
-      // Check tính nhất quán Keys
       const standardKeys = firstVariantAttrs
         .map((a) => a.code)
         .sort()
         .join(',');
 
       for (const variant of variants) {
-        // Check trùng SKU với DB
         await this.checkSkuExists(variant.sku);
 
         const currentKeys = variant.attributes
@@ -334,12 +305,10 @@ export class ProductsService {
       }
     }
 
-    //Tự động gán sale_price = price
     if (!createProductDto.sale_price || createProductDto.sale_price === 0) {
       createProductDto.sale_price = createProductDto.price;
     }
 
-    // Xử lý tương tự cho Biến thể (Variants)
     if (createProductDto.variants) {
       createProductDto.variants.forEach((v) => {
         if (!v.sale_price || v.sale_price === 0) {
@@ -348,14 +317,12 @@ export class ProductsService {
       });
     }
 
-    // 3. Tạo Slug & Sanitize
     const slug =
       createProductDto.slug || this.createSlug(createProductDto.name);
     const slugExists = await this.productModel.exists({ slug });
     if (slugExists) throw new ConflictException('Đường dẫn (Slug) đã tồn tại');
 
     const specs = this.calculateSpecs(variants);
-
     const flatAttributes = this.flattenAttributes(variants);
 
     let cleanDescription = createProductDto.description;
@@ -363,7 +330,6 @@ export class ProductsService {
       cleanDescription = this.sanitizeContent(cleanDescription);
     }
 
-    // 4. Khởi tạo Model
     const newProduct = new this.productModel({
       ...createProductDto,
       categories: createProductDto.category_ids.map(
@@ -380,11 +346,11 @@ export class ProductsService {
       price: createProductDto.price,
       sale_price: createProductDto.sale_price,
       variants: variants,
+      weight: createProductDto.weight ?? 0.5,
     });
 
     await newProduct.save();
 
-    // 5. Ghi Audit Log
     await this.auditLogsService.log({
       action: 'CREATE_PRODUCT',
       collection_name: 'products',
@@ -394,7 +360,7 @@ export class ProductsService {
       detail: {
         sku: newProduct.sku,
         name: newProduct.name,
-        is_price_reset: !isSuperAdmin,
+        is_price_reset: true,
         initial_price: newProduct.price,
       },
       ip: ip,
@@ -407,8 +373,6 @@ export class ProductsService {
   async findAll(query: ProductQueryParam) {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 20;
-
-    // Destructuring an toàn vì đã có type
     const { keyword, category_id, status, sort = 'newest' } = query;
 
     const filter: FilterQuery<ProductDocument> = {
@@ -426,15 +390,20 @@ export class ProductsService {
     }
 
     if (keyword && typeof keyword === 'string' && keyword.trim() !== '') {
-      filter.$text = { $search: keyword.trim() };
+      const cleanKeyword = keyword.trim();
+      filter.$or = [
+        { $text: { $search: cleanKeyword } },
+        { sku: { $regex: cleanKeyword, $options: 'i' } },
+      ];
     }
 
     let sortOption: Record<string, 1 | -1> = { created_at: -1 };
     if (sort === 'price_asc') sortOption = { price: 1 };
     if (sort === 'price_desc') sortOption = { price: -1 };
 
+    // Bổ sung price_request vào đây để giải quyết vấn đề
     const selectFields =
-      'name sku price sale_price thumbnail slug categories status stock rating_average created_at has_variants variants';
+      'name sku price sale_price thumbnail slug categories status stock rating_average created_at has_variants variants price_request';
 
     const [products, total] = await Promise.all([
       this.productModel
@@ -464,7 +433,6 @@ export class ProductsService {
     const limit = Number(query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    // Chỉ tìm sản phẩm chưa xóa
     const filter = {
       pending_price_change: { $ne: null },
       is_deleted: false,
@@ -509,13 +477,11 @@ export class ProductsService {
   }
 
   async findRelated(id: string, limit: number = 5) {
-    // 1. Lấy thông tin sản phẩm gốc để biết Category của nó
     const product = await this.productModel
       .findById(id)
       .select('categories price');
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
-    // 2. Tìm các sản phẩm khác có cùng ít nhất 1 category
     const relatedProducts = await this.productModel
       .find({
         _id: { $ne: product._id },
@@ -528,7 +494,6 @@ export class ProductsService {
       .limit(limit)
       .lean();
 
-    // Nếu không tìm thấy (ví dụ danh mục chỉ có 1 sp), có thể fallback lấy sản phẩm mới nhất
     if (relatedProducts.length === 0) {
       return this.productModel
         .find({
@@ -546,7 +511,6 @@ export class ProductsService {
   }
 
   async findBySlug(slug: string, userId?: string) {
-    // 1. Tìm Sản phẩm theo Slug
     const product = await this.productModel
       .findOne({ slug, status: ProductStatus.ACTIVE, is_deleted: false })
       .populate('categories', 'name slug')
@@ -569,10 +533,8 @@ export class ProductsService {
 
     let estimatedPoints = 0;
     let memberDiscountApplied = false;
-    // Tạo bản sao của sale_price để tính toán
     let finalSalePrice = product.sale_price || product.price;
 
-    // 2. TÍCH HỢP LOYALTY (AC4, AC5, AC13)
     if (userId) {
       const customer = await this.customerModel
         .findById(userId)
@@ -581,14 +543,12 @@ export class ProductsService {
         .exec();
       const userTierCode = customer?.loyalty?.tier || 'SILVER';
 
-      // Ép kiểu MemberTierDocument
       const tierConfig = (await this.tierModel
         .findOne({ code: userTierCode })
         .lean()
         .exec()) as MemberTierDocument | null;
 
       if (tierConfig) {
-        // Định nghĩa Type an toàn để xử lý triệt để lỗi ESLint "no-unsafe-assignment" và "no-unsafe-member-access"
         interface ExtendedProductData {
           rank_required?: number;
           is_member_only?: boolean;
@@ -603,11 +563,9 @@ export class ProductsService {
           };
         }
 
-        // Chuyển đổi qua unknown trước khi ép về Type chuẩn để đảm bảo an toàn tuyệt đối
         const prodData = product as unknown as ExtendedProductData;
         const tierData = tierConfig as unknown as ExtendedTierData;
 
-        // AC5: Quyền truy cập sớm (Early Access)
         const userRank = tierData.rank_level ?? 0;
         const requiredRank = prodData.rank_required ?? 0;
 
@@ -617,13 +575,10 @@ export class ProductsService {
           );
         }
 
-        // AC4: Giá thành viên (Member Pricing)
-        // Ưu tiên 1: Lấy giá thiết lập riêng cho hạng này trong member_prices
         if (prodData.member_prices && prodData.member_prices[userTierCode]) {
           finalSalePrice = prodData.member_prices[userTierCode];
           memberDiscountApplied = true;
         } else {
-          // Ưu tiên 2: Giảm giá theo % mặc định của hạng (Upgrade Reward)
           const upgradeReward = tierData.upgrade_reward;
           if (
             upgradeReward?.is_active &&
@@ -636,7 +591,6 @@ export class ProductsService {
         }
       }
 
-      // AC13: Tính điểm dự kiến (Dùng LoyaltyService đã Inject)
       const pointResult = await this.loyaltyService.estimateCheckoutPoints(
         userId,
         finalSalePrice,
@@ -646,13 +600,12 @@ export class ProductsService {
 
     return {
       ...product,
-      sale_price: Math.floor(finalSalePrice), // Làm tròn giá cuối
+      sale_price: Math.floor(finalSalePrice),
       estimated_points: estimatedPoints,
       is_member_pricing: memberDiscountApplied,
     };
   }
 
-  // UPDATE THÔNG TIN
   async update(
     id: string,
     updateDto: UpdateProductDto,
@@ -663,18 +616,15 @@ export class ProductsService {
     const product = await this.productModel.findById(id);
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
-    // 1. GIA CỐ BẢO MẬT
     delete updateDto['price'];
     delete updateDto['sale_price'];
     delete updateDto['status'];
     delete updateDto['pending_price_change'];
 
-    // Check trùng SKU
     if (updateDto.sku && updateDto.sku !== product.sku) {
       await this.checkSkuExists(updateDto.sku, id);
     }
 
-    // Xử lý Slug, Name trùng lặp
     if (updateDto.slug && updateDto.slug !== product.slug) {
       const exists = await this.productModel.exists({
         slug: updateDto.slug,
@@ -735,7 +685,6 @@ export class ProductsService {
       updateDto.description = this.sanitizeContent(updateDto.description);
     }
 
-    // Assign an toàn
     Object.assign(product, updateDto);
     delete updateDto.slug;
     await product.save();
@@ -753,7 +702,6 @@ export class ProductsService {
     return product;
   }
 
-  // UPDATE TRẠNG THÁI
   async updateStatus(
     id: string,
     statusDto: UpdateProductStatusDto,
@@ -764,7 +712,6 @@ export class ProductsService {
   ) {
     const { status } = statusDto;
 
-    // 1. Tìm sản phẩm
     const product = await this.productModel.findOne({
       _id: id,
       is_deleted: false,
@@ -773,11 +720,7 @@ export class ProductsService {
 
     const oldStatus = product.status;
 
-    // 2. CHECK QUYỀN KÍCH HOẠT (ACTIVE)
-    // Nếu muốn Active, phải vượt qua các bài test về dữ liệu
     if (status === ProductStatus.ACTIVE) {
-      // Rule 2: Validate Giá bán (Quan trọng nhất)
-      // Vì lúc tạo, nhân viên bị ép giá = 0, nên nếu chưa sửa giá mà đòi Active -> CHẶN NGAY.
       if (
         product.price <= 0 &&
         (!product.variants || product.variants.length === 0)
@@ -787,9 +730,7 @@ export class ProductsService {
         );
       }
 
-      // Rule 3: Validate Biến thể (Nếu có)
       if (product.has_variants) {
-        // Phải có ít nhất 1 biến thể đang Active và có giá > 0
         const validVariant = product.variants.some((v) => v.price > 0);
         if (!validVariant) {
           throw new BadRequestException(
@@ -798,7 +739,6 @@ export class ProductsService {
         }
       }
 
-      // Rule 4: Validate Hình ảnh (Bắt buộc phải có ảnh mới được bán)
       if (
         !product.thumbnail &&
         (!product.images || product.images.length === 0)
@@ -808,7 +748,6 @@ export class ProductsService {
         );
       }
 
-      // THÊM MỚI RULE 5: Validate Data cho thuật toán AI
       if (!product.categories || product.categories.length === 0) {
         throw new BadRequestException(
           'Sản phẩm chưa có Danh mục. Không thể kích hoạt.',
@@ -820,21 +759,12 @@ export class ProductsService {
           'Sản phẩm chưa có Tags từ khóa. Thuật toán AI cần ít nhất 1 Tag để hoạt động.',
         );
       }
-
-      if (!product.brand || product.brand.trim() === '') {
-        throw new BadRequestException(
-          'Sản phẩm High-end bắt buộc phải có Thương hiệu (Brand) để hiển thị bộ lọc.',
-        );
-      }
     }
 
-    // 3. Cập nhật & Lưu
     product.status = status;
     await product.save();
 
-    // THÊM ĐOẠN NÀY: Đồng bộ lên Algolia nếu sản phẩm được ACTIVE
     if (status === ProductStatus.ACTIVE) {
-      // Không dùng await ở đây để tránh làm chậm request của User
       this.syncToSearchEngine(product).catch((err) => {
         console.error('Lỗi đồng bộ Algolia:', err);
       });
@@ -842,12 +772,10 @@ export class ProductsService {
       status === ProductStatus.DRAFT ||
       status === ProductStatus.INACTIVE
     ) {
-      // Nếu chuyển về nháp hoặc ngưng bán -> xóa khỏi Algolia
       this.algoliaService.removeProduct(product._id.toString()).catch((err) => {
         console.error('Lỗi xóa Algolia:', err);
       });
 
-      // THÊM ĐOẠN NÀY: Tự động chuyển toàn bộ ảnh gán với sản phẩm này sang trạng thái Hidden
       this.mediaService
         .bulkUpdateStatusByTarget(product._id.toString(), 'Hidden')
         .catch((err) => {
@@ -855,7 +783,6 @@ export class ProductsService {
         });
     }
 
-    // 4. Ghi Audit Log
     await this.auditLogsService.log({
       action: 'UPDATE_PRODUCT_STATUS',
       collection_name: 'products',
@@ -874,8 +801,6 @@ export class ProductsService {
     return product;
   }
 
-  // REQUEST PRICE
-  // AC1 & AC5: Tạo mới hoặc cập nhật form Yêu cầu giá
   async requestPriceUpdate(
     id: string,
     dto: UpdateProductPriceDto,
@@ -889,7 +814,6 @@ export class ProductsService {
     });
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
-    // AC5: Ràng buộc trạng thái - Không cho sửa nếu đang Pending hoặc Approved
     const currentRequest = product.price_request;
     if (
       currentRequest &&
@@ -901,26 +825,37 @@ export class ProductsService {
       );
     }
 
-    // AC1: Kiểm tra ngày trong quá khứ
     const effectiveDate = new Date(dto.effective_date);
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Đưa về đầu ngày để so sánh chuẩn
+    today.setHours(0, 0, 0, 0);
     if (effectiveDate < today) {
       throw new BadRequestException(
         'Ngày áp dụng không được nằm trong quá khứ.',
       );
     }
 
-    const pendingVariants = dto.variants
+    // Merge các variant cũ trong request với variant mới gửi lên để đảm bảo không bị đè mất dữ liệu
+    const existingVariants = currentRequest?.variants || [];
+    const newVariants = dto.variants
       ? dto.variants.map((v) => ({ sku: v.sku, price: v.price, sale_price: 0 }))
       : [];
 
-    // Lưu vào bản nháp chờ (Tự động set PENDING khi vừa tạo xong)
+    const mergedVariants = [...existingVariants];
+    newVariants.forEach((nv) => {
+      const idx = mergedVariants.findIndex((ev) => ev.sku === nv.sku);
+      if (idx !== -1) {
+        mergedVariants[idx].price = nv.price;
+      } else {
+        mergedVariants.push(nv);
+      }
+    });
+
     product.price_request = {
       price: dto.price,
-      variants: pendingVariants,
+      variants: mergedVariants,
       effective_date: effectiveDate,
-      status: PriceRequestStatus.PENDING,
+      // sửa trạng thái thành draft thay vì pending để đúng với luồng nghiệp vụ
+      status: PriceRequestStatus.DRAFT,
       requester_id: new Types.ObjectId(userId),
       requested_at: new Date(),
     } as PriceRequest;
@@ -938,10 +873,9 @@ export class ProductsService {
       user_agent: userAgent,
     });
 
-    return { message: 'Đã gửi yêu cầu phê duyệt giá thành công' };
+    return { message: 'Đã lưu nháp yêu cầu giá thành công' };
   }
 
-  // AC4: Chuyển Draft -> Pending trực tiếp
   async submitPriceRequest(
     id: string,
     userId: string,
@@ -961,7 +895,6 @@ export class ProductsService {
     product.price_request.status = PriceRequestStatus.PENDING;
     await product.save();
 
-    // Thêm Log để giải quyết lỗi unused vars
     await this.auditLogsService.log({
       action: 'SUBMIT_PRICE_REQUEST',
       collection_name: 'products',
@@ -976,7 +909,6 @@ export class ProductsService {
     return { message: 'Đã đẩy yêu cầu lên chờ phê duyệt' };
   }
 
-  // AC2: Phê duyệt giá ĐƠN LẺ
   async approvePriceChange(
     id: string,
     isApproved: boolean,
@@ -992,7 +924,6 @@ export class ProductsService {
     if (!product || !product.price_request)
       throw new NotFoundException('Không có yêu cầu giá');
 
-    // AC5: Chỉ duyệt những cái đang Pending
     if (product.price_request.status !== PriceRequestStatus.PENDING) {
       throw new BadRequestException(
         'Bản ghi này không ở trạng thái chờ duyệt (Pending)',
@@ -1012,7 +943,6 @@ export class ProductsService {
 
     await product.save();
 
-    // AC8: Audit Log chi tiết
     await this.auditLogsService.log({
       action: isApproved ? 'APPROVE_PRICE' : 'REJECT_PRICE',
       collection_name: 'products',
@@ -1034,7 +964,6 @@ export class ProductsService {
     };
   }
 
-  // AC3: Phê duyệt giá HÀNG LOẠT (Bulk)
   async bulkApprovePriceChanges(
     productIds: string[],
     isApproved: boolean,
@@ -1056,7 +985,6 @@ export class ProductsService {
         );
         successCount++;
       } catch (error) {
-        // Bỏ qua lỗi lẻ tẻ để duyệt các sản phẩm hợp lệ khác
         const errorMessage =
           error instanceof Error ? error.message : String(error);
         console.error(`Bulk action failed for product ${id}:`, errorMessage);
@@ -1067,7 +995,6 @@ export class ProductsService {
     };
   }
 
-  // CRONJOB: Bơm giá
   @Cron(CronExpression.EVERY_MINUTE)
   async applyScheduledPrices() {
     const now = new Date();
@@ -1080,7 +1007,6 @@ export class ProductsService {
     for (const p of products) {
       const request = p.price_request;
 
-      // Fix lỗi "request is possibly null" của TypeScript
       if (!request) continue;
 
       p.price = request.price;
@@ -1098,19 +1024,16 @@ export class ProductsService {
     }
   }
 
-  //SOFT DELETE
   async remove(id: string, userId: string, ip: string, userAgent: string) {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('ID sản phẩm không hợp lệ');
     }
 
-    // 1. Tìm sản phẩm để lấy thông tin log
     const product = await this.productModel.findById(id);
     if (!product) {
       throw new NotFoundException('Sản phẩm không tồn tại');
     }
 
-    // 2. Kiểm tra ràng buộc đơn hàng (AC1: Mọi trạng thái đơn)
     const hasOrders = await this.orderModel.exists({
       'items.product_id': new Types.ObjectId(id),
     });
@@ -1121,14 +1044,10 @@ export class ProductsService {
       );
     }
 
-    // 3. Xóa vĩnh viễn (AC4)
-    // await this.productModel.findByIdAndDelete(id);
-    // 3. THỰC HIỆN SOFT DELETE (Thay vì hard delete như cũ)
     product.is_deleted = true;
-    product.status = ProductStatus.DRAFT; // Reset về Draft hoặc Archived
+    product.status = ProductStatus.DRAFT;
     await product.save();
 
-    // THÊM ĐOẠN NÀY: Khi xóa mềm sản phẩm, lập tức đưa toàn bộ ảnh của nó vào bộ kho Hidden
     this.mediaService.bulkUpdateStatusByTarget(id, 'Hidden').catch((err) => {
       console.error('Lỗi tự động ẩn media khi soft delete:', err);
     });
@@ -1140,9 +1059,7 @@ export class ProductsService {
       console.error('Lỗi xóa Algolia khi Soft Delete:', err);
     }
 
-    // 4. Log (AC5)
     await this.auditLogsService.log({
-      // action: 'HARD_DELETE_PRODUCT',
       action: 'SOFT_DELETE_PRODUCT',
       collection_name: 'products',
       actor_id: userId,
@@ -1160,7 +1077,6 @@ export class ProductsService {
     return { message: 'Đã xóa vĩnh viễn sản phẩm và dữ liệu liên quan.' };
   }
 
-  // Các hàm Tags giữ nguyên
   async updateTags(
     id: string,
     tags: string[],
@@ -1234,30 +1150,21 @@ export class ProductsService {
     };
   }
 
-  async removeMediaFile(filePath: string) {
-    this.contentService.deletePhysicalFile(filePath); // Dùng code dùng chung
-    return { message: 'Đã xóa file vật lý' };
-  }
-
-  //Hàm findByCategory hoàn chỉnh
   async findByCategory(dto: FilterProductDto) {
     const { categorySlug, sort, attributes } = dto;
     const page = dto.page || 1;
     const limit = dto.limit || 20;
 
-    // 1. Tìm Category hiện tại
     const category = await this.categoryModel
       .findOne({ slug: categorySlug })
       .lean();
     if (!category) throw new NotFoundException('Danh mục không tồn tại');
 
-    // 2. Logic Cha-Con
     const allCategories = await this.categoriesService.getAllChildCategories(
       category._id,
     );
     const categoryIds = [category._id, ...allCategories];
 
-    // 3. FIX: Query type an toàn
     const query: FilterQuery<ProductDocument> = {
       categories: { $in: categoryIds },
       status: ProductStatus.ACTIVE,
@@ -1288,12 +1195,10 @@ export class ProductsService {
       }
 
       if (attributeFilters.length > 0) {
-        // Logic AND giữa các nhóm (Màu VÀ Size)
         query.$and = attributeFilters;
       }
     }
 
-    // 4. Sort (AC8)
     let sortOptions: { [key: string]: SortOrder } = {};
     switch (sort) {
       case SortOption.PRICE_ASC:
@@ -1313,14 +1218,12 @@ export class ProductsService {
 
     const subCategories = await this.categoryModel
       .find({ parent_id: category._id })
-      .select('name slug image') // Lấy ảnh để hiển thị grid danh mục
+      .select('name slug image')
       .lean();
 
-    // 5. Execute
     const [products, total] = await Promise.all([
       this.productModel
         .find(query)
-        // AC1: Select đủ field hiển thị Card
         .select(
           'name slug price sale_price sale_start_date sale_end_date thumbnail rating_average review_count sold_count stock created_at',
         )
@@ -1330,7 +1233,6 @@ export class ProductsService {
       this.productModel.countDocuments(query),
     ]);
 
-    // AC4: Build Breadcrumbs
     const breadcrumbs = await this.buildBreadcrumbs(category);
 
     return {
@@ -1351,7 +1253,6 @@ export class ProductsService {
     };
   }
 
-  //Helper tạo Breadcrumb (AC4)
   private async buildBreadcrumbs(category: CategorySimple | null) {
     const crumbs: { name: string; slug: string }[] = [];
     let current = category;
@@ -1360,10 +1261,9 @@ export class ProductsService {
       crumbs.unshift({ name: current.name, slug: current.slug });
 
       if (current.parent_id) {
-        // Tìm cha, ép kiểu kết quả về CategorySimple
         const parent = await this.categoryModel
           .findById(current.parent_id)
-          .select('name slug parent_id') // Chỉ lấy field cần thiết
+          .select('name slug parent_id')
           .lean();
 
         current = parent as CategorySimple | null;
@@ -1377,13 +1277,11 @@ export class ProductsService {
     return crumbs;
   }
 
-  // AC4: Tự động gỡ giá khuyến mãi khi qua Ngày kết thúc
   @Cron(CronExpression.EVERY_MINUTE)
   async handleExpiredSales() {
     const now = new Date();
 
     try {
-      // Tìm các SP đã qua ngày kết thúc khuyến mãi nhưng vẫn đang có giá sale > 0
       const result = await this.productModel.updateMany(
         {
           sale_end_date: { $lt: now },
@@ -1392,8 +1290,8 @@ export class ProductsService {
         },
         {
           $set: {
-            sale_price: 0, // Trả SP chính về giá niêm yết
-            'variants.$[].sale_price': 0, // Trả toàn bộ biến thể về giá niêm yết
+            sale_price: 0,
+            'variants.$[].sale_price': 0,
           },
         },
       );
@@ -1408,12 +1306,10 @@ export class ProductsService {
     }
   }
 
-  // HÀM DÀNH RIÊNG CHO CHATBOT TÌM KIẾM
   async searchForChatbot(keyword: string) {
     console.log('\n--- N8N CHATBOT TÌM KIẾM SẢN PHẨM ---');
     console.log('1. Keyword gốc n8n gửi sang:', keyword);
 
-    // Xử lý khoảng trắng: Biến "iPhone 15" thành "iPhone.*15" để tìm kiểu gì cũng dính
     const safeKeyword = keyword.trim().replace(/\s+/g, '.*');
     const searchRegex = new RegExp(safeKeyword, 'i');
     console.log('2. Regex query trong DB:', searchRegex);
@@ -1439,10 +1335,8 @@ export class ProductsService {
   async bulkSyncToAlgolia() {
     console.log('Bắt đầu đồng bộ dữ liệu lên Algolia...');
 
-    // BƯỚC 1: Xóa sạch dữ liệu cũ trên Algolia trước khi đồng bộ lại
     await this.algoliaService.clearAllProducts();
 
-    // BƯỚC 2: Chỉ lấy các sản phẩm đang bán và chưa bị xóa
     const products = await this.productModel
       .find({ status: ProductStatus.ACTIVE, is_deleted: false })
       .exec();
@@ -1459,5 +1353,56 @@ export class ProductsService {
 
     console.log(`Hoàn tất! Đã đẩy ${count} sản phẩm lên Algolia.`);
     return { message: `Đã đồng bộ thành công ${count} sản phẩm lên Algolia` };
+  }
+
+  async bulkUpdateStatus(
+    productIds: string[],
+    status: ProductStatus,
+    userId: string,
+    userRoles: string[],
+    ip: string,
+    userAgent: string,
+  ) {
+    let successCount = 0;
+    for (const id of productIds) {
+      try {
+        await this.updateStatus(
+          id,
+          { status },
+          userId,
+          userRoles,
+          ip,
+          userAgent,
+        );
+        successCount++;
+      } catch (error) {
+        console.error(`Lỗi cập nhật trạng thái hàng loạt cho SP ${id}:`, error);
+      }
+    }
+    return {
+      message: `Đã cập nhật trạng thái thành công ${successCount}/${productIds.length} sản phẩm.`,
+      successCount,
+    };
+  }
+
+  async bulkRemove(
+    productIds: string[],
+    userId: string,
+    ip: string,
+    userAgent: string,
+  ) {
+    let successCount = 0;
+    for (const id of productIds) {
+      try {
+        await this.remove(id, userId, ip, userAgent);
+        successCount++;
+      } catch (error) {
+        console.error(`Lỗi xóa hàng loạt cho SP ${id}:`, error);
+      }
+    }
+    return {
+      message: `Đã xóa thành công ${successCount}/${productIds.length} sản phẩm.`,
+      successCount,
+    };
   }
 }

@@ -29,7 +29,7 @@ export interface IRealtimeStockPayload {
 
 @WebSocketGateway({
   cors: { origin: '*' },
-  namespace: '/admin/dashboard',
+  namespace: '/portal/dashboard',
 })
 export class DashboardGateway
   implements OnGatewayConnection, OnGatewayDisconnect

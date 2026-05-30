@@ -159,7 +159,6 @@ export class AlgoliaService {
       name: product.name,
       sku: product.sku,
       slug: product.slug,
-      brand: product.brand,
       image_url: product.thumbnail,
       description: product.description,
       short_description: product.short_description,
@@ -213,7 +212,6 @@ export class AlgoliaService {
     // Các bộ lọc core bắt buộc phải có
     const baseFacets = [
       'searchable(categories)',
-      'searchable(brand)',
       'searchable(tags)',
       'filterOnly(status)',
       'filterOnly(is_deleted)',

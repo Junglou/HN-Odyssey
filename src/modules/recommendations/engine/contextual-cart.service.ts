@@ -25,6 +25,7 @@ export class ContextualCartService {
     sessionId: string,
     userId: string | undefined,
     currentTotal: number,
+    excludeIdsStr?: string, // <--- 1. THÊM THAM SỐ NÀY
   ) {
     const cartMatch = userId
       ? { user_id: new Types.ObjectId(userId) }
@@ -32,11 +33,20 @@ export class ContextualCartService {
     const currentCart = await this.cartModel.findOne(cartMatch).lean();
     const cartProductIds = currentCart?.items.map((i) => i.product_id) || [];
 
-    // AC8: Xử lý giỏ hàng rỗng (Empty Cart State)
-    // Nếu giỏ hàng không có gì, trả về ngay hàng Trending và thoát sớm, không chạy Upsell/Cross-sell
+    // 2. TẠO MẢNG LOẠI TRỪ (GỘP GIỎ HÀNG VÀ DỮ LIỆU FRONTEND GỬI LÊN)
+    const excludeList = excludeIdsStr ? excludeIdsStr.split(',') : [];
+    const mergedExcludeIds = [
+      ...new Set([...cartProductIds.map(String), ...excludeList]),
+    ];
+    const objectIdsToExclude = mergedExcludeIds
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
+    // AC8: Xử lý giỏ hàng rỗng (Empty Cart State hoặc đã Checkout xong)
     if (cartProductIds.length === 0) {
       const trendingProducts = await this.productModel
         .find({
+          _id: { $nin: objectIdsToExclude }, // <--- 3. THÊM LỌC Ở ĐÂY (LOẠI TRỪ ĐỒ VỪA MUA)
           status: 'ACTIVE',
           is_deleted: false,
           stock: { $gt: 0 },
@@ -71,7 +81,7 @@ export class ContextualCartService {
     if (hasBulkyItem) excludedTags.push('fragile', 'de-vo');
 
     const baseQuery: Record<string, unknown> = {
-      _id: { $nin: cartProductIds },
+      _id: { $nin: objectIdsToExclude },
       status: 'ACTIVE',
       is_deleted: false,
       stock: { $gt: 0 },
@@ -195,8 +205,6 @@ export class ContextualCartService {
         .limit(6)
         .lean()) as unknown as ProductDocument[];
     }
-
-    // [FIX AC15]: Logic xung đột (Conflict Handling) - Ẩn gói quà nếu đã thêm
     const hasGiftWrapInCart = cartTags.includes('gift-wrap');
     const serviceTagsToSuggest = ['service', 'warranty']; // Luôn có thể gợi ý bảo hành
 
@@ -207,7 +215,7 @@ export class ContextualCartService {
     // AC9: Service Upselling
     const serviceProducts = (await this.productModel
       .find({
-        _id: { $nin: cartProductIds },
+        _id: { $nin: objectIdsToExclude },
         status: 'ACTIVE',
         is_deleted: false,
         tags: { $in: serviceTagsToSuggest }, // Đã áp dụng bộ lọc xung đột

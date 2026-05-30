@@ -32,6 +32,7 @@ import { AlgoliaService } from 'src/modules/search/algolia.service';
 import { ProductSeederCommand } from './seedProduct/product-seeder.command';
 import { ProductSeederService } from './seedProduct/product-seeder.service';
 import { CommandModule } from 'nestjs-command';
+import { ProductListener } from './product.listener';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { CommandModule } from 'nestjs-command';
     AlgoliaService,
     ProductSeederService,
     ProductSeederCommand,
+    ProductListener,
   ],
   exports: [ProductsService, AlgoliaService],
 })

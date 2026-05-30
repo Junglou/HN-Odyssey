@@ -115,6 +115,12 @@ export class PromotionsController {
     return new BaseResponse(true, 'Lấy danh sách mã giảm giá thành công', data);
   }
 
+  @Get('public/coupons/active')
+  async getActiveCouponsForClient() {
+    const data = await this.couponsService.findActiveCoupons();
+    return new BaseResponse(true, 'Thành công', data);
+  }
+
   @Get('coupons/:id')
   @RequirePermissions(Resource.PROMOTIONS, Action.READ)
   async getCouponDetail(@Param('id') id: string) {
@@ -129,12 +135,16 @@ export class PromotionsController {
     @Body('cart_total') cartTotal: number,
     @Req() req: RequestWithUser,
   ) {
-    const data = await this.couponsService.applyCoupon(
-      code,
-      cartTotal,
-      req.user?._id,
-    );
-    return new BaseResponse(true, 'Áp dụng mã giảm giá thành công', data);
+    try {
+      const data = await this.couponsService.applyCoupon(
+        code,
+        cartTotal,
+        req.user?._id,
+      );
+      return new BaseResponse(true, 'Áp dụng mã giảm giá thành công', data);
+    } catch {
+      return new BaseResponse(false, 'Mã giảm giá không tồn tại', null);
+    }
   }
 
   @Patch('coupons/:id')

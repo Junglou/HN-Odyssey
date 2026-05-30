@@ -8,12 +8,13 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, FilterQuery, Types } from 'mongoose';
 import * as fs from 'fs';
 import * as path from 'path';
-import { Media } from './schemas/media-record.schema';
+import { Media, MediaType } from './schemas/media-record.schema';
 import {
   MediaMetadataDto,
   QueryMediaInterface,
   UpdateMediaInfoDto,
 } from './dto/media-record.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 export interface UploadResponseInterface {
   id: string;
@@ -26,7 +27,10 @@ export interface UploadResponseInterface {
 export class MediaService {
   private readonly logger = new Logger(MediaService.name);
 
-  constructor(@InjectModel(Media.name) private mediaModel: Model<Media>) {}
+  constructor(
+    @InjectModel(Media.name) private mediaModel: Model<Media>,
+    private eventEmitter: EventEmitter2,
+  ) {}
 
   // Xử lý lưu mảng file và metadata
   async uploadBulkMedia(
@@ -143,7 +147,6 @@ export class MediaService {
     const media = await this.mediaModel.findById(id);
     if (!media) throw new NotFoundException('Không tìm thấy phương tiện.');
 
-    // AC3: Không cho phép Video làm ảnh đại diện
     if (media.mimetype.startsWith('video/')) {
       throw new BadRequestException(
         'Hệ thống vô hiệu hóa chức năng đặt ảnh đại diện đối với video.',
@@ -157,7 +160,17 @@ export class MediaService {
     );
 
     media.isPrimary = true;
-    return media.save();
+    const savedMedia = await media.save();
+
+    // THÊM ĐOẠN NÀY: Bắn event để ProductService bắt lấy
+    if (media.type === MediaType.PRODUCT) {
+      this.eventEmitter.emit('product.thumbnail.updated', {
+        productId: media.targetId,
+        thumbnailUrl: media.url,
+      });
+    }
+
+    return savedMedia;
   }
 
   // AC3: Xử lý lưu ảnh sau khi Crop

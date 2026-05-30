@@ -175,8 +175,8 @@ export class NotificationListener {
         user_id: data.user_id,
         ip: data.ip,
         target_url: data.user_id
-          ? `/admin/system/audit-logs?userId=${data.user_id}`
-          : `/admin/system/audit-logs`,
+          ? `/portal/system/audit-logs?userId=${data.user_id}`
+          : `/portal/system/audit-logs`,
       },
     });
   }

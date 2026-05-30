@@ -138,7 +138,7 @@ export class BusinessMonitoringCronService {
               error_code: 'HIGH_CHECKOUT_ABANDONMENT',
               drop_rate: dropRate,
               total_checkouts: stat.totalCheckouts,
-              target_url: '/admin/reports/business/behavior-abandonment',
+              target_url: '/portal/reports/business/behavior-abandonment',
             },
           });
         }
@@ -201,7 +201,7 @@ export class BusinessMonitoringCronService {
             error_code: 'ABNORMAL_CART_ABANDONMENT',
             sku: item._id,
             abandoned_count: item.abandonedCount,
-            target_url: `/admin/reports/business/abandoned-carts?sku=${item._id}`,
+            target_url: `/portal/reports/business/abandoned-carts?sku=${item._id}`,
           },
         });
       }

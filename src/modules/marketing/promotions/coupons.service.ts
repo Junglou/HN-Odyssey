@@ -138,6 +138,27 @@ export class CouponsService {
     };
   }
 
+  // API dành cho Frontend: Lấy danh sách các mã giảm giá đang có hiệu lực
+  async findActiveCoupons() {
+    const now = new Date();
+    const activeCoupons = await this.couponModel
+      .find({
+        is_deleted: false,
+        status: CouponStatus.ACTIVE,
+        start_date: { $lte: now },
+        end_date: { $gte: now },
+        // Chỉ lấy những mã mà số lần đã dùng vẫn còn nhỏ hơn giới hạn sử dụng
+        $expr: { $lt: ['$usage_count', '$usage_limit'] },
+      })
+      .select(
+        'code discount_type discount_value min_order_value usage_count usage_limit start_date end_date',
+      )
+      .lean()
+      .exec();
+
+    return activeCoupons;
+  }
+
   // Lấy chi tiết 1 mã
   async findOne(id: string) {
     const coupon = await this.couponModel

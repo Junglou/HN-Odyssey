@@ -122,9 +122,6 @@ export class Product {
   @Prop({ default: '' })
   short_description: string;
 
-  @Prop()
-  brand: string;
-
   // Thêm vào trong class Product ở file product.schema.ts
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Warehouse', index: true })
   warehouse_id: Types.ObjectId;

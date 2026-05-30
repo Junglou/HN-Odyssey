@@ -738,8 +738,13 @@ export class OrdersService {
       //Tạo đơn tạm
       const holdExpiresAt = new Date(Date.now() + 15 * 60000);
 
+      const randomSuffix = Math.random()
+        .toString(36)
+        .substring(2, 6)
+        .toUpperCase();
+
       const tempOrder = new this.orderModel({
-        order_code: `BUYNOW-${Date.now()}`,
+        order_code: `BUYNOW-${Date.now()}-${randomSuffix}`,
         user_id: data.userId ? new Types.ObjectId(data.userId) : null,
         session_id: data.userId ? undefined : data.guestSessionId,
         items: [
@@ -907,8 +912,13 @@ export class OrdersService {
         };
       });
 
+      const randomSuffix = Math.random()
+        .toString(36)
+        .substring(2, 6)
+        .toUpperCase();
+
       const tempOrder = new this.orderModel({
-        order_code: `GUEST-${Date.now()}`,
+        order_code: `GUEST-${Date.now()}-${randomSuffix}`,
         session_id: dto.cartSessionId,
         isGuest: true,
         status: 'TEMPORARY',
@@ -1286,8 +1296,13 @@ export class OrdersService {
           throw new BadRequestException('Đơn hàng > 5 triệu không hỗ trợ COD.');
         }
 
+        const randomSuffix = Math.random()
+          .toString(36)
+          .substring(2, 6)
+          .toUpperCase();
+
         // Cập nhật lại thông tin từ đơn tạm thành đơn chính thức
-        tempOrder.order_code = `ORD-${Date.now()}`;
+        tempOrder.order_code = `ORD-${Date.now()}-${randomSuffix}`;
         tempOrder.shipping_info = {
           ...dto.shippingInfo,
           email: dto.shippingInfo.email || '',
@@ -1480,8 +1495,13 @@ export class OrdersService {
           throw new BadRequestException('Đơn hàng > 5 triệu không hỗ trợ COD.');
         }
 
+        const randomSuffix = Math.random()
+          .toString(36)
+          .substring(2, 6)
+          .toUpperCase();
+
         const newOrder = new this.orderModel({
-          order_code: `ORD-${Date.now()}`,
+          order_code: `ORD-${Date.now()}-${randomSuffix}`,
           user_id: new Types.ObjectId(userId),
           items: orderItems,
           shipping_info: {
