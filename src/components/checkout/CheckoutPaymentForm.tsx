@@ -22,116 +22,122 @@ export default function CheckoutPaymentForm({
   // render
   return (
     <div className="checkout-payment-container">
-      {/* credit card block */}
+      {/* 1. Thanh toán khi nhận hàng (COD) */}
       <div
-        className={`checkout-payment-card ${paymentData.method === "credit_card" ? "active" : ""}`}
+        className={`checkout-payment-card ${paymentData.method === "COD" ? "active" : ""}`}
       >
         <div
           className="checkout-payment-header"
-          onClick={() => !loading && onChange("method", "credit_card")}
+          onClick={() => !loading && onChange("method", "COD")}
         >
           <div className="checkout-payment-radio">
-            {paymentData.method === "credit_card" ? (
+            {paymentData.method === "COD" ? (
               <RadioFilledIcon />
             ) : (
               <RadioOutlineIcon />
             )}
           </div>
-          <span className="checkout-payment-title">Credit Card</span>
+          <span className="checkout-payment-title">Cash on Delivery (COD)</span>
         </div>
 
-        {paymentData.method === "credit_card" && (
+        {paymentData.method === "COD" && (
           <div className="checkout-payment-body">
-            <div className="checkout-payment-input-group">
-              <input
-                type="text"
-                className="checkout-payment-input"
-                placeholder="Name of card holder"
-                value={paymentData.cardName}
-                onChange={(e) => onChange("cardName", e.target.value)}
-                disabled={loading}
-              />
-            </div>
+            <p
+              style={{
+                fontFamily: '"Lexend", sans-serif',
+                color: "#555",
+                margin: 0,
+                lineHeight: 1.5,
+                fontSize: "0.9rem",
+              }}
+            >
+              Thanh toán bằng tiền mặt khi đơn vị vận chuyển giao hàng đến địa
+              chỉ của bạn.
+            </p>
+          </div>
+        )}
+      </div>
 
-            <div className="checkout-payment-input-group">
-              <input
-                type="text"
-                className="checkout-payment-input"
-                placeholder="Card number"
-                value={paymentData.cardNumber}
-                onChange={(e) => onChange("cardNumber", e.target.value)}
-                disabled={loading}
-              />
-            </div>
+      {/* 2. Cổng thanh toán VNPAY */}
+      <div
+        className={`checkout-payment-card ${paymentData.method === "VNPAY" ? "active" : ""}`}
+      >
+        <div
+          className="checkout-payment-header"
+          onClick={() => !loading && onChange("method", "VNPAY")}
+        >
+          <div className="checkout-payment-radio">
+            {paymentData.method === "VNPAY" ? (
+              <RadioFilledIcon />
+            ) : (
+              <RadioOutlineIcon />
+            )}
+          </div>
+          <span className="checkout-payment-title">VNPAY Gateway</span>
+        </div>
 
-            <div className="checkout-payment-row">
-              <div className="checkout-payment-input-group">
-                <input
-                  type="text"
-                  className="checkout-payment-input"
-                  placeholder="MM/YY"
-                  value={paymentData.expDate}
-                  onChange={(e) => onChange("expDate", e.target.value)}
-                  disabled={loading}
-                />
-              </div>
-              <div className="checkout-payment-input-group">
-                <input
-                  type="password"
-                  className="checkout-payment-input"
-                  placeholder="CVV"
-                  value={paymentData.cvv}
-                  onChange={(e) => onChange("cvv", e.target.value)}
-                  disabled={loading}
-                />
-              </div>
+        {paymentData.method === "VNPAY" && (
+          <div className="checkout-payment-body">
+            <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+              <img
+                src="https://vnpay.vn/s1/statics.vnpay.vn/2023/6/0oxhzjmxbksr1686814746087.png"
+                alt="VNPAY"
+                style={{ height: "30px", objectFit: "contain" }}
+              />
+              <p
+                style={{
+                  fontFamily: '"Lexend", sans-serif',
+                  color: "#555",
+                  margin: 0,
+                  fontSize: "0.9rem",
+                  lineHeight: 1.5,
+                }}
+              >
+                Thanh toán an toàn qua VNPAY. Hỗ trợ quét mã QR bằng ứng dụng
+                ngân hàng, thẻ ATM nội địa và thẻ tín dụng (Visa/Mastercard).
+              </p>
             </div>
           </div>
         )}
       </div>
 
-      {/* qr pay & e-wallet block */}
+      {/* 3. Cổng thanh toán MoMo */}
       <div
-        className={`checkout-payment-card ${paymentData.method === "qr_pay" ? "active" : ""}`}
+        className={`checkout-payment-card ${paymentData.method === "MOMO" ? "active" : ""}`}
       >
         <div
           className="checkout-payment-header"
-          onClick={() => !loading && onChange("method", "qr_pay")}
+          onClick={() => !loading && onChange("method", "MOMO")}
         >
           <div className="checkout-payment-radio">
-            {paymentData.method === "qr_pay" ? (
+            {paymentData.method === "MOMO" ? (
               <RadioFilledIcon />
             ) : (
               <RadioOutlineIcon />
             )}
           </div>
-          <span className="checkout-payment-title">QR Pay & E-Wallet</span>
+          <span className="checkout-payment-title">MoMo E-Wallet</span>
         </div>
 
-        {paymentData.method === "qr_pay" && (
-          <div className="checkout-payment-body checkout-wallet-body">
-            <div className="checkout-wallet-options">
-              {["momo", "zalo_pay", "qr_pay", "atm"].map((wallet) => (
-                <button
-                  key={wallet}
-                  type="button"
-                  className={`checkout-wallet-btn ${paymentData.eWallet === wallet ? "selected" : ""}`}
-                  onClick={() => onChange("eWallet", wallet)}
-                  disabled={loading}
-                >
-                  {wallet.replace("_", " ").toUpperCase()}
-                </button>
-              ))}
-            </div>
-
-            <div className="checkout-qr-display">
+        {paymentData.method === "MOMO" && (
+          <div className="checkout-payment-body">
+            <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
               <img
-                src="https://placehold.co/355x355/png?text=QR+CODE"
-                alt="Payment QR"
+                src="https://upload.wikimedia.org/wikipedia/vi/f/fe/MoMo_Logo.png"
+                alt="MoMo"
+                style={{ height: "35px", objectFit: "contain" }}
               />
-              <p className="checkout-qr-instruction">
-                Scan with your{" "}
-                {paymentData.eWallet.replace("_", " ").toUpperCase()} app
+              <p
+                style={{
+                  fontFamily: '"Lexend", sans-serif',
+                  color: "#555",
+                  margin: 0,
+                  fontSize: "0.9rem",
+                  lineHeight: 1.5,
+                }}
+              >
+                Hệ thống sẽ chuyển hướng sang ứng dụng hoặc website MoMo để bạn
+                tiến hành quét mã QR thanh toán nhanh chóng.
               </p>
             </div>
           </div>

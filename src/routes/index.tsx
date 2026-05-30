@@ -137,6 +137,14 @@ export const router = createBrowserRouter([
         element: <CheckoutPage />,
       },
       {
+        path: "checkout/success",
+        element: <CheckoutPage />,
+      },
+      {
+        path: "checkout/fail",
+        element: <CheckoutPage />,
+      },
+      {
         path: "/pages/:slug",
         element: <StaticPageView />,
       },

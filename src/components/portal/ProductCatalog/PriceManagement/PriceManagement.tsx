@@ -42,9 +42,9 @@ interface PriceManagementProps {
     changeLimit: (limit: number) => void;
   };
   rowActions: {
-    submitPrice: (id: string) => void;
-    approvePrice: (id: string) => void;
-    rejectPrice: (id: string) => void;
+    submitPrice: (productId: string) => void;
+    approvePrice: (productId: string) => void;
+    rejectPrice: (productId: string) => void;
   };
   bulkActions: {
     bulkApprove: () => void;
@@ -64,7 +64,6 @@ export default function PriceManagement({
   rowActions,
   bulkActions,
 }: PriceManagementProps) {
-  // dropdown
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const statusRef = useRef<HTMLDivElement>(null);
   useClickOutside(statusRef, () => setIsStatusDropdownOpen(false));
@@ -81,7 +80,6 @@ export default function PriceManagement({
   const limitRef = useRef<HTMLDivElement>(null);
   useClickOutside(limitRef, () => setIsLimitDropdownOpen(false));
 
-  // helper
   const isAllSelected = data.length > 0 && selectedIds.size === data.length;
   const isPartiallySelected =
     selectedIds.size > 0 && selectedIds.size < data.length;
@@ -334,7 +332,10 @@ export default function PriceManagement({
                             <button
                               type="button"
                               className="prm-btn-action submit"
-                              onClick={() => rowActions.submitPrice(record.id)}
+                              // Sử dụng productId gốc thay cho id UI
+                              onClick={() =>
+                                rowActions.submitPrice(record.productId)
+                              }
                             >
                               Submit
                             </button>
@@ -345,14 +346,18 @@ export default function PriceManagement({
                             <button
                               type="button"
                               className="prm-btn-action approve"
-                              onClick={() => rowActions.approvePrice(record.id)}
+                              onClick={() =>
+                                rowActions.approvePrice(record.productId)
+                              }
                             >
                               Approve
                             </button>
                             <button
                               type="button"
                               className="prm-btn-action reject"
-                              onClick={() => rowActions.rejectPrice(record.id)}
+                              onClick={() =>
+                                rowActions.rejectPrice(record.productId)
+                              }
                             >
                               Reject
                             </button>

@@ -246,3 +246,12 @@
     width: 100%;
   }
 }
+
+/* Animation mượt mà cho phần thêm địa chỉ mới */
+.checkout-new-address-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+  animation: checkoutSlideDownFade 0.3s ease-out forwards;
+}
