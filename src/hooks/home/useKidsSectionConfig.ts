@@ -1,3 +1,4 @@
+import type { SectionConfig } from "../portal/Communication/ContentConfig/useContentConfig";
 import type { ConfigElement } from "./useJustForYouSlider";
 
 export interface KidsSectionData {
@@ -6,7 +7,6 @@ export interface KidsSectionData {
   elements: ConfigElement[];
 }
 
-// Mock data: Tọa độ kéo thả từ Portal (Canvas 1920x738)
 const MOCK_KIDS_DATA: KidsSectionData = {
   id: "kids-section-1",
   backgroundColor: "#C9E3E8",
@@ -45,7 +45,6 @@ const MOCK_KIDS_DATA: KidsSectionData = {
       content: "“Designed for every little moment.”",
       style: { fontFamily: "'Lexend', sans-serif", fontSize: "16px" },
     },
-
     {
       id: "el-k2-title",
       type: "heading",
@@ -81,7 +80,6 @@ const MOCK_KIDS_DATA: KidsSectionData = {
         "One young explorer will take home $20,000, learn from Jeff Corwin, and appear in Ranger Rick magazine!.jpg",
       style: { borderRadius: "10px" },
     },
-
     {
       id: "el-k3-img",
       type: "image",
@@ -92,7 +90,6 @@ const MOCK_KIDS_DATA: KidsSectionData = {
       content: "tải xuống 10.jpg",
       style: { borderRadius: "10px" },
     },
-
     {
       id: "el-k4-img",
       type: "image",
@@ -145,8 +142,17 @@ const MOCK_KIDS_DATA: KidsSectionData = {
   ],
 };
 
-export function useKidsSectionConfig() {
-  return {
-    configData: MOCK_KIDS_DATA,
-  };
+export function useKidsSectionConfig(dbSection?: SectionConfig | null) {
+  // Logic dự phòng (Fallback): Nếu DB rỗng, trả về MOCK_DATA
+  const configData: KidsSectionData =
+    dbSection && dbSection.elements && dbSection.elements.length > 0
+      ? {
+          id: dbSection.id,
+          backgroundColor: dbSection.backgroundUrl || "#C9E3E8",
+          // Dùng 'unknown' sau đó mới sang 'ConfigElement[]' để qua mặt ESLint một cách hợp lệ
+          elements: dbSection.elements as unknown as ConfigElement[],
+        }
+      : MOCK_KIDS_DATA;
+
+  return { configData };
 }

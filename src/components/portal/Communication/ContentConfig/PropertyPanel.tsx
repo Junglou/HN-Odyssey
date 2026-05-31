@@ -154,11 +154,13 @@ export default function PropertyPanel({
           style={{ display: "flex", flexDirection: "column", gap: "16px" }}
         >
           <div className="pp-form-group">
-            <label className="pp-label">Background Image URL</label>
+            <label className="pp-label">
+              Background (Image URL or Hex Color)
+            </label>
             <input
               type="text"
               className="pp-input"
-              placeholder="https://..."
+              placeholder="https://... or #FFFFFF"
               value={currentSection?.backgroundUrl || ""}
               onChange={(e) => actions.updateSectionBackground(e.target.value)}
             />

@@ -77,9 +77,9 @@
   transition: transform 0.2s ease;
 }
 
-.ks-dynamic-btn:hover {
+/* .ks-dynamic-btn:hover {
   transform: scale(1.05);
-}
+} */
 
 /* responsive */
 @media (max-width: 768px) {

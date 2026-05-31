@@ -1,5 +1,4 @@
-// imports
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import Moveable from "react-moveable";
 import SunEditor from "suneditor-react";
 import "suneditor/dist/css/suneditor.min.css";
@@ -18,7 +17,6 @@ import type {
   ElementType,
 } from "../../../../hooks/portal/Communication/ContentConfig/useContentConfig";
 
-// helpers
 function EditorDropdown({
   value,
   options,
@@ -83,7 +81,6 @@ function EditorDropdown({
   );
 }
 
-// props
 interface ContentConfigProps {
   selectedPage: PageType;
   selectedSectionId: string;
@@ -118,7 +115,6 @@ interface ContentConfigProps {
   };
 }
 
-// constants
 const PAGE_OPTIONS: { value: PageType; label: string }[] = [
   { value: "homepage", label: "Homepage" },
   { value: "about_us", label: "About Us" },
@@ -127,7 +123,6 @@ const PAGE_OPTIONS: { value: PageType; label: string }[] = [
   { value: "global", label: "Global Components" },
 ];
 
-// component
 export default function ContentConfig({
   selectedPage,
   selectedSectionId,
@@ -137,7 +132,6 @@ export default function ContentConfig({
   activeElementData,
   actions,
 }: ContentConfigProps) {
-  // refs & states
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const panStartRef = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
@@ -152,7 +146,20 @@ export default function ContentConfig({
     null,
   );
 
-  // Auto-fit Zoom
+  // XÁC ĐỊNH TỶ LỆ CANVAS DỰA TRÊN TÊN SECTION
+  const getCanvasSize = (sectionName?: string) => {
+    const name = (sectionName || "").toLowerCase();
+    if (name.includes("kids")) return { width: 1920, height: 738 };
+    if (name.includes("just in case")) return { width: 1920, height: 800 };
+    if (name.includes("other half")) return { width: 1920, height: 990 };
+    return { width: 1920, height: 900 }; // Mặc định cho Just For You
+  };
+
+  const { width: CANVAS_W, height: CANVAS_H } = useMemo(
+    () => getCanvasSize(currentSection?.name),
+    [currentSection?.name],
+  );
+
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
 
@@ -161,8 +168,8 @@ export default function ContentConfig({
       const availableWidth = clientWidth - 80;
       const availableHeight = clientHeight - 80;
 
-      const scaleX = availableWidth / 1200;
-      const scaleY = availableHeight / 600;
+      const scaleX = availableWidth / CANVAS_W;
+      const scaleY = availableHeight / CANVAS_H;
 
       const minScale = Math.min(scaleX, scaleY);
 
@@ -172,9 +179,8 @@ export default function ContentConfig({
     }
 
     return () => clearTimeout(timer);
-  }, [selectedSectionId, isPreviewMode]);
+  }, [selectedSectionId, isPreviewMode, CANVAS_W, CANVAS_H]);
 
-  // effects
   useEffect(() => {
     const handleClickOutsideEditor = (e: MouseEvent) => {
       if (editingElementId) {
@@ -262,7 +268,6 @@ export default function ContentConfig({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [actions, selectedElementId, isPreviewMode, editingElementId]);
 
-  // Target DOM tracking
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     if (selectedElementId && !isPreviewMode) {
@@ -278,7 +283,6 @@ export default function ContentConfig({
     return () => clearTimeout(timer);
   }, [selectedElementId, isPreviewMode, currentSection?.elements]);
 
-  // handlers
   const handleWrapperMouseDown = (e: React.MouseEvent) => {
     if (e.button === 2 || e.button === 1) {
       e.preventDefault();
@@ -325,7 +329,6 @@ export default function ContentConfig({
     editingElementId === selectedElementId &&
     !["rectangle", "ellipse"].includes(activeElementData?.type || "");
 
-  // render
   return (
     <div className="cc-container">
       <div className="cc-header">
@@ -363,7 +366,8 @@ export default function ContentConfig({
             onClick={actions.saveConfig}
             disabled={isPreviewMode}
           >
-            <SaveIcon /> Save
+            <SaveIcon />
+            Save
           </button>
         </div>
       </div>
@@ -411,17 +415,22 @@ export default function ContentConfig({
               >
                 <div
                   className="cc-canvas-container"
-                  style={{ width: 1200 * scale, height: 600 * scale }}
+                  style={{ width: CANVAS_W * scale, height: CANVAS_H * scale }}
                 >
                   <div
                     ref={canvasRef}
                     className="cc-canvas"
                     style={{
-                      width: 1200,
-                      height: 600,
+                      width: CANVAS_W,
+                      height: CANVAS_H,
                       transform: `scale(${scale})`,
                       transformOrigin: "top left",
-                      backgroundImage: `url(${currentSection.backgroundUrl})`,
+                      backgroundColor: "#ffffff",
+                      background:
+                        (currentSection.backgroundUrl || "").startsWith("#") ||
+                        (currentSection.backgroundUrl || "").startsWith("rgb")
+                          ? currentSection.backgroundUrl
+                          : `url(${currentSection.backgroundUrl}) center/cover no-repeat`,
                     }}
                   >
                     {currentSection.elements.length === 0 && !isPreviewMode && (
@@ -446,7 +455,8 @@ export default function ContentConfig({
                           zIndex: editingElementId === el.id ? 9999 : index + 1,
                           transform: `rotate(${el.rotate || 0}deg) ${el.style?.transform || ""}`,
                           transformOrigin: "center center",
-                          ...el.style,
+                          // ÉP KIỂU SANG REACT CSS PROPERTIES ĐỂ FIX LỖI 2322 HOÀN TOÀN
+                          ...(el.style as React.CSSProperties),
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -576,12 +586,14 @@ export default function ContentConfig({
                               width: "100%",
                               height: "100%",
                               display: "flex",
-                              alignItems: "center",
-                              justifyContent: ["button", "textlink"].includes(
+                              // FIX LỖI MÉO TRÁI: Dùng trục dọc để căn giữa 2 chiều, trả quyền căn lề ngang (Left/Center/Right) lại cho thuộc tính textAlign của Element
+                              flexDirection: "column",
+                              justifyContent: "center",
+                              alignItems: ["button", "textlink"].includes(
                                 el.type,
                               )
                                 ? "center"
-                                : "flex-start",
+                                : "stretch",
                               pointerEvents: "none",
                             }}
                             dangerouslySetInnerHTML={{ __html: el.content }}
@@ -644,17 +656,16 @@ export default function ContentConfig({
                         }}
                         onResizeEnd={(e) => {
                           const target = e.target as HTMLElement;
+                          // FIX CHÍNH LÀ ĐÂY: Gộp chung việc lưu Kích Thước và Tọa Độ vào 1 hàm duy nhất
+                          // Để triệt tiêu hoàn toàn lỗi ghi đè State của React!
                           actions.updateElementProperties(
                             selectedElementId as string,
                             {
                               width: parseFloat(target.style.width),
                               height: parseFloat(target.style.height),
+                              x: parseFloat(target.style.left),
+                              y: parseFloat(target.style.top),
                             },
-                          );
-                          actions.updateElementPosition(
-                            selectedElementId as string,
-                            parseFloat(target.style.left),
-                            parseFloat(target.style.top),
                           );
                         }}
                         onRotate={(e) => {
@@ -684,8 +695,7 @@ export default function ContentConfig({
                     setScale((s) => Number(Math.max(0.2, s - 0.1).toFixed(2)))
                   }
                 >
-                  {" "}
-                  -{" "}
+                  -
                 </button>
                 <span className="cc-zoom-value">
                   {Math.round(scale * 100)}%
@@ -696,8 +706,7 @@ export default function ContentConfig({
                     setScale((s) => Number(Math.min(3, s + 0.1).toFixed(2)))
                   }
                 >
-                  {" "}
-                  +{" "}
+                  +
                 </button>
               </div>
             </>

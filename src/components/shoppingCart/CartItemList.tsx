@@ -75,7 +75,9 @@ export default function CartItemList({
 
                 <div className="cart-list-item-actions">
                   <button
-                    className={`cart-list-btn-black ${editingItemId === item.id ? "active" : ""}`}
+                    className={`cart-list-btn-black ${
+                      editingItemId === item.id ? "active" : ""
+                    }`}
                     onClick={() => onToggleEdit(item.id)}
                   >
                     <EditIcon /> {editingItemId === item.id ? "Done" : "Edit"}
@@ -90,7 +92,9 @@ export default function CartItemList({
                     className="cart-list-link-wishlist"
                     onClick={() => onAddToWishlist(item.id)}
                   >
-                    Add to Wishlist
+                    {item.isWishlisted
+                      ? "Remove from Wishlist"
+                      : "Add to Wishlist"}
                   </button>
                 </div>
               </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import type { SectionConfig } from "../portal/Communication/ContentConfig/useContentConfig";
 
 export interface ConfigElement {
   id: string;
@@ -9,6 +10,8 @@ export interface ConfigElement {
   height: number;
   content: string;
   style?: React.CSSProperties;
+  rotate?: number; // Thêm trường góc xoay
+  tag?: string; // Thêm trường thẻ HTML (h1, h2, p,...)
 }
 
 export interface SlideConfig {
@@ -17,7 +20,6 @@ export interface SlideConfig {
   elements: ConfigElement[];
 }
 
-// mock data
 const MOCK_SLIDES: SlideConfig[] = [
   {
     id: "slide-1",
@@ -38,6 +40,7 @@ const MOCK_SLIDES: SlideConfig[] = [
           color: "rgba(255,255,255,0.9)",
           margin: 0,
         },
+        tag: "h2",
       },
       {
         id: "el-2",
@@ -54,6 +57,7 @@ const MOCK_SLIDES: SlideConfig[] = [
           color: "rgba(255,255,255,0.9)",
           margin: 0,
         },
+        tag: "p",
       },
       {
         id: "el-3",
@@ -95,26 +99,28 @@ const MOCK_SLIDES: SlideConfig[] = [
           color: "rgba(255,255,255,0.9)",
           margin: 0,
         },
+        tag: "h2",
       },
     ],
   },
-  {
-    id: "slide-3",
-    backgroundUrl:
-      "https://placehold.co/1920x900/e5e7eb/000000?text=Empty+Slide+3",
-    elements: [], // Trống rỗng
-  },
-  {
-    id: "slide-4",
-    backgroundUrl:
-      "https://placehold.co/1920x900/e5e7eb/000000?text=Empty+Slide+4",
-    elements: [], // Trống rỗng
-  },
 ];
 
-export function useJustForYouSlider() {
+export function useJustForYouSlider(dbSlides?: SectionConfig[]) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const totalSlides = MOCK_SLIDES.length;
+
+  const slides: SlideConfig[] =
+    dbSlides &&
+    dbSlides.length > 0 &&
+    dbSlides.some((s) => s.elements.length > 0)
+      ? dbSlides.map((s) => ({
+          id: s.id,
+          backgroundUrl: s.backgroundUrl || "",
+          // Mọi phần tử đều tuân thủ Interface ConfigElement
+          elements: s.elements as ConfigElement[],
+        }))
+      : MOCK_SLIDES;
+
+  const totalSlides = slides.length;
 
   useEffect(() => {
     if (totalSlides <= 1) return;
@@ -126,5 +132,5 @@ export function useJustForYouSlider() {
 
   const goToSlide = (index: number) => setCurrentIndex(index);
 
-  return { slides: MOCK_SLIDES, currentIndex, goToSlide };
+  return { slides, currentIndex, goToSlide };
 }

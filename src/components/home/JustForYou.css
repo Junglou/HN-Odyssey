@@ -46,9 +46,10 @@
 .jfy-slider-window {
   position: relative;
   width: 100%;
-  min-height: 700px;
+  aspect-ratio: 1920 / 900;
+  /* min-height: 700px;
   height: 45vw;
-  max-height: 900px;
+  max-height: 900px; */
   overflow: hidden;
 }
 
@@ -127,7 +128,7 @@
 
   /* Auto Scale content config layer cho mobile */
   .jfy-canvas-layer {
-    transform: scale(0.6);
+    /* transform: scale(0.6); */
     transform-origin: top left;
   }
 }

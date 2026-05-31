@@ -1,3 +1,4 @@
+import type { SectionConfig } from "../portal/Communication/ContentConfig/useContentConfig";
 import type { ConfigElement } from "./useJustForYouSlider";
 
 export interface JustInCaseData {
@@ -6,12 +7,11 @@ export interface JustInCaseData {
   elements: ConfigElement[];
 }
 
-//mock data
+// Bỏ hoàn toàn chữ "any" ở đây, TypeScript sẽ tự nội suy dựa vào interface JustInCaseData
 const MOCK_JUST_IN_CASE_DATA: JustInCaseData = {
   id: "jic-1",
   backgroundColor: "#ffffff",
   elements: [
-    // Grid 6 sản phẩm (Tọa độ giả định trên khung 1920x800)
     {
       id: "jic-1",
       type: "image",
@@ -37,7 +37,6 @@ const MOCK_JUST_IN_CASE_DATA: JustInCaseData = {
         textDecoration: "underline",
       },
     },
-
     {
       id: "jic-2",
       type: "image",
@@ -63,7 +62,6 @@ const MOCK_JUST_IN_CASE_DATA: JustInCaseData = {
         textDecoration: "underline",
       },
     },
-
     {
       id: "jic-3",
       type: "image",
@@ -89,7 +87,6 @@ const MOCK_JUST_IN_CASE_DATA: JustInCaseData = {
         textDecoration: "underline",
       },
     },
-
     {
       id: "jic-4",
       type: "image",
@@ -115,7 +112,6 @@ const MOCK_JUST_IN_CASE_DATA: JustInCaseData = {
         textDecoration: "underline",
       },
     },
-
     {
       id: "jic-5",
       type: "image",
@@ -141,7 +137,6 @@ const MOCK_JUST_IN_CASE_DATA: JustInCaseData = {
         textDecoration: "underline",
       },
     },
-
     {
       id: "jic-6",
       type: "image",
@@ -167,8 +162,6 @@ const MOCK_JUST_IN_CASE_DATA: JustInCaseData = {
         textDecoration: "underline",
       },
     },
-
-    // Cụm Bottom (Check it out + Nút) - Cũng nằm trong Canvas để Admin tự căn chỉnh
     {
       id: "jic-cio",
       type: "heading",
@@ -198,6 +191,16 @@ const MOCK_JUST_IN_CASE_DATA: JustInCaseData = {
   ],
 };
 
-export function useJustInCaseConfig() {
-  return { configData: MOCK_JUST_IN_CASE_DATA };
+export function useJustInCaseConfig(dbSection?: SectionConfig | null) {
+  const configData: JustInCaseData =
+    dbSection && dbSection.elements && dbSection.elements.length > 0
+      ? {
+          id: dbSection.id,
+          backgroundColor: dbSection.backgroundUrl || "#ffffff",
+          // Fix ESLint lỗi Any bằng cách ép qua unknown trước
+          elements: dbSection.elements as unknown as ConfigElement[],
+        }
+      : MOCK_JUST_IN_CASE_DATA;
+
+  return { configData };
 }

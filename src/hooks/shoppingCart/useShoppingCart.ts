@@ -1,11 +1,14 @@
-// imports
-import { useState, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import axiosClient from "../../api/axiosClient";
+import tokenStorage from "../../utils/tokenStorage";
 
-// interface
 export interface DetailedCartItem {
   id: string;
+  productId: string;
+  variantId?: string;
+  isWishlisted: boolean;
   name: string;
   price: number;
   description: string;
@@ -17,143 +20,336 @@ export interface DetailedCartItem {
 
 export interface RecommendItem {
   id: string;
+  productId: string;
+  variantId?: string; // Dùng để gửi API Wishlist
   name: string;
   description: string;
   price: number;
   image: string;
+  sku: string; // Dùng để gửi API Cart
 }
 
-// data
-const INITIAL_CART_ITEMS: DetailedCartItem[] = [
-  {
-    id: "1",
-    name: "Vital Kit 1",
-    price: 35.99,
-    description: "Basic wound care and essential first aid treatment.",
-    contents: "Bandages, Antiseptic Wipes, Scissors, EpiPen,...",
-    size: "Full",
-    quantity: 2,
-    image: "https://placehold.co/338x190/png?text=Vital+Kit+1",
-  },
-  {
-    id: "2",
-    name: "Solo Kit 1",
-    price: 15.99,
-    description:
-      "Core survival tools including a knife, fire starter, paracord, and multi-purpose gear.",
-    contents: "Knife, Strengthen-Rope, Fire-Starter,...",
-    size: "Full",
-    quantity: 1,
-    image: "https://placehold.co/338x190/png?text=Solo+Kit+1",
-  },
-  {
-    id: "3",
-    name: "Ration 1",
-    price: 5.99,
-    description: "Instant energy supply with no cooking required.",
-    contents: "Freeze-Dried Meal, Energy Bar, Dried-Nuts, ...",
-    size: "Full",
-    quantity: 2,
-    image: "https://placehold.co/338x190/png?text=Ration+1",
-  },
-];
+interface ApiCartItemAttribute {
+  k?: string;
+  name?: string;
+  v?: string;
+  value?: string;
+}
 
-const RECOMMEND_ITEMS: RecommendItem[] = [
-  {
-    id: "rec-1",
-    name: "Ration 1",
-    description: "Instant energy supply with no cooking required.",
-    price: 5.99,
-    image: "https://placehold.co/198x115/png?text=Ration+1",
-  },
-  {
-    id: "rec-2",
-    name: "Solo kit 1",
-    description: "a knife, fire starter, paracord, and multi-gear.",
-    price: 15.99,
-    image: "https://placehold.co/198x115/png?text=Solo+kit+1",
-  },
-  {
-    id: "rec-3",
-    name: "Vital 1",
-    description: "Basic wound care and essential first aid treatment.",
-    price: 35.99,
-    image: "https://placehold.co/198x115/png?text=Vital+1",
-  },
-];
+interface ApiCartItem {
+  productId: string;
+  variantId?: string;
+  sku: string;
+  productName: string;
+  unitPrice: number;
+  productSlug?: string;
+  quantity: number;
+  thumbnail: string;
+  attributes?: ApiCartItemAttribute[];
+}
 
-// hook
+interface ApiCartSummary {
+  subtotal?: number;
+  discount?: number;
+  shippingFee?: number;
+  grandTotal?: number;
+}
+
+interface ApiCartData {
+  items?: ApiCartItem[];
+  summary?: ApiCartSummary;
+}
+
+interface ApiRecommendation {
+  _id?: string;
+  productId?: string;
+  sku?: string;
+  has_variants?: boolean;
+  name: string;
+  description?: string;
+  sale_price?: number;
+  price: number;
+  thumbnail?: string;
+  variants?: { _id: string; sku: string; active?: boolean }[]; // BE trả về _id
+}
+
+interface RecParams {
+  current_cart_total: number;
+  exclude_ids: string;
+  session_id?: string;
+}
+
+interface ApiError {
+  message?: string;
+}
+
+interface ApiWishlistItem {
+  productId: string;
+  variantId?: string; // Hứng variantId từ BE
+}
+
+const getOrCreateGuestSessionId = (): string => {
+  let sessionId = localStorage.getItem("guestSessionId");
+  if (!sessionId) {
+    sessionId = `guest_${Math.random().toString(36).substring(2, 15)}`;
+    localStorage.setItem("guestSessionId", sessionId);
+  }
+  return sessionId;
+};
+
 export function useShoppingCart() {
-  // states
   const navigate = useNavigate();
-  const [cartItems, setCartItems] =
-    useState<DetailedCartItem[]>(INITIAL_CART_ITEMS);
-  const [recommendations] = useState<RecommendItem[]>(RECOMMEND_ITEMS);
+  const [cartItems, setCartItems] = useState<DetailedCartItem[]>([]);
+  const [recommendations, setRecommendations] = useState<RecommendItem[]>([]);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
-  // handlers
-  const handleRemoveItem = (id: string) => {
-    setCartItems((prev) => prev.filter((item) => item.id !== id));
-    toast.info("Đã xóa sản phẩm khỏi giỏ hàng");
+  const [cartSummary, setCartSummary] = useState({
+    subtotal: 0,
+    discount: 0,
+    shippingFee: 0,
+    grandTotal: 0,
+  });
+
+  const fetchCartAndRecommendations = useCallback(async () => {
+    try {
+      const isLogged = !!tokenStorage.getToken();
+      const guestSessionId = isLogged ? undefined : getOrCreateGuestSessionId();
+
+      // 1. LẤY DANH SÁCH WISHLIST (GHÉP CẢ PRODUCT VÀ VARIANT ĐỂ ĐỐI CHIẾU 100% CHÍNH XÁC)
+      const wishlistSet = new Set<string>();
+      if (isLogged) {
+        try {
+          const wlRes = await axiosClient.get("/users/wishlist");
+          if (wlRes.data?.success && Array.isArray(wlRes.data.data)) {
+            wlRes.data.data.forEach((wItem: ApiWishlistItem) => {
+              if (wItem.productId) {
+                // Key định dạng: "ProductId|VariantId"
+                const key = `${wItem.productId}|${wItem.variantId || "null"}`;
+                wishlistSet.add(key);
+              }
+            });
+          }
+        } catch (e) {
+          console.warn("Lỗi fetch wishlist ngầm", e);
+        }
+      }
+
+      // 2. LẤY GIỎ HÀNG
+      const cartResponse = await axiosClient.get<ApiCartData>("/cart", {
+        params: { guestSessionId },
+      });
+
+      const cartData = cartResponse.data;
+
+      const mappedItems: DetailedCartItem[] = (cartData.items || []).map(
+        (item: ApiCartItem) => {
+          const sizeAttr = item.attributes?.find(
+            (a: ApiCartItemAttribute) =>
+              a.k?.toLowerCase() === "size" || a.name?.toLowerCase() === "size",
+          );
+          const sizeVal = sizeAttr ? sizeAttr.v || sizeAttr.value : item.sku;
+
+          // Kiểm tra chuẩn xác cả ProductID và VariantID
+          const checkKey = `${item.productId}|${item.variantId || "null"}`;
+          const isWishlisted = wishlistSet.has(checkKey);
+
+          return {
+            id: `${item.productId}|${item.sku}`,
+            productId: item.productId,
+            variantId: item.variantId,
+            isWishlisted,
+            name: item.productName,
+            price: item.unitPrice,
+            description: item.productSlug || "",
+            contents: item.sku,
+            size: sizeVal || "",
+            quantity: item.quantity,
+            image: item.thumbnail,
+          };
+        },
+      );
+
+      setCartItems(mappedItems);
+
+      const currentSubtotal = cartData.summary?.subtotal || 0;
+      setCartSummary({
+        subtotal: currentSubtotal,
+        discount: cartData.summary?.discount || 0,
+        shippingFee: cartData.summary?.shippingFee || 0,
+        grandTotal: cartData.summary?.grandTotal || 0,
+      });
+
+      const excludeIds = (cartData.items || [])
+        .map((i: ApiCartItem) => i.productId)
+        .join(",");
+
+      const recParams: RecParams = {
+        current_cart_total: currentSubtotal,
+        exclude_ids: excludeIds,
+      };
+
+      if (!isLogged && guestSessionId) {
+        recParams.session_id = guestSessionId;
+      }
+
+      // 3. LẤY GỢI Ý (RECOMMENDATIONS)
+      const recResponse = await axiosClient.get<ApiRecommendation[]>(
+        "/recommendations/cart",
+        {
+          params: recParams,
+        },
+      );
+
+      if (recResponse.data && Array.isArray(recResponse.data)) {
+        const mappedRecs = recResponse.data.map((r: ApiRecommendation) => {
+          let realSku = r.sku || "";
+          let realVariantId: string | undefined = undefined;
+
+          // TRÍCH XUẤT OBJECT ID CỦA VARIANT ĐỂ GỬI WISHLIST
+          if (r.has_variants && r.variants && r.variants.length > 0) {
+            const validVariant =
+              r.variants.find((v) => v.active) || r.variants[0];
+            realSku = validVariant?.sku || realSku;
+            realVariantId = validVariant?._id || undefined;
+          }
+
+          return {
+            id: r._id || r.productId || "", // Đây thực chất là ProductID
+            productId: r._id || r.productId || "",
+            variantId: realVariantId, // Đã lấy được ObjectId thật sự
+            sku: realSku,
+            name: r.name,
+            description: r.description || "Sản phẩm gợi ý",
+            price: r.sale_price && r.sale_price > 0 ? r.sale_price : r.price,
+            image:
+              r.thumbnail || "https://placehold.co/198x115/png?text=No+Image",
+          };
+        });
+        setRecommendations(mappedRecs);
+      }
+    } catch (error: unknown) {
+      const err = error as ApiError;
+      toast.error(err?.message || "Lỗi khi lấy dữ liệu giỏ hàng");
+    }
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadInitialData = async () => {
+      if (isMounted) {
+        await fetchCartAndRecommendations();
+      }
+    };
+    void loadInitialData();
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchCartAndRecommendations]);
+
+  const handleRemoveItem = async (id: string) => {
+    const [productId, variantSku] = id.split("|");
+    try {
+      const isLogged = !!tokenStorage.getToken();
+      const guestSessionId = isLogged ? undefined : getOrCreateGuestSessionId();
+
+      await axiosClient.delete("/cart/remove", {
+        data: { productId, variantSku, guestSessionId },
+      });
+      toast.info("Đã xóa sản phẩm khỏi giỏ hàng");
+      await fetchCartAndRecommendations();
+    } catch (error: unknown) {
+      const err = error as ApiError;
+      toast.error(err?.message || "Lỗi xử lý xóa sản phẩm");
+    }
   };
 
-  const handleAddRecommendation = (recItem: RecommendItem) => {
-    setCartItems((prev) => {
-      const existing = prev.find((item) => item.name === recItem.name);
-      if (existing) {
-        return prev.map((item) =>
-          item.name === recItem.name
-            ? { ...item, quantity: item.quantity + 1 }
-            : item,
-        );
+  const handleAddRecommendation = async (recItem: RecommendItem) => {
+    try {
+      const isLogged = !!tokenStorage.getToken();
+      const guestSessionId = isLogged ? undefined : getOrCreateGuestSessionId();
+
+      if (!recItem.sku) {
+        toast.error("Sản phẩm này bị thiếu dữ liệu SKU.");
+        return;
       }
-      return [
-        ...prev,
-        {
-          id: recItem.id,
-          name: recItem.name,
-          price: recItem.price,
-          description: recItem.description,
-          contents: "Standard items package included.",
-          size: "Full",
-          quantity: 1,
-          image: recItem.image,
-        },
-      ];
-    });
-    toast.success("Đã thêm sản phẩm gợi ý vào giỏ hàng!");
+
+      await axiosClient.post("/cart/add", {
+        productId: recItem.productId,
+        variantSku: recItem.sku, // Cart API dùng SKU
+        quantity: 1,
+        guestSessionId,
+      });
+      toast.success("Đã thêm sản phẩm gợi ý vào giỏ hàng!");
+      await fetchCartAndRecommendations();
+    } catch (error: unknown) {
+      const err = error as ApiError;
+      toast.error(err?.message || "Lỗi khi thêm gợi ý giỏ hàng");
+    }
   };
 
   const toggleEdit = (id: string) => {
     setEditingItemId((prev) => (prev === id ? null : id));
   };
 
+  const updateQuantity = async (id: string, newQuantity: number) => {
+    const [productId, variantSku] = id.split("|");
+    try {
+      const isLogged = !!tokenStorage.getToken();
+      const guestSessionId = isLogged ? undefined : getOrCreateGuestSessionId();
+
+      await axiosClient.patch("/cart/update", {
+        productId,
+        variantSku,
+        quantity: newQuantity,
+        guestSessionId,
+      });
+      await fetchCartAndRecommendations();
+    } catch (error: unknown) {
+      const err = error as ApiError;
+      toast.error(err?.message || "Số lượng cập nhật không hợp lệ");
+    }
+  };
+
   const increaseQuantity = (id: string) => {
-    setCartItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, quantity: item.quantity + 1 } : item,
-      ),
-    );
+    const item = cartItems.find((i) => i.id === id);
+    if (item) {
+      void updateQuantity(id, item.quantity + 1);
+    }
   };
 
   const decreaseQuantity = (id: string) => {
-    setCartItems((prev) =>
-      prev.map((item) =>
-        item.id === id && item.quantity > 1
-          ? { ...item, quantity: item.quantity - 1 }
-          : item,
-      ),
-    );
+    const item = cartItems.find((i) => i.id === id);
+    if (item && item.quantity > 1) {
+      void updateQuantity(id, item.quantity - 1);
+    }
   };
 
-  const handleAddToWishlist = (id: string) => {
-    // TODO: Connect API
-    console.log(`Add item ${id} to wishlist`);
-    toast.success("Thêm vào danh sách yêu thích thành công!");
+  const handleAddToWishlist = async (id: string) => {
+    const item = cartItems.find((i) => i.id === id);
+    if (!item) return;
+
+    try {
+      const isLogged = !!tokenStorage.getToken();
+      if (!isLogged) {
+        toast.warning("Vui lòng đăng nhập để sử dụng tính năng này!");
+        return;
+      }
+
+      // TRUYỀN CHUẨN XÁC PRODUCT_ID VÀ VARIANT_ID THEO ĐÚNG API TOGGLE
+      const res = await axiosClient.post("/users/wishlist/toggle", {
+        productId: item.productId,
+        variantId: item.variantId || undefined,
+      });
+
+      toast.success(res.data.message || "Thao tác thành công!");
+      await fetchCartAndRecommendations(); // Tải lại state ngầm để chuyển đổi Text "Add / Remove"
+    } catch (error: unknown) {
+      const err = error as ApiError;
+      toast.error(err?.message || "Lỗi khi cập nhật wishlist");
+    }
   };
 
   const handleCheckout = () => {
-    // TODO: Connect API / Validate / Navigate to Checkout Page
     if (cartItems.length === 0) {
       toast.error("Giỏ hàng của bạn đang trống!");
       return;
@@ -161,25 +357,22 @@ export function useShoppingCart() {
     navigate("/checkout");
   };
 
-  // helpers
-  const subtotal = useMemo(() => {
-    return cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  }, [cartItems]);
-
-  const taxes = useMemo(() => subtotal * 0.05, [subtotal]);
-  const shippingFee = 0;
-  const total = useMemo(
-    () => subtotal + taxes + shippingFee,
-    [subtotal, taxes],
-  );
+  const subtotalFormatted = cartSummary.subtotal.toFixed(2);
+  const taxesFormatted = (cartSummary.subtotal * 0.05).toFixed(2);
+  const shippingFeeFormatted =
+    cartSummary.shippingFee === 0 ? "Free" : `${cartSummary.shippingFee}$`;
+  const totalFormatted =
+    cartSummary.grandTotal > 0
+      ? cartSummary.grandTotal.toFixed(2)
+      : (cartSummary.subtotal + parseFloat(taxesFormatted)).toFixed(2);
 
   return {
     cartItems,
     recommendations,
-    subtotal: subtotal.toFixed(2),
-    taxes: taxes.toFixed(2),
-    shippingFee: shippingFee === 0 ? "Free" : `${shippingFee}$`,
-    total: total.toFixed(2),
+    subtotal: subtotalFormatted,
+    taxes: taxesFormatted,
+    shippingFee: shippingFeeFormatted,
+    total: totalFormatted,
     editingItemId,
     handleRemoveItem,
     handleAddRecommendation,
