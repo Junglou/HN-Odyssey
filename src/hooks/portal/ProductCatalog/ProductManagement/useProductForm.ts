@@ -8,7 +8,7 @@ export interface ProductData {
   name: string;
   status: "Active" | "Inactive" | "Draft";
   description: string;
-  categoryId: string;
+  categoryIds: string[];
 }
 
 export interface PricingItem {
@@ -155,7 +155,7 @@ export function useProductForm() {
     name: "",
     status: "Draft",
     description: "",
-    categoryId: "",
+    categoryIds: [],
   });
 
   const [pricingList, setPricingList] = useState<PricingItem[]>([
@@ -181,6 +181,7 @@ export function useProductForm() {
     CategoryNode[]
   >([]);
 
+  // load dependencies
   useEffect(() => {
     const fetchDependencies = async () => {
       try {
@@ -228,6 +229,7 @@ export function useProductForm() {
     fetchDependencies();
   }, []);
 
+  // load product data
   useEffect(() => {
     if ((mode === "edit" || mode === "view") && id) {
       const loadProductData = async () => {
@@ -248,10 +250,10 @@ export function useProductForm() {
             name: p.name,
             status: formattedStatus,
             description: p.description || "",
-            categoryId:
+            categoryIds:
               p.categories && p.categories.length > 0
-                ? p.categories[0]._id
-                : "",
+                ? p.categories.map((c: ApiCategoryNode) => c._id || c.id || "")
+                : [],
           });
 
           setTags(p.tags || []);
@@ -278,7 +280,6 @@ export function useProductForm() {
 
             setProductVariants(restoredVariants);
 
-            // LOGIC MỚI: TỰ ĐỘNG XÁC ĐỊNH TRẠNG THÁI GIÁ CHO TỪNG BIẾN THỂ
             const mappedPricing = p.variants.map(
               (v: ApiVariant, idx: number) => {
                 const variantName = restoredVariants
@@ -298,7 +299,6 @@ export function useProductForm() {
                   | "rejected" = "draft";
                 let displayPrice = v.price;
 
-                // Kiểm tra xem có Request duyệt giá nào đang Pending/Rejected không
                 if (
                   p.price_request &&
                   (p.price_request.status === "PENDING" ||
@@ -319,7 +319,6 @@ export function useProductForm() {
                     currentStatus = "approved";
                   }
                 } else if (v.price > 0) {
-                  // Nếu không có request và giá lớn hơn 0 -> Đã được duyệt
                   currentStatus = "approved";
                 }
 
@@ -334,7 +333,6 @@ export function useProductForm() {
             );
             setPricingList(mappedPricing);
           } else {
-            // LOGIC MỚI: TỰ ĐỘNG XÁC ĐỊNH TRẠNG THÁI GIÁ CHO SẢN PHẨM ĐƠN GIẢN
             let currentStatus: "draft" | "pending" | "approved" | "rejected" =
               "draft";
             let displayPrice = p.price;
@@ -375,6 +373,7 @@ export function useProductForm() {
     }
   }, [mode, id, navigate]);
 
+  // actions
   const actions = {
     changeInput: (name: keyof ProductData, value: string) => {
       setFormData((prev) => {
@@ -387,13 +386,22 @@ export function useProductForm() {
         return newData;
       });
     },
-    changeCategory: (categoryId: string) => {
-      setFormData((prev) => ({ ...prev, categoryId }));
+
+    toggleCategorySelect: (categoryId: string) => {
+      setFormData((prev) => {
+        const isSelected = prev.categoryIds.includes(categoryId);
+        const newCategoryIds = isSelected
+          ? prev.categoryIds.filter((id) => id !== categoryId)
+          : [...prev.categoryIds, categoryId];
+        return { ...prev, categoryIds: newCategoryIds };
+      });
       setCategoryError("");
     },
+
     updateTags: (newTags: string[]) => {
       setTags(newTags);
     },
+
     removeTag: (tagToRemove: string) => {
       setTags((prev) => prev.filter((tag) => tag !== tagToRemove));
     },
@@ -420,7 +428,6 @@ export function useProductForm() {
     },
 
     savePrice: (priceId: string, newPrice: number) => {
-      // Chỉ cập nhật giá trị ở local, chưa đẩy lên backend
       setPricingList((prev) =>
         prev.map((item) =>
           item.id === priceId
@@ -439,7 +446,6 @@ export function useProductForm() {
       }
 
       try {
-        // Gom toàn bộ giá của các biến thể hiện tại đang có trên UI để gửi 1 lượt
         const baseProduct = pricingList.find(
           (p) => p.variantName === "Default / Base Product",
         );
@@ -463,13 +469,9 @@ export function useProductForm() {
           variants: variantPayloads,
         };
 
-        // Bước 1: Lưu Draft cho TẤT CẢ biến thể (Cập nhật Backend)
         await axiosClient.post(`/products/${id}/price-request`, payload);
-
-        // Bước 2: Bắn lệnh đẩy trạng thái phiếu duyệt từ Draft sang Pending
         await axiosClient.patch(`/products/${id}/price-request/submit`);
 
-        // Bước 3: Cập nhật UI đồng loạt sang Pending cho các biến thể đã nhập giá
         setPricingList((prev) =>
           prev.map((p) => (p.price > 0 ? { ...p, status: "pending" } : p)),
         );
@@ -497,7 +499,6 @@ export function useProductForm() {
           action: "approve",
         });
 
-        // Vì Backend duyệt là duyệt cả sản phẩm, nên FE cập nhật trạng thái đồng loạt
         setPricingList((prev) =>
           prev.map((item) =>
             item.status === "pending" ? { ...item, status: "approved" } : item,
@@ -517,7 +518,6 @@ export function useProductForm() {
           action: "reject",
         });
 
-        // Cập nhật đồng loạt các biến thể đang chờ về trạng thái bị từ chối
         setPricingList((prev) =>
           prev.map((item) =>
             item.status === "pending" ? { ...item, status: "rejected" } : item,
@@ -535,7 +535,7 @@ export function useProductForm() {
     },
 
     saveProduct: async () => {
-      if (!formData.categoryId) {
+      if (formData.categoryIds.length === 0) {
         setCategoryError("Vui lòng chọn ít nhất một danh mục cho sản phẩm.");
         return false;
       }
@@ -553,7 +553,7 @@ export function useProductForm() {
         name: formData.name,
         sku: formData.sku,
         description: formData.description,
-        category_ids: [formData.categoryId],
+        category_ids: formData.categoryIds,
         tags: tags,
       };
 

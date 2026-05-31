@@ -24,12 +24,12 @@ interface ProductFormProps {
   productVariants: VariantAttribute[];
   categoryError: string;
   userRole?: "admin" | "employee";
-  availableTags: string[]; // Được thêm vào để nhận data thật từ API
-  availableAttributes: VariantAttribute[]; // Được thêm vào để nhận data thật từ API
+  availableTags: string[];
+  availableAttributes: VariantAttribute[];
   availableCategories: CategoryNode[];
   actions: {
     changeInput: (name: keyof ProductData, value: string) => void;
-    changeCategory: (categoryId: string) => void;
+    toggleCategorySelect: (categoryId: string) => void;
     updateTags: (newTags: string[]) => void;
     removeTag: (tagToRemove: string) => void;
     confirmVariant: (
@@ -46,7 +46,7 @@ interface ProductFormProps {
   };
 }
 
-// hàm tìm đường dẫn danh mục
+// helpers
 const findCategoryPath = (
   nodes: CategoryNode[],
   targetId: string,
@@ -63,7 +63,6 @@ const findCategoryPath = (
   return null;
 };
 
-// component dropdown
 function CustomFormDropdown({
   value,
   options,
@@ -134,6 +133,7 @@ function CustomFormDropdown({
   );
 }
 
+// container
 export default function ProductForm({
   mode,
   formData,
@@ -149,7 +149,7 @@ export default function ProductForm({
 }: ProductFormProps) {
   const navigate = useNavigate();
 
-  // state quản lý cây danh mục
+  // states
   const [isTreeOpen, setIsTreeOpen] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({
     c1: true,
@@ -169,7 +169,7 @@ export default function ProductForm({
 
   const isViewMode = mode === "view";
 
-  // xử lý click ra ngoài để đóng cây danh mục
+  // effects
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (treeRef.current && !treeRef.current.contains(e.target as Node))
@@ -180,39 +180,37 @@ export default function ProductForm({
   }, []);
 
   const hasPendingApproval = pricingList.some((p) => p.status === "pending");
-  const categoryPath = formData.categoryId
-    ? findCategoryPath(availableCategories, formData.categoryId)?.join(" > ") // Thay MOCK_CATEGORIES bằng availableCategories
-    : "";
 
-  // check các trường bắt buộc trước khi lưu
+  const selectedPaths = formData.categoryIds
+    .map((id) => findCategoryPath(availableCategories, id)?.join(" > "))
+    .filter(Boolean);
+
   const isFormValid = Boolean(
     formData.sku.trim() !== "" &&
     formData.name.trim() !== "" &&
-    formData.categoryId !== "",
+    formData.categoryIds.length > 0,
   );
 
-  // đệ quy render cây danh mục
+  // helpers
   const renderTreeNodes = (nodes: CategoryNode[], level: number = 0) => {
     return nodes.map((node) => {
       const isExpanded = expandedNodes[node.id];
       const hasChildren = node.children && node.children.length > 0;
-      const isSelected = formData.categoryId === node.id;
+      const isSelected = formData.categoryIds.includes(node.id);
 
       const handleSingleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (hasChildren)
+        if (hasChildren) {
           setExpandedNodes((prev) => ({ ...prev, [node.id]: !isExpanded }));
-        else {
-          actions.changeCategory(node.id);
-          setIsTreeOpen(false);
+        } else {
+          actions.toggleCategorySelect(node.id);
         }
       };
 
       const handleDoubleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (hasChildren) {
-          actions.changeCategory(node.id);
-          setIsTreeOpen(false);
+          actions.toggleCategorySelect(node.id);
         }
       };
 
@@ -234,6 +232,7 @@ export default function ProductForm({
               <div className="pf-tree-spacer"></div>
             )}
             <span className="pf-tree-node-name">{node.name}</span>
+            {isSelected && <span className="pf-tree-check-icon">✔</span>}
           </div>
           {hasChildren &&
             isExpanded &&
@@ -243,6 +242,7 @@ export default function ProductForm({
     });
   };
 
+  // render
   return (
     <div className="pf-container">
       <div className="pf-header">
@@ -323,11 +323,24 @@ export default function ProductForm({
               className={`pf-tree-trigger ${isViewMode ? "view-mode" : ""} ${categoryError ? "error" : ""}`}
               onClick={() => !isViewMode && setIsTreeOpen(!isTreeOpen)}
             >
-              {categoryPath ? (
-                <span>{categoryPath}</span>
+              {selectedPaths.length > 0 ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "6px",
+                    margin: "-4px 0",
+                  }}
+                >
+                  {selectedPaths.map((path, idx) => (
+                    <span key={idx} className="pf-category-chip">
+                      {path}
+                    </span>
+                  ))}
+                </div>
               ) : (
                 <span className="pf-tree-placeholder">
-                  Select a category...
+                  Select categories...
                 </span>
               )}
               {!isViewMode && (
@@ -349,7 +362,7 @@ export default function ProductForm({
             )}
             {isTreeOpen && !isViewMode && (
               <div className="pf-tree-dropdown">
-                {renderTreeNodes(availableCategories)}{" "}
+                {renderTreeNodes(availableCategories)}
               </div>
             )}
           </div>
@@ -357,7 +370,6 @@ export default function ProductForm({
       </section>
 
       <div className="pf-grid-2-cols">
-        {/* Pricing Table */}
         <section className="pf-section">
           <div className="pf-section-header-row">
             <h3 className="pf-section-title">Pricing & Approval</h3>
@@ -481,7 +493,6 @@ export default function ProductForm({
           )}
         </section>
 
-        {/* Product Variants Table */}
         <section className="pf-section">
           <h3 className="pf-section-title">Product Variants</h3>
           <div className="pf-table-wrapper">

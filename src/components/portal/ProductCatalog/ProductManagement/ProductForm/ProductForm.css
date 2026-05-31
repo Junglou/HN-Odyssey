@@ -522,6 +522,25 @@
   background-color: #111827;
 }
 
+.pf-category-chip {
+  background-color: #f3f4f6;
+  color: #111827;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid #d1d5db;
+  display: inline-flex;
+  align-items: center;
+}
+
+.pf-tree-check-icon {
+  margin-left: auto;
+  color: #111827;
+  font-weight: 900;
+  font-size: 0.9rem;
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
   .pf-grid-2-cols {
