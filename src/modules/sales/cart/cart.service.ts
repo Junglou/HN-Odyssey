@@ -23,14 +23,38 @@ import {
   ValidatedCartItem,
   PopulatedCartProduct,
 } from 'src/common/interfaces/cart-response.interface';
+import { User } from 'src/modules/users/schemas/user.schema';
+import { ShippingService } from 'src/modules/shipping/shipping.service';
+import { CartItem as ICartItem } from 'src/common/interfaces/order.interface';
+
+// --- ĐỊNH NGHĨA INTERFACE LOCAL ĐỂ FIX LỖI TYPE & ESLINT STRICT MODE ---
+interface IAddressItem {
+  city_code: string;
+  district_code: string;
+  is_default: boolean;
+}
+
+interface IUserWithAddresses {
+  addresses?: IAddressItem[];
+}
+
+interface IShippingConfigWithFees {
+  fees?: {
+    other_province: number;
+    [key: string]: number;
+  };
+}
+// ------------------------------------------------------------------------
 
 @Injectable()
 export class CartService {
   constructor(
     @InjectModel(Cart.name) private cartModel: Model<Cart>,
     @InjectModel(Product.name) private productModel: Model<Product>,
+    @InjectModel('User') private userModel: Model<User>,
     private readonly auditLogsService: AuditLogsService,
     private readonly promotionEngine: PromotionEngineService,
+    private readonly shippingService: ShippingService,
     @InjectConnection() private readonly connection: Connection,
   ) {}
 
@@ -46,14 +70,15 @@ export class CartService {
 
   private async calculateSummary(
     items: ValidatedCartItem[],
+    userId: string | null,
     couponCode?: string,
   ): Promise<CartSummary> {
-    // Map ValidatedCartItem to CartItemInput format
     const cartItems = items.map((item) => ({
       productId: item.productId,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
     }));
+
     const { totalDiscount: comboDiscount } =
       await this.promotionEngine.applyCombos(cartItems);
 
@@ -66,7 +91,58 @@ export class CartService {
     }
 
     const totalDiscount = comboDiscount + voucherDiscount;
-    const shippingFee = 0;
+
+    // --- LOGIC TÍNH PHÍ VẬN CHUYỂN ĐỘNG ---
+    let shippingFee = 0;
+    const FREESHIP_THRESHOLD = 500000;
+
+    if (subtotal >= FREESHIP_THRESHOLD || items.length === 0) {
+      shippingFee = 0; // Đơn trên ngưỡng hoặc giỏ hàng trống thì phí ship = 0
+    } else {
+      let cityCode: string | null = null;
+      let districtCode: string | null = null;
+
+      if (userId) {
+        // Fix: Ép kiểu qua Interface để ESLint không báo lỗi Unsafe member access
+        const user = (await this.userModel
+          .findById(userId)
+          .select('addresses')
+          .lean()
+          .exec()) as unknown as IUserWithAddresses;
+
+        if (user && user.addresses && user.addresses.length > 0) {
+          const defaultAddress =
+            user.addresses.find((a) => a.is_default) || user.addresses[0];
+          cityCode = defaultAddress.city_code;
+          districtCode = defaultAddress.district_code;
+        }
+      }
+
+      // Chuẩn hóa dữ liệu theo Interface ICartItem
+      const shippingItemsForFee = items.map((i) => ({
+        name: i.productName,
+        product_name: i.productName, // Gửi cả 2 dự phòng sai lệch Interface
+        code: i.sku,
+        quantity: i.quantity,
+        price: i.unitPrice,
+        weight: i.weight || 500,
+      }));
+
+      if (cityCode && districtCode) {
+        shippingFee = await this.shippingService.calculateShippingFee(
+          cityCode,
+          districtCode,
+          // Fix: Ép kiểu mảng đúng chuẩn CartItem[] để không báo lỗi Unsafe argument
+          shippingItemsForFee as unknown as ICartItem[],
+          false,
+        );
+      } else {
+        // Fix: Ép kiểu IShippingConfigWithFees để đọc được trường .fees
+        const config =
+          (await this.shippingService.getDefaultConfig()) as unknown as IShippingConfigWithFees;
+        shippingFee = config?.fees?.other_province || 35000;
+      }
+    }
 
     return {
       subtotal,
@@ -104,7 +180,6 @@ export class CartService {
     let isCartModified = false;
 
     for (const item of cart.items) {
-      // Ép kiểu an toàn qua unknown
       const product = item.product_id as unknown as PopulatedCartProduct;
 
       if (
@@ -119,46 +194,71 @@ export class CartService {
         continue;
       }
 
-      const variant = product.variants.find((v) => v.sku === item.sku);
-      if (!variant || !variant.active) {
-        warnings.push(
-          `Phân loại hàng của "${product.name}" không còn tồn tại.`,
-        );
-        isCartModified = true;
-        continue;
+      let availableStock = 0;
+      let unitPrice = 0;
+      let originalPrice = 0;
+      let thumbnail = product.thumbnail ?? '';
+      let attributes: unknown[] = [];
+      let variantId: string | undefined = undefined;
+
+      if (product.has_variants) {
+        const variant = product.variants.find((v) => v.sku === item.sku);
+        if (!variant || !variant.active) {
+          warnings.push(
+            `Phân loại hàng của "${product.name}" không còn tồn tại.`,
+          );
+          isCartModified = true;
+          continue;
+        }
+        availableStock = variant.stock;
+        originalPrice = variant.price;
+        unitPrice = variant.sale_price > 0 ? variant.sale_price : variant.price;
+        thumbnail = variant.image ?? product.thumbnail ?? '';
+        attributes = variant.attributes;
+        variantId = (
+          variant as unknown as { _id?: Types.ObjectId }
+        )._id?.toString();
+      } else {
+        if (product.sku !== item.sku) {
+          warnings.push(`Mã sản phẩm của "${product.name}" không trùng khớp.`);
+          isCartModified = true;
+          continue;
+        }
+        availableStock = product.stock;
+        originalPrice = product.price;
+        unitPrice = product.sale_price > 0 ? product.sale_price : product.price;
       }
 
       let finalQty = item.quantity;
-      if (variant.stock < finalQty) {
-        finalQty = variant.stock;
+      if (availableStock < finalQty) {
+        finalQty = availableStock;
         warnings.push(
-          `Sản phẩm "${product.name} - ${item.sku}" chỉ còn ${variant.stock} món.`,
+          `Sản phẩm "${product.name} - ${item.sku}" chỉ còn ${availableStock} món.`,
         );
         isCartModified = true;
       }
 
-      if (variant.stock === 0) {
+      if (availableStock === 0) {
         warnings.push(`Sản phẩm "${product.name} - ${item.sku}" đã hết hàng.`);
         finalQty = 0;
       }
 
-      const unitPrice =
-        variant.sale_price > 0 ? variant.sale_price : variant.price;
-
       validatedItems.push({
         productId: product._id.toString(),
+        variantId: variantId,
         productName: product.name,
         productSlug: product.slug,
-        thumbnail: variant.image ?? product.thumbnail ?? '',
+        thumbnail: thumbnail,
         sku: item.sku,
-        attributes: variant.attributes,
+        attributes: attributes as Record<string, unknown>[],
         quantity: finalQty,
-        stock: variant.stock,
+        stock: availableStock,
         unitPrice: unitPrice,
-        originalPrice: variant.price,
+        originalPrice: originalPrice,
         subtotal: finalQty * unitPrice,
         maxPurchase: product.max_purchase_qty ?? 999,
         isError: finalQty === 0,
+        weight: product.weight || 500,
       });
     }
 
@@ -184,6 +284,7 @@ export class CartService {
 
     const summary = await this.calculateSummary(
       validatedItems,
+      userId,
       cart.applied_coupon ?? undefined,
     );
 
@@ -204,12 +305,11 @@ export class CartService {
     if (cart) {
       const itemCountBeforeClear = cart.items.length;
       cart.items = [];
-      (cart.applied_coupon as any) = null;
+      cart.set('applied_coupon', null);
 
       await cart.save();
 
       if (itemCountBeforeClear > 0) {
-        // FIX: Thêm await
         await this.auditLogsService.log({
           action: 'CLEAR_CART',
           collection_name: 'carts',
@@ -227,7 +327,6 @@ export class CartService {
     return { items: [], summary: this.getEmptySummary() };
   }
 
-  //CHANGE VARIANT
   async changeVariant(
     userId: string | null,
     dto: ChangeVariantDto,
@@ -241,6 +340,15 @@ export class CartService {
     const cart = await this.cartModel.findOne(filter);
     if (!cart) throw new NotFoundException('Giỏ hàng trống');
 
+    const product = await this.productModel.findById(dto.productId);
+    if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
+
+    if (!product.has_variants) {
+      throw new BadRequestException(
+        'Sản phẩm này không có tùy chọn phân loại để đổi',
+      );
+    }
+
     const oldItemIndex = cart.items.findIndex(
       (i) =>
         i.product_id.toString() === dto.productId &&
@@ -250,9 +358,6 @@ export class CartService {
       throw new NotFoundException('Sản phẩm không có trong giỏ');
 
     const qtyToMove = cart.items[oldItemIndex].quantity;
-
-    const product = await this.productModel.findById(dto.productId);
-    if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
     const newVariant = product.variants.find(
       (v) => v.sku === dto.newVariantSku,
@@ -272,24 +377,21 @@ export class CartService {
     );
 
     if (existingNewItemIndex > -1) {
-      // CASE A: Đã có -> Cộng dồn
       const newTotalQty = cart.items[existingNewItemIndex].quantity + qtyToMove;
 
       if (newTotalQty > newVariant.stock) {
         throw new BadRequestException(
-          `Không thể gộp. Tổng số lượng (${newTotalQty}) vượt quá tồn kho.`,
+          `Không thể gộp dữ liệu. Tổng số lượng (${newTotalQty}) vượt quá tồn kho hiện tại.`,
         );
       }
       cart.items[existingNewItemIndex].quantity = newTotalQty;
       cart.items.splice(oldItemIndex, 1);
     } else {
-      // CASE B: Chưa có -> Đổi SKU
       cart.items[oldItemIndex].sku = dto.newVariantSku;
     }
 
     await cart.save();
 
-    // FIX: Thêm await
     await this.auditLogsService.log({
       action: 'CHANGE_CART_VARIANT',
       collection_name: 'carts',
@@ -309,7 +411,6 @@ export class CartService {
     return this.getCart(userId, dto.guestSessionId);
   }
 
-  //ADD TO CART
   async addToCart(
     userId: string | null,
     dto: AddToCartDto,
@@ -324,7 +425,6 @@ export class CartService {
         .findById(dto.productId)
         .session(session);
 
-      //VALIDATION SẢN PHẨM
       if (!product || product.status !== ProductStatus.ACTIVE) {
         throw new NotFoundException(
           'Sản phẩm không tồn tại hoặc ngừng kinh doanh',
@@ -332,22 +432,30 @@ export class CartService {
       }
 
       if (product.is_member_only && !userId) {
-        throw new BadRequestException(
-          'Vui lòng đăng nhập để mua sản phẩm này.',
-        );
+        throw new BadRequestException('Vui lòng đăng nhập để mua sản phẩm này');
       }
 
-      const variant = product.variants.find((v) => v.sku === dto.variantSku);
-      if (!variant)
-        throw new BadRequestException('Phân loại hàng không hợp lệ');
+      let availableStock = 0;
 
-      if (!variant.active || variant.stock === 0)
-        throw new BadRequestException('Sản phẩm này tạm thời hết hàng');
+      if (product.has_variants) {
+        const variant = product.variants.find((v) => v.sku === dto.variantSku);
+        if (!variant)
+          throw new BadRequestException('Phân loại hàng không hợp lệ');
+        if (!variant.active || variant.stock === 0)
+          throw new BadRequestException('Sản phẩm này tạm thời hết hàng');
+        availableStock = variant.stock;
+      } else {
+        if (product.sku !== dto.variantSku)
+          throw new BadRequestException('Mã SKU không hợp lệ');
+        if (product.stock === 0)
+          throw new BadRequestException('Sản phẩm này tạm thời hết hàng');
+        availableStock = product.stock;
+      }
 
-      if (dto.quantity > variant.stock)
-        throw new BadRequestException(`Kho chỉ còn ${variant.stock} sản phẩm`);
+      if (dto.quantity > availableStock) {
+        throw new BadRequestException(`Kho chỉ còn ${availableStock} sản phẩm`);
+      }
 
-      //XỬ LÝ GIỎ HÀNG
       const filter = userId
         ? { user_id: new Types.ObjectId(userId) }
         : { session_id: dto.guestSessionId };
@@ -374,11 +482,9 @@ export class CartService {
         cart.items[itemIndex].selected_at = new Date();
       } else {
         if (cart.items.length >= 50) {
-          throw new BadRequestException('Giỏ hàng đã đầy (Tối đa 50 sản phẩm)');
+          throw new BadRequestException('Giỏ hàng đã đầy, tối đa 50 sản phẩm');
         }
-        // Xóa "as any" và đảm bảo push đúng cấu trúc Schema
-        // TypeScript có thể báo lỗi nếu CartItem schema quá strict,
-        // nhưng ở đây ta push object hợp lệ.
+
         cart.items.push({
           product_id: new Types.ObjectId(dto.productId),
           sku: dto.variantSku,
@@ -387,31 +493,30 @@ export class CartService {
         });
       }
 
-      //VALIDATE LOGIC TỔNG HỢP (AC3 & AC5)
-      if (newQuantity > variant.stock) {
+      if (newQuantity > availableStock) {
         throw new BadRequestException(
-          `Tổng số lượng mua vượt quá tồn kho (Kho: ${variant.stock}, Giỏ: ${newQuantity})`,
+          `Tổng số lượng mua vượt quá tồn kho thực tế. Kho đang còn ${availableStock}, giỏ hàng đang có ${newQuantity}.`,
         );
       }
 
       if (product.max_purchase_qty && product.max_purchase_qty > 0) {
         if (newQuantity > product.max_purchase_qty) {
           throw new BadRequestException(
-            `Sản phẩm này giới hạn mua tối đa ${product.max_purchase_qty} cái (Giỏ hàng của bạn đang có: ${newQuantity}).`,
+            `Sản phẩm này giới hạn mua tối đa ${product.max_purchase_qty} cái.`,
           );
         }
 
         const minQty = product.min_purchase_qty || 1;
         if (newQuantity < minQty) {
           throw new BadRequestException(
-            `Cần mua tối thiểu ${minQty} sản phẩm.`,
+            `Yêu cầu mua tối thiểu ${minQty} sản phẩm.`,
           );
         }
       }
+
       await cart.save({ session });
       await session.commitTransaction();
 
-      // Thêm await
       await this.auditLogsService.log({
         action: 'ADD_TO_CART',
         collection_name: 'carts',
@@ -437,7 +542,6 @@ export class CartService {
     }
   }
 
-  //UPDATE ITEM QUANTITY
   async updateItem(
     userId: string | null,
     dto: UpdateCartItemDto,
@@ -460,11 +564,20 @@ export class CartService {
       );
     }
 
-    const variant = product.variants.find((v) => v.sku === dto.variantSku);
-    if (!variant) throw new NotFoundException('Biến thể không tồn tại');
+    let availableStock = 0;
 
-    if (variant.stock < dto.quantity) {
-      throw new BadRequestException(`Kho chỉ còn ${variant.stock} sản phẩm`);
+    if (product.has_variants) {
+      const variant = product.variants.find((v) => v.sku === dto.variantSku);
+      if (!variant) throw new NotFoundException('Biến thể không tồn tại');
+      availableStock = variant.stock;
+    } else {
+      if (product.sku !== dto.variantSku)
+        throw new NotFoundException('Mã SKU không hợp lệ');
+      availableStock = product.stock;
+    }
+
+    if (availableStock < dto.quantity) {
+      throw new BadRequestException(`Kho chỉ còn ${availableStock} sản phẩm`);
     }
 
     const itemIndex = cart.items.findIndex(
@@ -477,7 +590,6 @@ export class CartService {
       cart.items[itemIndex].quantity = dto.quantity;
       await cart.save();
 
-      // FIX: Thêm await
       await this.auditLogsService.log({
         action: 'UPDATE_CART_ITEM',
         collection_name: 'carts',
@@ -493,10 +605,10 @@ export class CartService {
         user_agent: userAgent,
       });
     }
+
     return this.getCart(userId, dto.guestSessionId);
   }
 
-  // ACTION: REMOVE ITEM
   async removeItem(
     userId: string | null,
     dto: RemoveCartItemDto,
@@ -516,7 +628,6 @@ export class CartService {
       },
     });
 
-    // FIX: Thêm await
     await this.auditLogsService.log({
       action: 'REMOVE_CART_ITEM',
       collection_name: 'carts',
@@ -535,32 +646,28 @@ export class CartService {
     return this.getCart(userId, dto.guestSessionId);
   }
 
-  //MERGE GUEST CART (Login)
   async mergeGuestCart(
     userId: string,
     guestSessionId: string,
     ip: string,
     userAgent: string,
   ) {
-    // FIX: Nếu không có guest session, trả về luôn giỏ hàng của user thay vì return undefined
     if (!guestSessionId) {
       return this.getCart(userId, undefined);
     }
 
-    // 1. Lấy giỏ hàng Guest
     const guestCart = await this.cartModel.findOne({
       session_id: guestSessionId,
     });
 
-    // Check giỏ hàng null hoặc rỗng
     if (!guestCart || guestCart.items.length === 0) {
       return this.getCart(userId, undefined);
     }
 
-    // 2. Lấy (hoặc tạo) giỏ hàng Member
     let memberCart = await this.cartModel.findOne({
       user_id: new Types.ObjectId(userId),
     });
+
     if (!memberCart) {
       memberCart = new this.cartModel({
         user_id: new Types.ObjectId(userId),
@@ -568,7 +675,6 @@ export class CartService {
       });
     }
 
-    // Lấy thông tin sản phẩm để validate tồn kho/active
     const productIds = guestCart.items.map((i) => i.product_id);
     const products = await this.productModel
       .find({ _id: { $in: productIds } })
@@ -580,8 +686,16 @@ export class CartService {
       );
       if (!product || product.status !== ProductStatus.ACTIVE) continue;
 
-      const variant = product.variants.find((v) => v.sku === guestItem.sku);
-      if (!variant || !variant.active || variant.stock <= 0) continue;
+      let availableStock = 0;
+
+      if (product.has_variants) {
+        const variant = product.variants.find((v) => v.sku === guestItem.sku);
+        if (!variant || !variant.active || variant.stock <= 0) continue;
+        availableStock = variant.stock;
+      } else {
+        if (product.sku !== guestItem.sku || product.stock <= 0) continue;
+        availableStock = product.stock;
+      }
 
       const existingIndex = memberCart.items.findIndex(
         (mItem) =>
@@ -602,8 +716,8 @@ export class CartService {
         finalQuantity = product.max_purchase_qty;
       }
 
-      if (finalQuantity > variant.stock) {
-        finalQuantity = variant.stock;
+      if (finalQuantity > availableStock) {
+        finalQuantity = availableStock;
       }
 
       if (existingIndex > -1) {
@@ -620,11 +734,8 @@ export class CartService {
     }
 
     await memberCart.save();
-
-    // FIX: Thêm .exec() và await để đảm bảo Promise được resolve hoàn toàn
     await this.cartModel.deleteOne({ _id: guestCart._id }).exec();
 
-    // FIX: Thêm await cho log để tránh floating promise
     await this.auditLogsService.log({
       action: 'MERGE_GUEST_CART',
       collection_name: 'carts',

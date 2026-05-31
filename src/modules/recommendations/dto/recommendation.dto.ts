@@ -20,16 +20,21 @@ export class GetFBTDto {
 }
 
 export class GetCartRecommendationsDto {
+  // Cho phép bỏ qua nếu người dùng đã đăng nhập (sẽ lấy user_id từ Token)
+  @IsOptional()
   @IsString()
-  session_id: string;
+  session_id?: string;
 
   @IsOptional()
   @IsString()
   user_id?: string;
 
+  // Bắt buộc parse từ chuỗi query param sang số để @IsNumber() không báo lỗi 400
+  @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
-  current_cart_total: number; // Để tính Freeship Gap (AC2)
+  current_cart_total?: number = 0;
 
   @IsOptional()
   @IsString()

@@ -220,7 +220,9 @@ export class ContextualCartService {
         is_deleted: false,
         tags: { $in: serviceTagsToSuggest }, // Đã áp dụng bộ lọc xung đột
       })
-      .select('name sku price sale_price thumbnail stock tags')
+      .select(
+        'name sku price sale_price thumbnail stock tags variants.sku variants.active variants._id',
+      )
       .limit(2)
       .lean()) as unknown as ProductDocument[];
 

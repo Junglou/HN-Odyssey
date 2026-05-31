@@ -31,6 +31,7 @@ import { LoyaltyModule } from 'src/modules/marketing/loyalty/loyalty.module';
 import { CommandModule } from 'nestjs-command';
 import { OrderSeederCommand } from './SeedOrder/order-seeder.command';
 import { OrderSeederService } from './SeedOrder/order-seeder.service';
+import { CartModule } from '../cart/cart.module';
 
 @Module({
   imports: [
@@ -46,10 +47,11 @@ import { OrderSeederService } from './SeedOrder/order-seeder.service';
     MarketingModule,
     StockModule,
     forwardRef(() => PaymentModule),
-    ShippingModule,
+    forwardRef(() => ShippingModule), // <--- ĐÃ SỬA THÀNH FORWARD REF Ở ĐÂY
     JwtModule.register({}),
     LoyaltyModule,
     CommandModule,
+    forwardRef(() => CartModule),
   ],
   controllers: [OrdersController],
   providers: [

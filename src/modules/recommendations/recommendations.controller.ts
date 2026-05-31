@@ -91,10 +91,10 @@ export class RecommendationsController {
     @Query() dto: GetCartRecommendationsDto,
   ): Promise<ProductDocument[]> {
     return this.cartRecService.getCartRecommendations(
-      dto.session_id,
+      dto.session_id || '', // Thêm fallback string rỗng để sửa lỗi TypeScript
       dto.user_id,
       Number(dto.current_cart_total),
-      dto.exclude_ids, // <--- THÊM DÒNG NÀY VÀO
+      dto.exclude_ids,
     );
   }
 
