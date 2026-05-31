@@ -1,47 +1,47 @@
-const TOKEN_KEY = "accessToken";
-const REFRESH_TOKEN_KEY = "refreshToken"; // Bổ sung key cho Refresh Token
-const USER_KEY = "user";
+const ACCESS_TOKEN_KEY = "access_token";
+const REFRESH_TOKEN_KEY = "refreshToken";
+const USER_KEY = "user_info";
 
 const tokenStorage = {
-  // --- ACCESS TOKEN ---
-  setToken: (token: string) => {
-    localStorage.setItem(TOKEN_KEY, token);
+  setToken: (JWT_SECRET: string): void => {
+    localStorage.setItem(ACCESS_TOKEN_KEY, JWT_SECRET);
   },
-  getToken: () => {
-    return localStorage.getItem(TOKEN_KEY);
+  getToken: (): string | null => {
+    return localStorage.getItem(ACCESS_TOKEN_KEY);
   },
-  removeToken: () => {
-    localStorage.removeItem(TOKEN_KEY);
+  removeToken: (): void => {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
   },
 
-  // --- REFRESH TOKEN (BỔ SUNG) ---
-  setRefreshToken: (token: string) => {
+  setRefreshToken: (token: string): void => {
     localStorage.setItem(REFRESH_TOKEN_KEY, token);
   },
-  getRefreshToken: () => {
+  getRefreshToken: (): string | null => {
     return localStorage.getItem(REFRESH_TOKEN_KEY);
   },
-  removeRefreshToken: () => {
+  removeRefreshToken: (): void => {
     localStorage.removeItem(REFRESH_TOKEN_KEY);
   },
 
-  // --- USER INFO ---
-  setUser: (user: unknown) => {
+  setUser: <T>(user: T): void => {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
   },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  getUser: (): any => {
+  getUser: <T>(): T | null => {
     const user = localStorage.getItem(USER_KEY);
-    return user ? JSON.parse(user) : null;
+    try {
+      return user ? (JSON.parse(user) as T) : null;
+    } catch {
+      localStorage.removeItem(USER_KEY);
+      return null;
+    }
   },
-  removeUser: () => {
+  removeUser: (): void => {
     localStorage.removeItem(USER_KEY);
   },
 
-  // --- CLEAR ALL ---
-  clearAuth: () => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY); // Xóa luôn Refresh Token khi logout
+  clearAuth: (): void => {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
   },
 };

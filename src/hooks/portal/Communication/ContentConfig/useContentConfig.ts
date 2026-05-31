@@ -856,13 +856,11 @@ export function useContentConfig() {
         const data = res.data?.data;
         const initialSections = getPredefinedSections(selectedPage);
 
-        // NẾU DATABASE TRỐNG HOẶC ÍT HƠN BỘ PREDEFINED (Do lưu lỗi trước đó), NÓ SẼ RESET LẠI FULL KHUNG
         if (data && data.sections && data.sections.length > 0) {
           const mergedSections = initialSections.map((mockSec) => {
             const dbSec = data.sections.find(
               (s: SectionConfig) => s.name === mockSec.name,
             );
-            // Cập nhật thông minh: Chỉ ghi đè khi dbSec có nhiều element hơn mockSec (nghĩa là Admin đã thật sự chỉnh sửa)
             if (dbSec && dbSec.elements.length >= mockSec.elements.length) {
               return dbSec;
             }

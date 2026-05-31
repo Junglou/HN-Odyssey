@@ -146,13 +146,14 @@ export default function ContentConfig({
     null,
   );
 
-  // XÁC ĐỊNH TỶ LỆ CANVAS DỰA TRÊN TÊN SECTION
+  const editorContentRef = useRef<string>("");
+
   const getCanvasSize = (sectionName?: string) => {
     const name = (sectionName || "").toLowerCase();
     if (name.includes("kids")) return { width: 1920, height: 738 };
     if (name.includes("just in case")) return { width: 1920, height: 800 };
     if (name.includes("other half")) return { width: 1920, height: 990 };
-    return { width: 1920, height: 900 }; // Mặc định cho Just For You
+    return { width: 1920, height: 900 };
   };
 
   const { width: CANVAS_W, height: CANVAS_H } = useMemo(
@@ -216,7 +217,7 @@ export default function ContentConfig({
 
     wrapper.addEventListener("wheel", handleWheel, { passive: false });
     return () => wrapper.removeEventListener("wheel", handleWheel);
-  }, []);
+  }, [currentSection, isPreviewMode]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -455,7 +456,6 @@ export default function ContentConfig({
                           zIndex: editingElementId === el.id ? 9999 : index + 1,
                           transform: `rotate(${el.rotate || 0}deg) ${el.style?.transform || ""}`,
                           transformOrigin: "center center",
-                          // ÉP KIỂU SANG REACT CSS PROPERTIES ĐỂ FIX LỖI 2322 HOÀN TOÀN
                           ...(el.style as React.CSSProperties),
                         }}
                         onClick={(e) => {
@@ -479,8 +479,10 @@ export default function ContentConfig({
                               "rectangle",
                               "ellipse",
                             ].includes(el.type)
-                          )
+                          ) {
+                            editorContentRef.current = el.content;
                             setEditingElementId(el.id);
+                          }
                         }}
                       >
                         {!isPreviewMode &&
@@ -556,11 +558,9 @@ export default function ContentConfig({
                           >
                             <SunEditor
                               setContents={el.content}
-                              onChange={(content) =>
-                                actions.updateElementProperties(el.id, {
-                                  content: content,
-                                })
-                              }
+                              onChange={(content) => {
+                                editorContentRef.current = content;
+                              }}
                               setOptions={{
                                 minHeight: "100px",
                                 resizingBar: false,
@@ -574,7 +574,14 @@ export default function ContentConfig({
                             />
                             <button
                               className="cc-suneditor-done-btn"
-                              onClick={() => setEditingElementId(null)}
+                              onClick={() => {
+                                if (editorContentRef.current !== el.content) {
+                                  actions.updateElementProperties(el.id, {
+                                    content: editorContentRef.current,
+                                  });
+                                }
+                                setEditingElementId(null);
+                              }}
                             >
                               Done
                             </button>
@@ -586,7 +593,6 @@ export default function ContentConfig({
                               width: "100%",
                               height: "100%",
                               display: "flex",
-                              // FIX LỖI MÉO TRÁI: Dùng trục dọc để căn giữa 2 chiều, trả quyền căn lề ngang (Left/Center/Right) lại cho thuộc tính textAlign của Element
                               flexDirection: "column",
                               justifyContent: "center",
                               alignItems: ["button", "textlink"].includes(
@@ -656,8 +662,6 @@ export default function ContentConfig({
                         }}
                         onResizeEnd={(e) => {
                           const target = e.target as HTMLElement;
-                          // FIX CHÍNH LÀ ĐÂY: Gộp chung việc lưu Kích Thước và Tọa Độ vào 1 hàm duy nhất
-                          // Để triệt tiêu hoàn toàn lỗi ghi đè State của React!
                           actions.updateElementProperties(
                             selectedElementId as string,
                             {
@@ -669,7 +673,13 @@ export default function ContentConfig({
                           );
                         }}
                         onRotate={(e) => {
-                          e.target.style.transform = `rotate(${e.absoluteRotation}deg)`;
+                          const currentTransform =
+                            activeElementData?.style?.transform || "";
+                          const mirrorTransform = currentTransform
+                            .replace(/rotate\([^)]+\)/g, "")
+                            .trim();
+                          e.target.style.transform =
+                            `rotate(${e.absoluteRotation}deg) ${mirrorTransform}`.trim();
                         }}
                         onRotateEnd={(e) => {
                           const target = e.target as HTMLElement;
