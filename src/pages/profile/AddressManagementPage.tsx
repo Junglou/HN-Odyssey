@@ -1,10 +1,9 @@
 import AccountSidebar from "../../components/profile/AccountSidebar";
-import AddressManagement from "../../components/profile/AddressManagement/AddressManagement"; // Import Component mới đổi tên
-import "./AddressManagementPage.css"; // CSS Layout trang
+import AddressManagement from "../../components/profile/AddressManagement/AddressManagement";
+import "./AddressManagementPage.css";
 import AddressModal from "../../components/profile/AddressManagement/AddressModal/AddressModal";
 import { useAddressManagement } from "../../hooks/profile/useAddressManagement";
-import { productList } from "../../hooks/profile/productData";
-import type { Product } from "../../types/product";
+import { useRecommendProduct } from "../../hooks/profile/useRecommendProduct";
 
 const AddressMangementPage = () => {
   const {
@@ -17,21 +16,14 @@ const AddressMangementPage = () => {
     handleModalSubmit,
   } = useAddressManagement();
 
-  const getRandomProducts = (count: number = 3): Product[] => {
-    const shuffled = [...productList].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, count);
-  };
-
-  const recommendations = getRandomProducts();
+  const { products: recommendations } = useRecommendProduct();
 
   return (
     <div className="my-profile-page-container">
-      {/* Sidebar (Menu trái) */}
       <div className="sidebar-wrapper">
         <AccountSidebar />
       </div>
 
-      {/* Content (Nội dung phải) */}
       <div className="content-wrapper">
         <AddressManagement
           address={addresses}

@@ -1,17 +1,44 @@
-export interface Coupon {
-  // Thông tin cơ bản
+export type CouponStatus =
+  | "Active"
+  | "Inactive"
+  | "Scheduled"
+  | "Expired"
+  | "Draft";
+export type DiscountType = "Percentage" | "Fixed Amount";
+
+export interface ApplicableScopeObj {
+  isAllProducts: boolean;
+  categories: string[];
+  tags: string[];
+  products: string[];
+}
+
+export interface CouponRecord {
   id: string;
-  name: string;
-  description: string;
-  image: string;
-
-  discountType: "percentage" | "fixed";
-  discountValue: number;
-
+  code: string;
+  discountType: DiscountType;
+  discountValue: string;
+  usedCount: number;
+  totalUses: number;
+  perCustomerLimit?: number;
+  status: CouponStatus;
   startDate: string;
   endDate: string;
-  isActive: boolean;
+  minimumOrderValue?: number;
+  maximumDiscountAmount?: number;
+  applicableScope: ApplicableScopeObj;
+}
 
-  minimumPurchase: number;
-  couponCode: string;
+export interface CouponFormData {
+  code: string;
+  discountType: DiscountType;
+  discountValueNum: string;
+  minimumOrderValueNum: string;
+  maximumDiscountAmountNum: string;
+  totalUsesNum: string;
+  perCustomerLimitNum: string;
+  startDate: string;
+  endDate: string;
+  applicableScope: ApplicableScopeObj;
+  isDraft: boolean;
 }

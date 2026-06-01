@@ -20,7 +20,7 @@ import AccountRecoveryPage from "../pages/auth/AccountRecoveryPage";
 import AccountRecoVerifiedPage from "../pages/auth/AccountRecoVerifiedPage";
 import MyProfilePage from "../pages/profile/MyProfilePage";
 import AddressMangementPage from "../pages/profile/AddressManagementPage";
-import OrderMangementPage from "../pages/profile/OrderManagementPage";
+import MyOrderMangementPage from "../pages/profile/OrderManagementPage";
 import OrderDetailPage from "../pages/profile/OrderDetailPage";
 import PurchaseHistoryPage from "../pages/profile/PurchaseHistoryPage";
 import MyWishlistPage from "../pages/profile/MyWishlistPage";
@@ -159,10 +159,10 @@ export const router = createBrowserRouter([
       },
       {
         path: "/profile/orders",
-        element: <OrderMangementPage />,
+        element: <MyOrderMangementPage />,
       },
       {
-        path: "/profile/orders/detail",
+        path: "/profile/orders/detail/:id",
         element: <OrderDetailPage />,
       },
       {

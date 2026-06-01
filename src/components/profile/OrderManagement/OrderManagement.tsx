@@ -1,64 +1,166 @@
-import { useMemo, useState } from "react";
+import { useRef, useState } from "react";
 import "./OrderManagement.css";
 import type { UserOrder } from "../../../types/user";
 import RecommendationList from "../../common/RecommendationList";
+import type { RecommendProduct } from "../../../hooks/profile/useRecommendProduct";
 import OrderBox from "./OrderManagementBox";
-import type { Product } from "../../../types/product";
+import { ArrowDownIcon } from "../../../assets/icons/CheckoutIcons";
+import { useClickOutside } from "../../../hooks/common/useClickOutside";
 
 interface OrderManagementProps {
-  recommendations: Product[];
-  order: UserOrder[];
+  // Support either prop name `order` (existing) or `orders` (future-proof)
+  order?: UserOrder[];
+  orders?: UserOrder[];
+  pagination?: {
+    page: number;
+    limit: number;
+    totalPages: number;
+    totalFiltered: number;
+    startIndex: number;
+  };
+  onPageChange?: (page: number) => void;
+  statusFilter?: string;
+  onStatusChange?: (status: string | "All") => void;
+  recommendations: RecommendProduct[];
 }
 
-const OrderManagement = ({
-  recommendations,
-  order,
-}: OrderManagementProps) => {
-  const [filter, setFilter] = useState("All");
+const FILTER_OPTIONS = [
+  "All",
+  "Pending",
+  "Processing",
+  "Delivering",
+  "Delivered",
+  "Canceled",
+] as const;
 
-  const filteredOrders = useMemo(
-    () =>
-      order.filter((orderItem) =>
-        filter === "All" ? true : orderItem.status === filter,
-      ),
-    [order, filter],
-  );
+const OrderManagement = ({
+  order,
+  orders,
+  pagination,
+  onPageChange,
+  statusFilter,
+  onStatusChange,
+  recommendations,
+}: OrderManagementProps) => {
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
+
+  useClickOutside(filterRef, () => setIsFilterOpen(false));
+
+  const ordersList = order ?? orders ?? [];
+  const currentFilter = statusFilter ?? "All";
 
   return (
-    <div className="my-order-card">
+    <div className="my-order-card order-management-layout profile-ultra-wide-grid-card">
       <div className="order-header">
         <h1 className="order-title">Order Management</h1>
-        <div className="filter-container">
-          <select
+        <div
+          ref={filterRef}
+          className="filter-container"
+          onClick={() => setIsFilterOpen((prev) => !prev)}
+        >
+          <input
+            type="text"
             className="filter-box"
-            name="filter"
-            id="filter"
-            value={filter}
-            onChange={(event) => setFilter(event.target.value)}
-          >
-            <option value="All">All</option>
-            <option value="Confirming">Confirming</option>
-            <option value="Shipping">Shipping</option>
-            <option value="Completed">Completed</option>
-          </select>
+            value={currentFilter}
+            placeholder="Status"
+            readOnly
+            aria-label="Filter by status"
+            aria-expanded={isFilterOpen}
+            style={{ cursor: "pointer" }}
+          />
+          <ArrowDownIcon
+            className={`order-filter-select-icon ${isFilterOpen ? "open" : ""}`}
+          />
+          {isFilterOpen && (
+            <div
+              className="order-filter-dropdown-list"
+              role="listbox"
+              aria-label="Status options"
+            >
+              {FILTER_OPTIONS.map((status) => (
+                <div
+                  key={status}
+                  role="option"
+                  aria-selected={currentFilter === status}
+                  className={`order-filter-dropdown-item ${currentFilter === status ? "active" : ""}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onStatusChange?.(status);
+                    setIsFilterOpen(false);
+                  }}
+                >
+                  {status}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       <div className="order-box-internal-grid">
         {/* CỘT 1: Box quản lý đơn hàng */}
         <div className="grid-section section-order">
-          {filteredOrders.map((orderItem, index) => (
-            <OrderBox
-              key={`${orderItem.orderDate}-${index}`}
-              id={(index + 1).toString()}
-              address={orderItem.address}
-              order={orderItem}
-            />
+          {ordersList.map((orderItem) => (
+            <OrderBox key={orderItem.id} id={orderItem.id} order={orderItem} />
           ))}
+          {ordersList.length === 0 && (
+            <div className="no-orders">No orders found.</div>
+          )}
+
+          {/* Pagination placed inside the order column and spanning the grid */}
+          {pagination && pagination.totalPages > 1 && (
+            <div className="order-pagination">
+              <div className="order-page-numbers">
+                <button
+                  type="button"
+                  className="order-page-num"
+                  disabled={pagination.page === 1}
+                  onClick={() => onPageChange?.(pagination.page - 1)}
+                >
+                  &lt;
+                </button>
+                {Array.from(
+                  { length: pagination.totalPages },
+                  (_, i) => i + 1,
+                ).map((num) => (
+                  <button
+                    type="button"
+                    key={num}
+                    className={`order-page-num ${pagination.page === num ? "active" : ""}`}
+                    onClick={() => onPageChange?.(num)}
+                  >
+                    {num}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="order-page-num"
+                  disabled={
+                    pagination.page === pagination.totalPages ||
+                    pagination.totalPages === 0
+                  }
+                  onClick={() => onPageChange?.(pagination.page + 1)}
+                >
+                  &gt;
+                </button>
+              </div>
+              <span className="order-pagination-info">
+                Showing{" "}
+                {pagination.totalFiltered === 0 ? 0 : pagination.startIndex + 1}{" "}
+                to{" "}
+                {Math.min(
+                  pagination.startIndex + pagination.limit,
+                  pagination.totalFiltered,
+                )}{" "}
+                of {pagination.totalFiltered} orders
+              </span>
+            </div>
+          )}
         </div>
 
         {/* CỘT 2: RECOMMENDATIONS */}
-        <div className="grid-section section-recs">
+        <div className="grid-section section-recs profile-recommendations">
           <RecommendationList products={recommendations} />
         </div>
       </div>

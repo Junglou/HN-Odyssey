@@ -1,0 +1,368 @@
+/* Shared profile modal styles — responsive breakpoints match MyProfilePage.css */
+
+.um-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 2000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: clamp(1rem, 4vw, 2rem);
+  padding-top: max(clamp(1rem, 4vw, 2rem), env(safe-area-inset-top, 0px));
+  padding-right: max(clamp(1rem, 4vw, 2rem), env(safe-area-inset-right, 0px));
+  padding-bottom: max(clamp(1rem, 4vw, 2rem), env(safe-area-inset-bottom, 0px));
+  padding-left: max(clamp(1rem, 4vw, 2rem), env(safe-area-inset-left, 0px));
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  font-family: "Lexend Exa", sans-serif;
+}
+
+.um-modal-box {
+  background-color: #ffffff;
+  width: 100%;
+  max-width: min(480px, 100%);
+  max-height: min(
+    calc(100dvh - 2 * clamp(1rem, 4vw, 2rem)),
+    calc(100vh - 2 * clamp(1rem, 4vw, 2rem))
+  );
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  margin: auto;
+  flex-shrink: 0;
+}
+
+.um-modal-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #000000;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.um-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.um-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.um-form-group label {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #000000;
+}
+
+.req {
+  color: #e1251b;
+  margin-left: 2px;
+}
+
+.um-form-group input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  outline: none;
+  box-sizing: border-box;
+  font-family: "Lexend Exa", sans-serif;
+  font-size: 0.95rem;
+  color: #333333;
+  transition: border-color 0.2s ease;
+}
+
+.um-form-group input:focus {
+  border-color: #000000;
+}
+
+.um-form-group input:disabled {
+  background-color: #f9fafb;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+.um-form-row {
+  display: flex;
+  gap: 16px;
+  min-width: 0;
+}
+
+.um-form-row .um-form-group {
+  flex: 1;
+  min-width: 0;
+}
+
+.um-modal-status-flex {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.um-modal-status-text {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #000000;
+}
+
+.um-modal-switch {
+  width: 48px;
+  height: 26px;
+  border-radius: 20px;
+  position: relative;
+  cursor: pointer;
+  background-color: #d1d5db;
+  transition: background-color 0.3s ease;
+  border: 1px solid transparent;
+  flex-shrink: 0;
+}
+
+.um-modal-switch-handle {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  transition: transform 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.um-modal-switch.on {
+  background-color: #6b46c1;
+}
+
+.um-modal-switch.on .um-modal-switch-handle {
+  transform: translateX(22px);
+}
+
+.um-modal-switch.disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.um-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.um-btn-modal-submit {
+  background-color: #cccccc;
+  color: #ffffff;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.um-btn-modal-submit:hover {
+  background-color: #000000;
+}
+
+.um-btn-modal-cancel {
+  background-color: #ffffff;
+  color: #000000;
+  border: 1px solid #000000;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.um-btn-modal-cancel:hover {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+.um-modal-field-label {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #000000;
+}
+
+.um-modal-gender-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.um-modal-gender-options.is-disabled {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.um-modal-gender-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #333333;
+  cursor: pointer;
+}
+
+.um-modal-gender-label input[type="radio"] {
+  width: auto;
+  margin: 0;
+  accent-color: #000000;
+}
+
+.avatar-preview-img {
+  width: 100%;
+  max-width: 150px;
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+  margin: 0 auto;
+  border: 2px solid #e5e7eb;
+}
+
+/* --- RESPONSIVE (same breakpoints as MyProfilePage.css) --- */
+
+/* Laptop nhỏ & tablet ngang */
+@media (max-width: 1200px) {
+  .um-modal-overlay {
+    padding: clamp(1rem, 3vw, 2rem);
+    padding-top: max(clamp(1rem, 3vw, 2rem), env(safe-area-inset-top, 0px));
+    padding-right: max(clamp(1rem, 3vw, 2rem), env(safe-area-inset-right, 0px));
+    padding-bottom: max(
+      clamp(1rem, 3vw, 2rem),
+      env(safe-area-inset-bottom, 0px)
+    );
+    padding-left: max(clamp(1rem, 3vw, 2rem), env(safe-area-inset-left, 0px));
+  }
+
+  .um-modal-box {
+    max-height: min(
+      calc(100dvh - 2 * clamp(1rem, 3vw, 2rem)),
+      calc(100vh - 2 * clamp(1rem, 3vw, 2rem))
+    );
+  }
+}
+
+/* Tablet dọc & mobile */
+@media (max-width: 992px) {
+  .um-modal-overlay {
+    align-items: center;
+  }
+
+  .um-modal-box {
+    max-width: 100%;
+    max-height: min(
+      calc(
+        100dvh - 2rem - env(safe-area-inset-top, 0px) -
+          env(safe-area-inset-bottom, 0px)
+      ),
+      calc(100vh - 2rem)
+    );
+    padding: 24px 20px;
+    gap: 20px;
+    border-radius: 12px;
+    margin: auto;
+  }
+
+  .um-modal-title {
+    font-size: 1.5rem;
+  }
+
+  .um-form-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .um-modal-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    margin-top: 8px;
+  }
+
+  .um-btn-modal-submit,
+  .um-btn-modal-cancel {
+    width: 100%;
+    text-align: center;
+    box-sizing: border-box;
+  }
+
+  .um-modal-gender-options {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .avatar-preview-img {
+    max-width: 120px;
+  }
+}
+
+/* Narrow phones */
+@media (max-width: 480px) {
+  .um-modal-overlay {
+    padding: 0.75rem;
+    padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+    padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+    padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+  }
+
+  .um-modal-box {
+    max-height: min(
+      calc(
+        100dvh - 1.5rem - env(safe-area-inset-top, 0px) -
+          env(safe-area-inset-bottom, 0px)
+      ),
+      calc(100vh - 1.5rem)
+    );
+    padding: 20px 16px;
+    gap: 16px;
+  }
+
+  .um-modal-title {
+    font-size: 1.35rem;
+  }
+
+  .um-form-group input {
+    padding: 10px 14px;
+    font-size: 0.9rem;
+  }
+}

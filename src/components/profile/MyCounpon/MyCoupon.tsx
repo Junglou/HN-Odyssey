@@ -1,34 +1,34 @@
 import "./MyCoupon.css";
-import type { Product } from "../../../types/product";
-import type { Coupon } from "../../../types/coupon";
+import type { CustomerCoupon } from "../../../hooks/profile/useCouponManagement";
 import RecommendationList from "../../common/RecommendationList";
+import type { RecommendProduct } from "../../../hooks/profile/useRecommendProduct";
 import MyCouponBox from "./MyCouponBox";
 
-interface RecentViewProps {
-  recommendations: Product[];
-  coupons: Coupon[];
+interface MyCouponProps {
+  coupons: CustomerCoupon[];
+  recommendations: RecommendProduct[];
 }
 
-const MyCoupon = ({
-  recommendations,
-  coupons,
-}: RecentViewProps) => {
+const MyCoupon = ({ coupons, recommendations }: MyCouponProps) => {
+  const visibleCoupons = coupons.filter((coupon) => coupon.status !== "Draft");
+
   return (
-    <div className="recent-card">
-      <div className="recent-header">
-        <h1 className="recent-title">Coupon Management</h1>
+    <div className="coupon-card">
+      <div className="coupon-header">
+        <h1 className="coupon-title">Coupon Management</h1>
       </div>
 
-      <div className="recent-internal-grid">
-        {/* CỘT 1: Coupon của người dùng */}
-        <div className="grid-section section-recent">
-          {coupons.map((coupon) => (
+      <div className="coupon-internal-grid">
+        <div className="grid-section section-coupon">
+          {visibleCoupons.map((coupon) => (
             <MyCouponBox key={coupon.id} coupon={coupon} />
           ))}
+          {visibleCoupons.length === 0 && (
+            <div className="no-coupons">No coupons available.</div>
+          )}
         </div>
 
-        {/* CỘT 2: RECOMMENDATIONS */}
-        <div className="grid-section section-recs">
+        <div className="grid-section section-recs profile-recommendations">
           <RecommendationList products={recommendations} />
         </div>
       </div>

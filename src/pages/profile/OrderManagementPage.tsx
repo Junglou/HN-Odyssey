@@ -1,37 +1,30 @@
 import AccountSidebar from "../../components/profile/AccountSidebar";
-import OrderManagement from "../../components/profile/OrderManagement/OrderManagement"; // Import Component mới đổi tên
-import "./OrderManagementPage.css"; // CSS Layout trang
+import OrderManagement from "../../components/profile/OrderManagement/OrderManagement";
+import "./OrderManagementPage.css";
 import { useOrderManagement } from "../../hooks/profile/useOrderManagement";
-import { productList } from "../../hooks/profile/productData";
-import type { Product } from "../../types/product";
+import type { OrderStatusFE } from "../../hooks/profile/useOrderManagement";
+import { useRecommendProduct } from "../../hooks/profile/useRecommendProduct";
 
 const OrderMangementPage = () => {
+  const { orders, pagination, actions, statusFilter } = useOrderManagement();
+  const { products: recommendations } = useRecommendProduct();
 
-  const { orders, loading } = useOrderManagement();
-
-  const getRandomProducts = (count: number = 3): Product[] => {
-      const shuffled = [...productList].sort(() => 0.5 - Math.random());
-      return shuffled.slice(0, count);
-    };
-
-  // Data mẫu cho RecommendationList
-  const recommendations = getRandomProducts();
-
-  if (loading) return <div>Loading...</div>;
-
-  // 4. Render
   return (
     <div className="my-profile-page-container">
-      {/* Sidebar (Menu trái) */}
       <div className="sidebar-wrapper">
         <AccountSidebar />
       </div>
 
-      {/* Content (Nội dung phải) */}
       <div className="content-wrapper">
         <OrderManagement
-          recommendations={recommendations}
           order={orders}
+          recommendations={recommendations}
+          pagination={pagination}
+          onPageChange={(p) => actions.changePage(p)}
+          statusFilter={statusFilter}
+          onStatusChange={(s) =>
+            actions.changeStatusFilter(s as OrderStatusFE | "All")
+          }
         />
       </div>
     </div>

@@ -9,13 +9,21 @@ interface AddressBoxProp {
   onDelete?: (index: number) => void;
 }
 
-const AddressBox = ({ address, index, onAdd, onEdit, onDelete }: AddressBoxProp) => {
-  {if(address == null)
-    {
+const AddressBox = ({
+  address,
+  index,
+  onAdd,
+  onEdit,
+  onDelete,
+}: AddressBoxProp) => {
+  {
+    if (address == null) {
       return (
         <div className="address-box-container">
           <div className="add-address-box-btn-container">
-            <button className="add-new-address-btn" onClick={onAdd}>+</button>
+            <button className="add-new-address-btn" onClick={onAdd}>
+              +
+            </button>
           </div>
           <div className="add-new-address-txt-container">
             <span className="lbl-text">Add new address</span>

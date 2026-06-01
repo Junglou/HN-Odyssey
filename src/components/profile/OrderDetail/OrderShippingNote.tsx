@@ -1,5 +1,5 @@
 import "./OrderShippingNote.css";
-import { CircleCheck } from 'lucide-react';
+import { CircleCheck } from "lucide-react";
 
 interface OrderNoteProp {
   title: string;
@@ -7,11 +7,10 @@ interface OrderNoteProp {
   time: string;
 }
 
-const OrderShippingNote = ({title, date, time}:OrderNoteProp) => {
-  
+const OrderShippingNote = ({ title, date, time }: OrderNoteProp) => {
   return (
     <div className="order-tracking-note">
-      <CircleCheck size={40}/>
+      <CircleCheck size={40} />
       <div className="order-tracking-text-container">
         <div className="order-tracking-text">
           <span>{title}</span>

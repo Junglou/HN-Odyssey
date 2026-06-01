@@ -1,81 +1,62 @@
-.box-container
-{
-  width: 100%;
+.order-shipping-box.order-box-container {
+  counter-increment: none;
+  min-height: auto;
   height: fit-content;
-  min-width: 14rem;
-  border: solid lightgrey 0.1rem;
-  border-radius: 2rem;
-  box-shadow: 0 0 0 1px rgb(202, 200, 200),
-    8px 8px 4px rgba(17, 24, 39, 0.2);
 }
 
-.lbl-text
-{
-  font-size: 1rem;
-  font-weight: bold;
+.order-shipping-title {
+  padding-bottom: 0.35rem;
+  border-bottom: solid lightgray 0.1rem;
 }
 
-.lbl-thumb-text
-{
-  font-weight: bolder;
-  font-size: 1rem;
-}
-
-.box-content
-{
-  width: 93%;
-  height: 100%;
-  padding: 1rem;
+.order-tracking-content {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  gap: 0.25rem;
+  min-width: 0;
 }
 
-.span-text
-{
-  display: -webkit-box;
+.order-tracking-note {
   width: 100%;
-  font-weight: 200;
-  font-size: 0.9rem;
-  text-overflow: ellipsis;
-  overflow: hidden;
-    -webkit-line-clamp: 2; /* Number of lines to show */
-  -webkit-box-orient: vertical;
-  line-clamp: 2; /* Standard property (limited availability) */
-  box-orient: vertical; /* Standard property (imited availability) */
-}
-
-.order-tracking-lbl
-{
-  width: 100%;
-  height: fit-content;
-  border-bottom: solid lightgray 0.1rem;
-  padding-bottom: 0.2rem;
-}
-
-.order-tracking-note
-{
-  height: fit-content;
-  width: 100%;
+  min-width: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  gap: 0.5rem;
   padding: 0.5rem 0;
 }
 
-.order-tracking-text-container
-{
-  height: fit-content;
-  width: fit-content;
-  padding-left: 0.8rem;
+.order-tracking-note svg {
+  flex-shrink: 0;
+  width: clamp(28px, 6vw, 40px);
+  height: clamp(28px, 6vw, 40px);
 }
 
-.order-tracking-time
-{
+.order-tracking-text-container {
+  flex: 1;
+  min-width: 0;
+  padding-left: 0;
+}
+
+.order-tracking-text span {
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
+.order-tracking-time {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  margin-top: 0.2rem;
 }
 
-.order-tracking-time span
-{
-  font-weight: 200;
+.order-tracking-time span {
+  font-weight: 400;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 700px) {
+  .order-tracking-note {
+    align-items: center;
+  }
 }

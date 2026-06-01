@@ -1,20 +1,17 @@
 import { useEffect, useRef } from "react";
 import "./MyProfileModal.css";
+import { ProfileModalPortal } from "./ProfileModalPortal";
 import type { UserProfile } from "../../../types/user";
 
-// model user chung (dùng chung type với MyProfile / MyProfilePage)
 export type { UserProfile };
 
-// schema form để trả dữ liệu về component cha
 export interface UserProfileFormData {
   firstName: string;
   lastName: string;
   gender: UserProfile["gender"];
   birthday: string;
-  displayName: string;
 }
 
-// Alias cho hook/import cũ dùng tên UserFormData
 export type UserFormData = UserProfileFormData;
 
 interface MyProfileModalProps {
@@ -25,9 +22,22 @@ interface MyProfileModalProps {
   onSubmit: (data: UserProfileFormData) => void;
 }
 
-const GENDER_OPTIONS = ["Male", "Female", "Other"] as const;
+const GENDER_OPTIONS = [
+  { value: "MALE", label: "Male" },
+  { value: "FEMALE", label: "Female" },
+  { value: "OTHER", label: "Other" },
+] as const;
 
-// modal form popup
+const formatDateOfBirth = (dateOfBirth: string | null) => {
+  if (!dateOfBirth) return "";
+  const date = new Date(dateOfBirth);
+  if (Number.isNaN(date.getTime())) return "";
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yyyy = date.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+};
+
 export default function MyProfileModal({
   isOpen,
   mode,
@@ -35,77 +45,69 @@ export default function MyProfileModal({
   onClose,
   onSubmit,
 }: MyProfileModalProps) {
-  // khởi tạo state form; đồng bộ lại khi mở modal / initialData đổi (xem useEffect)
-  // (phiên bản hiện tại dùng uncontrolled input bằng refs để không dùng setFormData)
   const firstNameRef = useRef<HTMLInputElement | null>(null);
   const lastNameRef = useRef<HTMLInputElement | null>(null);
-  const displayNameRef = useRef<HTMLInputElement | null>(null);
   const birthdayRef = useRef<HTMLInputElement | null>(null);
   const genderRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  // đổ form từ initialData mỗi khi mở modal hoặc initialData thay đổi
   useEffect(() => {
     if (!isOpen || !initialData) return;
-    if (firstNameRef.current) firstNameRef.current.value = initialData.firstName ?? "";
-    if (lastNameRef.current) lastNameRef.current.value = initialData.lastName ?? "";
-    if (displayNameRef.current) {
-      displayNameRef.current.value = initialData.displayName ?? "";
-    }
-    if (birthdayRef.current) birthdayRef.current.value = initialData.birthday ?? "";
 
-    GENDER_OPTIONS.forEach((g) => {
-      if (genderRefs.current[g]) {
-        genderRefs.current[g]!.checked = initialData.gender === g;
+    if (firstNameRef.current) {
+      firstNameRef.current.value = initialData.first_Name ?? "";
+    }
+    if (lastNameRef.current) {
+      lastNameRef.current.value = initialData.last_Name ?? "";
+    }
+    if (birthdayRef.current) {
+      birthdayRef.current.value = formatDateOfBirth(initialData.dateOfBirth);
+    }
+
+    GENDER_OPTIONS.forEach(({ value }) => {
+      if (genderRefs.current[value]) {
+        genderRefs.current[value]!.checked = initialData.gender === value;
       }
     });
   }, [isOpen, initialData]);
 
-  // validate trước khi trả data ra ngoài
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     const fd = new FormData(e.currentTarget);
     const genderRaw = String(fd.get("gender") ?? "");
-    const gender: UserProfile["gender"] = (
-      GENDER_OPTIONS as readonly string[]
-    ).includes(genderRaw)
+    const gender: UserProfile["gender"] = GENDER_OPTIONS.some(
+      (option) => option.value === genderRaw,
+    )
       ? (genderRaw as UserProfile["gender"])
-      : (initialData?.gender ?? "Male");
+      : (initialData?.gender ?? "OTHER");
 
     const data: UserProfileFormData = {
       firstName: String(fd.get("firstName") ?? ""),
       lastName: String(fd.get("lastName") ?? ""),
       gender,
       birthday: String(fd.get("birthday") ?? ""),
-      displayName: String(fd.get("displayName") ?? ""),
     };
 
-    // validate dữ liệu trước khi trả lên cha
-    if (
-      !data.firstName?.trim() ||
-      !data.lastName?.trim() ||
-      !data.displayName?.trim()
-    ) {
+    if (!data.firstName.trim() || !data.lastName.trim()) {
       alert("Please fill in all required fields (*)");
       return;
     }
+
     onSubmit(data);
   };
 
   if (!isOpen) return null;
 
-  // check flag để vô hiệu hóa input
   const isViewOnly = mode === "view";
 
   return (
-    <div className="um-modal-overlay" onClick={onClose}>
+    <ProfileModalPortal isOpen={isOpen} onClose={onClose}>
       <div className="um-modal-box" onClick={(e) => e.stopPropagation()}>
         <h2 className="um-modal-title">
           {mode === "edit" ? "Edit profile" : "Profile details"}
         </h2>
 
         <form onSubmit={handleFormSubmit} className="um-modal-form">
-          {/* các field profile */}
           <div className="um-form-group">
             <label>
               First name <span className="req">*</span>
@@ -114,7 +116,7 @@ export default function MyProfileModal({
               name="firstName"
               type="text"
               ref={firstNameRef}
-              defaultValue={initialData?.firstName ?? ""}
+              defaultValue={initialData?.first_Name ?? ""}
               disabled={isViewOnly}
               placeholder="First name"
               required
@@ -129,24 +131,9 @@ export default function MyProfileModal({
               name="lastName"
               type="text"
               ref={lastNameRef}
-              defaultValue={initialData?.lastName ?? ""}
+              defaultValue={initialData?.last_Name ?? ""}
               disabled={isViewOnly}
               placeholder="Last name"
-              required
-            />
-          </div>
-
-          <div className="um-form-group">
-            <label>
-              Display name <span className="req">*</span>
-            </label>
-            <input
-              name="displayName"
-              type="text"
-              ref={displayNameRef}
-              defaultValue={initialData?.displayName ?? ""}
-              disabled={isViewOnly}
-              placeholder="Display name"
               required
             />
           </div>
@@ -157,13 +144,12 @@ export default function MyProfileModal({
               name="birthday"
               type="text"
               ref={birthdayRef}
-              defaultValue={initialData?.birthday ?? ""}
+              defaultValue={formatDateOfBirth(initialData?.dateOfBirth ?? null)}
               disabled={isViewOnly}
               placeholder="DD/MM/YYYY"
             />
           </div>
 
-          {/* cụm Gender: radio (không phải dropdown menu) */}
           <div className="um-form-group">
             <span className="um-modal-field-label">Gender</span>
             <div
@@ -171,25 +157,24 @@ export default function MyProfileModal({
               role="radiogroup"
               aria-label="Gender"
             >
-              {GENDER_OPTIONS.map((g) => (
-                <label key={g} className="um-modal-gender-label">
+              {GENDER_OPTIONS.map(({ value, label }) => (
+                <label key={value} className="um-modal-gender-label">
                   <input
                     type="radio"
                     name="gender"
-                    value={g}
+                    value={value}
                     ref={(el) => {
-                      genderRefs.current[g] = el;
+                      genderRefs.current[value] = el;
                     }}
-                    defaultChecked={initialData?.gender === g}
+                    defaultChecked={initialData?.gender === value}
                     disabled={isViewOnly}
                   />
-                  <span>{g}</span>
+                  <span>{label}</span>
                 </label>
               ))}
             </div>
           </div>
 
-          {/* cụm nút */}
           <div className="um-modal-actions">
             {!isViewOnly ? (
               <>
@@ -216,6 +201,6 @@ export default function MyProfileModal({
           </div>
         </form>
       </div>
-    </div>
+    </ProfileModalPortal>
   );
 }
