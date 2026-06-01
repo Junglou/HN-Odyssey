@@ -52,19 +52,27 @@ export class ProductAttributeParams {
   @Prop() values: string[]; // VD: ["red", "blue", "xl"]
 }
 
-@Schema({ _id: false })
-export class PendingVariantPrice {
-  @Prop({ required: true }) sku: string;
-  @Prop({ required: true }) price: number;
-  @Prop({ default: 0 }) sale_price: number;
-}
-
 // Enum định nghĩa 4 trạng thái của Yêu cầu giá
 export enum PriceRequestStatus {
   DRAFT = 'DRAFT',
   PENDING = 'PENDING',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
+}
+
+@Schema({ _id: false })
+export class PendingVariantPrice {
+  @Prop({ required: true }) sku: string;
+  @Prop({ required: true }) price: number;
+  @Prop({ default: 0 }) sale_price: number;
+
+  // Trạng thái độc lập cho từng biến thể
+  @Prop({
+    required: true,
+    enum: PriceRequestStatus,
+    default: PriceRequestStatus.DRAFT,
+  })
+  status: PriceRequestStatus;
 }
 
 @Schema({ _id: false })

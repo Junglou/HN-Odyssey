@@ -6,76 +6,190 @@ import { Product, ProductDocument } from './schemas/product.schema';
 import { ProductStatus } from 'src/common/enums/product-status.enum';
 import { ProductsService } from './products.service';
 
+// Định nghĩa Interface tường minh để tránh lỗi no-explicit-any
+export interface ProductThumbnailPayload {
+  productId: string;
+  thumbnailUrl: string;
+}
+
+export interface VariantThumbnailPayload {
+  variantSku: string;
+  thumbnailUrl: string;
+}
+
+export interface BulkMediaPayload {
+  targetId: string;
+  type: string;
+  urls: string[];
+}
+
+export interface MediaDeletedPayload {
+  targetId: string;
+  type: string;
+  url: string;
+}
+
 @Injectable()
 export class ProductListener {
-  // Khởi tạo Logger để dễ dàng debug ở console
   private readonly logger = new Logger(ProductListener.name);
 
   constructor(
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
-    // Inject ProductsService để tận dụng lại hàm syncToSearchEngine (Algolia)
     private readonly productsService: ProductsService,
   ) {}
 
-  /**
-   * Lắng nghe sự kiện từ MediaService khi có ảnh mới được "Đặt làm ảnh đại diện"
-   */
-  @OnEvent('product.thumbnail.updated', { async: true }) // async: true giúp event chạy ngầm không block request chính
-  async handleProductThumbnailUpdated(payload: {
-    productId: string;
-    thumbnailUrl: string;
-  }) {
+  // 1. LẮNG NGHE ĐỔI ẢNH ĐẠI DIỆN SẢN PHẨM MẸ
+  @OnEvent('product.thumbnail.updated', { async: true })
+  async handleProductThumbnailUpdated(payload: ProductThumbnailPayload) {
     try {
-      // 1. Tìm sản phẩm theo ID
       const product = await this.productModel.findById(payload.productId);
 
       if (!product) {
         this.logger.warn(
-          `[EVENT BỎ QUA] Không tìm thấy Product ID: ${payload.productId} để cập nhật thumbnail.`,
+          `[EVENT BỎ QUA] Không tìm thấy Product ID: ${payload.productId}`,
         );
         return;
       }
 
-      // 2. Cập nhật URL ảnh mới vào trường thumbnail
       product.thumbnail = payload.thumbnailUrl;
       await product.save();
 
-      // 3. Nếu sản phẩm đang bán (ACTIVE), đồng bộ lại data lên Algolia ngay lập tức
-      // Việc này giúp Storefront (trang chủ) cập nhật ảnh mới mà không cần F5 thủ công
       if (product.status === ProductStatus.ACTIVE) {
-        this.productsService.syncToSearchEngine(product).catch((err) => {
-          this.logger.error(
-            `[ALGOLIA ERROR] Lỗi đồng bộ khi cập nhật thumbnail cho SKU ${product.sku}:`,
-            err,
-          );
-        });
+        this.productsService
+          .syncToSearchEngine(product)
+          .catch((err: unknown) => {
+            this.logger.error(
+              `[ALGOLIA ERROR] Lỗi đồng bộ SKU ${product.sku}:`,
+              err instanceof Error ? err.stack : String(err),
+            );
+          });
       }
 
       this.logger.log(
-        `[EVENT SUCCESS] Tự động cập nhật thumbnail cho SKU: ${product.sku}`,
+        `[EVENT SUCCESS] Đã cập nhật thumbnail cho SKU: ${product.sku}`,
       );
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error(
-        `[EVENT ERROR] Lỗi hệ thống khi xử lý thumbnail cho Product ID: ${payload.productId}`,
-        error,
+        `[EVENT ERROR] Lỗi xử lý thumbnail cho Product ID: ${payload.productId}`,
+        error instanceof Error ? error.stack : String(error),
       );
     }
   }
 
-  /**
-   * (MỞ RỘNG) Lắng nghe sự kiện khi có file bị xóa hoặc upload mới
-   * Để đồng bộ trường "images" hoặc "gallery" nếu bạn có nhu cầu sau này.
-   */
-  @OnEvent('product.media.changed', { async: true })
-  async handleProductMediaChanged(payload: { productId: string }) {
+  // 2. LẮNG NGHE ĐỔI ẢNH ĐẠI DIỆN CHO BIẾN THỂ (VARIANT)
+  @OnEvent('variant.thumbnail.updated', { async: true })
+  async handleVariantThumbnailUpdated(payload: VariantThumbnailPayload) {
     try {
-      this.logger.log(
-        `[EVENT RECEIVED] Đã phát hiện thay đổi thư viện ảnh của Product ID: ${payload.productId}`,
+      // Query vào sub-document variants và update cột image
+      const result = await this.productModel.updateOne(
+        { 'variants.sku': payload.variantSku },
+        { $set: { 'variants.$.image': payload.thumbnailUrl } },
       );
-      // Tại đây bạn có thể dùng mongoose query thẳng qua bảng Media để lấy array URLs
-      // và đập lại vào trường product.images.
-    } catch (error) {
-      this.logger.error(`[EVENT ERROR] Lỗi đồng bộ thư viện ảnh.`, error);
+
+      if (result.modifiedCount > 0) {
+        this.logger.log(
+          `[EVENT SUCCESS] Đã cập nhật ảnh cho Variant SKU: ${payload.variantSku}`,
+        );
+      } else {
+        this.logger.warn(
+          `[EVENT BỎ QUA] Không tìm thấy Variant SKU: ${payload.variantSku} để gắn ảnh.`,
+        );
+      }
+    } catch (error: unknown) {
+      this.logger.error(
+        `[EVENT ERROR] Lỗi cập nhật ảnh Variant SKU: ${payload.variantSku}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+  }
+
+  // 3. LẮNG NGHE UPLOAD HÀNG LOẠT (Đẩy vào mảng Images)
+  @OnEvent('media.bulk.uploaded', { async: true })
+  async handleMediaBulkUploaded(payload: BulkMediaPayload) {
+    try {
+      if (payload.type === 'Product') {
+        // Dùng $push kèm $each để đẩy toàn bộ mảng ảnh mới vào đuôi mảng images hiện tại
+        await this.productModel.findByIdAndUpdate(payload.targetId, {
+          $push: { images: { $each: payload.urls } },
+        });
+        this.logger.log(
+          `[EVENT SUCCESS] Đã thêm ${payload.urls.length} ảnh vào mảng images của Product ID: ${payload.targetId}`,
+        );
+      } else if (payload.type === 'Variant' && payload.urls.length > 0) {
+        // Schema Variant chỉ lưu 1 ảnh (cột image: string), nên ta sẽ ghi đè ảnh đầu tiên nếu upload bulk
+        await this.productModel.updateOne(
+          { 'variants.sku': payload.targetId },
+          { $set: { 'variants.$.image': payload.urls[0] } },
+        );
+        this.logger.log(
+          `[EVENT SUCCESS] Đã lưu ảnh vào Variant SKU: ${payload.targetId}`,
+        );
+      }
+    } catch (error: unknown) {
+      this.logger.error(
+        `[EVENT ERROR] Lỗi Bulk Upload targetId: ${payload.targetId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+  }
+
+  // 4. LẮNG NGHE XÓA ẢNH (Dọn dẹp rác dữ liệu)
+  @OnEvent('media.deleted', { async: true })
+  async handleMediaDeleted(payload: MediaDeletedPayload) {
+    try {
+      if (payload.type === 'Product') {
+        const product = await this.productModel.findById(payload.targetId);
+
+        if (!product) return;
+
+        let isModified = false;
+
+        // 1. Nếu ảnh bị xóa đang là ảnh đại diện -> Xóa trắng
+        if (product.thumbnail === payload.url) {
+          product.thumbnail = '';
+          isModified = true;
+        }
+
+        // 2. Xóa URL khỏi mảng images (nếu có)
+        if (product.images && product.images.length > 0) {
+          const originalLength = product.images.length;
+          product.images = product.images.filter((img) => img !== payload.url);
+          if (product.images.length !== originalLength) {
+            isModified = true;
+          }
+        }
+
+        if (isModified) {
+          await product.save();
+          this.logger.log(
+            `[EVENT SUCCESS] Đã dọn dẹp URL ảnh bị xóa cho Product ID: ${payload.targetId}`,
+          );
+        }
+      } else if (payload.type === 'Variant') {
+        // Xóa trắng trường image của Variant nếu URL trùng với ảnh vừa bị xóa
+        const result = await this.productModel.updateOne(
+          { 'variants.sku': payload.targetId },
+          {
+            $set: { 'variants.$[elem].image': '' },
+          },
+          {
+            arrayFilters: [
+              { 'elem.sku': payload.targetId, 'elem.image': payload.url },
+            ],
+          },
+        );
+
+        if (result.modifiedCount > 0) {
+          this.logger.log(
+            `[EVENT SUCCESS] Đã dọn dẹp ảnh cho Variant SKU: ${payload.targetId}`,
+          );
+        }
+      }
+    } catch (error: unknown) {
+      this.logger.error(
+        `[EVENT ERROR] Lỗi xử lý dọn dẹp ảnh khi Media bị xóa (Target: ${payload.targetId})`,
+        error instanceof Error ? error.stack : String(error),
+      );
     }
   }
 }

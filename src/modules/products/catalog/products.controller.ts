@@ -238,12 +238,14 @@ export class ProductsController {
   approvePrice(
     @Param('id') id: string,
     @Body('action') action: 'approve' | 'reject',
+    @Body('sku') sku: string, // Nhận mã sku từ Frontend
     @CurrentUser() user: IUser,
     @Ip() ip: string,
     @HttpHeaders('user-agent') userAgent: string,
   ) {
     return this.productsService.approvePriceChange(
       id,
+      sku,
       action === 'approve',
       user._id,
       ip,
@@ -307,11 +309,18 @@ export class ProductsController {
   @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
   submitPriceDraft(
     @Param('id') id: string,
+    @Body('sku') sku: string, // Nhận mã sku từ Frontend
     @CurrentUser() user: IUser,
     @Ip() ip: string,
     @HttpHeaders('user-agent') userAgent: string,
   ) {
-    return this.productsService.submitPriceRequest(id, user._id, ip, userAgent);
+    return this.productsService.submitPriceRequest(
+      id,
+      sku,
+      user._id,
+      ip,
+      userAgent,
+    );
   }
 
   // AC3: Quản lý duyệt/từ chối HÀNG LOẠT

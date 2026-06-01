@@ -48,40 +48,94 @@ export class MediaService {
     }
 
     const savedRecords: Media[] = [];
+    // Map kiểm tra xem targetId đã có ảnh primary nào trong DB chưa
+    const targetCheckMap = new Map<string, boolean>();
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const meta = metadataArray[i];
 
-      // Đảm bảo tên file duy nhất nhưng giữ được AC2
+      // LOGIC: Tự động set Primary cho ảnh đầu tiên nếu chưa có
+      let isPrimaryFlag = false;
+      const targetKey = `${meta.type}_${meta.targetId}`;
+
+      if (!targetCheckMap.has(targetKey)) {
+        const existingPrimary = await this.mediaModel.exists({
+          targetId: String(meta.targetId),
+          type: String(meta.type),
+          isPrimary: true,
+        });
+        if (!existingPrimary) {
+          isPrimaryFlag = true;
+        }
+        targetCheckMap.set(targetKey, true); // Đánh dấu là đã xử lý kiểm tra
+      }
+
       const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
       const ext = path.extname(file.originalname);
-      // Loại bỏ ký tự nguy hiểm cho tên file vật lý, nhưng vẫn lưu tên gốc vào originalName
       const safePhysicalName = `media-${uniqueSuffix}${ext}`;
       const physicalPath = path.join(uploadDir, safePhysicalName);
       const relativeUrl = `/uploads/media/${safePhysicalName}`;
 
-      // Ghi file vật lý
       fs.writeFileSync(physicalPath, file.buffer);
 
-      // Lưu Database
       const newMedia = new this.mediaModel({
         url: relativeUrl,
         fileName: safePhysicalName,
-        originalName: String(file.originalname), // AC2: Giữ nguyên tên gốc để hiển thị
+        originalName: String(file.originalname),
         type: String(meta.type),
-        targetId: String(meta.targetId), // Đã fix no-unsafe-assignment
+        targetId: String(meta.targetId),
         status: String(meta.status),
-        altText: meta.altText ? String(meta.altText) : '', // Đã fix no-unsafe-assignment
+        altText: meta.altText ? String(meta.altText) : '',
         size: Number(file.size),
         mimetype: String(file.mimetype),
         created_by: new Types.ObjectId(userId),
-        isPrimary: false, // Mặc định luôn false khi mới upload
+        isPrimary: isPrimaryFlag, // Đã fix: Không set cứng false nữa
       });
 
       const saved = await newMedia.save();
       savedRecords.push(saved);
+
+      // Bắn event ngay lập tức nếu ảnh này được chọn làm Primary tự động
+      if (isPrimaryFlag) {
+        if (meta.type === MediaType.PRODUCT) {
+          this.eventEmitter.emit('product.thumbnail.updated', {
+            productId: meta.targetId,
+            thumbnailUrl: relativeUrl,
+          });
+        } else if (meta.type === MediaType.VARIANT) {
+          // Quy ước: targetId của Variant khi upload lên là SKU của nó
+          this.eventEmitter.emit('variant.thumbnail.updated', {
+            variantSku: meta.targetId,
+            thumbnailUrl: relativeUrl,
+          });
+        }
+      }
     }
+
+    // LOGIC: Gom nhóm và bắn Event upload hàng loạt để cập nhật mảng images/gallery
+    const groupedByTarget = savedRecords.reduce(
+      (acc, curr) => {
+        const key = `${curr.type}_${curr.targetId}`;
+        if (!acc[key]) {
+          acc[key] = { type: curr.type, targetId: curr.targetId, urls: [] };
+        }
+        acc[key].urls.push(curr.url);
+        return acc;
+      },
+      {} as Record<
+        string,
+        { type: MediaType; targetId: string; urls: string[] }
+      >,
+    );
+
+    Object.values(groupedByTarget).forEach((group) => {
+      this.eventEmitter.emit('media.bulk.uploaded', {
+        targetId: group.targetId,
+        type: group.type,
+        urls: group.urls,
+      });
+    });
 
     return savedRecords;
   }
@@ -153,7 +207,6 @@ export class MediaService {
       );
     }
 
-    // Reset toàn bộ các ảnh cùng targetId về false
     await this.mediaModel.updateMany(
       { targetId: media.targetId, type: media.type },
       { $set: { isPrimary: false } },
@@ -162,10 +215,15 @@ export class MediaService {
     media.isPrimary = true;
     const savedMedia = await media.save();
 
-    // THÊM ĐOẠN NÀY: Bắn event để ProductService bắt lấy
+    // Đã fix: Bổ sung rẽ nhánh bắn event cho cả Variant
     if (media.type === MediaType.PRODUCT) {
       this.eventEmitter.emit('product.thumbnail.updated', {
         productId: media.targetId,
+        thumbnailUrl: media.url,
+      });
+    } else if (media.type === MediaType.VARIANT) {
+      this.eventEmitter.emit('variant.thumbnail.updated', {
+        variantSku: media.targetId, // targetId truyền từ fontend lúc này phải là SKU của Variant
         thumbnailUrl: media.url,
       });
     }
@@ -247,15 +305,28 @@ export class MediaService {
   }
 
   // AC5: Xóa phương tiện hoàn toàn khỏi bộ nhớ
+  // AC5: Xóa phương tiện hoàn toàn khỏi bộ nhớ
   async hardDeleteMedia(id: string) {
     const media = await this.mediaModel.findById(id);
     if (!media) throw new NotFoundException('Không tìm thấy phương tiện.');
+
+    // Lưu tạm các thông tin cần thiết trước khi xóa khỏi DB
+    const deletedUrl = media.url;
+    const targetId = media.targetId;
+    const type = media.type;
 
     // Xóa file vật lý khỏi ổ cứng
     this.deletePhysicalFile(media.url);
 
     // Xóa khỏi Database hoàn toàn
     await this.mediaModel.findByIdAndDelete(id);
+
+    // THÊM ĐOẠN NÀY: Bắn event để dọn dẹp chuỗi string lưu bên Product/Variant
+    this.eventEmitter.emit('media.deleted', {
+      targetId: targetId,
+      type: type,
+      url: deletedUrl,
+    });
 
     return { message: 'Đã xóa hoàn toàn phương tiện khỏi hệ thống và bộ nhớ.' };
   }

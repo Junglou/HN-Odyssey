@@ -721,24 +721,37 @@ export class ProductsService {
     const oldStatus = product.status;
 
     if (status === ProductStatus.ACTIVE) {
+      // 1. Chặn nếu có yêu cầu giá chưa duyệt xong (Draft, Pending, Rejected)
+      if (
+        product.price_request &&
+        product.price_request.status !== PriceRequestStatus.APPROVED
+      ) {
+        throw new BadRequestException(
+          'Sản phẩm đang có yêu cầu giá chưa được duyệt hoàn tất. Vui lòng duyệt giá trước khi kích hoạt.',
+        );
+      }
+
+      // 2. Chặn nếu giá gốc bằng 0 (chưa từng được duyệt giá hợp lệ)
       if (
         product.price <= 0 &&
         (!product.variants || product.variants.length === 0)
       ) {
         throw new BadRequestException(
-          'Sản phẩm chưa có giá bán (Giá = 0). Vui lòng cập nhật giá trước khi kích hoạt.',
+          'Sản phẩm chưa có giá bán (Giá = 0). Vui lòng cập nhật và duyệt giá trước khi kích hoạt.',
         );
       }
 
+      // 3. Nếu là sản phẩm có biến thể, BẮT BUỘC tất cả biến thể phải có giá > 0
       if (product.has_variants) {
-        const validVariant = product.variants.some((v) => v.price > 0);
-        if (!validVariant) {
+        const invalidVariant = product.variants.find((v) => v.price <= 0);
+        if (invalidVariant) {
           throw new BadRequestException(
-            'Sản phẩm biến thể cần ít nhất 1 phiên bản có giá bán hợp lệ.',
+            `Biến thể [${invalidVariant.sku}] chưa được duyệt giá (Giá = 0). Tất cả biến thể phải được duyệt giá xong mới có thể kích hoạt sản phẩm.`,
           );
         }
       }
 
+      // 4. Validate ảnh
       if (
         !product.thumbnail &&
         (!product.images || product.images.length === 0)
@@ -748,12 +761,14 @@ export class ProductsService {
         );
       }
 
+      // 5. Validate Danh mục
       if (!product.categories || product.categories.length === 0) {
         throw new BadRequestException(
           'Sản phẩm chưa có Danh mục. Không thể kích hoạt.',
         );
       }
 
+      // 6. Validate Tags
       if (!product.tags || product.tags.length === 0) {
         throw new BadRequestException(
           'Sản phẩm chưa có Tags từ khóa. Thuật toán AI cần ít nhất 1 Tag để hoạt động.',
@@ -815,13 +830,13 @@ export class ProductsService {
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
     const currentRequest = product.price_request;
+    // Đã gỡ điều kiện chặn nếu đang ở trạng thái APPROVED hoặc REJECTED để cho phép sửa lại
     if (
       currentRequest &&
-      (currentRequest.status === PriceRequestStatus.PENDING ||
-        currentRequest.status === PriceRequestStatus.APPROVED)
+      currentRequest.status === PriceRequestStatus.PENDING
     ) {
       throw new BadRequestException(
-        'Không thể sửa yêu cầu giá đang chờ duyệt hoặc đã được duyệt.',
+        'Không thể sửa yêu cầu giá đang chờ duyệt.',
       );
     }
 
@@ -834,10 +849,14 @@ export class ProductsService {
       );
     }
 
-    // Merge các variant cũ trong request với variant mới gửi lên để đảm bảo không bị đè mất dữ liệu
     const existingVariants = currentRequest?.variants || [];
     const newVariants = dto.variants
-      ? dto.variants.map((v) => ({ sku: v.sku, price: v.price, sale_price: 0 }))
+      ? dto.variants.map((v) => ({
+          sku: v.sku,
+          price: v.price,
+          sale_price: 0,
+          status: PriceRequestStatus.DRAFT,
+        }))
       : [];
 
     const mergedVariants = [...existingVariants];
@@ -845,6 +864,8 @@ export class ProductsService {
       const idx = mergedVariants.findIndex((ev) => ev.sku === nv.sku);
       if (idx !== -1) {
         mergedVariants[idx].price = nv.price;
+        // Bắt buộc đổi lại thành DRAFT khi user edit lại biến thể từng bị Reject
+        mergedVariants[idx].status = PriceRequestStatus.DRAFT;
       } else {
         mergedVariants.push(nv);
       }
@@ -852,10 +873,10 @@ export class ProductsService {
 
     product.price_request = {
       price: dto.price,
+      currency: dto.currency || currentRequest?.currency || 'VND', // Cập nhật lại đúng currency
       variants: mergedVariants,
       effective_date: effectiveDate,
-      // sửa trạng thái thành draft thay vì pending để đúng với luồng nghiệp vụ
-      status: PriceRequestStatus.DRAFT,
+      status: PriceRequestStatus.DRAFT, // Đưa tổng request về DRAFT
       requester_id: new Types.ObjectId(userId),
       requested_at: new Date(),
     } as PriceRequest;
@@ -878,21 +899,50 @@ export class ProductsService {
 
   async submitPriceRequest(
     id: string,
+    sku: string | undefined,
     userId: string,
     ip: string,
     userAgent: string,
   ) {
     const product = await this.productModel.findById(id);
-    if (!product || !product.price_request)
+    if (!product || !product.price_request) {
       throw new NotFoundException('Không tìm thấy yêu cầu giá');
-
-    if (product.price_request.status !== PriceRequestStatus.DRAFT) {
-      throw new BadRequestException(
-        'Chỉ có thể Submit các bản ghi ở trạng thái Draft',
-      );
     }
 
-    product.price_request.status = PriceRequestStatus.PENDING;
+    if (
+      sku &&
+      product.price_request.variants &&
+      product.price_request.variants.length > 0
+    ) {
+      const variantIndex = product.price_request.variants.findIndex(
+        (v) => v.sku === sku,
+      );
+      if (variantIndex === -1) {
+        throw new NotFoundException(
+          'Không tìm thấy biến thể trong yêu cầu giá',
+        );
+      }
+
+      if (
+        product.price_request.variants[variantIndex].status !==
+        PriceRequestStatus.DRAFT
+      ) {
+        throw new BadRequestException(
+          'Chỉ có thể Submit bản ghi ở trạng thái Draft',
+        );
+      }
+
+      product.price_request.variants[variantIndex].status =
+        PriceRequestStatus.PENDING;
+    } else {
+      if (product.price_request.status !== PriceRequestStatus.DRAFT) {
+        throw new BadRequestException(
+          'Chỉ có thể Submit bản ghi ở trạng thái Draft',
+        );
+      }
+      product.price_request.status = PriceRequestStatus.PENDING;
+    }
+
     await product.save();
 
     await this.auditLogsService.log({
@@ -901,7 +951,9 @@ export class ProductsService {
       actor_id: userId,
       target_id: id,
       department: Department.WAREHOUSE,
-      detail: { message: 'Đẩy yêu cầu nháp lên chờ phê duyệt' },
+      detail: {
+        message: `Đẩy yêu cầu nháp lên chờ phê duyệt cho ${sku || 'sản phẩm'}`,
+      },
       ip,
       user_agent: userAgent,
     });
@@ -911,6 +963,7 @@ export class ProductsService {
 
   async approvePriceChange(
     id: string,
+    sku: string | undefined,
     isApproved: boolean,
     userId: string,
     ip: string,
@@ -921,25 +974,86 @@ export class ProductsService {
       _id: id,
       is_deleted: false,
     });
-    if (!product || !product.price_request)
+    if (!product || !product.price_request) {
       throw new NotFoundException('Không có yêu cầu giá');
-
-    if (product.price_request.status !== PriceRequestStatus.PENDING) {
-      throw new BadRequestException(
-        'Bản ghi này không ở trạng thái chờ duyệt (Pending)',
-      );
     }
 
-    if (isApproved) {
-      product.price_request.status = PriceRequestStatus.APPROVED;
-      product.price = product.price_request.price;
-      product.currency = product.price_request.currency;
+    const newStatus = isApproved
+      ? PriceRequestStatus.APPROVED
+      : PriceRequestStatus.REJECTED;
+    let oldPrice = product.price;
+    let newPrice = product.price_request.price;
+
+    if (
+      sku &&
+      product.price_request.variants &&
+      product.price_request.variants.length > 0
+    ) {
+      const variantIndex = product.price_request.variants.findIndex(
+        (v) => v.sku === sku,
+      );
+      if (variantIndex === -1) {
+        throw new NotFoundException('Không tìm thấy biến thể');
+      }
+
+      if (
+        product.price_request.variants[variantIndex].status !==
+        PriceRequestStatus.PENDING
+      ) {
+        throw new BadRequestException(
+          'Biến thể này không ở trạng thái chờ duyệt (Pending)',
+        );
+      }
+
+      product.price_request.variants[variantIndex].status = newStatus;
+      newPrice = product.price_request.variants[variantIndex].price;
+
+      if (isApproved) {
+        const productVariantIndex = product.variants.findIndex(
+          (v) => v.sku === sku,
+        );
+        if (productVariantIndex !== -1) {
+          oldPrice = product.variants[productVariantIndex].price;
+          product.variants[productVariantIndex].price = newPrice;
+        }
+      }
     } else {
-      product.price_request.status = PriceRequestStatus.REJECTED;
-      if (reason) product.price_request.reject_reason = reason;
+      if (product.price_request.status !== PriceRequestStatus.PENDING) {
+        throw new BadRequestException(
+          'Sản phẩm không ở trạng thái chờ duyệt (Pending)',
+        );
+      }
+      product.price_request.status = newStatus;
+      if (isApproved) {
+        product.price = newPrice;
+        product.currency = product.price_request.currency;
+      }
+      if (!isApproved && reason) {
+        product.price_request.reject_reason = reason;
+      }
     }
 
     product.price_request.approver_id = new Types.ObjectId(userId);
+
+    // Đồng bộ trạng thái tổng của price_request nếu tất cả biến thể đã được xử lý xong
+    if (
+      product.price_request.variants &&
+      product.price_request.variants.length > 0
+    ) {
+      const allProcessed = product.price_request.variants.every(
+        (v) =>
+          v.status === PriceRequestStatus.APPROVED ||
+          v.status === PriceRequestStatus.REJECTED,
+      );
+      if (allProcessed) {
+        const allApproved = product.price_request.variants.every(
+          (v) => v.status === PriceRequestStatus.APPROVED,
+        );
+        product.price_request.status = allApproved
+          ? PriceRequestStatus.APPROVED
+          : PriceRequestStatus.REJECTED;
+      }
+    }
 
     await product.save();
 
@@ -950,9 +1064,10 @@ export class ProductsService {
       target_id: id,
       department: Department.WAREHOUSE,
       detail: {
-        result: product.price_request.status,
-        old_price: product.price,
-        new_price: product.price_request.price,
+        sku: sku || product.sku,
+        result: newStatus,
+        old_price: oldPrice,
+        new_price: newPrice,
         effective_date: product.price_request.effective_date,
       },
       ip,
@@ -977,6 +1092,7 @@ export class ProductsService {
       try {
         await this.approvePriceChange(
           id,
+          undefined, // Bổ sung undefined cho tham số sku
           isApproved,
           userId,
           ip,

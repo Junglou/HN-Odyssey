@@ -127,8 +127,10 @@ export class OrdersService {
               {
                 text: {
                   query: search,
-                  path: 'shipping_info.name',
-                  fuzzy: { maxEdits: 1 },
+                  // BỔ SUNG guest_info.name ĐỂ TÌM CẢ KHÁCH VÃNG LAI
+                  path: ['shipping_info.name', 'guest_info.name'],
+                  // BỎ fuzzy ĐỂ TRÁNH NHẬN DIỆN "MAP" THÀNH "MAI"
+                  // Bỏ cấu hình fuzzy: { maxEdits: 1 } đi
                 },
               },
             ],

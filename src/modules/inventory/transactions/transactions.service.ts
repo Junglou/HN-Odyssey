@@ -182,8 +182,7 @@ export class TransactionsService {
     const [transactions, total] = await Promise.all([
       this.transactionModel
         .find(filter)
-        .populate('actor_id', 'email')
-        .populate('items.product_id', 'name')
+        .populate('actor_id', 'email full_name')
         .sort({ [sort_by || 'created_at']: sort_order === 'asc' ? 1 : -1 })
         .skip(skip)
         .limit(Number(limit))
@@ -191,8 +190,44 @@ export class TransactionsService {
       this.transactionModel.countDocuments(filter),
     ]);
 
+    // Lấy danh sách mã SKU từ các phiếu kho để tìm tên sản phẩm
+    const allSkus = transactions.flatMap((t) => t.items.map((i) => i.sku));
+    const products = await this.productModel
+      .find({
+        $or: [{ sku: { $in: allSkus } }, { 'variants.sku': { $in: allSkus } }],
+      })
+      .select('_id name sku has_variants variants')
+      .lean();
+
+    // Gắn tên sản phẩm tương ứng vào từng mặt hàng
+    const formattedData = transactions.map((t) => ({
+      ...t,
+      items: t.items.map((item) => {
+        const product = products.find(
+          (p) =>
+            p.sku === item.sku ||
+            (p.has_variants && p.variants?.some((v) => v.sku === item.sku)),
+        );
+
+        let finalName = 'Sản phẩm không xác định';
+        if (product) {
+          finalName = product.name;
+          // Bổ sung tên biến thể nếu sản phẩm là biến thể
+          if (product.has_variants && product.variants) {
+            const v = product.variants.find((x) => x.sku === item.sku);
+            if (v) finalName += ` - ${v.sku}`;
+          }
+        }
+
+        return {
+          ...item,
+          product_id: { name: finalName },
+        };
+      }),
+    }));
+
     return {
-      data: transactions,
+      data: formattedData,
       total,
       page: Number(page),
       limit: Number(limit),
@@ -1905,14 +1940,11 @@ export class TransactionsService {
 
   // 5. GET TẤT CẢ LỊCH SỬ CHO DROPDOWN "ALL TYPES"
   async getAllHistory(queryDto: GetTransactionsDto) {
-    // Lấy thẳng biến chuẩn từ DTO
     const actionType = queryDto.action_type;
 
-    // Điều hướng logic gọi hàm
     if (actionType === 'IMPORT') return this.getBaseHistory('IMPORT', queryDto);
     if (actionType === 'EXPORT') return this.getBaseHistory('EXPORT', queryDto);
 
-    // Nếu actionType không được truyền (tương đương với FE chọn 'All Types')
     const { search, page = 1, limit = 10 } = queryDto;
     const filter: FilterQuery<StockTransactionDocument> = {};
 
@@ -1940,8 +1972,7 @@ export class TransactionsService {
     const [transactions, total] = await Promise.all([
       this.transactionModel
         .find(filter)
-        .populate('actor_id', 'email full_name') // Có thể thêm 'full_name' vào populate nếu FE cần hiển thị
-        .populate('items.product_id', 'name')
+        .populate('actor_id', 'email full_name')
         .sort({ created_at: -1 })
         .skip(skip)
         .limit(Number(limit))
@@ -1949,8 +1980,44 @@ export class TransactionsService {
       this.transactionModel.countDocuments(filter),
     ]);
 
+    // Lấy danh sách mã SKU từ các phiếu kho để tìm tên sản phẩm
+    const allSkus = transactions.flatMap((t) => t.items.map((i) => i.sku));
+    const products = await this.productModel
+      .find({
+        $or: [{ sku: { $in: allSkus } }, { 'variants.sku': { $in: allSkus } }],
+      })
+      .select('_id name sku has_variants variants')
+      .lean();
+
+    // Gắn tên sản phẩm tương ứng vào từng mặt hàng
+    const formattedData = transactions.map((t) => ({
+      ...t,
+      items: t.items.map((item) => {
+        const product = products.find(
+          (p) =>
+            p.sku === item.sku ||
+            (p.has_variants && p.variants?.some((v) => v.sku === item.sku)),
+        );
+
+        let finalName = 'Sản phẩm không xác định';
+        if (product) {
+          finalName = product.name;
+          // Bổ sung tên biến thể nếu sản phẩm là biến thể
+          if (product.has_variants && product.variants) {
+            const v = product.variants.find((x) => x.sku === item.sku);
+            if (v) finalName += ` - ${v.sku}`;
+          }
+        }
+
+        return {
+          ...item,
+          product_id: { name: finalName },
+        };
+      }),
+    }));
+
     return {
-      data: transactions,
+      data: formattedData,
       total,
       page: Number(page),
       limit: Number(limit),

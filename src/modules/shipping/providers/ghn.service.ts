@@ -119,7 +119,7 @@ export class GhnService {
             name: item.name,
             code: item.code,
             quantity: item.quantity,
-            price: item.price,
+            price: Math.round(item.price),
             weight: Math.ceil(item.weight) || 500,
           })),
         },

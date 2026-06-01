@@ -84,54 +84,56 @@ export class ProductSeederService {
       this.attributeModel.deleteMany({}),
     ]);
 
+    // 1. ĐỒNG BỘ DANH MỤC KHỚP VỚI FRONTEND ROUTING
     const categoryData = [
       {
-        name: 'Áo Khoác Nam',
-        slug: 'ao-khoac-nam',
-        description: 'Áo khoác chống nước, giữ nhiệt',
+        name: 'Men',
+        slug: 'men',
+        description: 'Men Collection',
         display_order: 1,
       },
       {
-        name: 'Balo Leo Núi',
-        slug: 'balo-leo-nui',
-        description: 'Balo trợ lực, dã ngoại',
+        name: 'Women',
+        slug: 'women',
+        description: 'Women Collection',
         display_order: 2,
       },
       {
-        name: 'Giày Trekking',
-        slug: 'giay-trekking',
-        description: 'Giày đi rừng, leo núi',
+        name: 'Kid',
+        slug: 'kid',
+        description: 'Kid Collection',
         display_order: 3,
       },
       {
-        name: 'Phụ Kiện Cắm Trại',
-        slug: 'phu-kien-cam-trai',
-        description: 'Lều, võng, đèn pin',
+        name: 'Equipment',
+        slug: 'equipment',
+        description: 'Outdoor Equipment',
         display_order: 4,
       },
       {
-        name: 'Quần Áo Giữ Nhiệt',
-        slug: 'quan-ao-giu-nhiet',
-        description: 'Đồ lót giữ nhiệt Base layer',
+        name: 'Emergency Packs',
+        slug: 'emergency',
+        description: 'Emergency & Survival Packs',
         display_order: 5,
       },
     ];
     await this.categoryModel.insertMany(categoryData);
     const dbCategories = await this.categoryModel.find().exec();
 
+    // 2. KHỞI TẠO BỘ LỌC ATTRIBUTES
     const attributeData = [
       {
-        name: 'Màu sắc',
+        name: 'Color',
         code: 'color',
         display_type: AttributeType.COLOR_SWATCH,
         values: [
-          { label: 'Đen Obsidian', value: 'black', meta: '#000000' },
-          { label: 'Xanh Navy', value: 'navy', meta: '#000080' },
-          { label: 'Cam Cứu Hộ', value: 'orange', meta: '#FFA500' },
+          { label: 'Obsidian Black', value: 'black', meta: '#000000' },
+          { label: 'Navy Blue', value: 'navy', meta: '#000080' },
+          { label: 'Rescue Orange', value: 'orange', meta: '#FFA500' },
         ],
       },
       {
-        name: 'Kích cỡ',
+        name: 'Size',
         code: 'size',
         display_type: AttributeType.BUTTON,
         values: [
@@ -141,7 +143,7 @@ export class ProductSeederService {
         ],
       },
       {
-        name: 'Chất liệu',
+        name: 'Material',
         code: 'material',
         display_type: AttributeType.BUTTON,
         values: [
@@ -184,18 +186,23 @@ export class ProductSeederService {
 
       let name = `${this.MY_BRAND} ${randomMaterial.label} ${activity} ${type}`;
       const baseSku = `HNO-${faker.string.alphanumeric(6).toUpperCase()}`;
-      const price = faker.number.int({ min: 1200000, max: 25000000 });
+
+      // 3. ĐIỀU CHỈNH GIÁ TIỀN CHUẨN USD (Từ $20.00 đến $350.00)
+      const price = faker.number.float({
+        min: 20,
+        max: 350,
+        fractionDigits: 2,
+      });
       let forcedTags: string[] = [];
 
       if (i === 0) {
         name = `${this.MY_BRAND} Merino Wool Hiking Socks`;
         forcedTags = ['phu-kien', 'Trending'];
       } else if (i === 1) {
-        name = `Gói bảo hành rách vải mở rộng 12 tháng`;
+        name = `Extended 12-Month Warranty Pack`;
         forcedTags = ['service', 'warranty'];
       }
 
-      // Đẩy text thô của danh mục vào thuộc tính tag để tăng hiệu quả máy học không gian vector
       const categorySemanticText = randomCategory.name.toLowerCase();
       const currentTags = [
         'Outdoor',
@@ -220,7 +227,7 @@ export class ProductSeederService {
 
           variants.push({
             sku: `${baseSku}-${vColor.value.toUpperCase()}-${vSize.value.toUpperCase()}`,
-            price: price,
+            price: price, // Giữ nguyên giá gốc cho biến thể
             sale_price: 0,
             stock: vStock,
             thumbnail: `https://picsum.photos/seed/${faker.string.uuid()}/400/400`,
@@ -257,7 +264,7 @@ export class ProductSeederService {
         min_purchase_qty: 1,
         max_purchase_qty: 5,
         is_member_only: false,
-        member_prices: { GOLD: Math.round(price * 0.9) },
+        member_prices: { GOLD: parseFloat((price * 0.9).toFixed(2)) },
         rank_required: 0,
         allowed_tiers: [],
         categories: [randomCategory._id],
@@ -267,10 +274,10 @@ export class ProductSeederService {
           { code: materialAttr.code, value: randomMaterial.value },
         ],
         tags: currentTags,
-        specs: [{ name: 'Hoạt động', values: [activity] }],
+        specs: [{ name: 'Activity', values: [activity] }],
         price: price,
         sale_price:
-          faker.helpers.maybe(() => Math.round(price * 0.8), {
+          faker.helpers.maybe(() => parseFloat((price * 0.8).toFixed(2)), {
             probability: 0.25,
           }) || 0,
         sale_start_date: null,
@@ -284,12 +291,12 @@ export class ProductSeederService {
         min_stock: 5,
         max_stock: 300,
         allow_backorder: false,
-        weight: faker.number.int({ min: 250, max: 3500 }),
+        weight: 0.5, // Cập nhật trọng lượng mặc định là 0.5kg
         status: ProductStatus.ACTIVE,
         seo_config: {
           meta_title: name,
-          meta_description: `Mua ${name}`,
-          meta_keywords: `${this.MY_BRAND}, outdoor`,
+          meta_description: `Buy ${name} at ${this.MY_BRAND}`,
+          meta_keywords: `${this.MY_BRAND}, outdoor, ${activity}`,
         },
         view_count: faker.number.int({ min: 50, max: 3000 }),
         sold_count: faker.number.int({ min: 5, max: 500 }),
