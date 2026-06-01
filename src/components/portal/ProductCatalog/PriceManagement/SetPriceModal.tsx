@@ -1,6 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import "./SetPriceModal.css";
-import type { PriceFormData } from "../../../../hooks/portal/ProductCatalog/PriceManagement/usePriceManagement";
+
+// Khai báo interface chuẩn thay cho any
+export interface PriceSubmitData {
+  priceAmount: number;
+  currency: string;
+  effectiveDate: string;
+}
 
 export interface SetPriceModalProps {
   isOpen: boolean;
@@ -8,8 +14,9 @@ export interface SetPriceModalProps {
   productName: string;
   sku: string;
   initialPrice?: number;
-  isSubmitting: boolean;
-  onSave: (data: PriceFormData) => void;
+  initialCurrency?: string;
+  isSubmitting?: boolean;
+  onSave: (data: PriceSubmitData) => void;
 }
 
 export default function SetPriceModal(props: SetPriceModalProps) {
@@ -23,13 +30,15 @@ function SetPriceModalContent({
   productName,
   sku,
   initialPrice = 0,
-  isSubmitting,
+  initialCurrency = "VND",
+  isSubmitting = false,
   onSave,
 }: Omit<SetPriceModalProps, "isOpen">) {
   const [priceAmount, setPriceAmount] = useState<string>(
     initialPrice > 0 ? initialPrice.toString() : "",
   );
-  const [currency, setCurrency] = useState<string>("USD");
+
+  const [currency, setCurrency] = useState<string>(initialCurrency);
   const [error, setError] = useState<string>("");
 
   const getTodayString = () => {
@@ -42,16 +51,6 @@ function SetPriceModalContent({
 
   const [effectiveDate] = useState<string>(getTodayString());
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !isSubmitting) {
-        onClose();
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, isSubmitting]);
-
   const handleSave = () => {
     if (isSubmitting) return;
 
@@ -63,6 +62,7 @@ function SetPriceModalContent({
 
     setError("");
 
+    // Truyền trực tiếp object chuẩn xác
     onSave({
       priceAmount: numPrice,
       currency,
@@ -123,8 +123,8 @@ function SetPriceModalContent({
               onChange={(e) => setCurrency(e.target.value)}
               disabled={isSubmitting}
             >
-              <option value="USD">USD</option>
               <option value="VND">VND</option>
+              <option value="USD">USD</option>
               <option value="EUR">EUR</option>
             </select>
           </div>

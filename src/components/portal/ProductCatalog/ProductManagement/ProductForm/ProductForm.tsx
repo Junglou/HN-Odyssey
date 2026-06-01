@@ -36,7 +36,7 @@ interface ProductFormProps {
       updatedAttributes: VariantAttribute[],
       editingVariantId?: string,
     ) => void;
-    savePrice: (priceId: string, newPrice: number) => void;
+    savePrice: (priceId: string, newPrice: number, currency: string) => void;
     submitSinglePrice: (id: string) => void;
     approveSinglePrice: (id: string) => void;
     rejectSinglePrice: (id: string) => void;
@@ -665,9 +665,16 @@ export default function ProductForm({
             productName={formData.name || "N/A"}
             sku={formData.sku || "N/A"}
             initialPrice={editingPriceItem?.price || 0}
-            onSave={(newPrice) => {
+            initialCurrency={editingPriceItem?.currency || "VND"}
+            // Thay vì nhận (newPrice, currency), ta nhận object data từ SetPriceModal
+            onSave={(data) => {
               if (editingPriceItem) {
-                actions.savePrice(editingPriceItem.id, newPrice);
+                // Lấy priceAmount và currency từ object data truyền vào action
+                actions.savePrice(
+                  editingPriceItem.id,
+                  data.priceAmount,
+                  data.currency,
+                );
               }
               setIsSetPriceModalOpen(false);
             }}

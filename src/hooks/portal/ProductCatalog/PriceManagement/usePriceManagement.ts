@@ -6,7 +6,7 @@ export type PriceStatus = "APPROVED" | "PENDING" | "REJECTED" | "DRAFT";
 
 export interface PriceRecord {
   id: string;
-  productId: string; // ID gốc của Product để call API
+  productId: string;
   productName: string;
   sku: string;
   variant: string;
@@ -23,6 +23,7 @@ export interface PriceFormData {
 
 export interface ApiError {
   response?: {
+    status?: number;
     data?: {
       message?: string | string[];
     };
@@ -46,7 +47,7 @@ export interface ApiProduct {
     status?: string;
     price?: number;
     currency?: string;
-    variants?: { sku: string; price: number }[];
+    variants?: { sku: string; price: number; status?: string }[];
   };
   variants?: ApiVariant[];
 }
@@ -71,10 +72,10 @@ export function usePriceManagement() {
     const flatRecords: PriceRecord[] = [];
 
     products.forEach((p) => {
-      // Bóc tách variants ra thành từng dòng hiển thị
       if (p.has_variants && p.variants && p.variants.length > 0) {
         p.variants.forEach((v, index) => {
-          let currentStatus = "APPROVED";
+          // Trạng thái mặc định là DRAFT thay vì APPROVED để bắt buộc quy trình phê duyệt
+          let currentStatus = "DRAFT";
           let displayPrice = v.price;
           const displayCurrency =
             p.price_request?.currency || p.currency || "VND";
@@ -84,13 +85,14 @@ export function usePriceManagement() {
               (rv) => rv.sku === v.sku,
             );
             if (reqVar) {
-              currentStatus = p.price_request.status || "PENDING";
+              currentStatus =
+                reqVar.status || p.price_request.status || "PENDING";
               displayPrice = reqVar.price;
-            } else if (v.price === 0) {
-              currentStatus = "DRAFT";
+            } else if (v.price > 0) {
+              currentStatus = "APPROVED";
             }
-          } else if (v.price === 0) {
-            currentStatus = "DRAFT";
+          } else if (v.price > 0) {
+            currentStatus = "APPROVED";
           }
 
           const variantText =
@@ -109,8 +111,7 @@ export function usePriceManagement() {
           });
         });
       } else {
-        // Render mặc định cho sản phẩm đơn lẻ
-        let currentStatus = "APPROVED";
+        let currentStatus = "DRAFT";
         let displayPrice = p.price;
         const displayCurrency =
           p.price_request?.currency || p.currency || "VND";
@@ -118,8 +119,8 @@ export function usePriceManagement() {
         if (p.price_request) {
           currentStatus = p.price_request.status || "PENDING";
           displayPrice = p.price_request.price || p.price;
-        } else if (p.price === 0) {
-          currentStatus = "DRAFT";
+        } else if (p.price > 0) {
+          currentStatus = "APPROVED";
         }
 
         flatRecords.push({
@@ -259,7 +260,6 @@ export function usePriceManagement() {
       } = {
         price: targetRecord.variant === "Single" ? data.priceAmount : basePrice,
         currency: data.currency,
-        // lấy thời điểm hiện tại thực tế để tránh lỗi chênh lệch múi giờ với backend
         effective_date: new Date().toISOString(),
       };
 
@@ -300,23 +300,50 @@ export function usePriceManagement() {
   };
 
   const rowActions = {
-    submitPrice: async (productId: string) => {
+    // Nhận thêm params sku để xử lý riêng biệt
+    submitPrice: async (productId: string, sku: string) => {
+      // Tìm xem record đang được click có giá hiện tại là bao nhiêu
+      const targetRecord = records.find(
+        (r) =>
+          r.sku === sku ||
+          (r.productId === productId && r.variant === "Single"),
+      );
+
+      if (targetRecord && targetRecord.price <= 0) {
+        toast.warning(
+          "Giá đang bằng 0. Vui lòng nhấn 'Edit' và 'Save' trước khi Submit!",
+        );
+        return;
+      }
+
       try {
-        await axiosClient.patch(`/products/${productId}/price-request/submit`);
+        await axiosClient.patch(`/products/${productId}/price-request/submit`, {
+          sku,
+        });
         toast.success("Đã gửi yêu cầu duyệt giá!");
         refreshData();
       } catch (error) {
         const err = error as ApiError;
+
+        // Bắt lỗi 404 (Chưa có nháp trong DB) để nhắc nhở thân thiện
+        if (err.response?.status === 404) {
+          toast.error(
+            "Chưa có bản nháp trên hệ thống. Vui lòng nhấn 'Edit' và 'Save Price' trước khi Submit.",
+          );
+          return;
+        }
+
         const msg = err.response?.data?.message;
         toast.error(
           Array.isArray(msg) ? msg.join(", ") : msg || "Lỗi gửi duyệt",
         );
       }
     },
-    approvePrice: async (productId: string) => {
+    approvePrice: async (productId: string, sku: string) => {
       try {
         await axiosClient.patch(`/products/${productId}/price-approval`, {
           action: "approve",
+          sku: sku,
         });
         toast.success("Đã duyệt giá thành công!");
         refreshData();
@@ -328,10 +355,11 @@ export function usePriceManagement() {
         );
       }
     },
-    rejectPrice: async (productId: string) => {
+    rejectPrice: async (productId: string, sku: string) => {
       try {
         await axiosClient.patch(`/products/${productId}/price-approval`, {
           action: "reject",
+          sku: sku,
         });
         toast.warning("Đã từ chối giá!");
         refreshData();
@@ -344,6 +372,7 @@ export function usePriceManagement() {
   };
 
   const bulkActions = {
+    // BE cần được update logic để xử lý bulk theo danh sách SKU thay vì ProductID thuần túy
     bulkApprove: async () => {
       const targets = getUniqueProductIds();
       if (targets.length === 0) return;

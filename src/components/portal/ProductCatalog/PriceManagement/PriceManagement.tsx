@@ -42,9 +42,9 @@ interface PriceManagementProps {
     changeLimit: (limit: number) => void;
   };
   rowActions: {
-    submitPrice: (productId: string) => void;
-    approvePrice: (productId: string) => void;
-    rejectPrice: (productId: string) => void;
+    submitPrice: (productId: string, sku: string) => void;
+    approvePrice: (productId: string, sku: string) => void;
+    rejectPrice: (productId: string, sku: string) => void;
   };
   bulkActions: {
     bulkApprove: () => void;
@@ -332,22 +332,28 @@ export default function PriceManagement({
                             <button
                               type="button"
                               className="prm-btn-action submit"
-                              // Sử dụng productId gốc thay cho id UI
                               onClick={() =>
-                                rowActions.submitPrice(record.productId)
+                                rowActions.submitPrice(
+                                  record.productId,
+                                  record.sku,
+                                )
                               }
                             >
                               Submit
                             </button>
                           </>
                         )}
+
                         {record.status === "PENDING" && (
                           <>
                             <button
                               type="button"
                               className="prm-btn-action approve"
                               onClick={() =>
-                                rowActions.approvePrice(record.productId)
+                                rowActions.approvePrice(
+                                  record.productId,
+                                  record.sku,
+                                )
                               }
                             >
                               Approve
@@ -356,7 +362,10 @@ export default function PriceManagement({
                               type="button"
                               className="prm-btn-action reject"
                               onClick={() =>
-                                rowActions.rejectPrice(record.productId)
+                                rowActions.rejectPrice(
+                                  record.productId,
+                                  record.sku,
+                                )
                               }
                             >
                               Reject

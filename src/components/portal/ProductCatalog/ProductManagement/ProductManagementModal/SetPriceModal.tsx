@@ -1,67 +1,89 @@
 import { useState } from "react";
 import "./SetPriceModal.css";
 
-// Props
+// Khai báo interface chuẩn thay cho any
+export interface PriceSubmitData {
+  priceAmount: number;
+  currency: string;
+  effectiveDate: string;
+}
+
 export interface SetPriceModalProps {
   isOpen: boolean;
   onClose: () => void;
   productName: string;
   sku: string;
   initialPrice?: number;
-  onSave: (newPrice: number) => void;
+  initialCurrency?: string;
+  isSubmitting?: boolean;
+  onSave: (data: PriceSubmitData) => void;
 }
 
-export default function SetPriceModal({
-  isOpen,
+export default function SetPriceModal(props: SetPriceModalProps) {
+  if (!props.isOpen) return null;
+  const modalKey = props.sku || "new-price";
+  return <SetPriceModalContent key={modalKey} {...props} />;
+}
+
+function SetPriceModalContent({
   onClose,
   productName,
   sku,
   initialPrice = 0,
+  initialCurrency = "VND",
+  isSubmitting = false,
   onSave,
-}: SetPriceModalProps) {
-  // Quản lý giá nhập
-  const [priceAmount, setPriceAmount] = useState<string>("");
+}: Omit<SetPriceModalProps, "isOpen">) {
+  const [priceAmount, setPriceAmount] = useState<string>(
+    initialPrice > 0 ? initialPrice.toString() : "",
+  );
+
+  const [currency, setCurrency] = useState<string>(initialCurrency);
   const [error, setError] = useState<string>("");
-  const [currentDate, setCurrentDate] = useState<string>("");
 
-  // state tracking mở/đóng modal
-  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
-  if (isOpen !== prevIsOpen) {
-    setPrevIsOpen(isOpen);
+  const getTodayString = () => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
 
-    // reset lại các giá trị modal
-    if (isOpen) {
-      setPriceAmount(initialPrice > 0 ? initialPrice.toString() : "");
-      setError("");
+  const [effectiveDate] = useState<string>(getTodayString());
 
-      // lấy format dạng YYYY-MM-DD
-      const today = new Date();
-      const yyyy = today.getFullYear();
-      const mm = String(today.getMonth() + 1).padStart(2, "0");
-      const dd = String(today.getDate()).padStart(2, "0");
-      setCurrentDate(`${yyyy}-${mm}-${dd}`);
-    }
-  }
-
-  if (!isOpen) return null;
-
-  // nút Save Price
   const handleSave = () => {
+    if (isSubmitting) return;
+
     const numPrice = parseFloat(priceAmount);
     if (isNaN(numPrice) || numPrice <= 0) {
       setError("Price amount must be greater than 0.");
       return;
     }
+
     setError("");
-    onSave(numPrice);
+
+    // Truyền trực tiếp object chuẩn xác
+    onSave({
+      priceAmount: numPrice,
+      currency,
+      effectiveDate,
+    });
   };
 
   return (
-    <div className="spm-modal-overlay" onClick={onClose}>
+    <div
+      className="spm-modal-overlay"
+      onClick={!isSubmitting ? onClose : undefined}
+    >
       <div className="spm-modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="spm-modal-header">
           <h3 className="spm-modal-title">Set Price</h3>
-          <button type="button" className="spm-close-btn" onClick={onClose}>
+          <button
+            type="button"
+            className="spm-close-btn"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
             ✕
           </button>
         </div>
@@ -77,42 +99,66 @@ export default function SetPriceModal({
 
         <div className="spm-input-grid">
           <div className="spm-input-group">
-            <label>Price Amount (USD)</label>
+            <label>
+              Price Amount <span style={{ color: "#ef4444" }}>*</span>
+            </label>
             <input
               type="number"
               min="0.01"
               step="0.01"
-              className={error ? "spm-input-error" : ""}
+              className={error.includes("Price") ? "spm-input-error" : ""}
               value={priceAmount}
               onChange={(e) => {
                 setPriceAmount(e.target.value);
-                if (error) setError(""); // xóa lỗi khi gõ lại
+                if (error) setError("");
               }}
               placeholder="0.00"
+              disabled={isSubmitting}
             />
           </div>
           <div className="spm-input-group">
             <label>Currency</label>
-            <select disabled>
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              disabled={isSubmitting}
+            >
+              <option value="VND">VND</option>
               <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
             </select>
           </div>
           <div className="spm-input-group">
-            <label>Effective Date</label>
-            <input type="date" value={currentDate} readOnly disabled />
+            <label>
+              Effective Date <span style={{ color: "#ef4444" }}>*</span>
+            </label>
+            <input type="date" value={effectiveDate} disabled readOnly />
           </div>
         </div>
+
         {error && <div className="spm-error-text">{error}</div>}
+
         <div className="spm-warning-banner">
           <span>⚠️</span>
           This price requires approval before being published.
         </div>
+
         <div className="spm-modal-footer">
-          <button type="button" className="spm-btn-cancel" onClick={onClose}>
+          <button
+            type="button"
+            className="spm-btn-cancel"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
             Cancel
           </button>
-          <button type="button" className="spm-btn-save" onClick={handleSave}>
-            Save Price
+          <button
+            type="button"
+            className="spm-btn-save"
+            onClick={handleSave}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Saving..." : "Save Price"}
           </button>
         </div>
       </div>

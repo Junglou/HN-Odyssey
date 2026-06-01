@@ -231,6 +231,16 @@ export function useOrderManagement() {
         const totalAmount = order.total_amount;
         const subtotal = totalAmount + (order.discount_amount || 0) - shipFee;
 
+        // Xác định người tạo đơn dựa vào actor của sự kiện khởi tạo (nằm ở vị trí đầu tiên trong mảng timeline)
+        // Backend đang trả về 'Member' đối với thành viên, 'Guest' đối với khách vãng lai
+        const firstEventActor = order.timeline?.[0]?.actor;
+        const creatorRole =
+          firstEventActor === "Guest" ||
+          firstEventActor === "Member" ||
+          order.isGuest
+            ? "Customer"
+            : "Sales Staff";
+
         return {
           id: order._id,
           orderCode: order.order_code,
@@ -244,7 +254,7 @@ export function useOrderManagement() {
           totalAmount: totalAmount,
           paymentStatus: mapPaymentStatus(order.payment?.status),
           orderStatus: mapBeToFeStatus(order.status),
-          createdBy: order.isGuest ? "Customer" : "Sales Staff",
+          createdBy: creatorRole,
           note: order.internal_note,
           waybillCode:
             order.waybill_code || order.shipping_info?.tracking_code || "",

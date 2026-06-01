@@ -15,6 +15,7 @@ export interface PricingItem {
   id: string;
   variantName: string;
   price: number;
+  currency?: string;
   status: "draft" | "pending" | "approved" | "rejected";
   sku?: string;
 }
@@ -78,20 +79,6 @@ export interface ApiCategoryNode {
   name: string;
   children?: ApiCategoryNode[];
 }
-
-export const MOCK_CATEGORIES: CategoryNode[] = [
-  {
-    id: "c1",
-    name: "Women",
-    children: [
-      {
-        id: "c1-1",
-        name: "Outerwear",
-        children: [{ id: "c1-1-1", name: "Jackets" }],
-      },
-    ],
-  },
-];
 
 const generatePricingVariants = (
   variants: VariantAttribute[],
@@ -181,7 +168,6 @@ export function useProductForm() {
     CategoryNode[]
   >([]);
 
-  // load dependencies
   useEffect(() => {
     const fetchDependencies = async () => {
       try {
@@ -229,7 +215,6 @@ export function useProductForm() {
     fetchDependencies();
   }, []);
 
-  // load product data
   useEffect(() => {
     if ((mode === "edit" || mode === "view") && id) {
       const loadProductData = async () => {
@@ -299,27 +284,22 @@ export function useProductForm() {
                   | "rejected" = "draft";
                 let displayPrice = v.price;
 
-                if (
-                  p.price_request &&
-                  (p.price_request.status === "PENDING" ||
-                    p.price_request.status === "REJECTED")
-                ) {
+                if (p.price_request) {
                   const reqVar = p.price_request.variants?.find(
-                    (reqV: { sku: string; price: number }) =>
+                    (reqV: { sku: string; price: number; status?: string }) =>
                       reqV.sku === v.sku,
                   );
+
                   if (reqVar) {
-                    currentStatus = p.price_request.status.toLowerCase() as
+                    currentStatus = (
+                      reqVar.status || p.price_request.status
+                    ).toLowerCase() as
                       | "draft"
                       | "pending"
                       | "approved"
                       | "rejected";
                     displayPrice = reqVar.price;
-                  } else if (v.price > 0) {
-                    currentStatus = "approved";
                   }
-                } else if (v.price > 0) {
-                  currentStatus = "approved";
                 }
 
                 return {
@@ -337,19 +317,13 @@ export function useProductForm() {
               "draft";
             let displayPrice = p.price;
 
-            if (
-              p.price_request &&
-              (p.price_request.status === "PENDING" ||
-                p.price_request.status === "REJECTED")
-            ) {
+            if (p.price_request) {
               currentStatus = p.price_request.status.toLowerCase() as
                 | "draft"
                 | "pending"
                 | "approved"
                 | "rejected";
               displayPrice = p.price_request.price;
-            } else if (p.price > 0) {
-              currentStatus = "approved";
             }
 
             setPricingList([
@@ -373,7 +347,6 @@ export function useProductForm() {
     }
   }, [mode, id, navigate]);
 
-  // actions
   const actions = {
     changeInput: (name: keyof ProductData, value: string) => {
       setFormData((prev) => {
@@ -427,17 +400,17 @@ export function useProductForm() {
       });
     },
 
-    savePrice: (priceId: string, newPrice: number) => {
+    savePrice: (priceId: string, newPrice: number, currency: string) => {
       setPricingList((prev) =>
         prev.map((item) =>
           item.id === priceId
-            ? { ...item, price: newPrice, status: "draft" }
+            ? { ...item, price: newPrice, currency: currency, status: "draft" }
             : item,
         ),
       );
     },
 
-    submitSinglePrice: async () => {
+    submitSinglePrice: async (pricingItemId: string) => {
       if (mode === "add" || id === "add" || !id) {
         toast.warning(
           "Vui lòng 'Save Product' trước khi gửi yêu cầu duyệt giá!",
@@ -445,37 +418,62 @@ export function useProductForm() {
         return;
       }
 
+      const targetItem = pricingList.find((p) => p.id === pricingItemId);
+      if (!targetItem) return;
+
+      if (targetItem.price <= 0) {
+        toast.warning(
+          "Vui lòng thiết lập giá (Edit) lớn hơn 0 trước khi Submit!",
+        );
+        return;
+      }
+
       try {
+        const isSingleProduct =
+          targetItem.variantName === "Default / Base Product";
         const baseProduct = pricingList.find(
           (p) => p.variantName === "Default / Base Product",
         );
+        const basePrice = baseProduct ? baseProduct.price : targetItem.price;
 
-        let rootPrice = baseProduct
-          ? baseProduct.price
-          : pricingList[0]?.price || 0;
-        if (rootPrice <= 0) {
-          rootPrice = pricingList.find((p) => p.price > 0)?.price || 0;
-        }
-
-        const variantPayloads = pricingList
-          .filter(
-            (p) => p.variantName !== "Default / Base Product" && p.price > 0,
-          )
-          .map((p) => ({ sku: p.sku || `${formData.sku}-V`, price: p.price }));
-
-        const payload = {
-          price: rootPrice,
+        // Bổ sung type chặt chẽ, lấy currency đã setup thay vì hardcode VND
+        const payload: {
+          price: number;
+          currency: string;
+          effective_date: string;
+          variants?: { sku: string; price: number }[];
+        } = {
+          price: isSingleProduct
+            ? targetItem.price
+            : basePrice > 0
+              ? basePrice
+              : targetItem.price,
+          currency: targetItem.currency || "USD",
           effective_date: new Date().toISOString(),
-          variants: variantPayloads,
         };
 
+        if (!isSingleProduct) {
+          payload.variants = [
+            {
+              sku: targetItem.sku || `${formData.sku}-V`,
+              price: targetItem.price,
+            },
+          ];
+        }
+
         await axiosClient.post(`/products/${id}/price-request`, payload);
-        await axiosClient.patch(`/products/${id}/price-request/submit`);
+        await axiosClient.patch(`/products/${id}/price-request/submit`, {
+          sku: targetItem.sku,
+        });
 
         setPricingList((prev) =>
-          prev.map((p) => (p.price > 0 ? { ...p, status: "pending" } : p)),
+          prev.map((p) =>
+            p.id === pricingItemId ? { ...p, status: "pending" } : p,
+          ),
         );
-        toast.success("Đã gửi yêu cầu phê duyệt giá cho toàn bộ sản phẩm");
+        toast.success(
+          `Đã gửi yêu cầu phê duyệt giá cho biến thể ${targetItem.variantName}`,
+        );
       } catch (error: unknown) {
         let errorMsg = "Lỗi khi gửi yêu cầu giá";
         const err = error as {
@@ -492,38 +490,48 @@ export function useProductForm() {
       }
     },
 
-    approveSinglePrice: async () => {
+    approveSinglePrice: async (pricingItemId: string) => {
       if (!id) return;
+      const targetItem = pricingList.find((p) => p.id === pricingItemId);
+      if (!targetItem) return;
+
       try {
         await axiosClient.patch(`/products/${id}/price-approval`, {
           action: "approve",
+          sku: targetItem.sku,
         });
 
         setPricingList((prev) =>
           prev.map((item) =>
-            item.status === "pending" ? { ...item, status: "approved" } : item,
+            item.id === pricingItemId ? { ...item, status: "approved" } : item,
           ),
         );
-        toast.success("Duyệt giá thành công cho toàn bộ biến thể");
+        toast.success(
+          `Duyệt giá thành công cho biến thể ${targetItem.variantName}`,
+        );
       } catch (error: unknown) {
         console.error(error);
         toast.error("Lỗi khi duyệt giá");
       }
     },
 
-    rejectSinglePrice: async () => {
+    rejectSinglePrice: async (pricingItemId: string) => {
       if (!id) return;
+      const targetItem = pricingList.find((p) => p.id === pricingItemId);
+      if (!targetItem) return;
+
       try {
         await axiosClient.patch(`/products/${id}/price-approval`, {
           action: "reject",
+          sku: targetItem.sku,
         });
 
         setPricingList((prev) =>
           prev.map((item) =>
-            item.status === "pending" ? { ...item, status: "rejected" } : item,
+            item.id === pricingItemId ? { ...item, status: "rejected" } : item,
           ),
         );
-        toast.success("Đã từ chối giá cho toàn bộ biến thể");
+        toast.success(`Đã từ chối giá cho biến thể ${targetItem.variantName}`);
       } catch (error: unknown) {
         console.error(error);
         toast.error("Lỗi khi từ chối giá");
