@@ -51,20 +51,16 @@ const AccountRecoveryForm = ({
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-
-    // Validate các trường bắt buộc
-    if (!email || !otp || !description) {
-      toast.warning(
-        "Vui lòng điền đầy đủ thông tin bắt buộc (Email, OTP, Mô tả).",
-      );
+    if (!email || !description) {
+      toast.warning("Vui lòng điền đầy đủ thông tin bắt buộc (Email, Mô tả).");
       return;
     }
 
     onSubmit({
-      email,
-      otpCode: otp,
-      description,
-      images: file,
+      target_account: email,
+      contact_email: email,
+      reason: description,
+      evidence: file,
     });
   };
 

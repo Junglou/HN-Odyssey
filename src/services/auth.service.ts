@@ -17,34 +17,25 @@ import type {
 const authService = {
   // Login (US.02)
   async login(payload: LoginPayload): Promise<LoginResponse> {
-    const data = await axiosClient.post<unknown, LoginResponse>(
-      "/auth/login",
-      payload,
-    );
-
-    // Lưu Token, Refresh Token và User info
+    const response = await axiosClient.post("/auth/login", payload);
+    const data = response.data as LoginResponse;
     if (data.access_token) {
       tokenStorage.setToken(data.access_token);
-
-      // BỔ SUNG: Lưu refresh_token vào storage
       if (data.refresh_token) {
         tokenStorage.setRefreshToken(data.refresh_token);
       }
-
       if (data.user) {
         tokenStorage.setUser(data.user);
       }
     }
-
     return data;
   },
 
   // Register (US.01)
   async register(payload: RegisterPayload): Promise<RegisterResponse> {
-    return await axiosClient.post<unknown, RegisterResponse>(
-      "/auth/register",
-      payload,
-    );
+    const response = await axiosClient.post("/auth/register", payload);
+    const data = response.data as RegisterResponse;
+    return data;
   },
 
   // Logout
@@ -83,9 +74,9 @@ const authService = {
     );
   },
 
-  // Forgot Password (ĐÃ FIX MAP DỮ LIỆU)
-  async forgotPassword(email: string): Promise<AuthResponse> {
-    const payload: ForgotPasswordPayload = { account: email };
+  // Forgot Password
+  async forgotPassword(account: string): Promise<AuthResponse> {
+    const payload: ForgotPasswordPayload = { account };
     return await axiosClient.post<unknown, AuthResponse>(
       "/auth/forgot-password",
       payload,

@@ -20,23 +20,19 @@ export const useAccountRecovery = () => {
     setError(null);
 
     try {
-      // FIX 422: Chặn việc gửi API nếu người dùng chưa cung cấp file (Vì BE bắt buộc)
-      if (!payload.images) {
+      if (!payload.evidence) {
         throw new Error("Vui lòng đính kèm file xác minh (hình ảnh/tài liệu).");
       }
 
       const formData = new FormData();
 
-      // Mapping đúng 100% với DTO của Backend
-      formData.append("target_account", payload.email);
-      formData.append("contact_email", payload.email);
-      formData.append("reason", payload.description);
+      // Mapping đúng 100% với DTO của Backend bằng các key mới
+      formData.append("target_account", payload.target_account);
+      formData.append("contact_email", payload.contact_email);
+      formData.append("reason", payload.reason);
 
-      // Bỏ comment dòng dưới nếu DTO BE thực sự có khai báo và cần nhận otpCode
-      // formData.append("otpCode", payload.otpCode);
-
-      // Chắc chắn append vào trường "images" khớp với @UseInterceptors(FilesInterceptor('images', 3))
-      formData.append("images", payload.images);
+      // Chắc chắn append vào trường "images" khớp với @UseInterceptors(FilesInterceptor('images', 3)) của Backend
+      formData.append("images", payload.evidence);
 
       // Gọi Service
       await authService.requestAccountRecovery(formData);

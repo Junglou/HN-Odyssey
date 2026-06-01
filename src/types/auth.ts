@@ -34,30 +34,30 @@ export interface RegisterResponse {
   account?: string;
 }
 
-// Verify OTP Payload
+// Verify OTP Payload (Khớp verify.dto.ts)
 export interface VerifyOtpPayload {
-  email?: string;
-  phoneNumber?: string;
-  otpCode: string;
+  account: string;
+  code: string;
+  type: string;
 }
 
-// Resend OTP Payload
+// Resend OTP Payload (Khớp resend-otp.dto.ts.ts)
 export interface ResendOtpPayload {
-  email?: string;
-  phoneNumber?: string;
+  account: string;
+  type: string;
 }
 
-// Forgot Password Payload
+// Forgot Password Payload (Khớp forgot-password.dto.ts)
 export interface ForgotPasswordPayload {
-  email: string;
+  account: string;
 }
 
-// Reset Password Payload
+// Reset Password Payload (Khớp reset-password.dto.ts)
 export interface ResetPasswordPayload {
-  email: string; // Backend yêu cầu email/account
-  otpCode?: string;
+  account: string;
+  code: string;
   newPassword: string;
-  confirmPassword: string;
+  confirmNewPassword: string;
 }
 
 // Generic Response
@@ -65,11 +65,11 @@ export interface AuthResponse {
   message: string;
 }
 
-// Account Recovery Payload
+// Account Recovery Payload (Khớp create-recovery.dto.ts)
 export interface AccountRecoveryPayload {
-  email: string;
-  otpCode: string;
-  description: string;
+  target_account: string;
+  contact_email: string;
+  reason: string;
   evidence: File | null;
 }
 
@@ -79,14 +79,13 @@ export interface AccountRecoveryResponse {
   ticketId?: string;
 }
 
-// Confirm Recovery Payload
+// Confirm Recovery Payload (Khớp recover-account.dto.ts)
 export interface ConfirmRecoveryPayload {
-  ticketId: string;
+  account: string;
+  code: string;
   newPassword: string;
   confirmNewPassword: string;
   newEmail: string;
-  confirmNewEmail: string;
-  otpCode: string;
 }
 
 // Confirm Recovery Response

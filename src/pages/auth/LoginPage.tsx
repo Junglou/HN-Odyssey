@@ -30,7 +30,7 @@ const LoginPage = () => {
     try {
       await login(data);
       toast.success("Đăng nhập thành công!");
-      // navigate("/dashboard");
+      navigate("/");
     } catch (err: unknown) {
       const apiError = err as ApiError;
       toast.error(apiError.message || "Đăng nhập thất bại");
