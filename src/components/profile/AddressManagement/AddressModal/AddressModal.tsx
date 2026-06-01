@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import "./AddressModal.css";
+import { ProfileModalPortal } from "../../ProfileModal/ProfileModalPortal";
 import type { UserAddress } from "../../../../types/user";
 
 export type { UserAddress };
@@ -50,10 +51,13 @@ export default function AddressModal({
 
     // Nếu là mode edit hoặc view, populate dữ liệu từ initialData
     if (!initialData) return;
-    if (receiverNameRef.current) receiverNameRef.current.value = initialData.receiverName ?? "";
-    if (addressRef.current) addressRef.current.value = initialData.address ?? "";
+    if (receiverNameRef.current)
+      receiverNameRef.current.value = initialData.receiverName ?? "";
+    if (addressRef.current)
+      addressRef.current.value = initialData.address ?? "";
     if (cityRef.current) cityRef.current.value = initialData.city ?? "";
-    if (countryRef.current) countryRef.current.value = initialData.country ?? "";
+    if (countryRef.current)
+      countryRef.current.value = initialData.country ?? "";
   }, [isOpen, initialData, mode]);
 
   // validate trước khi trả data ra ngoài
@@ -85,10 +89,14 @@ export default function AddressModal({
   if (!isOpen) return null;
 
   return (
-    <div className="um-modal-overlay" onClick={onClose}>
+    <ProfileModalPortal isOpen={isOpen} onClose={onClose}>
       <div className="um-modal-box" onClick={(e) => e.stopPropagation()}>
         <h2 className="um-modal-title">
-          {mode === "add" ? "Add new address" : mode === "edit" ? "Edit address" : "Address details"}
+          {mode === "add"
+            ? "Add new address"
+            : mode === "edit"
+              ? "Edit address"
+              : "Address details"}
         </h2>
 
         <form onSubmit={handleFormSubmit} className="um-modal-form">
@@ -151,21 +159,21 @@ export default function AddressModal({
 
           {/* cụm nút */}
           <div className="um-modal-actions">
-              <>
-                <button type="submit" className="um-btn-modal-submit">
-                  {mode === "add" ? "Add address" : "Save changes"}
-                </button>
-                <button
-                  type="button"
-                  className="um-btn-modal-cancel"
-                  onClick={onClose}
-                >
-                  Cancel
-                </button>
-              </>
+            <>
+              <button type="submit" className="um-btn-modal-submit">
+                {mode === "add" ? "Add address" : "Save changes"}
+              </button>
+              <button
+                type="button"
+                className="um-btn-modal-cancel"
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+            </>
           </div>
         </form>
       </div>
-    </div>
+    </ProfileModalPortal>
   );
 }

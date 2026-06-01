@@ -1,13 +1,13 @@
 import "./AddressManagement.css";
 import type { UserAddress } from "../../../types/user";
 import RecommendationList from "../../common/RecommendationList";
+import type { RecommendProduct } from "../../../hooks/profile/useRecommendProduct";
 import AddressBox from "./AddressBox";
 import { useNavigate } from "react-router-dom"; // Import useNavigate
-import type { Product } from "../../../types/product";
 
 interface AddressProps {
   address: UserAddress[];
-  recommendations: Product[];
+  recommendations: RecommendProduct[];
   onAddAddress?: () => void;
   onEditAddress?: (index: number) => void;
   onDeleteAddress?: (index: number) => void;
@@ -33,7 +33,7 @@ const AddressManagement = ({
         <div className="grid-section section-address">
           {address.map((items, index) => (
             <AddressBox
-              key={index}
+              key={items.id || index}
               address={items}
               index={index}
               onEdit={onEditAddress}
@@ -45,19 +45,27 @@ const AddressManagement = ({
 
         {/* CỘT 2: RECOMMENDATIONS */}
         <div className="grid-section section-recs">
-          <RecommendationList products={recommendations} />
+          <div className="profile-recommendations-embedded">
+            <RecommendationList products={recommendations} />
+          </div>
           <div className="bottom-link-container">
             {/* Gắn link nội bộ */}
             <a className="text-link" onClick={() => navigate("/refund-policy")}>
               Refund Policy
             </a>
-            <a className="text-link" onClick={() => navigate("/profile/loyalty")}>
+            <a
+              className="text-link"
+              onClick={() => navigate("/profile/loyalty")}
+            >
               About Loyalty Plan
             </a>
             <a className="text-link" onClick={() => navigate("/about-us")}>
               About us
             </a>
-            <a className="text-link" onClick={() => navigate("/Information-policy")}>
+            <a
+              className="text-link"
+              onClick={() => navigate("/Information-policy")}
+            >
               Information Policy
             </a>
           </div>

@@ -1,37 +1,39 @@
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
+import { useLocation, useParams } from "react-router-dom";
 import AccountSidebar from "../../components/profile/AccountSidebar";
-import "./OrderDetailPage.css"; // CSS Layout trang
+import "./OrderDetailPage.css";
 import OrderDetail from "../../components/profile/OrderDetail/OrderDetail";
-import { useProfileManagement } from "../../hooks/profile/useProfileManagement";
+import type { UserOrder } from "../../types/user";
+
+type OrderDetailLocationState = {
+  order?: UserOrder;
+};
 
 const OrderDetailPage = () => {
-  const {
-    user,
-  } = useProfileManagement();
-  // 1. Quản lý State
-  const [loading, setLoading] = useState(true);
+  const { orderId = "" } = useParams<{ orderId: string }>();
+  const { state } = useLocation();
+  const orderFromState =
+    (state as OrderDetailLocationState | null)?.order ?? null;
 
-  // 2. Giả lập API
-  useEffect(() => {
-    // Gọi API thật ở đây. Tạm thời setTimeout giả lập
-    setTimeout(() => {
-      setLoading(false);
-    }, 500);
-  }, []);
+  const order = useMemo((): UserOrder | null => {
+    if (
+      orderFromState &&
+      (orderFromState.id === orderId || orderFromState.orderCode === orderId)
+    ) {
+      return orderFromState;
+    }
 
-  if (loading) return <div>Loading...</div>;
+    return null;
+  }, [orderFromState, orderId]);
 
-  // 4. Render
   return (
     <div className="my-profile-page-container">
-      {/* Sidebar (Menu trái) */}
       <div className="sidebar-wrapper">
         <AccountSidebar />
       </div>
 
-      {/* Content (Nội dung phải) */}
       <div className="content-wrapper">
-        <OrderDetail user={user} />
+        <OrderDetail orderId={orderId} order={order} />
       </div>
     </div>
   );

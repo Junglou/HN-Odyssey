@@ -1,51 +1,45 @@
 .account-sidebar-wrapper {
   background-color: #fff;
-  border-radius: 24px;
-  /* DROP SHADOW */
+  border-radius: clamp(18px, 1.5vw, 24px);
   box-shadow:
-    /* 1. Stroke: Viền định hình (Giữ nguyên) */
     0 0 0 1px rgb(202, 200, 200),
-    /* - 8px (X): Lệch phải
-       - 8px (Y): Lệch xuống
-       - 4px (Blur): QUAN TRỌNG - Để 0 để bóng sắc nét, không bị nhòe
-       - rgba(...): Màu bóng */
     8px 8px 4px rgba(17, 24, 39, 0.2);
 
   width: 100%;
-  min-height: 700px;
+  min-height: auto;
 
   display: flex;
   flex-direction: column;
   font-family: "Lexend Exa", sans-serif;
   box-sizing: border-box;
-  padding: 1.5rem 1rem;
+  padding: clamp(1.35rem, 1.8vw, 1.85rem) clamp(1.15rem, 1.5vw, 1.6rem);
 }
 
-/* Container nội dung */
 .sidebar-content {
   display: flex;
   flex-direction: column;
   height: 100%;
   flex: 1;
+  min-width: 0;
 }
 
 .sidebar-menu-list {
   display: flex;
   flex-direction: column;
-  gap: 0.8rem;
+  gap: clamp(0.75rem, 0.95vw, 1rem);
 }
 
-/* --- CẤU TRÚC HÀNG --- */
 .sidebar-row {
   display: flex;
   align-items: center;
-  gap: 16px;
-  height: 48px;
+  gap: clamp(0.65rem, 0.9vw, 0.85rem);
+  min-height: clamp(48px, 3.2vw, 54px);
+  height: auto;
+  min-width: 0;
 }
 
-/* --- CỘT LINE (Bên trái) --- */
 .line-column {
-  width: 6px;
+  width: clamp(5px, 0.45vw, 7px);
   height: 100%;
   display: flex;
   align-items: center;
@@ -54,8 +48,8 @@
 }
 
 .thread-line {
-  width: 3px;
-  height: 28px;
+  width: clamp(2px, 0.2vw, 3px);
+  height: clamp(26px, 2vw, 30px);
   background-color: #dcdcdc;
   border-radius: 4px;
   transition: all 0.2s ease;
@@ -63,36 +57,38 @@
 
 .active-line {
   background-color: #111;
-  height: 36px;
-  width: 4px;
+  height: clamp(32px, 2.4vw, 38px);
+  width: clamp(3px, 0.25vw, 4px);
 }
 
-/* --- CỘT VIÊN THUỐC (Bên phải) --- */
 .sidebar-item-pill {
   flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-start; /* Căn trái */
+  justify-content: flex-start;
 
-  padding: 0 1.2rem;
-  height: 100%;
+  padding: clamp(0.6rem, 0.85vw, 0.78rem) clamp(0.9rem, 1.1vw, 1.08rem);
+  min-height: clamp(48px, 3.2vw, 54px);
+  height: auto;
 
   border-radius: 50px;
   cursor: pointer;
   transition: all 0.2s ease;
 
   color: #555;
-  font-size: 0.95rem;
+  font-size: clamp(0.88rem, 0.9vw, 0.98rem);
   font-weight: 500;
 
   background-color: transparent;
   border: 1.5px solid transparent;
+  box-sizing: border-box;
 }
 
 .sidebar-icon {
-  width: 24px;
-  height: 24px;
-  margin-right: 14px;
+  width: clamp(22px, 1.55vw, 26px);
+  height: clamp(22px, 1.55vw, 26px);
+  margin-right: clamp(0.55rem, 0.75vw, 0.7rem);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -107,51 +103,94 @@
 }
 
 .sidebar-label {
-  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.35;
 }
 
-/* Hover */
+/* Desktop — size column to fit labels, no truncation */
+@media (min-width: 993px) {
+  .sidebar-wrapper:has(.account-sidebar-wrapper) {
+    flex: 0 0 auto;
+    width: fit-content;
+    min-width: 22rem;
+    max-width: 26rem;
+  }
+
+  .account-sidebar-wrapper {
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .sidebar-content {
+    min-width: max-content;
+    width: 100%;
+  }
+
+  .sidebar-menu-list {
+    min-width: max-content;
+    width: 100%;
+  }
+
+  .sidebar-row {
+    width: 100%;
+    min-width: max-content;
+  }
+
+  .sidebar-item-pill,
+  .sidebar-logout-btn {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: max-content;
+  }
+
+  .sidebar-label {
+    flex: 0 1 auto;
+    white-space: nowrap;
+    word-break: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+}
+
 .sidebar-item-pill:hover {
   background-color: #f9f9f9;
   color: #000;
 }
 
-/* --- ACTIVE STATE --- */
 .sidebar-item-pill.active {
   background-color: #ffffff;
   color: #000;
   font-weight: 700;
-
-  /* Border đen */
   border: 1.5px solid #000;
-
-  /* Shadow nhẹ */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-/* --- LOGOUT --- */
 .sidebar-logout-container {
   margin-top: auto;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding-top: 2rem;
+  gap: clamp(0.85rem, 1.1vw, 1.05rem);
+  padding-top: clamp(1.5rem, 2vw, 2.15rem);
 }
 
 .sidebar-logout-btn {
   flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  padding: 0 1.2rem;
-  height: 48px;
+  padding: clamp(0.6rem, 0.85vw, 0.78rem) clamp(0.9rem, 1.15vw, 1.12rem);
+  min-height: clamp(48px, 3.2vw, 54px);
+  height: auto;
+  box-sizing: border-box;
 
   border-radius: 50px;
   cursor: pointer;
 
   color: #ef4444;
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: clamp(0.92rem, 0.98vw, 1.02rem);
   transition: all 0.2s;
   border: 1px solid transparent;
 }
@@ -161,36 +200,136 @@
   border-color: #fca5a5;
 }
 
-/* Mobile Responsive */
+/* Large screens — slightly larger than original desktop */
+@media (min-width: 1981px) {
+  .account-sidebar-wrapper {
+    padding: clamp(1.55rem, 1.65vw, 1.75rem) clamp(1.1rem, 1.2vw, 1.35rem);
+  }
+
+  .sidebar-item-pill,
+  .sidebar-logout-btn {
+    font-size: clamp(0.88rem, 0.75vw, 0.94rem);
+    padding-inline: clamp(0.8rem, 0.85vw, 0.95rem);
+  }
+
+  .sidebar-icon {
+    width: clamp(22px, 1.1vw, 24px);
+    height: clamp(22px, 1.1vw, 24px);
+  }
+}
+
+@media (min-width: 2560px) {
+  .account-sidebar-wrapper {
+    padding: clamp(1.6rem, 1.35vw, 1.75rem) clamp(1.15rem, 1.1vw, 1.35rem);
+  }
+
+  .sidebar-menu-list {
+    gap: clamp(0.85rem, 0.85vw, 1.05rem);
+  }
+
+  .sidebar-item-pill,
+  .sidebar-logout-btn {
+    font-size: clamp(0.88rem, 0.65vw, 0.94rem);
+  }
+}
+
+/* Tablet & mobile: horizontal scroll chips */
 @media (max-width: 992px) {
   .account-sidebar-wrapper {
     min-height: auto;
+    min-width: 0;
     border-radius: 16px;
     padding: 1rem;
   }
+
   .sidebar-menu-list {
     flex-direction: row;
-    overflow-x: auto;
+    flex-wrap: nowrap;
+    align-items: center;
     gap: 0.5rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.35rem;
+    scrollbar-width: thin;
+    scrollbar-color: #bbb transparent;
+    -webkit-overflow-scrolling: touch;
   }
+
+  .sidebar-menu-list::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .sidebar-menu-list::-webkit-scrollbar-thumb {
+    background-color: #bbb;
+    border-radius: 999px;
+  }
+
   .sidebar-row {
+    flex: 0 0 auto;
+    flex-shrink: 0;
     width: auto;
+    min-width: max-content;
     gap: 0;
+    min-height: auto;
+    height: auto;
   }
+
   .line-column {
     display: none;
   }
 
   .sidebar-item-pill {
-    padding: 0.6rem 1rem;
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    width: max-content;
+    max-width: none;
+    min-width: max-content;
+    padding: 0.55rem 1rem;
+    min-height: 44px;
+    height: auto;
     border: 1px solid #eee;
+    white-space: nowrap;
+    font-size: 0.88rem;
   }
+
+  .sidebar-label {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    word-break: normal;
+    line-height: 1.2;
+  }
+
+  .sidebar-icon {
+    width: 20px;
+    height: 20px;
+    margin-right: 8px;
+  }
+
   .sidebar-item-pill.active {
     background-color: #000;
     color: #fff;
     border-color: #000;
   }
+
   .sidebar-logout-container {
     display: none;
+  }
+}
+
+@media (max-width: 576px) {
+  .account-sidebar-wrapper {
+    padding: 0.75rem;
+  }
+
+  .sidebar-item-pill {
+    font-size: 0.85rem;
+    padding: 0.5rem 0.85rem;
+    min-height: 40px;
+  }
+
+  .sidebar-icon {
+    width: 20px;
+    height: 20px;
+    margin-right: 6px;
   }
 }

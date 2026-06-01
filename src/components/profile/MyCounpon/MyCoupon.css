@@ -1,5 +1,5 @@
 /* --- MAIN CARD --- */
-.recent-card {
+.coupon-card {
   background-color: #ffffff;
   border-radius: 24px;
 
@@ -17,13 +17,13 @@
 }
 
 /* Header */
-.recent-header {
+.coupon-header {
   padding: 2.5rem 3rem 1rem 3rem;
   background: #fff;
   display: flex;
   justify-content: space-between;
 }
-.recent-title {
+.coupon-title {
   font-size: 2rem;
   font-weight: 700;
   margin: 0;
@@ -31,16 +31,20 @@
 }
 
 /* --- GRID SYSTEM --- */
-.recent-internal-grid {
+.coupon-internal-grid {
   display: grid;
   /* Content | Recommend */
   grid-template-columns: 65% 35%;
 }
 
-.section-recent
-{
-  padding-left: 1rem;
-  padding-right: 1rem;
+.no-coupons {
+  font-size: 1.2rem;
+  color: #555;
+  padding: 1rem 2rem 2rem;
+}
+
+.section-coupon {
+  padding: 1rem;
   height: fit-content;
   display: grid;
   grid-template-columns: auto;
@@ -57,8 +61,7 @@
   border-left: none;
 }
 
-.bottom-link-container
-{
+.bottom-link-container {
   margin-left: 1rem;
   margin-top: 1rem;
   display: grid;
@@ -67,13 +70,11 @@
 
 /* RESPONSIVE */
 @media (max-width: 2200px) {
-  .recent-internal-grid {
+  .coupon-internal-grid {
     grid-template-columns: 65% 35%;
   }
-  .section-recent
-  {
-    padding-left: 1rem;
-    padding-right: 1rem;
+  .section-coupon {
+    padding: 1rem;
     height: fit-content;
     display: grid;
     grid-template-columns: auto;
@@ -86,41 +87,40 @@
 }
 
 @media (max-width: 1500px) {
-  .recent-internal-grid {
+  .coupon-internal-grid {
     grid-template-columns: 100%;
   }
-  .section-recent {
-  padding: 0 1rem;
-  height: fit-content;
-  display: grid;
-  grid-template-columns: auto;
-  column-gap: 1rem;
-  row-gap: 1rem;
-  max-height: 500px;
-  overflow-y: auto;
-  max-height: 40rem;
-  overflow-y: scroll;
-  overflow-x: hidden;
+  .section-coupon {
+    padding: 1rem;
+    height: fit-content;
+    display: grid;
+    grid-template-columns: auto;
+    column-gap: 1rem;
+    row-gap: 1rem;
+    max-height: 500px;
+    overflow-y: auto;
+    max-height: 40rem;
+    overflow-y: scroll;
+    overflow-x: hidden;
   }
 }
 @media (max-width: 1120px) {
-  .recent-header
-  {
+  .coupon-header {
     padding: 2rem 2rem 1rem 2rem;
   }
-  .recent-internal-grid {
+  .coupon-internal-grid {
     grid-template-columns: 1fr;
   }
-  .section-recent {
-  padding-left: 1rem;
-  height: fit-content;
-  display: grid;
-  grid-template-columns: auto;
-  column-gap: 1rem;
-  row-gap: 1rem;
-  max-height: 40rem;
-  overflow-y: scroll;
-  overflow-x: hidden;
+  .section-coupon {
+    padding: 1rem;
+    height: fit-content;
+    display: grid;
+    grid-template-columns: auto;
+    column-gap: 1rem;
+    row-gap: 1rem;
+    max-height: 40rem;
+    overflow-y: scroll;
+    overflow-x: hidden;
   }
 
   .section-recs {
@@ -129,34 +129,34 @@
   }
 }
 @media (max-width: 990px) {
-  .recent-internal-grid {
+  .coupon-internal-grid {
     grid-template-columns: 1fr;
   }
-  .section-recent {
-  padding: 0 1rem;
-  height: fit-content;
-  display: grid;
-  grid-template-columns: auto;
-  column-gap: 1rem;
-  row-gap: 1rem;
-  max-height: 40rem;
-  overflow-y: scroll;
-  overflow-x: hidden;
+  .section-coupon {
+    padding: 1rem;
+    height: fit-content;
+    display: grid;
+    grid-template-columns: auto;
+    column-gap: 1rem;
+    row-gap: 1rem;
+    max-height: 40rem;
+    overflow-y: scroll;
+    overflow-x: hidden;
   }
 }
 @media (max-width: 700px) {
-  .recent-internal-grid {
+  .coupon-internal-grid {
     grid-template-columns: 1fr;
   }
-  .section-recent {
-  padding: 0 1rem;
-  height: fit-content;
-  display: grid;
-  grid-template-columns: auto;
-  column-gap: 1rem;
-  row-gap: 1rem;
-  max-height: 40rem;
-  overflow-y: scroll;
-  overflow-x: hidden;
+  .section-coupon {
+    padding: 1rem;
+    height: fit-content;
+    display: grid;
+    grid-template-columns: auto;
+    column-gap: 1rem;
+    row-gap: 1rem;
+    max-height: 40rem;
+    overflow-y: scroll;
+    overflow-x: hidden;
   }
 }

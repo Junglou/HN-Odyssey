@@ -1,121 +1,254 @@
-.order-box-container
-{
+.order-box-container {
+  box-sizing: border-box;
   width: 100%;
-  height: fit-content;
-  min-width: 20rem;
-  border: solid lightgrey 0.1rem;
-  border-radius: 2rem;
-  box-shadow: 0 0 0 1px rgb(202, 200, 200),
-    8px 8px 4px rgba(17, 24, 39, 0.2);
-}
-
-.lbl-text
-{
-  font-size: 1rem;
-  font-weight: bold;
-}
-
-.lbl-thumb-text
-{
-  font-weight: bolder;
-  font-size: 1rem;
-}
-
-.box-content
-{
-  width: 93%;
   height: 100%;
-  padding: 1rem;
+  min-width: 0;
+  min-height: clamp(11.5rem, 14vw, 14.5rem);
+  border: solid lightgrey 0.1rem;
+  border-radius: clamp(1.25rem, 1.5vw, 2rem);
+  box-shadow:
+    0 0 0 1px rgb(202, 200, 200),
+    8px 8px 4px rgba(17, 24, 39, 0.2);
+  counter-increment: order-box-position;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  align-items: stretch;
 }
 
-.box-infor  
-{
+.order-box-container:first-of-type {
+  counter-reset: order-box-position;
+}
+
+.lbl-text {
   width: 100%;
   height: fit-content;
-}
-
-.box-btn-container
-{
-  margin-top: 1.5rem;
-  width: fit-content;
-  height: fit-content;
+  font-size: clamp(0.85rem, 0.95vw, 1.05rem);
+  font-weight: bold;
   display: flex;
+  justify-content: start;
   align-items: center;
 }
 
-.box-edit-btn
-{
-  background-color: white;
-  border: solid lightgray 0.1rem;
-  border-radius: 0.8rem;
+.order-box-position-label::before {
+  content: "Order#" counter(order-box-position);
 }
 
-.order-thumbnail-container
-{
+.lbl-thumb-text {
+  font-weight: bolder;
+  font-size: clamp(0.9rem, 1vw, 1.15rem);
+  line-height: 1.2;
+  display: block;
   width: 100%;
-  height: 6rem;
-  display: flex;
+  min-width: 0;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.thumbnail-img-container
-{
+.order-box-container .box-content {
+  box-sizing: border-box;
+  width: 100%;
+  flex: 1;
+  min-width: 0;
+  padding: clamp(0.85rem, 1.1vw, 1.25rem);
   display: flex;
+  flex-direction: column;
+}
+
+.box-infor {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.35rem, 0.5vw, 0.5rem);
+  min-height: 0;
+  min-width: 0;
+}
+
+.title-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.address-container {
+  width: 100%;
+}
+
+.address-container span {
+  display: block;
+  width: 100%;
+  font-size: clamp(0.8rem, 0.9vw, 1rem);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.order-thumbnail-container {
+  width: 100%;
+  flex: 0 0 auto;
+  min-height: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(0.5rem, 0.75vw, 0.85rem);
+}
+
+.thumbnail-img-container {
+  flex: 0 0 auto;
+  width: clamp(5.25rem, 32%, 8.25rem);
+  max-width: clamp(5.25rem, 32%, 8.25rem);
+  min-width: 5.25rem;
+  display: flex;
+  align-items: center;
   justify-content: center;
-  align-items: center;
 }
 
 .order-img {
-  width: 150px;
-  height: 90%;
-  border-radius: 12px;
-  object-fit:fill;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  border-radius: clamp(8px, 0.85vw, 10px);
+  object-fit: cover;
   background-color: #ddd;
 }
 
-.thumbnail-detail-container
-{
+.thumbnail-detail-container {
+  padding-top: 0.5rem;
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 0.2rem;
-  height: 100%;
-  width: 70%;
-  padding-left: 0.5rem;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  width: 100%;
+  padding-left: 0;
 }
 
-.span-text
-{
+.thumbnail-detail-container .lbl-thumb-text {
+  line-height: 1.2;
+  margin: 0;
+}
+
+.des-container,
+.price-container {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+.thumbnail-detail-container .span-text {
+  display: block;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+  -webkit-box-orient: unset;
+  box-orient: unset;
+}
+
+.span-text {
   display: -webkit-box;
   width: 100%;
   font-weight: 200;
-  font-size: 0.9rem;
+  font-size: clamp(0.8rem, 0.9vw, 1rem);
+  line-height: 1.35;
   text-overflow: ellipsis;
   overflow: hidden;
-    -webkit-line-clamp: 2;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   line-clamp: 2;
   box-orient: vertical;
 }
 
-.title-container
-{
+.order-box-footer-row {
+  margin-top: auto;
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
-}
-
-.view-detail-link-container
-{
+  gap: clamp(0.5rem, 0.75vw, 0.85rem);
   width: 100%;
-  display: flex;
-  justify-content: end;
+  padding-top: 0.25rem;
 }
 
-.view-detail-link
-{
-  font-size: 0.8rem;
+.view-detail-link {
+  flex-shrink: 0;
+  font-size: clamp(0.75rem, 0.85vw, 0.92rem);
 }
 
+.order-box-footer-row .total-price-text {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  text-align: left;
+}
+
+.status {
+  width: 100%;
+}
+
+.order-box-footer-row .total-price-text,
+.status .span-text {
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+}
+
+@media (min-width: 1981px) {
+  .order-management-layout .lbl-text {
+    font-size: clamp(0.88rem, 0.92vw, 1.08rem);
+  }
+
+  .order-management-layout .lbl-thumb-text {
+    font-size: clamp(0.92rem, 0.98vw, 1.12rem);
+  }
+
+  .order-management-layout .address-container span,
+  .order-management-layout .span-text {
+    font-size: clamp(0.82rem, 0.88vw, 1rem);
+  }
+
+  .order-management-layout .view-detail-link {
+    font-size: clamp(0.78rem, 0.82vw, 0.92rem);
+  }
+}
+
+@media (min-width: 2560px) {
+  .order-management-layout .order-box-container {
+    min-height: clamp(12rem, 9.5vw, 14.5rem);
+  }
+
+  .order-management-layout .order-box-container .box-content {
+    padding: clamp(1rem, 1.05vw, 1.4rem);
+  }
+
+  .order-management-layout .thumbnail-img-container {
+    width: clamp(5.5rem, 28%, 8.75rem);
+    max-width: clamp(5.5rem, 28%, 8.75rem);
+  }
+
+  .order-management-layout .lbl-text {
+    font-size: clamp(0.92rem, 0.88vw, 1.12rem);
+  }
+
+  .order-management-layout .lbl-thumb-text {
+    font-size: clamp(0.98rem, 0.95vw, 1.18rem);
+  }
+
+  .order-management-layout .address-container span,
+  .order-management-layout .span-text {
+    font-size: clamp(0.86rem, 0.82vw, 1.05rem);
+  }
+}
+
+@media (max-width: 700px) {
+  .order-box-container {
+    min-height: 11.5rem;
+  }
+
+  .thumbnail-img-container {
+    width: clamp(5rem, 30%, 7.5rem);
+    max-width: clamp(5rem, 30%, 7.5rem);
+  }
+}

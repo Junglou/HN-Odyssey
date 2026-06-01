@@ -1,4 +1,4 @@
-// Login Response
+// Login Response (snake_case từ Backend)
 export interface LoginResponse {
   access_token: string;
   refresh_token: string;
@@ -36,28 +36,28 @@ export interface RegisterResponse {
 
 // Verify OTP Payload
 export interface VerifyOtpPayload {
-  account: string;
-  code: string;
-  type: string;
+  email?: string;
+  phoneNumber?: string;
+  otpCode: string;
 }
 
 // Resend OTP Payload
 export interface ResendOtpPayload {
-  account: string;
-  type: string;
+  email?: string;
+  phoneNumber?: string;
 }
 
-// Forgot Password Payload (ĐÃ FIX: Đổi email thành account)
+// Forgot Password Payload
 export interface ForgotPasswordPayload {
-  account: string;
+  email: string;
 }
 
 // Reset Password Payload
 export interface ResetPasswordPayload {
-  account: string;
-  code: string;
+  email: string; // Backend yêu cầu email/account
+  otpCode?: string;
   newPassword: string;
-  confirmNewPassword: string;
+  confirmPassword: string;
 }
 
 // Generic Response
@@ -70,7 +70,7 @@ export interface AccountRecoveryPayload {
   email: string;
   otpCode: string;
   description: string;
-  images: File | null;
+  evidence: File | null;
 }
 
 // Account Recovery Response
@@ -81,11 +81,12 @@ export interface AccountRecoveryResponse {
 
 // Confirm Recovery Payload
 export interface ConfirmRecoveryPayload {
-  account: string;
-  code: string;
+  ticketId: string;
   newPassword: string;
   confirmNewPassword: string;
   newEmail: string;
+  confirmNewEmail: string;
+  otpCode: string;
 }
 
 // Confirm Recovery Response

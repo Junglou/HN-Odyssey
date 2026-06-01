@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import "./AvatarModal.css";
+import { ProfileModalPortal } from "./ProfileModalPortal";
 import type { UserProfile } from "../../../types/user";
 
-// model user chung (dùng chung type với MyProfile / MyProfilePage)
 export type { UserProfile };
 
-// schema form để trả dữ liệu về component cha
 export interface AvatarFormData {
-  avatar: string; // Data URL
+  file: File;
 }
 
 interface AvatarModalProps {
@@ -18,7 +17,17 @@ interface AvatarModalProps {
   onSubmit: (data: AvatarFormData) => void;
 }
 
-// modal form popup
+const getFullAvatarPreviewUrl = (avatar: string | null | undefined): string => {
+  if (!avatar) return "";
+  if (avatar.startsWith("http") || avatar.startsWith("data:")) return avatar;
+
+  const baseUrl = import.meta.env.VITE_API_URL
+    ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, "")
+    : "";
+
+  return `${baseUrl}${avatar.startsWith("/") ? avatar : `/${avatar}`}`;
+};
+
 export default function AvatarModal({
   isOpen,
   mode,
@@ -26,29 +35,62 @@ export default function AvatarModal({
   onClose,
   onSubmit,
 }: AvatarModalProps) {
-  // Giữ preview URL để xem trước
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewSrc, setPreviewSrc] = useState<string>(initialData?.avatar ?? "");
+  const [objectPreviewUrl, setObjectPreviewUrl] = useState<string | null>(null);
 
-  // Cập nhật giá trị mỗi khi các prop thay đổi
+  // theo dõi props isOpen để reset state mà không cần dùng useEffect
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
+    if (isOpen) {
+      // reset dữ liệu nháp khi modal vừa mở lên
+      setSelectedFile(null);
+      setObjectPreviewUrl(null);
+    }
+  }
+
+  // tính toán trực tiếp ảnh preview, không cần lưu thừa một state cho previewSrc
+  const previewSrc =
+    objectPreviewUrl || getFullAvatarPreviewUrl(initialData?.avatar);
+
+  // cleanup URL để tránh rò rỉ bộ nhớ khi component unmount hoặc khi chọn ảnh khác
   useEffect(() => {
-    if (!isOpen || !initialData) return;
-  }, [isOpen, initialData]);
+    return () => {
+      if (objectPreviewUrl) URL.revokeObjectURL(objectPreviewUrl);
+    };
+  }, [objectPreviewUrl]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
     if (!file) {
       setSelectedFile(null);
+      setObjectPreviewUrl(null);
+      return;
+    }
+
+    if (
+      !["image/jpeg", "image/jpg", "image/png"].includes(
+        file.type.toLowerCase(),
+      )
+    ) {
+      alert("Please choose a JPG or PNG image.");
+      e.target.value = "";
+      setSelectedFile(null);
+      setObjectPreviewUrl(null);
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image must be 5 MB or smaller.");
+      e.target.value = "";
+      setSelectedFile(null);
+      setObjectPreviewUrl(null);
       return;
     }
 
     setSelectedFile(file);
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPreviewSrc(String(reader.result ?? ""));
-    };
-    reader.readAsDataURL(file);
+    setObjectPreviewUrl(URL.createObjectURL(file));
   };
 
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -59,10 +101,7 @@ export default function AvatarModal({
       return;
     }
 
-    // Lưu avatar vào profile dưới dạng data URL
-    onSubmit({
-      avatar: previewSrc,
-    });
+    onSubmit({ file: selectedFile });
   };
 
   if (!isOpen) return null;
@@ -70,7 +109,7 @@ export default function AvatarModal({
   const isViewOnly = mode === "view";
 
   return (
-    <div className="um-modal-overlay" onClick={onClose}>
+    <ProfileModalPortal isOpen={isOpen} onClose={onClose}>
       <div className="um-modal-box" onClick={(e) => e.stopPropagation()}>
         <h2 className="um-modal-title">
           {mode === "edit" ? "Update Avatar" : "Avatar preview"}
@@ -93,13 +132,14 @@ export default function AvatarModal({
             <input
               name="avatar"
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/jpg"
               disabled={isViewOnly}
               onChange={handleFileChange}
             />
           </div>
 
           <div className="um-modal-actions">
+            {!isViewOnly ? (
               <>
                 <button type="submit" className="um-btn-modal-submit">
                   Save avatar
@@ -112,9 +152,18 @@ export default function AvatarModal({
                   Cancel
                 </button>
               </>
+            ) : (
+              <button
+                type="button"
+                className="um-btn-modal-cancel"
+                onClick={onClose}
+              >
+                Close
+              </button>
+            )}
           </div>
         </form>
       </div>
-    </div>
+    </ProfileModalPortal>
   );
 }

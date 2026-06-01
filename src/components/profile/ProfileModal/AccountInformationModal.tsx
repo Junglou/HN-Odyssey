@@ -1,160 +1,412 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./AccountInformationModal.css";
+import { ProfileModalPortal } from "./ProfileModalPortal";
 import type { UserProfile } from "../../../types/user";
 
-// model user chung (dùng chung type với MyProfile / MyProfilePage)
 export type { UserProfile };
 
-// schema form để trả dữ liệu về component cha
-export interface AccountFormData {
-  username: string;
-  password: string;
-  email: string;
-  phone: string;
+export type ContactOtpType = "EMAIL" | "PHONE";
+
+export interface RequestContactOtpParams {
+  type: ContactOtpType;
+  newValue: string;
+  currentPassword: string;
 }
 
-// Alias cho hook/import cũ dùng tên UserFormData
-export type UserFormData = AccountFormData;
+export interface VerifyContactOtpParams {
+  code: string;
+  type: ContactOtpType;
+}
 
 interface AccountModalProps {
   isOpen: boolean;
   mode: "edit" | "view";
   initialData: UserProfile | null;
   onClose: () => void;
-  onSubmit: (data: AccountFormData) => void;
+  onRequestContactOtp: (params: RequestContactOtpParams) => Promise<void>;
+  onVerifyContactOtp: (params: VerifyContactOtpParams) => Promise<void>;
+  isSubmitting?: boolean;
+  requestingOtpType?: ContactOtpType | null;
+  verifyingOtpType?: ContactOtpType | null;
 }
 
-// modal form popup
+const normalizePhone = (value: string) => value.trim();
+
 export default function AccountModal({
   isOpen,
   mode,
   initialData,
   onClose,
-  onSubmit,
+  onRequestContactOtp,
+  onVerifyContactOtp,
+  isSubmitting = false,
+  requestingOtpType = null,
+  verifyingOtpType = null,
 }: AccountModalProps) {
-  // khởi tạo state form; đồng bộ lại khi mở modal / initialData đổi (xem useEffect)
-  // (phiên bản hiện tại dùng uncontrolled input bằng refs để không dùng setFormData)
-  const usernameRef = useRef<HTMLInputElement | null>(null);
   const passwordRef = useRef<HTMLInputElement | null>(null);
-  const emailRef = useRef<HTMLInputElement | null>(null);
-  const phoneRef = useRef<HTMLInputElement | null>(null);
+  const confirmedPasswordRef = useRef("");
+  const newEmailRef = useRef<HTMLInputElement | null>(null);
+  const newPhoneRef = useRef<HTMLInputElement | null>(null);
+  const emailOtpRef = useRef<HTMLInputElement | null>(null);
+  const phoneOtpRef = useRef<HTMLInputElement | null>(null);
 
-  // đổ form từ initialData mỗi khi mở modal hoặc initialData thay đổi
+  const [passwordConfirmed, setPasswordConfirmed] = useState(false);
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  const [prevInitialData, setPrevInitialData] = useState(initialData);
+
+  if (isOpen !== prevIsOpen || initialData !== prevInitialData) {
+    setPrevIsOpen(isOpen);
+    setPrevInitialData(initialData);
+
+    // reset các biến state ngay trong quá trình render để tránh cascading renders
+    setPasswordConfirmed(false);
+    setEmailOtpSent(false);
+    setPhoneOtpSent(false);
+  }
+
+  const currentEmail = (initialData?.email ?? "").trim();
+  const currentPhone = normalizePhone(initialData?.phone ?? "");
+
   useEffect(() => {
-    if (!isOpen || !initialData) return;
-    if (usernameRef.current) usernameRef.current.value = initialData.username ?? "";
-    if (passwordRef.current) passwordRef.current.value = initialData.password ?? "";
-    if (emailRef.current) emailRef.current.value = initialData.email ?? "";
-    if (phoneRef.current) phoneRef.current.value = initialData.phone ?? "";
+    // reset các ref và input dom bên trong effect để đảm bảo react render an toàn
+    confirmedPasswordRef.current = "";
+
+    if (isOpen) {
+      if (passwordRef.current) passwordRef.current.value = "";
+      if (newEmailRef.current) newEmailRef.current.value = "";
+      if (newPhoneRef.current) newPhoneRef.current.value = "";
+      if (emailOtpRef.current) emailOtpRef.current.value = "";
+      if (phoneOtpRef.current) phoneOtpRef.current.value = "";
+    }
   }, [isOpen, initialData]);
 
-  // validate trước khi trả data ra ngoài
-  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    const fd = new FormData(e.currentTarget);
-
-    const data: AccountFormData = {
-      username: String(fd.get("username") ?? ""),
-      password: String(fd.get("password") ?? ""),
-      email: String(fd.get("email") ?? ""),
-      phone: String(fd.get("phone") ?? ""),
-    };
-
-    // validate dữ liệu trước khi trả lên cha
-    if (
-      !data.username?.trim() ||
-      !data.password?.trim() ||
-      !data.email?.trim() ||
-      !data.phone?.trim()
-    ) {
-      alert("Please fill in all required fields (*)");
+  const handleConfirmPassword = () => {
+    const currentPassword = (passwordRef.current?.value ?? "").trim();
+    if (!currentPassword) {
+      alert("Enter your current password first.");
       return;
     }
-    onSubmit(data);
+
+    confirmedPasswordRef.current = currentPassword;
+    setPasswordConfirmed(true);
+    if (passwordRef.current) {
+      passwordRef.current.value = currentPassword;
+    }
+  };
+
+  const handleChangePassword = () => {
+    confirmedPasswordRef.current = "";
+    setPasswordConfirmed(false);
+    setEmailOtpSent(false);
+    setPhoneOtpSent(false);
+    if (emailOtpRef.current) emailOtpRef.current.value = "";
+    if (phoneOtpRef.current) phoneOtpRef.current.value = "";
+  };
+
+  const handleSendOtp = async (type: ContactOtpType) => {
+    if (!passwordConfirmed || !confirmedPasswordRef.current) {
+      alert("Confirm your current password first.");
+      return;
+    }
+
+    const newValue =
+      type === "EMAIL"
+        ? (newEmailRef.current?.value ?? "").trim()
+        : normalizePhone(newPhoneRef.current?.value ?? "");
+
+    if (!newValue) {
+      alert(
+        type === "EMAIL" ? "Enter a new email." : "Enter a new phone number.",
+      );
+      return;
+    }
+
+    if (type === "EMAIL" && newValue === currentEmail) {
+      alert("New email must be different from your current email.");
+      return;
+    }
+
+    if (type === "PHONE" && newValue === currentPhone) {
+      alert("New phone must be different from your current phone number.");
+      return;
+    }
+
+    try {
+      await onRequestContactOtp({
+        type,
+        newValue,
+        currentPassword: confirmedPasswordRef.current,
+      });
+      if (type === "EMAIL") setEmailOtpSent(true);
+      if (type === "PHONE") setPhoneOtpSent(true);
+    } catch {
+      // Hook shows toast.
+    }
+  };
+
+  const handleVerifyOtp = async (type: ContactOtpType) => {
+    const otpRef = type === "EMAIL" ? emailOtpRef : phoneOtpRef;
+    const code = (otpRef.current?.value ?? "").trim();
+
+    if (!code) {
+      alert("Enter the OTP sent to your new contact.");
+      return;
+    }
+
+    try {
+      await onVerifyContactOtp({ type, code });
+      if (type === "EMAIL") {
+        setEmailOtpSent(false);
+        if (newEmailRef.current) newEmailRef.current.value = "";
+      }
+      if (type === "PHONE") {
+        setPhoneOtpSent(false);
+        if (newPhoneRef.current) newPhoneRef.current.value = "";
+      }
+      if (otpRef.current) otpRef.current.value = "";
+    } catch {
+      // Hook shows toast.
+    }
   };
 
   if (!isOpen) return null;
 
+  const isViewOnly = mode === "view";
+
   return (
-    <div className="um-modal-overlay" onClick={onClose}>
-      <div className="um-modal-box" onClick={(e) => e.stopPropagation()}>
+    <ProfileModalPortal isOpen={isOpen} onClose={onClose}>
+      <div
+        className="um-modal-box account-info-modal"
+        onClick={(e) => e.stopPropagation()}
+      >
         <h2 className="um-modal-title">
-          {mode === "edit" ? "Edit profile" : "Profile details"}
+          {mode === "edit" ? "Edit account" : "Account details"}
         </h2>
 
-        <form onSubmit={handleFormSubmit} className="um-modal-form">
-          {/* các field profile */}
-          <div className="um-form-group">
-            <label>
-              Username <span className="req">*</span>
-            </label>
+        <div className="um-modal-form">
+          <div className="um-form-group account-field-readonly">
+            <label>Username</label>
             <input
-              name="username"
               type="text"
-              ref={usernameRef}
-              defaultValue={initialData?.username ?? ""}
-              placeholder="Username"
-              required
+              value={initialData?.username ?? ""}
+              disabled
+              readOnly
+              aria-label="Username (read only)"
             />
+            <p className="account-field-hint">
+              Username cannot be changed at this time.
+            </p>
           </div>
 
-          <div className="um-form-group">
-            <label>
-              Password <span className="req">*</span>
-            </label>
+          <div className="um-form-group account-field-readonly">
+            <label>Password</label>
             <input
-              name="password"
-              type="text"
-              ref={passwordRef}
-              defaultValue={initialData?.password ?? ""}
-              placeholder="Password"
-              required
+              type="password"
+              value="************"
+              disabled
+              readOnly
+              aria-label="Password masked (read only)"
             />
+            <p className="account-field-hint">
+              Password cannot be changed at this time.
+            </p>
           </div>
 
-          <div className="um-form-group">
-            <label>
-              Email <span className="req">*</span>
-            </label>
+          {!isViewOnly ? (
+            <div className="um-form-group">
+              <label>
+                Current password <span className="req">*</span>
+              </label>
+              <div className="account-password-row">
+                <input
+                  ref={passwordRef}
+                  name="currentPassword"
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="Enter current password"
+                  disabled={isSubmitting || passwordConfirmed}
+                />
+                {!passwordConfirmed ? (
+                  <button
+                    type="button"
+                    className="um-btn-modal-submit account-password-confirm-btn"
+                    disabled={isSubmitting}
+                    onClick={handleConfirmPassword}
+                  >
+                    Confirm password
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="um-btn-modal-cancel account-password-confirm-btn"
+                    disabled={isSubmitting}
+                    onClick={handleChangePassword}
+                  >
+                    Change
+                  </button>
+                )}
+              </div>
+              <p className="account-field-hint">
+                {passwordConfirmed
+                  ? "Password confirmed. You can update your email or phone below."
+                  : "Confirm your password before requesting an OTP."}
+              </p>
+            </div>
+          ) : null}
+
+          <div className="um-form-group account-editable-group">
+            <label>Email</label>
             <input
-              name="email"
               type="email"
-              ref={emailRef}
-              defaultValue={initialData?.email ?? ""}
-              placeholder="Email"
-              required
+              value={currentEmail || "—"}
+              disabled
+              readOnly
+              aria-label="Current email"
             />
-          </div>
 
-          <div className="um-form-group">
-            <label>Phone</label>
-            <input
-              name="phone"
-              type="text"
-              ref={phoneRef}
-              defaultValue={initialData?.phone ?? ""}
-              placeholder="Phone number"
-            />
-          </div>
-
-          {/* cụm nút */}
-          <div className="um-modal-actions">
-              <>
-                <button type="submit" className="um-btn-modal-submit">
-                  Save changes
-                </button>
+            {!isViewOnly ? (
+              <div className="account-otp-section">
+                <p className="account-field-hint">
+                  Enter a new email, then send an OTP to that address. The code
+                  is sent to the new email, not your current one.
+                </p>
+                <input
+                  ref={newEmailRef}
+                  name="newEmail"
+                  type="email"
+                  placeholder="New email address"
+                  disabled={isSubmitting || !passwordConfirmed}
+                  aria-label="New email"
+                />
                 <button
                   type="button"
-                  className="um-btn-modal-cancel"
-                  onClick={onClose}
+                  className="um-btn-modal-cancel account-otp-request-btn"
+                  disabled={
+                    isSubmitting ||
+                    !passwordConfirmed ||
+                    requestingOtpType === "EMAIL"
+                  }
+                  onClick={() => void handleSendOtp("EMAIL")}
                 >
-                  Cancel
+                  {requestingOtpType === "EMAIL"
+                    ? "Sending..."
+                    : "Send OTP to new email"}
                 </button>
-              </>
+
+                {emailOtpSent ? (
+                  <>
+                    <input
+                      ref={emailOtpRef}
+                      type="text"
+                      className="account-otp-input"
+                      placeholder="OTP from new email"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      minLength={6}
+                      maxLength={8}
+                      disabled={isSubmitting}
+                      aria-label="New email OTP"
+                    />
+                    <button
+                      type="button"
+                      className="um-btn-modal-submit account-otp-request-btn"
+                      disabled={isSubmitting || verifyingOtpType === "EMAIL"}
+                      onClick={() => void handleVerifyOtp("EMAIL")}
+                    >
+                      {verifyingOtpType === "EMAIL"
+                        ? "Saving..."
+                        : "Confirm new email"}
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
           </div>
-        </form>
+
+          <div className="um-form-group account-editable-group">
+            <label>Phone</label>
+            <input
+              type="text"
+              value={currentPhone || "—"}
+              disabled
+              readOnly
+              aria-label="Current phone"
+            />
+
+            {!isViewOnly ? (
+              <div className="account-otp-section">
+                <p className="account-field-hint">
+                  Enter a new phone number, then send an OTP to that number. The
+                  code is sent to the new phone, not your current one.
+                </p>
+                <input
+                  ref={newPhoneRef}
+                  name="newPhone"
+                  type="text"
+                  placeholder="New phone number (10 digits, VN)"
+                  disabled={isSubmitting || !passwordConfirmed}
+                  aria-label="New phone"
+                />
+                <button
+                  type="button"
+                  className="um-btn-modal-cancel account-otp-request-btn"
+                  disabled={
+                    isSubmitting ||
+                    !passwordConfirmed ||
+                    requestingOtpType === "PHONE"
+                  }
+                  onClick={() => void handleSendOtp("PHONE")}
+                >
+                  {requestingOtpType === "PHONE"
+                    ? "Sending..."
+                    : "Send OTP to new phone"}
+                </button>
+
+                {phoneOtpSent ? (
+                  <>
+                    <input
+                      ref={phoneOtpRef}
+                      type="text"
+                      className="account-otp-input"
+                      placeholder="OTP from new phone"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      minLength={6}
+                      maxLength={8}
+                      disabled={isSubmitting}
+                      aria-label="New phone OTP"
+                    />
+                    <button
+                      type="button"
+                      className="um-btn-modal-submit account-otp-request-btn"
+                      disabled={isSubmitting || verifyingOtpType === "PHONE"}
+                      onClick={() => void handleVerifyOtp("PHONE")}
+                    >
+                      {verifyingOtpType === "PHONE"
+                        ? "Saving..."
+                        : "Confirm new phone"}
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="um-modal-actions">
+            <button
+              type="button"
+              className="um-btn-modal-cancel"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              {isViewOnly ? "Close" : "Cancel"}
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
+    </ProfileModalPortal>
   );
 }

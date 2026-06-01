@@ -1,0 +1,216 @@
+/* Shared "Recommend for you" column — matches Order Management sidebar design */
+.profile-recommendations,
+.profile-recommendations-embedded {
+  border-left: none;
+  padding: 0 clamp(1rem, 1.75vw, 1.5rem) clamp(0.65rem, 1.5vw, 1.15rem);
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.profile-recommendations .recommendation-container,
+.profile-recommendations-embedded .recommendation-container,
+.profile-recommendations .reco-list,
+.profile-recommendations-embedded .reco-list {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.profile-recommendations .reco-title,
+.profile-recommendations-embedded .reco-title {
+  width: 100%;
+  max-width: 100%;
+  font-size: clamp(1.3rem, 1.55vw, 1.75rem);
+  font-weight: 800;
+  margin: 0 0 clamp(0.9rem, 1.25vw, 1.35rem);
+  color: #000;
+  overflow-wrap: break-word;
+}
+
+.profile-recommendations .reco-list,
+.profile-recommendations-embedded .reco-list {
+  gap: clamp(0.95rem, 1.25vw, 1.35rem);
+}
+
+.profile-recommendations .reco-card,
+.profile-recommendations-embedded .reco-card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(0.85rem, 1.05vw, 1.1rem);
+  padding: clamp(14px, 1.15vw, 20px);
+  border-radius: clamp(13px, 1.15vw, 17px);
+  background: #f4f4f4;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.profile-recommendations .reco-card:hover,
+.profile-recommendations-embedded .reco-card:hover {
+  background: #eeeeee;
+  transform: translateY(-2px);
+}
+
+.profile-recommendations .reco-img,
+.profile-recommendations-embedded .reco-img {
+  width: clamp(72px, 24%, 96px);
+  height: clamp(72px, 24%, 96px);
+  max-width: 34%;
+  border-radius: 12px;
+  object-fit: cover;
+  background-color: #ddd;
+  flex-shrink: 0;
+}
+
+.profile-recommendations .reco-info,
+.profile-recommendations-embedded .reco-info {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  min-height: clamp(72px, 24%, 96px);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 0;
+}
+
+.profile-recommendations .reco-name,
+.profile-recommendations-embedded .reco-name {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  font-size: clamp(1rem, 1.1vw, 1.18rem);
+  line-height: 1.2;
+  margin: 0;
+  font-weight: 800;
+  color: #000;
+  font-family: "Lexend Exa", sans-serif;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-recommendations .reco-label,
+.profile-recommendations-embedded .reco-label {
+  font-weight: 700;
+  color: #000;
+  font-size: clamp(0.92rem, 1vw, 1.05rem);
+  font-family: "Lexend Exa", sans-serif;
+}
+
+.profile-recommendations .reco-desc-block,
+.profile-recommendations-embedded .reco-desc-block {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-recommendations .reco-desc-block .reco-label,
+.profile-recommendations .reco-desc-block .reco-mono-text,
+.profile-recommendations-embedded .reco-desc-block .reco-label,
+.profile-recommendations-embedded .reco-desc-block .reco-mono-text {
+  display: inline;
+  max-width: 100%;
+}
+
+.profile-recommendations .reco-mono-text,
+.profile-recommendations-embedded .reco-mono-text {
+  font-family: "Courier New", Courier, monospace;
+  color: #222;
+  font-size: clamp(0.88rem, 0.96vw, 1rem);
+  line-height: 1.2;
+}
+
+.profile-recommendations .reco-price-block,
+.profile-recommendations-embedded .reco-price-block {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.profile-recommendations .reco-price-block .reco-label,
+.profile-recommendations .reco-price-block .price-val,
+.profile-recommendations-embedded .reco-price-block .reco-label,
+.profile-recommendations-embedded .reco-price-block .price-val {
+  display: inline;
+}
+
+.profile-recommendations .price-val,
+.profile-recommendations-embedded .price-val {
+  font-size: clamp(0.95rem, 1vw, 1.05rem);
+  color: #000;
+}
+
+/* Shared layout: main content + recommendations column */
+.profile-with-recs-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 62fr) minmax(260px, 38fr);
+  gap: clamp(0.85rem, 1.3vw, 1.15rem);
+  min-width: 0;
+  width: 100%;
+}
+
+.profile-with-recs-main {
+  min-width: 0;
+}
+
+@media (min-width: 1981px) {
+  .profile-recommendations .reco-img,
+  .profile-recommendations-embedded .reco-img {
+    width: clamp(80px, 21%, 104px);
+    height: clamp(80px, 21%, 104px);
+    max-width: 32%;
+  }
+
+  .profile-recommendations .reco-info,
+  .profile-recommendations-embedded .reco-info {
+    min-height: clamp(80px, 21%, 104px);
+  }
+}
+
+@media (max-width: 1650px) {
+  .profile-with-recs-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-recommendations,
+  .profile-recommendations-embedded {
+    padding: 0 clamp(1rem, 1.75vw, 1.5rem) clamp(0.65rem, 1.5vw, 1.15rem);
+  }
+}
+
+@media (max-width: 768px) {
+  .profile-recommendations .reco-img,
+  .profile-recommendations-embedded .reco-img {
+    width: 92px;
+    height: 92px;
+    max-width: 34%;
+  }
+
+  .profile-recommendations .reco-info,
+  .profile-recommendations-embedded .reco-info {
+    min-height: 92px;
+  }
+}

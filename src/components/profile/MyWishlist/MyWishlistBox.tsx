@@ -19,24 +19,24 @@ const WishlistBox = ({ product, onDelete }: MyWishlistProp) => {
               <span className="lbl-thumb-text">{product.name}</span>
               <div className="des-container">
                 <span className="span-text">
-                  <strong>Description: </strong> 
+                  <strong>Description: </strong>
                   {product.description}
                 </span>
               </div>
               <div className="price-container">
                 <span className="span-text">
-                  <strong>Price: </strong> 
+                  <strong>Price: </strong>
                   {product.price}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="btn-container">
-            <button className="edit-btn" onClick={onDelete}>
+          <div className="my-wishlist-btn-container">
+            <button className="my-wishlist-edit-btn" onClick={onDelete}>
               Remove
             </button>
-            <button className="remove-btn">Add to cart</button>
+            <button className="my-wishlist-remove-btn">Add to cart</button>
           </div>
         </div>
       </div>
