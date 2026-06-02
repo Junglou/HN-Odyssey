@@ -28,7 +28,7 @@ const MyCoupon = ({ coupons, recommendations }: MyCouponProps) => {
           )}
         </div>
 
-        <div className="grid-section section-recs profile-recommendations">
+        <div className="grid-section section-recs">
           <RecommendationList products={recommendations} />
         </div>
       </div>

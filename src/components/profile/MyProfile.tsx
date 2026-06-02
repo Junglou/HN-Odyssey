@@ -1,5 +1,4 @@
 import "./MyProfile.css";
-import "./OrderManagement/OrderManagement.css";
 import RecommendationList from "../common/RecommendationList";
 import type { RecommendProduct } from "../../hooks/profile/useRecommendProduct";
 import { useProfileManagement } from "../../hooks/profile/useProfileManagement";
@@ -69,12 +68,12 @@ const MyProfile = ({ recommendations }: MyProfileProps) => {
 
   return (
     <>
-      <div className="my-profile-card order-management-layout">
+      <div className="my-profile-card">
         <div className="profile-header">
           <h1 className="profile-title">My Profile</h1>
         </div>
 
-        <div className="order-box-internal-grid">
+        <div className="my-profile-internal-grid">
           <div className="grid-section section-profile-main">
             <div className="profile-main-grid">
               <div className="grid-section section-avatar">
@@ -292,7 +291,7 @@ const MyProfile = ({ recommendations }: MyProfileProps) => {
             </div>
           </div>
 
-          <div className="grid-section section-recs profile-recommendations">
+          <div className="grid-section section-recs">
             <RecommendationList products={recommendations} />
           </div>
         </div>

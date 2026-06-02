@@ -20,6 +20,30 @@
   box-sizing: border-box;
 }
 
+.pod-loading-message {
+  margin: 0;
+  padding: clamp(2rem, 4vw, 3rem);
+  text-align: center;
+  color: #555;
+  font-size: clamp(0.9rem, 1.2vw, 1rem);
+}
+
+.pod-retry-btn {
+  margin-top: 1rem;
+  padding: 0.55rem 1.25rem;
+  border: 1px solid #ddd;
+  border-radius: 50px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.pod-retry-btn:hover {
+  border-color: #000;
+  color: #000;
+}
+
 /* header */
 .pod-header {
   padding: clamp(16px, 2.5vw, 20px) clamp(16px, 3vw, 24px);

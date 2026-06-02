@@ -12,7 +12,7 @@ interface OrderBoxProp {
 }
 
 const OrderManagementBox = ({ id: orderId, order }: OrderBoxProp) => {
-  void orderId;
+  const detailRouteId = order.id || order.orderCode || orderId;
 
   const lineItems = getOrderLineItems(order);
   const primary = lineItems[0];
@@ -62,8 +62,7 @@ const OrderManagementBox = ({ id: orderId, order }: OrderBoxProp) => {
               Total Price: {order.totalAmount}
             </span>
             <Link
-              to={`/profile/orders/detail/${order.id}`}
-              state={{ order }}
+              to={`/profile/orders/detail/${encodeURIComponent(detailRouteId)}`}
               className="view-detail-link"
             >
               View detail

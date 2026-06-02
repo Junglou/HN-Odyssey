@@ -33,21 +33,13 @@
   line-height: 1.2;
 }
 
-/* --- MAIN COLUMN (same inset as Order Management .section-order) --- */
+/* --- MAIN COLUMN (wraps profile-main-grid; flattened when recs sit beside) --- */
 .section-profile-main {
+  display: block;
   min-width: 0;
   width: 100%;
   padding-left: 1rem;
   box-sizing: border-box;
-}
-
-.order-management-layout .section-recs {
-  border-top: none;
-  padding-bottom: 0;
-}
-
-.order-management-layout .grid-section.section-recs {
-  padding-bottom: 0;
 }
 
 .profile-main-grid {
@@ -73,6 +65,8 @@
   box-sizing: border-box;
   height: fit-content;
   padding-bottom: 0;
+  padding: 0 1rem;
+  padding-bottom: 1rem;
 }
 
 /* --- AVATAR --- */
@@ -237,6 +231,44 @@
   color: #000;
 }
 
+/*
+ * Outer grid — same base as OrderManagement .order-box-internal-grid.
+ * Wide layout: flatten wrappers so avatar | forms | social | recs share one grid
+ * (Order Management only has two direct children: orders | recs).
+ */
+.my-profile-internal-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 65fr) minmax(260px, 35fr);
+  gap: clamp(0.85rem, 1.3vw, 1.15rem);
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.my-profile-card .my-profile-internal-grid > .grid-section {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Side-by-side with recommendations: one row, four columns (no nested 65fr band) */
+@media (min-width: 1651px) {
+  .my-profile-internal-grid > .section-profile-main,
+  .my-profile-internal-grid > .section-profile-main > .profile-main-grid {
+    display: contents;
+  }
+
+  .my-profile-internal-grid {
+    grid-template-columns:
+      minmax(13rem, 16fr) minmax(0, 42fr) minmax(0, 22fr)
+      minmax(260px, 35fr);
+  }
+
+  .my-profile-internal-grid > .section-recs {
+    align-self: start;
+  }
+}
+
 /* --- SOCIAL --- */
 .section-social {
   width: 100%;
@@ -302,7 +334,7 @@
   overflow-wrap: anywhere;
 }
 
-/* --- RECOMMENDATIONS (visuals in ProfileRecommendations.css) --- */
+/* --- RECOMMENDATIONS (visuals in common/RecommendationList.css) --- */
 .section-recs {
   border-left: none;
   min-width: 0;
@@ -310,67 +342,75 @@
   max-width: 100%;
 }
 
-/*
- * Keep "Recommend for you" on the right when the profile card is wide enough.
- * Viewport @media (max-width: 1650px) in OrderManagement.css stacks too early for
- * this page because the card can still be ~1100px+ while viewport is < 1650px.
- */
-.my-profile-card.order-management-layout > .order-box-internal-grid {
-  grid-template-columns: minmax(0, 65fr) minmax(260px, 35fr);
-  gap: clamp(0.85rem, 1.3vw, 1.15rem);
+/* --- RESPONSIVE — .my-profile-internal-grid (OrderManagement breakpoints) --- */
+@media (max-width: 1980px) and (min-width: 1651px) {
+  .my-profile-internal-grid {
+    grid-template-columns:
+      minmax(12rem, 15fr) minmax(0, 40fr) minmax(0, 21fr)
+      minmax(280px, 32fr);
+  }
 }
 
-@container profile-card (max-width: 899px) {
-  .my-profile-card.order-management-layout > .order-box-internal-grid {
+@media (max-width: 1650px) {
+  .my-profile-internal-grid {
+    grid-template-columns: 100%;
+  }
+
+  .my-profile-internal-grid > .section-profile-main {
+    display: block;
+  }
+
+  .my-profile-internal-grid > .section-profile-main > .profile-main-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1120px) {
+  .my-profile-internal-grid {
     grid-template-columns: 1fr;
   }
 
-  .my-profile-card.order-management-layout .section-recs {
-    border-top: 1px solid #eee;
-  }
-}
-
-@container profile-card (min-width: 900px) {
-  .my-profile-card.order-management-layout .section-recs {
+  .my-profile-card .section-recs {
     border-top: none;
   }
 }
 
-@media (max-width: 1980px) {
-  @container profile-card (min-width: 900px) {
-    .my-profile-card.order-management-layout > .order-box-internal-grid {
-      grid-template-columns: minmax(0, 62fr) minmax(280px, 38fr);
-    }
-  }
-}
-
 @media (min-width: 1981px) {
-  @container profile-card (min-width: 900px) {
-    .my-profile-card.order-management-layout > .order-box-internal-grid {
-      grid-template-columns: minmax(0, 58fr) minmax(320px, 42fr);
-      gap: clamp(0.85rem, 1.1vw, 1.25rem);
-    }
+  .my-profile-internal-grid {
+    grid-template-columns:
+      minmax(13rem, 14fr) minmax(0, 38fr) minmax(0, 20fr)
+      minmax(320px, 28fr);
+    gap: clamp(0.85rem, 1.1vw, 1.25rem);
+  }
+
+  .my-profile-internal-grid > .section-profile-main {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .my-profile-internal-grid > .section-avatar {
+    padding-left: clamp(0.75rem, 1.5vw, 1.5rem);
   }
 }
 
-@media (min-width: 2560px) {
-  @container profile-card (min-width: 900px) {
-    .my-profile-card.order-management-layout > .order-box-internal-grid {
-      grid-template-columns: minmax(0, 55fr) minmax(340px, 45fr);
-      gap: clamp(1rem, 1.2vw, 1.5rem);
-    }
+/* @media (min-width: 2560px) {
+  .my-profile-internal-grid {
+    grid-template-columns:
+      minmax(13rem, 13fr) minmax(0, 36fr) minmax(0, 19fr) minmax(340px, 32fr);
+    gap: clamp(1rem, 1.2vw, 1.5rem);
   }
-}
+} */
 
 @media (min-width: 3200px) {
-  @container profile-card (min-width: 900px) {
-    .my-profile-card.order-management-layout > .order-box-internal-grid {
-      grid-template-columns: minmax(0, 52fr) minmax(360px, 48fr);
-    }
+  .my-profile-internal-grid {
+    grid-template-columns:
+      minmax(13rem, 12fr) minmax(0, 35fr) minmax(0, 18fr)
+      minmax(360px, 35fr);
   }
 }
 
-/* --- RESPONSIVE — profile main columns --- */
+/* --- RESPONSIVE — profile main columns (avatar / forms / social) --- */
 
 /* Stacked card (default): avatar band on top */
 .section-avatar {
@@ -381,27 +421,19 @@
   border-top: 1px solid #eee;
 }
 
-.section-recs {
+.my-profile-card .section-recs {
   border-top: 1px solid #eee;
+}
+
+@media (min-width: 1651px) {
+  .my-profile-card .section-recs {
+    border-top: none;
+  }
 }
 
 @media (max-width: 1650px) {
   .section-profile-main {
     padding: 0 1rem;
-  }
-}
-
-@media (min-width: 1981px) {
-  .order-management-layout .section-profile-main {
-    padding-left: clamp(0.75rem, 1.5vw, 1.5rem);
-    padding-right: clamp(0.25rem, 0.75vw, 0.75rem);
-  }
-}
-
-/* Stacked card only — wide card uses container rules above */
-@container profile-card (max-width: 899px) {
-  .section-recs {
-    border-top: 1px solid #eee;
   }
 }
 

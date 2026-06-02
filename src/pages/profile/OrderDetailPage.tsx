@@ -1,30 +1,12 @@
-import { useMemo } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import AccountSidebar from "../../components/profile/AccountSidebar";
 import "./OrderDetailPage.css";
 import OrderDetail from "../../components/profile/OrderDetail/OrderDetail";
-import type { UserOrder } from "../../types/user";
-
-type OrderDetailLocationState = {
-  order?: UserOrder;
-};
+import { useOrderDetail } from "../../hooks/profile/useOrderDetail";
 
 const OrderDetailPage = () => {
   const { orderId = "" } = useParams<{ orderId: string }>();
-  const { state } = useLocation();
-  const orderFromState =
-    (state as OrderDetailLocationState | null)?.order ?? null;
-
-  const order = useMemo((): UserOrder | null => {
-    if (
-      orderFromState &&
-      (orderFromState.id === orderId || orderFromState.orderCode === orderId)
-    ) {
-      return orderFromState;
-    }
-
-    return null;
-  }, [orderFromState, orderId]);
+  const { order, loading, refresh } = useOrderDetail(orderId);
 
   return (
     <div className="my-profile-page-container">
@@ -33,7 +15,12 @@ const OrderDetailPage = () => {
       </div>
 
       <div className="content-wrapper">
-        <OrderDetail orderId={orderId} order={order} />
+        <OrderDetail
+          orderId={orderId}
+          order={order}
+          loading={loading}
+          onRefresh={refresh}
+        />
       </div>
     </div>
   );
