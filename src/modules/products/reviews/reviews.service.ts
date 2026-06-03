@@ -104,6 +104,22 @@ export class ReviewsService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
   ) {}
 
+  // Hàm tự động nhận diện và chuyển đổi Slug thành ObjectId chuẩn
+  private async resolveProductId(identifier: string): Promise<string> {
+    if (Types.ObjectId.isValid(identifier)) {
+      return identifier;
+    }
+    const product = await this.productModel
+      .findOne({ slug: identifier })
+      .select('_id')
+      .lean();
+
+    if (!product) {
+      throw new NotFoundException('Sản phẩm không tồn tại');
+    }
+    return product._id.toString();
+  }
+
   async create(
     userId: string,
     dto: CreateReviewDto,
@@ -134,9 +150,11 @@ export class ReviewsService {
       );
     }
 
+    const actualProductId = await this.resolveProductId(dto.productId);
+
     const itemExists = order.items.find(
       (item) =>
-        item.product_id.toString() === dto.productId &&
+        item.product_id.toString() === actualProductId &&
         item.sku === dto.variantSku,
     );
     if (!itemExists) {
@@ -148,7 +166,7 @@ export class ReviewsService {
     const existingReview = await this.reviewModel
       .findOne({
         order_id: new Types.ObjectId(dto.orderId),
-        product_id: new Types.ObjectId(dto.productId),
+        product_id: new Types.ObjectId(actualProductId),
         variant_sku: dto.variantSku,
       })
       .lean();
@@ -172,7 +190,7 @@ export class ReviewsService {
     }
 
     const review = await this.reviewModel.create({
-      product_id: new Types.ObjectId(dto.productId),
+      product_id: new Types.ObjectId(actualProductId),
       order_id: new Types.ObjectId(dto.orderId),
       variant_sku: dto.variantSku,
       user_id: new Types.ObjectId(userId),
@@ -183,7 +201,7 @@ export class ReviewsService {
       status: ReviewStatus.NEW,
     });
 
-    await this.updateProductRating(dto.productId);
+    await this.updateProductRating(actualProductId);
 
     this.eventEmitter.emit(NOTIFY_EVENTS.REVIEW_PUBLISHED, {
       userId,
@@ -361,6 +379,7 @@ export class ReviewsService {
   }
 
   async findAll(productId: string, query: ReviewQueryDto) {
+    const actualProductId = await this.resolveProductId(productId);
     const {
       page = 1,
       limit = 10,
@@ -373,7 +392,7 @@ export class ReviewsService {
     const limitNumber = Number(limit);
     const skip = (pageNumber - 1) * limitNumber;
     const matchFilter: ReviewFilter = {
-      product_id: new Types.ObjectId(productId),
+      product_id: new Types.ObjectId(actualProductId),
       status: {
         $in: [ReviewStatus.NEW, ReviewStatus.APPROVED, ReviewStatus.REPLIED],
       },
@@ -532,7 +551,8 @@ export class ReviewsService {
   }
 
   async getStats(productId: string) {
-    const objectId = new Types.ObjectId(productId);
+    const actualProductId = await this.resolveProductId(productId);
+    const objectId = new Types.ObjectId(actualProductId);
 
     const stats = await this.reviewModel.aggregate<RatingStatResult>([
       {
@@ -586,5 +606,63 @@ export class ReviewsService {
     };
 
     return { stats: result, percentages };
+  }
+
+  async checkEligibility(userId: string, productId: string) {
+    console.log('--- DEBUG REVIEW ELIGIBILITY ---');
+    console.log('1. User ID gọi API:', userId);
+    // 1. Chuyển đổi Slug thành ObjectId chuẩn
+    const actualProductId = await this.resolveProductId(productId);
+
+    // 2. Tìm tất cả đơn hàng đã hoàn thành của user
+    const eligibleOrders = await this.orderModel
+      .find({
+        user_id: new Types.ObjectId(userId),
+        status: { $in: ['COMPLETED', 'DELIVERED'] },
+        'items.product_id': new Types.ObjectId(actualProductId), // Sử dụng ID đã convert
+      })
+      .lean();
+
+    console.log('3. Số đơn hàng khớp điều kiện:', eligibleOrders.length);
+
+    if (!eligibleOrders || eligibleOrders.length === 0) {
+      return {
+        isEligible: false,
+        message: 'Chưa mua hàng hoặc đơn hàng chưa hoàn thành',
+      };
+    }
+
+    // 3. Tìm xem trong các đơn hàng hợp lệ đó, có item nào chưa được review không
+    for (const order of eligibleOrders) {
+      const itemsMatchingProduct = order.items.filter(
+        (item) => item.product_id.toString() === actualProductId, // Sử dụng ID đã convert
+      );
+
+      for (const item of itemsMatchingProduct) {
+        // Kiểm tra xem item này trong đơn hàng này đã có review chưa
+        const existingReview = await this.reviewModel
+          .findOne({
+            order_id: order._id,
+            product_id: new Types.ObjectId(actualProductId), // Sử dụng ID đã convert
+            variant_sku: item.sku,
+          })
+          .lean();
+
+        // Nếu chưa có review -> Trả về ngay orderId và sku để FE dùng
+        if (!existingReview) {
+          return {
+            isEligible: true,
+            orderId: order._id.toString(),
+            variantSku: item.sku,
+          };
+        }
+      }
+    }
+
+    // Nếu tất cả các lần mua đều đã được đánh giá hết
+    return {
+      isEligible: false,
+      message: 'Bạn đã đánh giá tất cả các sản phẩm đã mua',
+    };
   }
 }

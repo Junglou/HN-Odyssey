@@ -107,7 +107,9 @@ export class ProductListener {
   @OnEvent('media.bulk.uploaded', { async: true })
   async handleMediaBulkUploaded(payload: BulkMediaPayload) {
     try {
-      if (payload.type === 'Product') {
+      const safeType = payload.type.toUpperCase(); // Chuẩn hóa chuỗi để so sánh an toàn
+
+      if (safeType === 'PRODUCT') {
         // Dùng $push kèm $each để đẩy toàn bộ mảng ảnh mới vào đuôi mảng images hiện tại
         await this.productModel.findByIdAndUpdate(payload.targetId, {
           $push: { images: { $each: payload.urls } },
@@ -115,14 +117,14 @@ export class ProductListener {
         this.logger.log(
           `[EVENT SUCCESS] Đã thêm ${payload.urls.length} ảnh vào mảng images của Product ID: ${payload.targetId}`,
         );
-      } else if (payload.type === 'Variant' && payload.urls.length > 0) {
-        // Schema Variant chỉ lưu 1 ảnh (cột image: string), nên ta sẽ ghi đè ảnh đầu tiên nếu upload bulk
+      } else if (safeType === 'VARIANT' && payload.urls.length > 0) {
+        // Schema Variant chỉ lưu 1 ảnh (cột image), nên ta sẽ ghi đè ảnh đầu tiên nếu upload bulk
         await this.productModel.updateOne(
           { 'variants.sku': payload.targetId },
           { $set: { 'variants.$.image': payload.urls[0] } },
         );
         this.logger.log(
-          `[EVENT SUCCESS] Đã lưu ảnh vào Variant SKU: ${payload.targetId}`,
+          `[EVENT SUCCESS] Đã lưu ảnh bulk vào Variant SKU: ${payload.targetId}`,
         );
       }
     } catch (error: unknown) {
@@ -137,9 +139,10 @@ export class ProductListener {
   @OnEvent('media.deleted', { async: true })
   async handleMediaDeleted(payload: MediaDeletedPayload) {
     try {
-      if (payload.type === 'Product') {
-        const product = await this.productModel.findById(payload.targetId);
+      const safeType = payload.type.toUpperCase();
 
+      if (safeType === 'PRODUCT') {
+        const product = await this.productModel.findById(payload.targetId);
         if (!product) return;
 
         let isModified = false;
@@ -165,8 +168,9 @@ export class ProductListener {
             `[EVENT SUCCESS] Đã dọn dẹp URL ảnh bị xóa cho Product ID: ${payload.targetId}`,
           );
         }
-      } else if (payload.type === 'Variant') {
+      } else if (safeType === 'VARIANT') {
         // Xóa trắng trường image của Variant nếu URL trùng với ảnh vừa bị xóa
+        // Dùng arrayFilters để rà soát chính xác phần tử cần xóa bên trong mảng
         const result = await this.productModel.updateOne(
           { 'variants.sku': payload.targetId },
           {

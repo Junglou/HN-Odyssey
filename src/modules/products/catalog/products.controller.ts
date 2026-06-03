@@ -70,11 +70,10 @@ export class ProductsController {
   @Public()
   @Get('store/list')
   findAllPublic(@Query() query: FilterProductDto) {
-    if (query.categorySlug) {
-      return this.productsService.findByCategory(query);
-    }
-    const findAllQuery = { ...query, status: 'ACTIVE' };
-    return this.productsService.findAll(findAllQuery);
+    console.log('Dữ liệu Controller nhận được:', query);
+    // Bỏ vòng lặp if rườm rà, dùng thẳng findByCategory cho mọi request Storefront
+    // vì findByCategory đã bao hàm cả xử lý chữ "all", phân trang, sort và filter.
+    return this.productsService.findByCategory(query);
   }
 
   @Public()

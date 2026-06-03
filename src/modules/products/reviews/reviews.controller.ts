@@ -29,6 +29,7 @@ import {
   storageConfig,
   fileFilter,
 } from '../../../common/utils/file-upload.util';
+import { ApiOperation } from '@nestjs/swagger';
 
 interface ICurrentUser {
   userId?: string;
@@ -163,5 +164,15 @@ export class ReviewsController {
   @Get('stats/:productId')
   async getStats(@Param('productId') productId: string) {
     return this.reviewsService.getStats(productId);
+  }
+
+  @Get('eligibility/:productId')
+  @ApiOperation({ summary: 'Kiểm tra quyền đánh giá sản phẩm của user' })
+  async checkEligibility(
+    @Param('productId') productId: string,
+    @CurrentUser() user: ICurrentUser,
+  ) {
+    const userId = this.getUserId(user);
+    return this.reviewsService.checkEligibility(userId, productId);
   }
 }

@@ -67,6 +67,15 @@ interface PopulatedCategory {
   slug: string;
 }
 
+export interface ICategoryDoc {
+  _id: Types.ObjectId;
+  name: string;
+  slug: string;
+  description?: string;
+  image?: string;
+  parent_id?: Types.ObjectId | null;
+}
+
 @Injectable()
 export class ProductsService {
   constructor(
@@ -511,11 +520,26 @@ export class ProductsService {
   }
 
   async findBySlug(slug: string, userId?: string) {
-    const product = await this.productModel
-      .findOne({ slug, status: ProductStatus.ACTIVE, is_deleted: false })
-      .populate('categories', 'name slug')
-      .lean()
-      .exec();
+    // khai báo kiểu record để tránh lỗi type mismatch và không vi phạm quy tắc no-explicit-any của eslint
+    let product: Product | null = null;
+
+    // hỗ trợ fallback tìm theo id nếu frontend truyền nhầm id thay vì slug
+    if (Types.ObjectId.isValid(slug)) {
+      product = (await this.productModel
+        .findOne({ _id: slug, status: ProductStatus.ACTIVE, is_deleted: false })
+        .populate('categories', 'name slug')
+        .lean()
+        .exec()) as unknown as Product;
+    }
+
+    // nếu không tìm thấy bằng id, thực hiện tìm theo slug thông thường
+    if (!product) {
+      product = (await this.productModel
+        .findOne({ slug, status: ProductStatus.ACTIVE, is_deleted: false })
+        .populate('categories', 'name slug')
+        .lean()
+        .exec()) as unknown as Product;
+    }
 
     if (!product) {
       const oldProduct = await this.productModel
@@ -665,6 +689,22 @@ export class ProductsService {
       await this.validateAttributesExist(updateDto.variants);
       product.has_variants = updateDto.variants.length > 0;
       product.specs = this.calculateSpecs(updateDto.variants);
+
+      // ==========================================
+      // FIX: GIỮ LẠI IMAGE CŨ CỦA VARIANT KHI UPDATE
+      // ==========================================
+      const oldVariants = product.variants || [];
+      updateDto.variants = updateDto.variants.map((newVar) => {
+        // Tìm biến thể cũ trong DB dựa vào sku
+        const oldVar = oldVariants.find((v) => v.sku === newVar.sku);
+
+        // Nếu biến thể cũ có ảnh, phải giữ lại url ảnh đó truyền sang data mới
+        if (oldVar && oldVar.image) {
+          return { ...newVar, image: oldVar.image };
+        }
+        return newVar;
+      });
+
       product.attributes = this.flattenAttributes(
         updateDto.variants,
       ) as unknown as ProductAttribute[];
@@ -1267,89 +1307,160 @@ export class ProductsService {
   }
 
   async findByCategory(dto: FilterProductDto) {
-    const { categorySlug, sort, attributes } = dto;
+    // 1. CHÌA KHÓA: Lấy thêm keyword từ dto
+    const { categorySlug, sort, attributes, keyword } = dto;
     const page = dto.page || 1;
     const limit = dto.limit || 20;
 
-    const category = await this.categoryModel
-      .findOne({ slug: categorySlug })
-      .lean();
-    if (!category) throw new NotFoundException('Danh mục không tồn tại');
-
-    const allCategories = await this.categoriesService.getAllChildCategories(
-      category._id,
-    );
-    const categoryIds = [category._id, ...allCategories];
-
     const query: FilterQuery<ProductDocument> = {
-      categories: { $in: categoryIds },
       status: ProductStatus.ACTIVE,
       is_deleted: false,
     };
 
+    // 2. CHÌA KHÓA: Xử lý tìm kiếm theo keyword (từ thanh Header chuyển xuống)
+    if (keyword && typeof keyword === 'string' && keyword.trim() !== '') {
+      const cleanKeyword = keyword.trim();
+      query.$or = [
+        { name: { $regex: cleanKeyword, $options: 'i' } }, // Tìm theo tên
+        { tags: { $regex: cleanKeyword, $options: 'i' } }, // Tìm theo từ khóa tag
+        { sku: { $regex: cleanKeyword, $options: 'i' } }, // Tìm theo mã sản phẩm
+      ];
+    }
+
+    let category: ICategoryDoc | null = null;
+    let subCategories: Partial<ICategoryDoc>[] = [];
+
+    // XỬ LÝ DANH MỤC (Hỗ trợ Tab "All")
+    if (categorySlug && categorySlug !== 'all') {
+      const foundCategory = await this.categoryModel
+        .findOne({ slug: categorySlug })
+        .lean<ICategoryDoc>();
+
+      if (!foundCategory) throw new NotFoundException('Danh mục không tồn tại');
+
+      category = foundCategory;
+
+      // Đã gỡ bỏ lệnh ép kiểu "as Types.ObjectId" dư thừa tại đây
+      const allCategories = await this.categoriesService.getAllChildCategories(
+        category._id,
+      );
+      const categoryIds = [category._id, ...allCategories];
+      query.categories = { $in: categoryIds };
+
+      const subs = await this.categoryModel
+        .find({ parent_id: category._id })
+        .select('name slug image')
+        .lean<ICategoryDoc[]>();
+
+      subCategories = subs;
+    }
+
+    // XỬ LÝ LỌC ATTRIBUTES TỪ FRONTEND GỬI XUỐNG
     if (attributes) {
       const attributeFilters: FilterQuery<ProductDocument>[] = [];
 
       for (const [code, valuesStr] of Object.entries(attributes)) {
         if (!valuesStr) continue;
 
-        const values = valuesStr
+        // Tách chuỗi filter
+        const values = String(valuesStr)
           .split(',')
           .map((v) => v.trim())
           .filter((v) => v);
 
         if (values.length > 0) {
-          attributeFilters.push({
-            attributes: {
-              $elemMatch: {
-                code: code,
-                value: { $in: values },
+          if (code === 'tags') {
+            attributeFilters.push({ tags: { $in: values } });
+          } else if (code === 'price') {
+            if (values.length === 2) {
+              attributeFilters.push({
+                $expr: {
+                  $and: [
+                    {
+                      $gte: [
+                        {
+                          $cond: [
+                            { $gt: ['$sale_price', 0] },
+                            '$sale_price',
+                            '$price',
+                          ],
+                        },
+                        Number(values[0]),
+                      ],
+                    },
+                    {
+                      $lte: [
+                        {
+                          $cond: [
+                            { $gt: ['$sale_price', 0] },
+                            '$sale_price',
+                            '$price',
+                          ],
+                        },
+                        Number(values[1]),
+                      ],
+                    },
+                  ],
+                },
+              });
+            }
+          } else {
+            attributeFilters.push({
+              attributes: {
+                $elemMatch: {
+                  code: code,
+                  value: { $in: values },
+                },
               },
-            },
-          });
+            });
+          }
         }
       }
 
       if (attributeFilters.length > 0) {
+        // Gán mảng điều kiện lọc vào $and (hoạt động độc lập với $or của keyword phía trên)
         query.$and = attributeFilters;
       }
     }
 
+    // XỬ LÝ SẮP XẾP (SORT)
     let sortOptions: { [key: string]: SortOrder } = {};
     switch (sort) {
+      case SortOption.TRENDING:
+      case SortOption.BEST_SELLER:
+        sortOptions = { sold_count: -1, rating_average: -1, created_at: -1 };
+        break;
       case SortOption.PRICE_ASC:
         sortOptions = { sale_price: 1, price: 1 };
         break;
       case SortOption.PRICE_DESC:
         sortOptions = { sale_price: -1, price: -1 };
         break;
-      case SortOption.BEST_SELLER:
-        sortOptions = { sold_count: -1 };
-        break;
+      case SortOption.NEWEST:
       default:
         sortOptions = { created_at: -1 };
     }
 
     const skip = (page - 1) * limit;
 
-    const subCategories = await this.categoryModel
-      .find({ parent_id: category._id })
-      .select('name slug image')
-      .lean();
-
+    // TRUY VẤN MONGODB VỚI BỘ LỌC HOÀN CHỈNH
     const [products, total] = await Promise.all([
       this.productModel
         .find(query)
         .select(
-          'name slug price sale_price sale_start_date sale_end_date thumbnail rating_average review_count sold_count stock created_at',
+          'name sku has_variants slug price sale_price sale_start_date sale_end_date thumbnail rating_average review_count sold_count stock created_at',
         )
         .sort(sortOptions)
         .skip(skip)
-        .limit(limit),
+        .limit(limit)
+        .lean(),
       this.productModel.countDocuments(query),
     ]);
 
-    const breadcrumbs = await this.buildBreadcrumbs(category);
+    // Đã gỡ bỏ lệnh ép kiểu "as unknown as CategorySimple | null" dư thừa tại đây
+    const breadcrumbs = await this.buildBreadcrumbs(
+      category ? (category as unknown as CategorySimple) : null,
+    );
 
     return {
       data: products,
@@ -1359,11 +1470,13 @@ export class ProductsService {
         limit,
         lastPage: Math.ceil(total / limit),
         sub_categories: subCategories,
-        category: {
-          name: category.name,
-          description: category.description,
-          banner: category.image,
-        },
+        category: category
+          ? {
+              name: category.name,
+              description: category.description || '',
+              banner: category.image || '',
+            }
+          : { name: 'All Products', description: '', banner: '' },
         breadcrumbs: breadcrumbs,
       },
     };

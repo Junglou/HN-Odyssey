@@ -1381,10 +1381,6 @@ export class OrdersService {
             session,
           );
 
-          const variant = product.variants.find((v) => v.sku === item.sku);
-          if (!variant)
-            throw new BadRequestException(`Lỗi biến thể ${item.sku}`);
-
           if (
             product.max_purchase_qty &&
             item.quantity > product.max_purchase_qty
@@ -1394,7 +1390,28 @@ export class OrdersService {
             );
           }
 
-          if (variant.stock < item.quantity) {
+          let availableStock = 0;
+          let currentPrice = 0;
+
+          // Bổ sung logic rẽ nhánh cho Sản phẩm có biến thể và Sản phẩm đơn
+          if (product.has_variants) {
+            const variant = product.variants.find((v) => v.sku === item.sku);
+            if (!variant)
+              throw new BadRequestException(`Lỗi biến thể ${item.sku}`);
+
+            availableStock = variant.stock;
+            currentPrice =
+              variant.sale_price > 0 ? variant.sale_price : variant.price;
+          } else {
+            if (product.sku !== item.sku)
+              throw new BadRequestException(`Mã SKU không hợp lệ ${item.sku}`);
+
+            availableStock = product.stock;
+            currentPrice =
+              product.sale_price > 0 ? product.sale_price : product.price;
+          }
+
+          if (availableStock < item.quantity) {
             throw new BadRequestException(`Sản phẩm ${product.name} hết hàng.`);
           }
 
@@ -1403,8 +1420,6 @@ export class OrdersService {
           totalWeight += weight * item.quantity;
 
           // Xử lý giá Flash Sale
-          let currentPrice =
-            variant.sale_price > 0 ? variant.sale_price : variant.price;
           const activeFlashSale = await this.flashSaleModel
             .findOne({
               status: FlashSaleStatus.ACTIVE,
@@ -1429,7 +1444,7 @@ export class OrdersService {
 
           orderItems.push({
             product_id: product._id,
-            sku: variant.sku,
+            sku: item.sku,
             product_name: product.name,
             price: currentPrice,
             quantity: item.quantity,

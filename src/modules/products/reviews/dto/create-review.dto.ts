@@ -30,11 +30,11 @@ class ReviewMediaDto {
 }
 
 export class CreateReviewDto {
-  @IsMongoId()
+  @IsString()
   @IsNotEmpty()
   productId: string;
 
-  @IsMongoId()
+  @IsString()
   @IsNotEmpty()
   orderId: string;
 

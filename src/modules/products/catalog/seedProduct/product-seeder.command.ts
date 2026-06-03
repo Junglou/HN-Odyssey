@@ -10,10 +10,11 @@ export class ProductSeederCommand {
 
   @Command({
     command: 'seed:products',
-    describe: 'Tạo 50 dữ liệu giả cho collection Products',
+    describe: 'Tạo 100 dữ liệu giả cho collection Products',
   })
   async createProducts() {
-    await this.productSeederService.seedProducts(50);
+    // Truyền tham số 100 để tạo 100 sản phẩm
+    await this.productSeederService.seedProducts(100);
     this.logger.log('Command seed:products hoàn thành.');
   }
 }

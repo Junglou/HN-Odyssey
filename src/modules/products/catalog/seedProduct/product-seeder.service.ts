@@ -17,6 +17,20 @@ import {
 } from 'src/modules/products/attributes/schemas/attribute.schema';
 import { AttributeType } from 'src/common/enums/attribute-type.enum';
 
+interface ISeedAttribute {
+  code: string;
+  value: string;
+}
+
+interface ISeedVariant {
+  sku: string;
+  price: number;
+  sale_price: number;
+  stock: number;
+  thumbnail: string;
+  attributes: ISeedAttribute[];
+}
+
 interface IMockProduct {
   name: string;
   sku: string;
@@ -37,14 +51,14 @@ interface IMockProduct {
   categories: Types.ObjectId[];
   tags: string[];
   specs: any[];
-  attributes: any[];
+  attributes: ISeedAttribute[];
   price: number;
   sale_price: number;
   sale_start_date: Date | null;
   sale_end_date: Date | null;
   is_flash_sale: boolean;
   margin_tier: number;
-  variants: any[];
+  variants: ISeedVariant[];
   has_variants: boolean;
   stock: number;
   stock_on_hold: number;
@@ -76,7 +90,8 @@ export class ProductSeederService {
     private readonly attributeModel: Model<AttributeDocument>,
   ) {}
 
-  async seedProducts(count: number = 50): Promise<void> {
+  // Đổi mặc định lên 100 sản phẩm
+  async seedProducts(count: number = 100): Promise<void> {
     this.logger.log('Bắt đầu dọn dẹp toàn bộ dữ liệu Catalog...');
     await Promise.all([
       this.productModel.deleteMany({}),
@@ -84,71 +99,73 @@ export class ProductSeederService {
       this.attributeModel.deleteMany({}),
     ]);
 
-    // 1. ĐỒNG BỘ DANH MỤC KHỚP VỚI FRONTEND ROUTING
+    // 1. Đồng bộ danh mục chuẩn trekking gear
     const categoryData = [
       {
-        name: 'Men',
-        slug: 'men',
-        description: 'Men Collection',
+        name: 'Backpacks',
+        slug: 'backpacks',
+        description: 'Trekking & Hiking Backpacks',
         display_order: 1,
       },
       {
-        name: 'Women',
-        slug: 'women',
-        description: 'Women Collection',
+        name: 'Tents & Shelters',
+        slug: 'tents-shelters',
+        description: 'Camping Tents and Shelters',
         display_order: 2,
       },
       {
-        name: 'Kid',
-        slug: 'kid',
-        description: 'Kid Collection',
+        name: 'Footwear',
+        slug: 'footwear',
+        description: 'Hiking Boots and Shoes',
         display_order: 3,
       },
       {
-        name: 'Equipment',
-        slug: 'equipment',
-        description: 'Outdoor Equipment',
+        name: 'Apparel',
+        slug: 'apparel',
+        description: 'Outdoor Clothing & Jackets',
         display_order: 4,
       },
       {
-        name: 'Emergency Packs',
-        slug: 'emergency',
-        description: 'Emergency & Survival Packs',
+        name: 'Accessories',
+        slug: 'accessories',
+        description: 'Navigation, Hydration & Gears',
         display_order: 5,
       },
     ];
     await this.categoryModel.insertMany(categoryData);
     const dbCategories = await this.categoryModel.find().exec();
 
-    // 2. KHỞI TẠO BỘ LỌC ATTRIBUTES
+    // 2. Khởi tạo bộ lọc attributes chuẩn
     const attributeData = [
       {
         name: 'Color',
         code: 'color',
         display_type: AttributeType.COLOR_SWATCH,
         values: [
-          { label: 'Obsidian Black', value: 'black', meta: '#000000' },
-          { label: 'Navy Blue', value: 'navy', meta: '#000080' },
-          { label: 'Rescue Orange', value: 'orange', meta: '#FFA500' },
+          { label: 'Forest Green', value: 'forest-green', meta: '#228B22' },
+          { label: 'Desert Sand', value: 'desert-sand', meta: '#EDC9AF' },
+          { label: 'Charcoal', value: 'charcoal', meta: '#36454F' },
         ],
       },
       {
-        name: 'Size',
+        name: 'Size (Apparel)',
         code: 'size',
         display_type: AttributeType.BUTTON,
         values: [
           { label: 'Size S', value: 's' },
           { label: 'Size M', value: 'm' },
           { label: 'Size L', value: 'l' },
+          { label: 'Size XL', value: 'xl' },
         ],
       },
       {
-        name: 'Material',
-        code: 'material',
+        name: 'Capacity (Backpacks)',
+        code: 'capacity',
         display_type: AttributeType.BUTTON,
         values: [
-          { label: 'Gore-Tex', value: 'gore-tex' },
-          { label: 'Merino Wool', value: 'merino' },
+          { label: '20 Liters', value: '20l' },
+          { label: '40 Liters', value: '40l' },
+          { label: '65+ Liters', value: '65l' },
         ],
       },
     ];
@@ -178,16 +195,18 @@ export class ProductSeederService {
 
       const colorAttr = dbAttributes.find((a) => a.code === 'color')!;
       const sizeAttr = dbAttributes.find((a) => a.code === 'size')!;
-      const materialAttr = dbAttributes.find((a) => a.code === 'material')!;
+
+      // Cập nhật 'material' thành 'capacity' để map đúng với dbAttributes
+      const capacityAttr = dbAttributes.find((a) => a.code === 'capacity')!;
 
       const randomColor = faker.helpers.arrayElement(colorAttr.values);
       const randomSize = faker.helpers.arrayElement(sizeAttr.values);
-      const randomMaterial = faker.helpers.arrayElement(materialAttr.values);
+      const randomCapacity = faker.helpers.arrayElement(capacityAttr.values);
 
-      let name = `${this.MY_BRAND} ${randomMaterial.label} ${activity} ${type}`;
+      let name = `${this.MY_BRAND} ${randomCapacity.label} ${activity} ${type}`;
       const baseSku = `HNO-${faker.string.alphanumeric(6).toUpperCase()}`;
 
-      // 3. ĐIỀU CHỈNH GIÁ TIỀN CHUẨN USD (Từ $20.00 đến $350.00)
+      // 3. Điều chỉnh giá tiền chuẩn USD (từ $20.00 đến $350.00)
       const price = faker.number.float({
         min: 20,
         max: 350,
@@ -201,6 +220,11 @@ export class ProductSeederService {
       } else if (i === 1) {
         name = `Extended 12-Month Warranty Pack`;
         forcedTags = ['service', 'warranty'];
+      } else {
+        // Rải ngẫu nhiên tag Trending cho khoảng 30% sản phẩm để đảm bảo AI Engine luôn có Data Fallback
+        if (faker.datatype.boolean({ probability: 0.3 })) {
+          forcedTags.push('Trending');
+        }
       }
 
       const categorySemanticText = randomCategory.name.toLowerCase();
@@ -208,13 +232,13 @@ export class ProductSeederService {
         'Outdoor',
         'Trekking',
         this.MY_BRAND,
-        randomMaterial.value,
+        randomCapacity.value,
         categorySemanticText,
         ...forcedTags,
       ];
 
       const hasVariants = faker.datatype.boolean();
-      const variants: any[] = [];
+      const variants: ISeedVariant[] = [];
       let totalStock = 0;
 
       if (hasVariants) {
@@ -239,6 +263,37 @@ export class ProductSeederService {
         }
       } else {
         totalStock = faker.number.int({ min: 10, max: 150 });
+      }
+
+      // Xử lý lấy tất cả thuộc tính từ biến thể để đồng bộ lên mảng thuộc tính gốc
+      let rootAttributes: ISeedAttribute[] = [];
+
+      if (hasVariants) {
+        // Định nghĩa type Map để trình biên dịch tự động nhận diện giá trị khi set
+        const attrMap = new Map<string, ISeedAttribute>();
+
+        variants.forEach((v) => {
+          v.attributes.forEach((a) => {
+            attrMap.set(`${a.code}_${a.value}`, {
+              code: a.code,
+              value: a.value,
+            });
+          });
+        });
+
+        // Bổ sung capacity mặc định vì biến thể ở trên chỉ tạo ngẫu nhiên color và size
+        attrMap.set(`capacity_${randomCapacity.value}`, {
+          code: capacityAttr.code,
+          value: randomCapacity.value,
+        });
+
+        rootAttributes = Array.from(attrMap.values());
+      } else {
+        rootAttributes = [
+          { code: colorAttr.code, value: randomColor.value },
+          { code: sizeAttr.code, value: randomSize.value },
+          { code: capacityAttr.code, value: randomCapacity.value },
+        ];
       }
 
       mockProducts.push({
@@ -268,11 +323,7 @@ export class ProductSeederService {
         rank_required: 0,
         allowed_tiers: [],
         categories: [randomCategory._id],
-        attributes: [
-          { code: colorAttr.code, value: randomColor.value },
-          { code: sizeAttr.code, value: randomSize.value },
-          { code: materialAttr.code, value: randomMaterial.value },
-        ],
+        attributes: rootAttributes, // Sử dụng mảng thuộc tính đã được gom nhóm chuẩn
         tags: currentTags,
         specs: [{ name: 'Activity', values: [activity] }],
         price: price,
@@ -291,7 +342,7 @@ export class ProductSeederService {
         min_stock: 5,
         max_stock: 300,
         allow_backorder: false,
-        weight: 0.5, // Cập nhật trọng lượng mặc định là 0.5kg
+        weight: 0.5,
         status: ProductStatus.ACTIVE,
         seo_config: {
           meta_title: name,

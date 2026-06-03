@@ -14,6 +14,7 @@ import {
 // ĐỊNH NGHĨA INTERFACE
 interface IVariant {
   _id: Types.ObjectId;
+  sku: string;
   price: number;
   sale_price: number;
   stock: number;
@@ -22,6 +23,8 @@ interface IVariant {
 
 interface IPopulatedProduct {
   _id: Types.ObjectId;
+  sku: string;
+  has_variants: boolean;
   name: string;
   images: string[];
   price: number;
@@ -61,7 +64,8 @@ export class WishlistService {
       .select('wishlist')
       .populate({
         path: 'wishlist.product',
-        select: 'name images price sale_price stock status variants',
+        select:
+          'name sku has_variants images price sale_price stock status variants',
         model: 'Product',
       })
       .lean()
@@ -90,6 +94,8 @@ export class WishlistService {
         return {
           productId: prod._id,
           variantId: item.variant_id || null,
+          sku: variantInfo ? variantInfo.sku : prod.sku,
+          has_variants: prod.has_variants,
           name: prod.name,
           images: prod.images,
           price: variantInfo ? variantInfo.price : prod.price,

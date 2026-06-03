@@ -93,17 +93,19 @@ export class CartService {
     const totalDiscount = comboDiscount + voucherDiscount;
 
     // --- LOGIC TÍNH PHÍ VẬN CHUYỂN ĐỘNG ---
-    let shippingFee = 0;
-    const FREESHIP_THRESHOLD = 500000;
+    let shippingFeeVND = 0;
+    const EXCHANGE_RATE = 25400; // Tỷ giá cố định 1 USD = 25,400 VNĐ
 
-    if (subtotal >= FREESHIP_THRESHOLD || items.length === 0) {
-      shippingFee = 0; // Đơn trên ngưỡng hoặc giỏ hàng trống thì phí ship = 0
+    // Đặt trực tiếp ngưỡng Freeship bằng USD (Ví dụ: 150$, bạn thích đổi thành 100$ hay 200$ thì chỉ cần sửa số này)
+    const FREESHIP_THRESHOLD_USD = 200;
+
+    if (subtotal >= FREESHIP_THRESHOLD_USD || items.length === 0) {
+      shippingFeeVND = 0; // Đơn trên ngưỡng quy định hoặc giỏ hàng trống thì phí ship = 0
     } else {
       let cityCode: string | null = null;
       let districtCode: string | null = null;
 
       if (userId) {
-        // Fix: Ép kiểu qua Interface để ESLint không báo lỗi Unsafe member access
         const user = (await this.userModel
           .findById(userId)
           .select('addresses')
@@ -118,10 +120,9 @@ export class CartService {
         }
       }
 
-      // Chuẩn hóa dữ liệu theo Interface ICartItem
       const shippingItemsForFee = items.map((i) => ({
         name: i.productName,
-        product_name: i.productName, // Gửi cả 2 dự phòng sai lệch Interface
+        product_name: i.productName,
         code: i.sku,
         quantity: i.quantity,
         price: i.unitPrice,
@@ -129,26 +130,28 @@ export class CartService {
       }));
 
       if (cityCode && districtCode) {
-        shippingFee = await this.shippingService.calculateShippingFee(
+        shippingFeeVND = await this.shippingService.calculateShippingFee(
           cityCode,
           districtCode,
-          // Fix: Ép kiểu mảng đúng chuẩn CartItem[] để không báo lỗi Unsafe argument
           shippingItemsForFee as unknown as ICartItem[],
           false,
         );
       } else {
-        // Fix: Ép kiểu IShippingConfigWithFees để đọc được trường .fees
         const config =
           (await this.shippingService.getDefaultConfig()) as unknown as IShippingConfigWithFees;
-        shippingFee = config?.fees?.other_province || 35000;
+        shippingFeeVND = config?.fees?.other_province || 35000;
       }
     }
+
+    // Quy đổi ngược phí ship nội địa (VNĐ) từ các bên vận chuyển về lại USD để tính tổng tiền đơn hàng
+    const shippingFeeUSD =
+      shippingFeeVND > 0 ? shippingFeeVND / EXCHANGE_RATE : 0;
 
     return {
       subtotal,
       discount: totalDiscount,
-      shippingFee,
-      grandTotal: Math.max(0, subtotal - totalDiscount + shippingFee),
+      shippingFee: shippingFeeUSD,
+      grandTotal: Math.max(0, subtotal - totalDiscount + shippingFeeUSD),
       itemCount,
     };
   }
