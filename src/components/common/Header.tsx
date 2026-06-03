@@ -1,10 +1,12 @@
-// imports
 import { useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { InstantSearch, useSearchBox } from "react-instantsearch";
 import { useHeader } from "../../hooks/common/useHeader";
 import { useCart } from "../../hooks/common/cartDrop/useCart";
 import { useClickOutside } from "../../hooks/common/useClickOutside";
 import CartDropdown from "./cartDrop/CartDropdown";
+import SearchDropdown from "./searchDrop/SearchDropdown";
+import { searchClient, ALGOLIA_INDEX_NAME } from "../../utils/algoliaClient";
 import logoImage from "../../assets/images/logo.png";
 import {
   HeartIcon,
@@ -14,9 +16,18 @@ import {
 } from "../../assets/icons/HeaderIcons";
 import "./Header.css";
 
-// component
+// component ảo đồng bộ giá trị input với engine của algolia
+function VirtualSearchBox({ currentQuery }: { currentQuery: string }) {
+  const { refine } = useSearchBox();
+
+  useEffect(() => {
+    refine(currentQuery);
+  }, [currentQuery, refine]);
+
+  return null;
+}
+
 export default function Header() {
-  // hooks
   const {
     isVisible,
     isSearchOpen,
@@ -26,7 +37,7 @@ export default function Header() {
     searchInputRef,
     setSearchQuery,
     handleOpenSearch,
-    handleCloseSearch,
+    forceCloseSearch,
     toggleMobileMenu,
     closeMobileMenu,
     handleSearchKeyDown,
@@ -49,20 +60,28 @@ export default function Header() {
   } = useCart();
 
   const cartWrapperRef = useRef<HTMLDivElement>(null);
+  const searchWrapperRef = useRef<HTMLDivElement>(null);
   const isModalOpenRef = useRef(isDeleteModalOpen);
 
-  // side effects
+  // cập nhật ref theo state modal xóa để tránh lỗi click outside
   useEffect(() => {
     isModalOpenRef.current = isDeleteModalOpen;
   }, [isDeleteModalOpen]);
 
+  // đóng giỏ hàng khi click ra ngoài
   useClickOutside(cartWrapperRef, () => {
     if (isCartOpen && !isModalOpenRef.current) {
       closeCart();
     }
   });
 
-  // render
+  // đóng popup tìm kiếm khi click ra ngoài
+  useClickOutside(searchWrapperRef, () => {
+    if (isSearchOpen) {
+      forceCloseSearch();
+    }
+  });
+
   return (
     <div className={`hn-header-wrapper ${isVisible ? "visible" : "hidden"}`}>
       {/* màng phủ mờ nền khi mở menu di động */}
@@ -145,21 +164,40 @@ export default function Header() {
             />
           </div>
 
-          <div
-            className={`header-search ${isSearchOpen ? "active" : ""}`}
-            onClick={handleOpenSearch}
+          {/* bọc algolia tại đây */}
+          <InstantSearch
+            searchClient={searchClient}
+            indexName={ALGOLIA_INDEX_NAME}
           >
-            <SearchIconSmall />
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onBlur={handleCloseSearch}
-              onKeyDown={handleSearchKeyDown}
-            />
-          </div>
+            <VirtualSearchBox currentQuery={searchQuery} />
+
+            <div
+              className={`header-search ${isSearchOpen ? "active" : ""}`}
+              onClick={handleOpenSearch}
+              ref={searchWrapperRef}
+              style={{ position: "relative" }}
+            >
+              <SearchIconSmall />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                // đã gỡ onBlur để popup không bị ẩn mất trước khi user kịp click vào item
+                onKeyDown={handleSearchKeyDown}
+              />
+
+              <SearchDropdown
+                isOpen={isSearchOpen}
+                searchQuery={searchQuery}
+                onClose={() => {
+                  forceCloseSearch();
+                  setSearchQuery("");
+                }}
+              />
+            </div>
+          </InstantSearch>
         </div>
       </div>
 

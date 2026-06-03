@@ -2,15 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axios from "axios";
 import type { UserFormData } from "../../../../components/portal/UsersAndRoles/UserManagement/UserModal";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
-
-const getAuthHeaders = () => {
-  const token = localStorage.getItem("accessToken");
-  return {
-    headers: { Authorization: `Bearer ${token}` },
-  };
-};
+import axiosClient from "../../../../api/axiosClient";
 
 export type BulkAction = "activate" | "deactivate" | "delete";
 
@@ -71,16 +63,16 @@ const formatLastLogin = (dateString?: string) => {
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMins / 60);
 
-  // Định dạng linh hoạt theo thời gian thực (giống Facebook/Google)
+  // Định dạng linh hoạt theo thời gian thực giống các nền tảng mạng xã hội
   if (diffMins < 2) return "Vừa mới đây";
   if (diffMins < 60) return `${diffMins} phút trước`;
 
-  // Nếu là cùng ngày hôm nay
+  // Kiểm tra thời gian trong cùng ngày hôm nay
   if (diffHours < 24 && now.getDate() === date.getDate()) {
     return `Hôm nay, ${date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`;
   }
 
-  // Nếu là hôm qua
+  // Kiểm tra thời gian là ngày hôm qua
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
   if (
@@ -90,7 +82,7 @@ const formatLastLogin = (dateString?: string) => {
     return `Hôm qua, ${date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`;
   }
 
-  // Cũ hơn thì hiện ngày tháng gọn gàng (VD: 08/05/2026)
+  // Hiển thị ngày tháng đầy đủ nếu thời gian đã cũ
   return date.toLocaleDateString("vi-VN", {
     day: "2-digit",
     month: "2-digit",
@@ -132,11 +124,8 @@ export function useUserManagement() {
   const fetchMetadata = useCallback(async () => {
     try {
       const [rolesRes, deptsRes] = await Promise.all([
-        axios.get(`${API_URL}/admin/roles`, getAuthHeaders()),
-        axios.get(
-          `${API_URL}/admin/users/staff/metadata/departments`,
-          getAuthHeaders(),
-        ),
+        axiosClient.get(`/admin/roles`),
+        axiosClient.get(`/admin/users/staff/metadata/departments`),
       ]);
 
       const rawRoles: BackendRole[] = rolesRes.data?.data || rolesRes.data;
@@ -160,7 +149,7 @@ export function useUserManagement() {
         setDepartmentOptions(dynamicDepts);
       }
     } catch (error) {
-      console.error("Không thể tải Metadata (Roles/Departments)", error);
+      console.error("Không thể tải dữ liệu vai trò và phòng ban", error);
     }
   }, []);
 
@@ -176,10 +165,7 @@ export function useUserManagement() {
         params.status = filters.status;
       if (filters.role && filters.role !== "Role") params.role = filters.role;
 
-      const res = await axios.get(`${API_URL}/admin/users/staff`, {
-        ...getAuthHeaders(),
-        params,
-      });
+      const res = await axiosClient.get(`/admin/users/staff`, { params });
 
       const rawData: BackendUser[] = res.data?.data || [];
       const rawMeta = res.data?.meta || {};
@@ -208,7 +194,7 @@ export function useUserManagement() {
       if (axios.isAxiosError(error)) {
         const errorMsg =
           (error.response?.data as { message?: string })?.message ||
-          "Lỗi xảy ra";
+          "Đã xảy ra lỗi khi tải danh sách người dùng";
         toast.error(errorMsg);
       }
     }
@@ -220,7 +206,7 @@ export function useUserManagement() {
       await fetchMetadata();
       await fetchList();
       if (!ignore) {
-        // Không cần setState ở đây vì fetchList đã cập nhật state users, totalPages, totalFiltered
+        // Biến state đã được cập nhật bên trong hàm fetchList
       }
     };
     void initData();
@@ -229,13 +215,12 @@ export function useUserManagement() {
     };
   }, [fetchMetadata, fetchList]);
 
-  // XÓA (SINGLE / BULK)
+  // Hàm xử lý xóa người dùng đơn lẻ hoặc xóa hàng loạt
   const executeDelete = async () => {
     if (deleteConfig.type === "single" && deleteConfig.userId !== null) {
       try {
-        const res = await axios.delete(
-          `${API_URL}/admin/users/staff/${deleteConfig.userId}`,
-          getAuthHeaders(),
+        const res = await axiosClient.delete(
+          `/admin/users/staff/${deleteConfig.userId}`,
         );
         if (res?.data)
           toast.success(res.data.message || "Đã xóa nhân viên thành công!");
@@ -244,7 +229,7 @@ export function useUserManagement() {
         if (axios.isAxiosError(error)) {
           const errorMsg =
             (error.response?.data as { message?: string })?.message ||
-            "Lỗi xảy ra";
+            "Lỗi xảy ra khi xóa người dùng";
           toast.error(errorMsg);
         }
       }
@@ -252,11 +237,9 @@ export function useUserManagement() {
       try {
         const selectedIds = users.filter((u) => u.selected).map((u) => u.id);
 
-        const res = await axios.post(
-          `${API_URL}/admin/users/staff/bulk/delete`,
-          { userIds: selectedIds },
-          getAuthHeaders(),
-        );
+        const res = await axiosClient.post(`/admin/users/staff/bulk/delete`, {
+          userIds: selectedIds,
+        });
 
         if (res?.data)
           toast.success(
@@ -293,11 +276,7 @@ export function useUserManagement() {
           roles: [data.role],
           department: data.department,
         };
-        const res = await axios.post(
-          `${API_URL}/admin/users/staff`,
-          payload,
-          getAuthHeaders(),
-        );
+        const res = await axiosClient.post(`/admin/users/staff`, payload);
         if (res)
           toast.success(res.data?.message || "Thêm nhân viên mới thành công!");
       } else if (modalConfig.mode === "edit" && modalConfig.editingUser) {
@@ -318,10 +297,9 @@ export function useUserManagement() {
           payload.password = data.password;
         }
 
-        const res = await axios.patch(
-          `${API_URL}/admin/users/staff/${modalConfig.editingUser.id}`,
+        const res = await axiosClient.patch(
+          `/admin/users/staff/${modalConfig.editingUser.id}`,
           payload,
-          getAuthHeaders(),
         );
         if (res)
           toast.success(res.data?.message || "Cập nhật thông tin thành công!");
@@ -333,7 +311,7 @@ export function useUserManagement() {
       if (axios.isAxiosError(error)) {
         const errorMsg =
           (error.response?.data as { message?: string })?.message ||
-          "Lỗi khi lưu dữ liệu!";
+          "Lỗi khi lưu dữ liệu người dùng!";
         toast.error(errorMsg);
       }
     }
@@ -371,11 +349,10 @@ export function useUserManagement() {
 
       try {
         const is_active = action === "activate";
-        const res = await axios.patch(
-          `${API_URL}/admin/users/staff/bulk/status`,
-          { userIds: selectedIds, is_active },
-          getAuthHeaders(),
-        );
+        const res = await axiosClient.patch(`/admin/users/staff/bulk/status`, {
+          userIds: selectedIds,
+          is_active,
+        });
         if (res)
           toast.success(
             res.data?.message ||
@@ -386,7 +363,7 @@ export function useUserManagement() {
         if (axios.isAxiosError(error)) {
           const errorMsg =
             (error.response?.data as { message?: string })?.message ||
-            "Lỗi đổi trạng thái";
+            "Lỗi đổi trạng thái hàng loạt";
           toast.error(errorMsg);
         }
       }
@@ -396,11 +373,10 @@ export function useUserManagement() {
       if (currentStatus === "Inactive") return;
       try {
         const newStatus = currentStatus === "Active" ? "SUSPENDED" : "ACTIVE";
-        const res = await axios.patch(
-          `${API_URL}/admin/users/staff/${id}/status`,
-          { status: newStatus, reason: "Cập nhật từ Portal" },
-          getAuthHeaders(),
-        );
+        const res = await axiosClient.patch(`/admin/users/staff/${id}/status`, {
+          status: newStatus,
+          reason: "Cập nhật từ Portal",
+        });
         if (res)
           toast.success(res.data?.message || "Đã đổi trạng thái thành công!");
         void fetchList();
@@ -408,7 +384,7 @@ export function useUserManagement() {
         if (axios.isAxiosError(error)) {
           const errorMsg =
             (error.response?.data as { message?: string })?.message ||
-            "Lỗi xảy ra";
+            "Đã xảy ra lỗi khi thay đổi trạng thái";
           toast.error(errorMsg);
         }
       }

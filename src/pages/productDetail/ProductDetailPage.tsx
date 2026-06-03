@@ -1,4 +1,3 @@
-// imports
 import { useProductDetail } from "../../hooks/productDetail/useProductDetail";
 import "./ProductDetailPage.css";
 import ProductBreadcrumb from "../../components/productDetail/ProductBreadcrumb";
@@ -6,34 +5,27 @@ import ProductDetailMain from "../../components/productDetail/ProductDetailMain"
 import ProductRecommendations from "../../components/productDetail/ProductRecommendations";
 import ProductReviews from "../../components/productDetail/ProductReviews";
 
-// component
 export default function ProductDetailPage() {
-  // hooks
   const {
     product,
-    selectedColor,
-    selectedSize,
+    selectedOptions,
     activeImageIndex,
     quantity,
-    handleColorChange,
-    handleSizeChange,
+    handleOptionChange,
     handleImageChange,
     handleQuantityChange,
     handleQuantityInput,
     handleQuantityBlur,
   } = useProductDetail();
 
-  // render
   return (
     <div className="pdp-page-wrapper">
       <ProductBreadcrumb />
       <ProductDetailMain
         product={product}
-        selectedColor={selectedColor}
-        selectedSize={selectedSize}
+        selectedOptions={selectedOptions}
         activeImageIndex={activeImageIndex}
-        onColorChange={handleColorChange}
-        onSizeChange={handleSizeChange}
+        onOptionChange={handleOptionChange}
         onImageChange={handleImageChange}
         quantity={quantity}
         onQuantityChange={handleQuantityChange}

@@ -1,46 +1,52 @@
-// imports
 import { useState } from "react";
 import { useProductList } from "../../hooks/products/useProductList";
 import ProductSidebar from "../../components/products/ProductSidebar";
 import ProductMainContent from "../../components/products/ProductMainContent";
 import "./ProductListPage.css";
 
-// container
 export default function ProductListPage() {
-  // hooks
   const {
     gridItems,
+    filterSections,
+    tabs, // Truyền cấu trúc tabs động có mang theo tên và slug
+    activeTabSlug, // Slug tab hiện tại
     currentPage,
     totalPages,
-    activeTabs,
     selectedFilters,
-    sortValue, // lấy state sort
+    priceRange, // <-- Lấy state priceRange từ hook ra để truyền xuống Sidebar
+    sortValue,
     handlePageChange,
     handleTabChange,
     handleFilterToggle,
-    handleSortChange, // lấy hàm cập nhật sort
+    handlePriceChange, // <-- Lấy hàm xử lý thay đổi khoảng giá từ hook ra
+    handleSortChange,
+    handleClearFilters,
   } = useProductList();
 
-  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState<boolean>(false);
 
-  // render
   return (
     <div className="pl-page-wrapper">
       <ProductSidebar
         isOpen={isMobileFilterOpen}
         onClose={() => setIsMobileFilterOpen(false)}
+        filterSections={filterSections}
         selectedOptions={selectedFilters}
+        priceRange={priceRange} // <-- Truyền thuộc tính dữ liệu khoảng giá
         onOptionToggle={handleFilterToggle}
+        onPriceChange={handlePriceChange} // <-- Truyền callback kích hoạt khi nhấn Apply giá
+        onClearFilters={handleClearFilters}
       />
       <ProductMainContent
         gridItems={gridItems}
         currentPage={currentPage}
         totalPages={totalPages}
-        activeTabs={activeTabs}
-        sortValue={sortValue} // truyền xuống UI
+        tabs={tabs}
+        activeTabSlug={activeTabSlug}
+        sortValue={sortValue}
         onPageChange={handlePageChange}
         onTabChange={handleTabChange}
-        onSortChange={handleSortChange} // truyền xuống UI
+        onSortChange={handleSortChange}
         onOpenFilter={() => setIsMobileFilterOpen(true)}
       />
     </div>

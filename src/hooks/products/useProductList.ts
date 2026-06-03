@@ -1,18 +1,83 @@
-import { useState, useEffect, useMemo } from "react";
-// TODO: import axiosClient from "../../../api/axiosClient";
+import { useState, useEffect, useMemo, useCallback } from "react";
+// 1. THÊM IMPORT useSearchParams
+import { useSearchParams } from "react-router-dom";
+import axiosClient from "../../api/axiosClient";
+import tokenStorage from "../../utils/tokenStorage";
 
-// types
+const getFullImageUrl = (url?: string): string => {
+  if (!url) return "https://placehold.co/400x383/f3f4f6/000?text=No+Image";
+  if (
+    url.startsWith("http") ||
+    url.startsWith("data:") ||
+    url.startsWith("blob:")
+  ) {
+    return url;
+  }
+  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
+  const serverRootUrl = baseUrl.replace(/\/api.*$/, "").replace(/\/$/, "");
+  const formattedUrl = url.startsWith("/") ? url : `/${url}`;
+  return `${serverRootUrl}${formattedUrl}`;
+};
+
+type BEProductItem = {
+  _id: string;
+  sku: string;
+  slug: string;
+  has_variants?: boolean;
+  name: string;
+  short_description?: string;
+  price: number;
+  sale_price: number;
+  thumbnail?: string;
+  tags?: string[];
+};
+
+type BEFilterOption = {
+  label: string;
+  value: string;
+  meta?: string;
+  count: number;
+  disabled: boolean;
+};
+
+type BEFilterSection = {
+  code: string;
+  name: string;
+  type: string;
+  min?: number;
+  max?: number;
+  options?: BEFilterOption[];
+};
+
+export type BECategory = {
+  _id: string;
+  name: string;
+  slug: string;
+  children?: BECategory[];
+};
+
+type BEBannerItem = {
+  _id: string;
+  title: string;
+  link: string;
+  image_pc: string;
+  status: string;
+};
+
 export type ProductItem = {
   id: string;
   sku: string;
+  slug: string;
+  hasVariants: boolean;
   type: "product";
   name: string;
   desc: string;
   price: number;
-  originalPrice?: number; // giá gốc trước khi giảm
-  discountBadge?: string; // nhãn hiển thị mức giảm (VD: -20%)
+  originalPrice?: number;
+  discountBadge?: string;
   imageUrl: string;
   tags: string[];
+  initialWishlisted: boolean;
 };
 
 export type BannerItem = {
@@ -21,7 +86,7 @@ export type BannerItem = {
   title: string;
   subtitle: string;
   btnText: string;
-  span: number;
+  shape: "square" | "horizontal" | "vertical" | "small";
   imageDesktopUrl: string;
   targetUrl: string;
   status: string;
@@ -30,226 +95,340 @@ export type BannerItem = {
 
 export type GridItem = ProductItem | BannerItem;
 
-// mock data có chứa sản phẩm được khuyến mãi
-const MOCK_PRODUCTS: ProductItem[] = [
-  {
-    id: "p1",
-    sku: "JCK-001",
-    type: "product",
-    name: "Summit Softshell Jacket",
-    desc: "Grey-blue softshell",
-    price: 35.99,
-    originalPrice: 45.0,
-    discountBadge: "-20%",
-    imageUrl: "https://via.placeholder.com/400x383/94a3b8/fff?text=Product+1",
-    tags: ["New Arrival"],
-  },
-  {
-    id: "p2",
-    sku: "JCK-002",
-    type: "product",
-    name: "Alpine Puffer Jacket",
-    desc: "Navy puffer",
-    price: 35.99,
-    imageUrl: "https://via.placeholder.com/400x383/1e3a8a/fff?text=Product+2",
-    tags: ["Winter"],
-  },
-  {
-    id: "p3",
-    sku: "JCK-003",
-    type: "product",
-    name: "Trailblazer Rain Jacket",
-    desc: "Green rain jacket",
-    price: 35.99,
-    imageUrl: "https://via.placeholder.com/400x383/166534/fff?text=Product+3",
-    tags: [],
-  },
-  {
-    id: "p4",
-    sku: "JCK-004",
-    type: "product",
-    name: "Expedition Shell Jacket",
-    desc: "Orange shell jacket",
-    price: 25.0,
-    originalPrice: 35.99,
-    discountBadge: "Sale",
-    imageUrl: "https://via.placeholder.com/400x383/ea580c/fff?text=Product+4",
-    tags: ["Sale"],
-  },
-  {
-    id: "p5",
-    sku: "JCK-005",
-    type: "product",
-    name: "Summit Softshell Jacket",
-    desc: "Grey-blue softshell",
-    price: 35.99,
-    imageUrl: "https://via.placeholder.com/400x383/cbd5e1/000?text=Product+5",
-    tags: [],
-  },
-  {
-    id: "p6",
-    sku: "JCK-006",
-    type: "product",
-    name: "Alpine Puffer Jacket",
-    desc: "Grey puffer",
-    price: 35.99,
-    imageUrl: "https://via.placeholder.com/400x383/64748b/fff?text=Product+6",
-    tags: [],
-  },
-  {
-    id: "p7",
-    sku: "JCK-007",
-    type: "product",
-    name: "Expedition Shell Jacket",
-    desc: "Grey shell jacket",
-    price: 35.99,
-    imageUrl: "https://via.placeholder.com/400x383/334155/fff?text=Product+7",
-    tags: ["New Arrival"],
-  },
-  {
-    id: "p8",
-    sku: "JCK-008",
-    type: "product",
-    name: "Trailblazer Rain Jacket",
-    desc: "Navy rain jacket",
-    price: 35.99,
-    imageUrl: "https://via.placeholder.com/400x383/1e40af/fff?text=Product+8",
-    tags: [],
-  },
-];
+export type FilterOption = {
+  id: string;
+  label: string;
+  value: string;
+  count: number;
+  disabled: boolean;
+};
 
-const MOCK_BANNERS: BannerItem[] = [
-  {
-    id: "b1",
-    type: "banner",
-    title: "Get it now!",
-    subtitle: "Wrap yourself in comfort and style.",
-    btnText: "Explore",
-    span: 2,
-    imageDesktopUrl:
-      "https://via.placeholder.com/800x400/e5e7eb/000?text=Banner+1",
-    targetUrl: "/products/promo-1",
-    status: "ACTIVE",
-    position: "Category",
-  },
-  {
-    id: "b2",
-    type: "banner",
-    title: "Summer Sale",
-    subtitle: "Up to 50% off on all items.",
-    btnText: "Shop Now",
-    span: 1,
-    imageDesktopUrl:
-      "https://via.placeholder.com/400x400/fecaca/000?text=Banner+2",
-    targetUrl: "/products/promo-2",
-    status: "ACTIVE",
-    position: "Promotion",
-  },
-];
+export type FilterSection = {
+  id: string;
+  name: string;
+  type: string;
+  min?: number;
+  max?: number;
+  options: FilterOption[];
+};
+
+export type CategoryTab = {
+  name: string;
+  slug: string;
+};
 
 export function useProductList() {
-  // states quản lý bộ lọc và phân trang
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(8);
-  const [activeTabs, setActiveTabs] = useState<string[]>(["All"]);
+  // 2. LẤY KEYWORD TỪ URL
+  const [searchParams] = useSearchParams();
+  const keyword = searchParams.get("keyword") || "";
+
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage] = useState<number>(12);
+
+  const [tabs, setTabs] = useState<CategoryTab[]>([
+    { name: "All", slug: "all" },
+  ]);
+  const [activeTabSlug, setActiveTabSlug] = useState<string>("all");
+
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
-  const [sortValue, setSortValue] = useState("Sort by");
+  const [priceRange, setPriceRange] = useState<[number, number] | null>(null);
+  const [sortValue, setSortValue] = useState<string>("Newest");
 
-  // states chứa dữ liệu trả về từ API
   const [products, setProducts] = useState<ProductItem[]>([]);
+  const [filterSections, setFilterSections] = useState<FilterSection[]>([]);
   const [banners, setBanners] = useState<BannerItem[]>([]);
-  const [totalItems, setTotalItems] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
 
-  // fetch data mỗi khi các tham số thay đổi
+  const [totalItems, setTotalItems] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // 3. TỰ ĐỘNG RESET VỀ TRANG 1 KHI USER TÌM TỪ KHÓA MỚI
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [keyword]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await axiosClient.get<BECategory[]>(
+          "/categories/tree-view",
+        );
+        const catData = res.data || [];
+        const dynamicTabs = catData.map((c: BECategory) => ({
+          name: c.name,
+          slug: c.slug,
+        }));
+        setTabs([{ name: "All", slug: "all" }, ...dynamicTabs]);
+      } catch (error) {
+        console.error("Failed to fetch categories:", error);
+      }
+    };
+    fetchCategories();
+  }, []);
+
   useEffect(() => {
     const fetchListings = async () => {
       setIsLoading(true);
       try {
-        // TODO: nối API danh sách sản phẩm và banner sau khi hoàn thiện BE
-        setProducts(MOCK_PRODUCTS);
-        setBanners(MOCK_BANNERS);
-        setTotalItems(MOCK_PRODUCTS.length);
+        const params: Record<string, string | number> = {
+          page: currentPage,
+          limit: itemsPerPage,
+        };
+
+        if (keyword) params.keyword = keyword;
+        if (activeTabSlug !== "all") params.categorySlug = activeTabSlug;
+
+        // Bổ sung mapping cho Trending
+        if (sortValue === "Trending") params.sort = "trending";
+        else if (sortValue === "Price: Low to High") params.sort = "price_asc";
+        else if (sortValue === "Price: High to Low") params.sort = "price_desc";
+        else if (sortValue === "Newest") params.sort = "newest";
+
+        const attributesMap: Record<string, string[]> = {};
+        selectedFilters.forEach((filterId) => {
+          const [code, val] = filterId.split(":");
+          if (code && val) {
+            if (!attributesMap[code]) attributesMap[code] = [];
+            attributesMap[code].push(val);
+          }
+        });
+
+        const finalAttributes: Record<string, string> = {};
+        Object.keys(attributesMap).forEach((code) => {
+          finalAttributes[code] = attributesMap[code].join(",");
+        });
+
+        if (priceRange) {
+          finalAttributes.price = `${priceRange[0]},${priceRange[1]}`;
+        }
+
+        if (Object.keys(finalAttributes).length > 0) {
+          params.attributes = JSON.stringify(finalAttributes);
+        }
+
+        const apiRequests: Promise<unknown>[] = [
+          axiosClient.get<{ data: BEProductItem[]; meta: { total: number } }>(
+            "/products/store/list",
+            { params },
+          ),
+          axiosClient.get<BEFilterSection[]>("/products/filters", { params }),
+          axiosClient.get<{ data: BEBannerItem[] }>(
+            "/marketing/content/banners/public/active",
+            { params: { position: "Category" } },
+          ),
+        ];
+
+        let wishlistIndex = -1;
+        if (tokenStorage.getToken()) {
+          apiRequests.push(
+            axiosClient.get<{ data: { productId: string }[] }>(
+              "/users/wishlist",
+            ),
+          );
+          wishlistIndex = 3;
+        }
+
+        const responses = await Promise.all(apiRequests);
+
+        const productRes = responses[0] as {
+          data: { data: BEProductItem[]; meta: { total: number } };
+        };
+        const filterRes = responses[1] as { data: BEFilterSection[] };
+        const bannerRes = responses[2] as { data: { data: BEBannerItem[] } };
+
+        const wishlistRes =
+          wishlistIndex > -1
+            ? (responses[wishlistIndex] as {
+                data: { data: { productId: string }[] };
+              })
+            : undefined;
+
+        const wishlistIds: string[] = wishlistRes?.data?.data
+          ? wishlistRes.data.data.map((i: { productId: string }) => i.productId)
+          : [];
+
+        const fetchedProducts: ProductItem[] = (
+          productRes.data?.data || []
+        ).map((p: BEProductItem) => ({
+          id: p._id,
+          sku: p.sku,
+          slug: p.slug,
+          hasVariants: p.has_variants || false,
+          type: "product",
+          name: p.name,
+          desc: p.short_description || "",
+          price: p.sale_price > 0 ? p.sale_price : p.price,
+          originalPrice: p.sale_price > 0 ? p.price : undefined,
+          discountBadge:
+            p.sale_price > 0
+              ? `-${Math.round((1 - p.sale_price / p.price) * 100)}%`
+              : undefined,
+          imageUrl: getFullImageUrl(p.thumbnail),
+          tags: p.tags || [],
+          initialWishlisted: wishlistIds.includes(p._id),
+        }));
+
+        setProducts(fetchedProducts);
+        setTotalItems(productRes.data?.meta?.total || 0);
+
+        const fetchedFilters: FilterSection[] = (filterRes.data || []).map(
+          (section: BEFilterSection) => ({
+            id: section.code,
+            name: section.name,
+            type: section.type,
+            min: section.min,
+            max: section.max,
+            options: (section.options || []).map((opt: BEFilterOption) => ({
+              id: `${section.code}:${opt.value}`,
+              label: opt.label,
+              value: opt.value,
+              count: opt.count,
+              disabled: opt.disabled,
+            })),
+          }),
+        );
+        setFilterSections(fetchedFilters);
+
+        const shouldShowBanners = currentPage === 1 && Math.random() <= 0.5;
+
+        if (shouldShowBanners && bannerRes?.data?.data?.length > 0) {
+          const fetchedBanners = bannerRes.data.data;
+
+          // Trộn và bốc ngẫu nhiên 2 banner từ API
+          const randomBanners = [...fetchedBanners]
+            .sort(() => 0.5 - Math.random())
+            .slice(0, 2);
+
+          // THỦ THUẬT: Khai báo các "Cặp hình dáng" có tổng số ô chia hết cho 4
+          // horizontal (2 ô), vertical (2 ô), square (4 ô)
+          const shapePairs = [
+            ["horizontal", "horizontal"], // Tổng = 4 ô
+            ["vertical", "vertical"], // Tổng = 4 ô
+            ["horizontal", "vertical"], // Tổng = 4 ô
+            ["square", "square"], // Tổng = 8 ô
+          ];
+
+          // Bốc ngẫu nhiên 1 cặp hình dáng
+          const selectedPair =
+            shapePairs[Math.floor(Math.random() * shapePairs.length)];
+
+          const formattedBanners: BannerItem[] = randomBanners.map(
+            (b, index) => ({
+              id: b._id,
+              type: "banner",
+              title: b.title || "Ưu đãi đặc biệt",
+              subtitle: "Khám phá ngay các ưu đãi hấp dẫn dành riêng cho bạn.",
+              btnText: "Khám phá",
+              // Gán hình dáng từ cặp đã bốc (Nếu API chỉ trả 1 banner thì lấy cái đầu tiên của cặp)
+              shape: (selectedPair[index] || "square") as
+                | "square"
+                | "horizontal"
+                | "vertical",
+              imageDesktopUrl: getFullImageUrl(b.image_pc),
+              targetUrl: b.link || "/products",
+              status: "ACTIVE",
+              position: "Category",
+            }),
+          );
+
+          setBanners(formattedBanners);
+        } else {
+          setBanners([]);
+        }
       } catch (error) {
         console.error("Failed to fetch listings:", error);
-        // TODO: Xử lý hiển thị toast báo lỗi
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchListings();
-  }, [currentPage, itemsPerPage, activeTabs, selectedFilters, sortValue]);
+  }, [
+    currentPage,
+    itemsPerPage,
+    activeTabSlug,
+    selectedFilters,
+    priceRange,
+    sortValue,
+    keyword, // 5. QUAN TRỌNG: Nạp keyword vào mảng dependency để tự gọi lại API khi keyword đổi
+  ]);
 
-  // chèn banner vào danh sách sản phẩm lấy được
   const mixedItems = useMemo(() => {
+    if (banners.length === 0) return products;
+
     const mixed: GridItem[] = [...products];
-    const activeBanners = banners.filter((b) => b.status === "ACTIVE");
 
-    let bannerIndex = 0;
-    let insertPos = 4;
+    // Chèn banner vào vị trí ngẫu nhiên
+    banners.forEach((banner) => {
+      // Chừa 2 ô đầu tiên cho sản phẩm
+      const minPos = Math.min(2, mixed.length);
+      const maxPos = mixed.length;
 
-    while (bannerIndex < activeBanners.length && insertPos <= mixed.length) {
-      mixed.splice(insertPos, 0, activeBanners[bannerIndex]);
-      bannerIndex++;
-      insertPos += 5;
-    }
+      const randomPos =
+        Math.floor(Math.random() * (maxPos - minPos + 1)) + minPos;
+      mixed.splice(randomPos, 0, banner);
+    });
 
-    while (bannerIndex < activeBanners.length) {
-      mixed.push(activeBanners[bannerIndex]);
-      bannerIndex++;
-    }
-
+    // Css grid-auto-flow: dense sẽ tự hút sản phẩm lấp vào mọi khoảng trống!
     return mixed;
   }, [products, banners]);
 
-  // tính tổng số trang dựa trên totalItems từ BE
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
 
-  // actions
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) setCurrentPage(page);
-  };
+  const handlePageChange = useCallback(
+    (page: number) => {
+      if (page >= 1 && page <= totalPages) setCurrentPage(page);
+    },
+    [totalPages],
+  );
 
-  const handleTabChange = (tab: string) => {
-    setActiveTabs((prev) => {
-      if (tab === "All") return ["All"];
-      let newTabs = prev.filter((t) => t !== "All");
-      if (newTabs.includes(tab)) {
-        newTabs = newTabs.filter((t) => t !== tab);
-      } else {
-        newTabs.push(tab);
-      }
-      return newTabs.length === 0 ? ["All"] : newTabs;
-    });
+  const handleTabChange = useCallback((slug: string) => {
+    setActiveTabSlug(slug);
     setCurrentPage(1);
-  };
+    setSelectedFilters([]);
+    setPriceRange(null);
+  }, []);
 
-  const handleFilterToggle = (optionId: string) => {
+  const handleFilterToggle = useCallback((optionId: string) => {
     setSelectedFilters((prev) =>
       prev.includes(optionId)
         ? prev.filter((id) => id !== optionId)
         : [...prev, optionId],
     );
     setCurrentPage(1);
-  };
+  }, []);
 
-  const handleSortChange = (val: string) => {
+  const handlePriceChange = useCallback((min: number, max: number) => {
+    setPriceRange([min, max]);
+    setCurrentPage(1);
+  }, []);
+
+  const handleSortChange = useCallback((val: string) => {
     setSortValue(val);
     setCurrentPage(1);
-  };
+  }, []);
+
+  const handleClearFilters = useCallback(() => {
+    setSelectedFilters([]);
+    setPriceRange(null);
+    setCurrentPage(1);
+  }, []);
 
   return {
     gridItems: mixedItems,
+    filterSections,
+    tabs,
+    activeTabSlug,
     currentPage,
     totalPages,
-    activeTabs,
     selectedFilters,
+    priceRange,
     sortValue,
     isLoading,
     handlePageChange,
     handleTabChange,
     handleFilterToggle,
+    handlePriceChange,
     handleSortChange,
+    handleClearFilters,
   };
 }

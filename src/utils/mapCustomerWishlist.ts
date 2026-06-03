@@ -3,6 +3,8 @@ import type { Product } from "../types/product";
 export interface WishlistItemApiResponse {
   productId?: string;
   variantId?: string | null;
+  sku: string;
+  has_variants?: boolean;
   name?: string;
   images?: string[];
   price?: number;
@@ -32,7 +34,7 @@ const formatAttributes = (attributes?: unknown[]): string => {
 };
 
 export const mapWishlistItemFromApi = (
-  item: WishlistItemApiResponse,
+  item: WishlistItemApiResponse, // <-- Tham số tên là "item"
 ): Product => {
   const images = item.images ?? [];
   const salePrice = item.sale_price ?? 0;
@@ -47,5 +49,7 @@ export const mapWishlistItemFromApi = (
     price: displayPrice,
     image: images[0] ?? "",
     variantId: item.variantId ? String(item.variantId) : null,
+    sku: item.sku,
+    hasVariants: item.has_variants || false,
   };
 };

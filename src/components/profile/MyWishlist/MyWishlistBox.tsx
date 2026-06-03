@@ -4,14 +4,17 @@ import "./MyWishlistBox.css";
 interface MyWishlistProp {
   product: Product;
   onDelete: () => void;
+  onAddToCart: () => void; // BỔ SUNG: Khai báo interface
 }
 
-const WishlistBox = ({ product, onDelete }: MyWishlistProp) => {
+const WishlistBox = ({ product, onDelete, onAddToCart }: MyWishlistProp) => {
+  // BỔ SUNG: Nhận prop
   return (
     <div className="box-container">
       <div className="box-content">
         <div className="box-infor">
           <div className="order-thumbnail-container">
+            {/* ... Giữ nguyên phần hình ảnh và mô tả ... */}
             <div className="thumbnail-img-container">
               <img src={product.image} className="order-img" />
             </div>
@@ -36,7 +39,10 @@ const WishlistBox = ({ product, onDelete }: MyWishlistProp) => {
             <button className="my-wishlist-edit-btn" onClick={onDelete}>
               Remove
             </button>
-            <button className="my-wishlist-remove-btn">Add to cart</button>
+            {/* BỔ SUNG: Gắn sự kiện onClick vào nút Add to cart */}
+            <button className="my-wishlist-remove-btn" onClick={onAddToCart}>
+              Add to cart
+            </button>
           </div>
         </div>
       </div>

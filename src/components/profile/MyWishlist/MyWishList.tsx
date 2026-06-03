@@ -15,7 +15,8 @@ interface MyWishlistProps {
     startIndex: number;
   };
   onPageChange?: (page: number) => void;
-  onDeleteItem: (productId: string) => void;
+  onDeleteItem: (product: Product) => void;
+  onAddToCartItem: (product: Product) => void;
 }
 
 const MyWishlist = ({
@@ -24,6 +25,7 @@ const MyWishlist = ({
   pagination,
   onPageChange,
   onDeleteItem,
+  onAddToCartItem,
 }: MyWishlistProps) => {
   return (
     <div className="my-order-card order-management-layout profile-ultra-wide-grid-card">
@@ -37,7 +39,8 @@ const MyWishlist = ({
             <WishlistBox
               key={`${product.id}-${product.variantId ?? "default"}`}
               product={product}
-              onDelete={() => onDeleteItem(product.id)}
+              onDelete={() => onDeleteItem(product)} // SỬA LỖI: Truyền nguyên object product
+              onAddToCart={() => onAddToCartItem(product)} // BỔ SUNG: Truyền sự kiện xuống thẻ
             />
           ))}
 

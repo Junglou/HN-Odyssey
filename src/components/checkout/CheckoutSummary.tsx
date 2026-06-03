@@ -128,13 +128,12 @@ export default function CheckoutSummary({
       <div className="checkout-summary-pricing-block">
         <div className="checkout-summary-pricing-row">
           <span>Subtotal:</span>
-          {/* Thêm toLocaleString() và đổi $ thành đ */}
-          <span>{subtotal.toLocaleString()}đ</span>
+          <span>{subtotal.toLocaleString()}$</span>
         </div>
 
         <div className="checkout-summary-pricing-row">
           <span>Shipping fee:</span>
-          {/* shippingFee vốn dĩ đã là string có sẵn chữ đ từ hook nên giữ nguyên */}
+          {/* Biến shippingFee đã được format sẵn kèm ký hiệu $ hoặc chữ "Free" từ hook useCheckout */}
           <span>{shippingFee}</span>
         </div>
 
@@ -144,18 +143,18 @@ export default function CheckoutSummary({
             style={{ color: "#d32f2f", fontWeight: 500 }}
           >
             <span>Discount (Voucher):</span>
-            <span>-{discountAmount.toLocaleString()}đ</span>
+            <span>-{discountAmount.toLocaleString()}$</span>
           </div>
         )}
 
         <div className="checkout-summary-pricing-row">
           <span>Taxes:</span>
-          <span>{taxes.toLocaleString()}đ</span>
+          <span>{taxes.toLocaleString()}$</span>
         </div>
 
         <div className="checkout-summary-pricing-row checkout-summary-total-row">
           <span>Total:</span>
-          <span>{total.toLocaleString()}đ</span>
+          <span>{total.toLocaleString()}$</span>
         </div>
       </div>
 

@@ -32,6 +32,8 @@
   background-size: cover;
   background-position: center;
   transition: transform 0.35s ease;
+  /* thêm con trỏ chuột khi đưa vào ảnh do đã gắn sự kiện click vào đây */
+  cursor: pointer;
 }
 
 .pl-product-card:hover .pl-card-image-bg {
@@ -74,6 +76,13 @@
   color: #ef4444;
 }
 
+/* xử lý trạng thái vô hiệu hóa khi đang gọi api thả tim */
+.pl-card-heart:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 /* info block */
 .pl-card-info {
   display: flex;
@@ -92,6 +101,8 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* thêm con trỏ chuột khi đưa vào tên do đã gắn sự kiện click vào đây */
+  cursor: pointer;
 }
 
 .pl-card-desc {
@@ -175,4 +186,98 @@
   font-weight: 300;
   font-size: clamp(11px, 1.1vw, 14px);
   color: #000000;
+}
+
+/* xử lý trạng thái vô hiệu hóa nút bấm khi đang gọi api thêm giỏ hàng */
+.pl-card-add-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  pointer-events: none;
+}
+
+.pl-promo-card {
+  width: 100%;
+  /* CHÌA KHÓA NẰM Ở ĐÂY: Ép thẻ banner cao bằng 100% dòng lưới, đồng bộ với ProductCard */
+  height: 100%;
+  display: flex;
+  align-items: center;
+  background-color: #f9fafb;
+
+  /* ĐỒNG BỘ UI VỚI PRODUCT CARD */
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+
+  /* SỬA LỖI ẢNH BỊ LẶP & KÉO GIÃN */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.pl-promo-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  border-color: #d1d5db;
+}
+
+.pl-promo-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.7) 0%,
+    rgba(0, 0, 0, 0.1) 100%
+  );
+  z-index: 1;
+}
+
+.pl-promo-content {
+  position: relative;
+  z-index: 2;
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.pl-promo-title {
+  margin: 0;
+  font-weight: 700;
+  font-size: clamp(24px, 2.5vw, 36px);
+  color: #ffffff; /* Đổi chữ thành trắng để nổi trên lớp phủ đen */
+}
+
+.pl-promo-subtitle {
+  margin: 0;
+  font-weight: 300;
+  font-size: clamp(14px, 1.5vw, 18px);
+  color: #f3f4f6;
+  max-width: 80%;
+  line-height: 1.5;
+}
+
+.pl-promo-btn {
+  padding: 10px 32px;
+  background: #ffffff;
+  color: #000000;
+  border-radius: 50px;
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition:
+    background-color 0.2s,
+    transform 0.2s;
+}
+
+.pl-promo-btn:hover {
+  background: #e5e7eb;
+  transform: scale(1.05);
 }

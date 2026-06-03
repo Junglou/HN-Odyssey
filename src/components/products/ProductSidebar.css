@@ -24,6 +24,24 @@
   color: #000000;
 }
 
+.pl-sidebar-clear {
+  margin-left: auto;
+  margin-right: 16px;
+  font-size: 14px;
+  font-weight: 300;
+  color: #6b7280; /* Màu xám đồng bộ với text checkbox */
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s ease;
+}
+
+.pl-sidebar-clear:hover {
+  color: #111827; /* Đen đậm lên khi hover */
+  text-decoration: underline;
+}
+
 .pl-sidebar-close {
   display: none;
   cursor: pointer;

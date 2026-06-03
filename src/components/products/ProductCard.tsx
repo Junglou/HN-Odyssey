@@ -10,23 +10,35 @@ import "./ProductCard.css";
 
 // component
 export default function ProductCard({ product }: { product: ProductItem }) {
-  // Nhận toàn bộ state và handlers từ hook, truyền id vào để hook sử dụng
-  const { isWishlisted, handleCardClick, handleHeartClick, handleAddToCart } =
-    useProductCard(product.id);
+  // 1. CẬP NHẬT: Truyền thêm product.sku vào Hook và lấy thêm cờ loading
+  const {
+    isWishlisted,
+    handleCardClick,
+    handleHeartClick,
+    handleAddToCart,
+    isAddingToCart,
+    isTogglingWishlist,
+  } = useProductCard(
+    product.id,
+    product.slug,
+    product.sku,
+    product.hasVariants,
+    product.initialWishlisted,
+  );
 
   // render
   return (
-    <div
-      className="pl-product-card"
-      onClick={handleCardClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => e.key === "Enter" && handleCardClick()}
-    >
+    <div className="pl-product-card">
       <div className="pl-card-image-wrap">
+        {/* di chuyển sự kiện điều hướng vào ảnh để tránh bọc nút bấm bên trong một nút bấm khác */}
         <div
           className="pl-card-image-bg"
           style={{ backgroundImage: `url(${product.imageUrl})` }}
+          onClick={handleCardClick}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === "Enter" && handleCardClick()}
+          aria-label={`Xem chi tiết sản phẩm ${product.name}`}
         ></div>
 
         {/* hiển thị nhãn phần trăm giảm giá nếu có */}
@@ -34,9 +46,11 @@ export default function ProductCard({ product }: { product: ProductItem }) {
           <div className="pl-card-discount-badge">{product.discountBadge}</div>
         )}
 
+        {/* 2. CẬP NHẬT: Vô hiệu hóa nút thả tim khi đang call API */}
         <button
           className={`pl-card-heart ${isWishlisted ? "wishlisted" : ""}`}
           onClick={handleHeartClick}
+          disabled={isTogglingWishlist}
           aria-label="Save to wishlist"
         >
           {isWishlisted ? <HeartFilledIcon /> : <HeartIcon />}
@@ -44,7 +58,16 @@ export default function ProductCard({ product }: { product: ProductItem }) {
       </div>
 
       <div className="pl-card-info">
-        <h3 className="pl-card-name">{product.name}</h3>
+        {/* gắn sự kiện điều hướng vào tên sản phẩm giúp người dùng dễ thao tác */}
+        <h3
+          className="pl-card-name"
+          onClick={handleCardClick}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === "Enter" && handleCardClick()}
+        >
+          {product.name}
+        </h3>
         <p className="pl-card-desc">{product.desc}</p>
         <div className="pl-card-line"></div>
 
@@ -63,8 +86,19 @@ export default function ProductCard({ product }: { product: ProductItem }) {
             )}
           </div>
 
-          <button className="pl-card-add-btn" onClick={handleAddToCart}>
-            <span>Add to Cart</span>
+          {/* 3. CẬP NHẬT: Đổi Text và vô hiệu hóa nút Add khi đang gọi API */}
+          <button
+            className="pl-card-add-btn"
+            onClick={handleAddToCart}
+            disabled={isAddingToCart}
+          >
+            <span>
+              {isAddingToCart
+                ? "Adding..."
+                : product.hasVariants
+                  ? "Select Options"
+                  : "Add to Cart"}
+            </span>
             <CartIcon />
           </button>
         </div>

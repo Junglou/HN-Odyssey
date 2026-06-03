@@ -337,8 +337,22 @@ export function useCheckout() {
   }, [formData.districtCode]);
 
   useEffect(() => {
-    if (items.length === 0 || !formData.provinceCode || !formData.districtCode)
+    if (
+      items.length === 0 ||
+      !formData.provinceCode ||
+      !formData.districtCode
+    ) {
       return;
+    }
+
+    const FREESHIP_THRESHOLD_USD = 200;
+
+    // Nếu tổng tiền hàng >= 150$ thì set phí ship = 0 và ngưng gọi API
+    if (summary.subtotal >= FREESHIP_THRESHOLD_USD) {
+      setShippingFee(0);
+      return;
+    }
+
     const payload = {
       cityCode: formData.provinceCode,
       districtCode: formData.districtCode,
@@ -350,11 +364,12 @@ export function useCheckout() {
       })),
       isInstant: false,
     };
+
     axiosClient
       .post("/shipping/calculate", payload)
       .then((res) => setShippingFee(res.data.shipping_fee || 0))
       .catch(() => setShippingFee(0));
-  }, [formData.provinceCode, formData.districtCode, items]);
+  }, [formData.provinceCode, formData.districtCode, items, summary.subtotal]);
 
   // KHÔI PHỤC LẠI: TỰ ĐỘNG ÁP MÃ ĐỂ UI CLICK CHỌN HOẠT ĐỘNG
   useEffect(() => {
@@ -593,6 +608,9 @@ export function useCheckout() {
     }
   };
 
+  const EXCHANGE_RATE = 25400; // Tỷ giá 1 USD = 25,400 VNĐ
+  const shippingFeeUSD = shippingFee > 0 ? shippingFee / EXCHANGE_RATE : 0;
+
   return {
     step,
     items,
@@ -610,10 +628,13 @@ export function useCheckout() {
     otpTimer,
     loading,
     subtotal: summary.subtotal,
-    shippingFee: shippingFee > 0 ? `${shippingFee.toLocaleString()}đ` : "Free",
+    shippingFee: shippingFee > 0 ? `${shippingFeeUSD.toFixed(2)}$` : "Free",
     taxes: 0,
     discountAmount: voucherDiscount,
-    total: summary.grandTotal + shippingFee - voucherDiscount,
+    total: Math.max(
+      0,
+      summary.subtotal - summary.discount + shippingFeeUSD - voucherDiscount,
+    ),
     availablePromos,
     setPromoCode,
     setIsSubscribed,

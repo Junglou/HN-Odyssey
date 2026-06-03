@@ -5,8 +5,14 @@ import { useWishlistManagement } from "../../hooks/profile/useWishlistManagement
 import { useRecommendProduct } from "../../hooks/profile/useRecommendProduct";
 
 const MyWishlistPage = () => {
-  const { wishlist, pagination, actions, deleteWishlistItem } =
-    useWishlistManagement();
+  // BỔ SUNG: Lấy thêm addToCartFromWishlist từ hook
+  const {
+    wishlist,
+    pagination,
+    actions,
+    deleteWishlistItem,
+    addToCartFromWishlist,
+  } = useWishlistManagement();
   const { products: recommendations } = useRecommendProduct();
 
   return (
@@ -22,6 +28,7 @@ const MyWishlistPage = () => {
           pagination={pagination}
           onPageChange={(p) => actions.changePage(p)}
           onDeleteItem={deleteWishlistItem}
+          onAddToCartItem={addToCartFromWishlist} // BỔ SUNG: Truyền hàm xuống component con
         />
       </div>
     </div>

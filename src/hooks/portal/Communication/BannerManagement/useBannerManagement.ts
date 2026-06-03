@@ -80,9 +80,27 @@ const mapBannerToFE = (beBanner: BEBannerResponse): BannerRecord => {
   // Đảm bảo domain nối vào ảnh nếu BE chỉ trả relative path
   const processImageUrl = (url?: string) => {
     if (!url) return "";
-    return url.startsWith("http")
-      ? url
-      : `${import.meta.env.VITE_API_URL || ""}${url}`;
+
+    // Nếu URL đã là tuyệt đối (http, base64, blob) thì giữ nguyên
+    if (
+      url.startsWith("http") ||
+      url.startsWith("data:") ||
+      url.startsWith("blob:")
+    ) {
+      return url;
+    }
+
+    // Lấy baseUrl từ env (VD: http://localhost:8080/api)
+    const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
+
+    // Cắt bỏ đuôi /api (nếu có) để trỏ về root domain (http://localhost:8080)
+    const serverRootUrl = baseUrl.replace(/\/api.*$/, "").replace(/\/$/, "");
+
+    // Đảm bảo có dấu "/" ở đầu path ảnh
+    const formattedUrl = url.startsWith("/") ? url : `/${url}`;
+
+    // Kết quả chuẩn: http://localhost:8080/uploads/xxx.png
+    return `${serverRootUrl}${formattedUrl}`;
   };
 
   return {

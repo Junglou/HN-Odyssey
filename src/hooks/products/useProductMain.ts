@@ -2,6 +2,7 @@ import { useState } from "react";
 
 const MOCK_TABS = ["All", "New arrivals", "Best sellers", "Tops", "Bottoms"];
 const MOCK_SORT_OPTIONS = [
+  "Trending",
   "Price: Low to High",
   "Price: High to Low",
   "Newest",

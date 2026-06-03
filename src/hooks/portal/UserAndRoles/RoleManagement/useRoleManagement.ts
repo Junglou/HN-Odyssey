@@ -1,15 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axios from "axios";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
-
-const getAuthHeaders = () => {
-  const token = localStorage.getItem("accessToken");
-  return {
-    headers: { Authorization: `Bearer ${token}` },
-  };
-};
+import axiosClient from "../../../../api/axiosClient";
 
 export const STANDARD_ACTIONS = ["READ", "CREATE", "UPDATE", "DELETE"];
 
@@ -18,7 +10,7 @@ export interface BackendPermission {
   actions: string[];
 }
 
-// ĐÃ FIX: Đồng bộ chuẩn schema trả về từ BE (is_active thay vì status)
+// Đồng bộ chuẩn schema trả về từ server, sử dụng is_active để xác định trạng thái
 export interface BackendRole {
   _id: string;
   name: string;
@@ -95,11 +87,8 @@ export function useRoleManagement() {
   const fetchList = useCallback(async () => {
     try {
       const [metaRes, rolesRes] = await Promise.all([
-        axios.get(
-          `${API_URL}/admin/roles/metadata/permissions`,
-          getAuthHeaders(),
-        ),
-        axios.get(`${API_URL}/admin/roles`, getAuthHeaders()),
+        axiosClient.get(`/admin/roles/metadata/permissions`),
+        axiosClient.get(`/admin/roles`),
       ]);
 
       const rawMeta: BackendGroupMeta[] = metaRes.data?.data || metaRes.data;
@@ -141,7 +130,7 @@ export function useRoleManagement() {
       const mappedRoles: Role[] = rawRolesList.map((r: BackendRole) => ({
         id: r._id,
         name: r.name,
-        // ĐÃ FIX: Ánh xạ is_active (boolean) của BE thành status (string) của UI
+        // Ánh xạ is_active dạng boolean của hệ thống thành status dạng chuỗi cho giao diện
         status: r.is_active === false ? "Inactive" : "Active",
         isLocked: r.is_system || false,
         permissions: r.permissions || [],
@@ -180,21 +169,20 @@ export function useRoleManagement() {
 
   const handleModalSubmit = async (data: RoleFormData) => {
     try {
-      // ĐÃ FIX: Gửi payload khớp 100% với CreateRoleDto / UpdateRoleDto
+      // Đảm bảo dữ liệu gửi lên khớp với cấu trúc được yêu cầu bởi hệ thống
       const payload = {
         name: data.name,
-        is_active: data.status === "Active", // BE dùng boolean is_active
+        is_active: data.status === "Active", // Máy chủ nhận cấu trúc boolean
         permissions: modalConfig.mode === "add" ? [] : undefined,
       };
 
       if (modalConfig.mode === "add") {
-        await axios.post(`${API_URL}/admin/roles`, payload, getAuthHeaders());
+        await axiosClient.post(`/admin/roles`, payload);
         toast.success("Thêm vai trò mới thành công!");
       } else if (modalConfig.mode === "edit" && modalConfig.editingRole) {
-        await axios.patch(
-          `${API_URL}/admin/roles/${modalConfig.editingRole.id}`,
+        await axiosClient.patch(
+          `/admin/roles/${modalConfig.editingRole.id}`,
           payload,
-          getAuthHeaders(),
         );
         toast.success("Cập nhật vai trò thành công!");
       }
@@ -211,10 +199,7 @@ export function useRoleManagement() {
   const executeDelete = async () => {
     if (deleteConfig.roleId !== null) {
       try {
-        await axios.delete(
-          `${API_URL}/admin/roles/${deleteConfig.roleId}`,
-          getAuthHeaders(),
-        );
+        await axiosClient.delete(`/admin/roles/${deleteConfig.roleId}`);
         if (selectedRoleId === deleteConfig.roleId) {
           setSelectedRoleId(null);
         }
@@ -320,13 +305,9 @@ export function useRoleManagement() {
           });
         });
 
-        await axios.patch(
-          `${API_URL}/admin/roles/${selectedRoleId}`,
-          {
-            permissions: bePermissionsPayload,
-          },
-          getAuthHeaders(),
-        );
+        await axiosClient.patch(`/admin/roles/${selectedRoleId}`, {
+          permissions: bePermissionsPayload,
+        });
 
         setOriginalPermissions(permissions);
         setHasUnsavedChanges(false);

@@ -6,4 +6,6 @@ export interface Product {
   image: string;
   /** Present on wishlist items from API */
   variantId?: string | null;
+  sku?: string;
+  hasVariants?: boolean;
 }

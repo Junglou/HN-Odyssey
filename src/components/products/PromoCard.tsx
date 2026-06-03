@@ -1,17 +1,14 @@
-// imports
 import type { BannerItem } from "../../hooks/products/useProductList";
 import { usePromoCard } from "../../hooks/products/usePromoCard";
 import "./PromoCard.css";
 
-// component
 export default function PromoCard({ banner }: { banner: BannerItem }) {
-  // Nhận hàm xử lý
   const { handleBannerClick } = usePromoCard(banner.targetUrl);
 
-  // render
   return (
     <div
-      className={`pl-promo-card span-${banner.span}`}
+      // Đổi thành class shape tương ứng để CSS bắt được
+      className={`pl-promo-card shape-${banner.shape}`}
       style={{ backgroundImage: `url(${banner.imageDesktopUrl})` }}
       onClick={handleBannerClick}
       role="button"

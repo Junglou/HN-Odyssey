@@ -227,6 +227,23 @@ export default function ProductReviews() {
 
               <p className="pdp-review-content">{review.content}</p>
 
+              {/* phần render nội dung phản hồi từ quản trị viên */}
+              {review.reply && (
+                <div className="pdp-review-reply">
+                  <div className="pdp-review-reply-header">
+                    <span className="pdp-review-reply-name">
+                      HN-Odyssey Team
+                    </span>
+                    <span className="pdp-review-reply-date">
+                      {review.reply.date}
+                    </span>
+                  </div>
+                  <p className="pdp-review-reply-content">
+                    {review.reply.content}
+                  </p>
+                </div>
+              )}
+
               <div className="pdp-review-actions">
                 <button
                   className={`pdp-feedback-btn ${userFeedback[review.id] === "like" ? "active" : ""}`}

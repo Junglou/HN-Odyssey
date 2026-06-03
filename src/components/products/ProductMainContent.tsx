@@ -1,6 +1,8 @@
-// imports
 import { useState, useRef, useEffect } from "react";
-import type { GridItem } from "../../hooks/products/useProductList";
+import type {
+  GridItem,
+  CategoryTab,
+} from "../../hooks/products/useProductList";
 import { ArrowDownIcon, FilterIcon } from "../../assets/icons/ProductIcons";
 import ProductCard from "./ProductCard";
 import PromoCard from "./PromoCard";
@@ -8,12 +10,12 @@ import ProductPagination from "./ProductPagination";
 import { useProductMain } from "../../hooks/products/useProductMain";
 import "./ProductMainContent.css";
 
-// component
 export default function ProductMainContent({
   gridItems,
   currentPage,
   totalPages,
-  activeTabs,
+  tabs,
+  activeTabSlug,
   sortValue,
   onPageChange,
   onTabChange,
@@ -23,19 +25,20 @@ export default function ProductMainContent({
   gridItems: GridItem[];
   currentPage: number;
   totalPages: number;
-  activeTabs: string[];
+  tabs: CategoryTab[];
+  activeTabSlug: string;
   sortValue: string;
   onPageChange: (page: number) => void;
-  onTabChange: (tab: string) => void;
+  onTabChange: (slug: string) => void;
   onSortChange: (val: string) => void;
   onOpenFilter: () => void;
 }) {
-  // hooks - chỉ giữ state phục vụ đóng mở dropdown UI
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [hasSortOpened, setHasSortOpened] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const { tabs, sortOptions } = useProductMain();
+  // Chỉ còn lấy sortOptions từ Mock, phần tabs đã được thay thế bằng dữ liệu động
+  const { sortOptions } = useProductMain();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -50,7 +53,6 @@ export default function ProductMainContent({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // render
   return (
     <div className="pl-main-container">
       <div className="pl-header-bar">
@@ -62,10 +64,10 @@ export default function ProductMainContent({
           {tabs.map((tab, idx) => (
             <button
               key={idx}
-              className={`pl-chip ${activeTabs.includes(tab) ? "active" : ""}`}
-              onClick={() => onTabChange(tab)}
+              className={`pl-chip ${activeTabSlug === tab.slug ? "active" : ""}`}
+              onClick={() => onTabChange(tab.slug)}
             >
-              {tab}
+              {tab.name}
             </button>
           ))}
         </div>

@@ -69,6 +69,11 @@ export function useHeader() {
     }
   };
 
+  // ép đóng popup tìm kiếm dù có chữ hay không
+  const forceCloseSearch = () => {
+    setIsSearchOpen(false);
+  };
+
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen((prev) => !prev);
   };
@@ -80,8 +85,9 @@ export function useHeader() {
   // xử lý điều hướng khi nhấn enter tìm kiếm
   const handleSearchKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      navigate(`/products?keyword=${encodeURIComponent(searchQuery.trim())}`);
       setIsSearchOpen(false);
+      setSearchQuery(""); // xóa trắng ô search sau khi enter
     }
   };
 
@@ -108,6 +114,7 @@ export function useHeader() {
     setSearchQuery,
     handleOpenSearch,
     handleCloseSearch,
+    forceCloseSearch,
     toggleMobileMenu,
     closeMobileMenu,
     handleSearchKeyDown,

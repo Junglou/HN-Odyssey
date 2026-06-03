@@ -215,9 +215,26 @@
 /* grid */
 .pl-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
+  /* Tự động nhét các thẻ nhỏ vào chỗ trống để layout không bị thủng */
+  grid-auto-flow: row dense;
   gap: 24px;
   width: 100%;
+}
+
+.pl-grid .shape-horizontal {
+  grid-column: span 2;
+  grid-row: span 1;
+}
+
+.pl-grid .shape-vertical {
+  grid-column: span 1;
+  grid-row: span 2;
+}
+
+.pl-grid .shape-square {
+  grid-column: span 2;
+  grid-row: span 2;
 }
 
 .pl-grid .span-2 {
@@ -230,8 +247,15 @@
     grid-template-columns: repeat(2, 1fr);
     gap: 16px;
   }
-  .pl-grid .span-2 {
+
+  /* Giữ nguyên tỷ lệ trên tablet */
+  .pl-grid .shape-horizontal,
+  .pl-grid .shape-square {
     grid-column: span 2;
+  }
+  .pl-grid .shape-vertical {
+    grid-column: span 1;
+    grid-row: span 2;
   }
 }
 
@@ -240,16 +264,23 @@
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
   }
-  .pl-grid .span-2 {
-    grid-column: span 2;
-  }
 }
 
 @media screen and (max-width: 400px) {
   .pl-grid {
     grid-template-columns: 1fr;
   }
-  .pl-grid .span-2 {
+
+  /* Trên Mobile nhỏ nhất, hủy bỏ đa hình dạng, ép tất cả thành 1 cột để tránh vỡ UI */
+  .pl-grid .shape-horizontal,
+  .pl-grid .shape-vertical,
+  .pl-grid .shape-square {
     grid-column: span 1;
+    grid-row: auto;
   }
+}
+
+.pl-grid .shape-small {
+  grid-column: span 1;
+  grid-row: span 1;
 }

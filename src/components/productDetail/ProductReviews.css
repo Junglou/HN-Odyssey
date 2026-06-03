@@ -422,3 +422,46 @@
   justify-content: flex-end;
   margin-top: clamp(4px, 0.8vw, 12px);
 }
+
+/* phần phản hồi của admin (Đã đồng bộ thiết kế Minimalist) */
+.pdp-review-reply {
+  margin-top: clamp(12px, 1.5vw, 16px);
+  padding: clamp(12px, 1.5vw, 16px);
+  background-color: rgba(
+    0,
+    0,
+    0,
+    0.03
+  ); /* Nền xám cực nhạt để tách biệt nhẹ nhàng */
+  border: 1px solid rgba(0, 0, 0, 0.1); /* Viền mỏng đồng bộ với thẻ card bên ngoài */
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6px, 0.8vw, 10px);
+}
+
+.pdp-review-reply-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pdp-review-reply-name {
+  font-weight: 600;
+  font-size: clamp(13px, 1vw, 15px);
+  color: #000000;
+}
+
+.pdp-review-reply-date {
+  font-size: clamp(12px, 0.9vw, 14px);
+  color: rgba(0, 0, 0, 0.4); /* Đồng bộ màu text phụ của hệ thống */
+}
+
+.pdp-review-reply-content {
+  margin: 0;
+  font-size: clamp(13px, 1vw, 15px);
+  color: #111827;
+  line-height: 1.5;
+}

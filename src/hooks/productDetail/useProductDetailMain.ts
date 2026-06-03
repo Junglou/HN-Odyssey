@@ -1,62 +1,103 @@
 import { useState } from "react";
+import { toast } from "react-toastify";
+import axiosClient from "../../api/axiosClient";
+import type { ProductDetailState } from "./useProductDetail";
 
-// types
-interface ColorOption {
-  id: string;
-  hex: string;
-  name: string;
-  images: string[];
+// --- KHAI BÁO TYPE CHO LỖI TRẢ VỀ TỪ AXIOS ---
+interface INormalizedError {
+  status?: number;
+  message?: string;
+  data?: unknown;
 }
 
-// hook
+const getGuestSessionId = (): string => {
+  let sessionId = localStorage.getItem("guest_session_id");
+  if (!sessionId) {
+    sessionId =
+      Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+    localStorage.setItem("guest_session_id", sessionId);
+  }
+  return sessionId;
+};
+
 export function useProductDetailMain() {
-  // states
   const [isWishlisted, setIsWishlisted] = useState(false);
-  const [sizeError, setSizeError] = useState("");
+  const [optionError, setOptionError] = useState("");
 
-  // handlers
-  const handleWishlistToggle = (productId: string) => {
-    setIsWishlisted((prev) => !prev);
-    // test log khi có api
-    console.log("Toggle wishlist cho ID:", productId);
+  const handleWishlistToggle = async (productId: string) => {
+    try {
+      const response = await axiosClient.post("/users/wishlist/toggle", {
+        productId,
+      });
+      setIsWishlisted((prev) => !prev);
+      toast.success(response.data.message || "Đã cập nhật danh sách yêu thích");
+    } catch (error: unknown) {
+      // Đổi any thành unknown
+      console.error("Lỗi Wishlist:", error);
+      const err = error as INormalizedError; // Ép kiểu an toàn
+
+      if (err?.status === 401) {
+        toast.warning("Vui lòng đăng nhập để lưu sản phẩm!");
+      }
+    }
   };
 
-  const handleAddToCart = (
-    productId: string,
-    color: ColorOption,
-    size: string,
+  const handleAddToCart = async (
+    product: ProductDetailState,
+    selectedOptions: Record<string, string>,
     quantity: number,
   ) => {
-    if (!size) {
-      setSizeError("Vui lòng chọn Kích cỡ.");
-      return;
+    // Ràng buộc phải chọn đủ các option NẾU SP đó là dạng có biến thể (has_variants = true)
+    if (product.hasVariants) {
+      const missingOptions = product.options.filter(
+        (opt) => !selectedOptions[opt.code],
+      );
+      if (missingOptions.length > 0) {
+        setOptionError(
+          `Vui lòng chọn: ${missingOptions.map((m) => m.label).join(", ")}.`,
+        );
+        return;
+      }
     }
-    setSizeError("");
-    console.log("Add to cart:", { productId, color, size, quantity });
+    setOptionError("");
+
+    try {
+      // Gọi API chuẩn theo Schema của giỏ hàng backend
+      await axiosClient.post("/cart/add", {
+        productId: product.id,
+        variantSku: product.sku, // Hook phía trước đã tự map Sku đúng biến thể
+        quantity: quantity,
+        guestSessionId: getGuestSessionId(),
+      });
+      toast.success("Đã thêm sản phẩm vào giỏ hàng thành công!");
+    } catch (error: unknown) {
+      // Đổi any thành unknown
+      console.error("Lỗi Add to Cart:", error);
+      const err = error as INormalizedError; // Ép kiểu an toàn
+
+      setOptionError(err.message || "Lỗi khi thêm vào giỏ hàng");
+      toast.error(err.message || "Không thể thêm vào giỏ hàng");
+    }
   };
 
-  const handleProcessToCheckout = (
-    productId: string,
-    color: ColorOption,
-    size: string,
+  const handleProcessToCheckout = async (
+    product: ProductDetailState,
+    selectedOptions: Record<string, string>,
     quantity: number,
   ) => {
-    if (!size) {
-      setSizeError("Vui lòng chọn Kích cỡ.");
-      return;
-    }
-    setSizeError("");
-    console.log("Checkout:", { productId, color, size, quantity });
+    await handleAddToCart(product, selectedOptions, quantity);
+    // Chuyển thẳng qua trang checkout
+    window.location.href = "/checkout";
   };
 
-  const clearSizeError = () => setSizeError("");
+  const clearOptionError = () => setOptionError("");
 
   return {
     isWishlisted,
-    sizeError,
+    optionError,
     handleWishlistToggle,
     handleAddToCart,
     handleProcessToCheckout,
-    clearSizeError,
+    clearOptionError,
   };
 }

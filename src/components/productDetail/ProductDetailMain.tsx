@@ -1,77 +1,48 @@
-// imports
 import { useState, useEffect } from "react";
 import { useProductDetailMain } from "../../hooks/productDetail/useProductDetailMain";
 import {
   HeartEmptyIcon,
   HeartFilledIcon,
 } from "../../assets/icons/ProductDetailIcons";
+import type { ProductDetailState } from "../../hooks/productDetail/useProductDetail";
 import "./ProductDetailMain.css";
 
-// types
-interface ColorOption {
-  id: string;
-  hex: string;
-  name: string;
-  images: string[];
-}
-
 interface ProductDetailMainProps {
-  product: {
-    id: string;
-    name: string;
-    price: number;
-    originalPrice?: number;
-    stock: number;
-    desc: string;
-    details: string;
-    colors: ColorOption[];
-    sizes: string[];
-  };
-  selectedColor: ColorOption;
-  selectedSize: string;
+  product: ProductDetailState;
+  selectedOptions: Record<string, string>;
   activeImageIndex: number;
   quantity: number | string;
-  onColorChange: (color: ColorOption) => void;
-  onSizeChange: (size: string) => void;
+  onOptionChange: (code: string, value: string) => void;
   onImageChange: (index: number) => void;
   onQuantityChange: (type: "inc" | "dec") => void;
   onQuantityInput: (val: string) => void;
   onQuantityBlur: () => void;
 }
 
-// component
 export default function ProductDetailMain({
   product,
-  selectedColor,
-  selectedSize,
+  selectedOptions,
   activeImageIndex,
   quantity,
-  onColorChange,
-  onSizeChange,
+  onOptionChange,
   onImageChange,
   onQuantityChange,
   onQuantityInput,
   onQuantityBlur,
 }: ProductDetailMainProps) {
-  // states
   const [isZoomed, setIsZoomed] = useState(false);
 
-  // hooks
   const {
     isWishlisted,
-    sizeError,
+    optionError,
     handleWishlistToggle,
     handleAddToCart,
     handleProcessToCheckout,
-    clearSizeError,
+    clearOptionError,
   } = useProductDetailMain();
 
   useEffect(() => {
-    if (isZoomed) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
+    document.body.style.overflow = isZoomed ? "hidden" : "unset";
     return () => {
       document.body.style.overflow = "unset";
     };
@@ -79,24 +50,27 @@ export default function ProductDetailMain({
 
   if (!product) return null;
 
-  // handlers
-  const handleSelectSize = (size: string) => {
-    clearSizeError();
-    onSizeChange(size);
-  };
-
-  const hasImages = selectedColor.images && selectedColor.images.length > 0;
-  const currentMainImage = hasImages
-    ? selectedColor.images[activeImageIndex]
-    : "https://via.placeholder.com/960x740?text=No+Image";
+  // Xử lý Lấy ảnh chính (Ưu tiên ảnh biến thể -> ảnh gallery -> Logo dự án)
+  const currentMainImage =
+    product.images && product.images.length > 0
+      ? product.images[activeImageIndex]
+      : "/Logo.png";
 
   const safeQuantity = typeof quantity === "number" ? quantity : 1;
   const isOutOfStock = product.stock <= 0;
 
-  // render
+  // Xử lý fallback khi URL ảnh bị chết (404) hoặc nhập bậy bạ
+  const handleImageError = (
+    e: React.SyntheticEvent<HTMLImageElement, Event>,
+  ) => {
+    e.currentTarget.src = "/Logo.png";
+    e.currentTarget.onerror = null; // Chống lặp vô hạn nếu bản thân Logo.png cũng lỗi
+  };
+
   return (
     <>
       <div className="pdp-main-section">
+        {/* -- KHU VỰC ẢNH -- */}
         <div className="pdp-gallery-container">
           <div className="pdp-main-image-wrap">
             <img
@@ -104,6 +78,7 @@ export default function ProductDetailMain({
               src={currentMainImage}
               alt={product.name}
               onClick={() => setIsZoomed(true)}
+              onError={handleImageError}
             />
             <button
               className={`pdp-heart-btn ${isWishlisted ? "active" : ""}`}
@@ -112,10 +87,9 @@ export default function ProductDetailMain({
               {isWishlisted ? <HeartFilledIcon /> : <HeartEmptyIcon />}
             </button>
           </div>
-
-          {hasImages && (
+          {product.images.length > 0 && (
             <div className="pdp-thumbnail-list">
-              {selectedColor.images.map((img, idx) => (
+              {product.images.map((img, idx) => (
                 <div
                   key={idx}
                   className={`pdp-thumbnail-wrap ${activeImageIndex === idx ? "active" : ""}`}
@@ -125,6 +99,7 @@ export default function ProductDetailMain({
                     className="pdp-thumbnail"
                     src={img}
                     alt={`${product.name} ${idx + 1}`}
+                    onError={handleImageError}
                   />
                 </div>
               ))}
@@ -132,6 +107,7 @@ export default function ProductDetailMain({
           )}
         </div>
 
+        {/* -- KHU VỰC THÔNG TIN -- */}
         <div className="pdp-info-container">
           <h1 className="pdp-title">{product.name}</h1>
 
@@ -143,48 +119,58 @@ export default function ProductDetailMain({
               </span>
             )}
           </div>
-
           <p className="pdp-desc">{product.desc}</p>
 
-          <div className="pdp-option-group">
-            <div className="pdp-option-header">
-              <span className="pdp-option-label">Color</span>
-              <span className="pdp-option-value">{selectedColor.name}</span>
-            </div>
-            <div className="pdp-color-list">
-              {product.colors.map((color) => (
-                <button
-                  key={color.id}
-                  className={`pdp-color-btn ${selectedColor.id === color.id ? "active" : ""}`}
-                  style={{ backgroundColor: color.hex }}
-                  onClick={() => onColorChange(color)}
-                  title={color.name}
-                ></button>
-              ))}
-            </div>
-          </div>
+          {/* RENDER ĐỘNG TẤT CẢ THUỘC TÍNH */}
+          {product.options.map((option) => {
+            const currentSelectedValue = selectedOptions[option.code];
+            const displayLabel =
+              option.values.find((v) => v.value === currentSelectedValue)
+                ?.label || currentSelectedValue;
 
-          <div className="pdp-option-group">
-            <div className="pdp-option-header">
-              <span className="pdp-option-label">Size</span>
-            </div>
-            <div className="pdp-size-list">
-              {product.sizes.map((size) => (
-                <button
-                  key={size}
-                  className={`pdp-size-btn ${selectedSize === size ? "active" : ""}`}
-                  onClick={() => handleSelectSize(size)}
+            return (
+              <div key={option.code} className="pdp-option-group">
+                <div className="pdp-option-header">
+                  <span className="pdp-option-label">{option.label}</span>
+                  <span className="pdp-option-value">{displayLabel}</span>
+                </div>
+
+                <div
+                  className={
+                    option.isColor ? "pdp-color-list" : "pdp-size-list"
+                  }
                 >
-                  {size}
-                </button>
-              ))}
-            </div>
-            {sizeError && <span className="pdp-error-text">{sizeError}</span>}
-          </div>
+                  {option.values.map((val) => (
+                    <button
+                      key={val.value}
+                      className={`${option.isColor ? "pdp-color-btn" : "pdp-size-btn"} ${currentSelectedValue === val.value ? "active" : ""}`}
+                      style={
+                        option.isColor
+                          ? { backgroundColor: val.hex || val.value }
+                          : {}
+                      }
+                      title={val.label}
+                      disabled={
+                        !product.hasVariants && option.values.length === 1
+                      }
+                      onClick={() => {
+                        clearOptionError();
+                        onOptionChange(option.code, val.value);
+                      }}
+                    >
+                      {!option.isColor && val.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+          {optionError && <span className="pdp-error-text">{optionError}</span>}
 
           <div className="pdp-option-group">
             <div className="pdp-option-header">
               <span className="pdp-option-label">Quantity</span>
+              <span className="pdp-option-value">Kho: {product.stock}</span>
             </div>
             <div className="pdp-quantity-selector">
               <button
@@ -200,7 +186,6 @@ export default function ProductDetailMain({
                 value={isOutOfStock ? 0 : quantity}
                 onChange={(e) => onQuantityInput(e.target.value)}
                 onBlur={onQuantityBlur}
-                style={{ width: `${Math.max(2, String(quantity).length)}ch` }}
                 disabled={isOutOfStock}
               />
               <button
@@ -215,23 +200,17 @@ export default function ProductDetailMain({
 
           <div className="pdp-details-block">
             <h3 className="pdp-details-title">Details:</h3>
-            <div className="pdp-details-content">
-              {product.details.split("\n").map((line, idx) => (
-                <div key={idx}>{line}</div>
-              ))}
-            </div>
+            <div
+              className="pdp-details-content"
+              dangerouslySetInnerHTML={{ __html: product.details }}
+            ></div>
           </div>
 
           <div className="pdp-action-group">
             <button
               className="pdp-btn-add"
               onClick={() =>
-                handleAddToCart(
-                  product.id,
-                  selectedColor,
-                  selectedSize,
-                  safeQuantity,
-                )
+                handleAddToCart(product, selectedOptions, safeQuantity)
               }
               disabled={isOutOfStock}
             >
@@ -240,12 +219,7 @@ export default function ProductDetailMain({
             <button
               className="pdp-btn-checkout"
               onClick={() =>
-                handleProcessToCheckout(
-                  product.id,
-                  selectedColor,
-                  selectedSize,
-                  safeQuantity,
-                )
+                handleProcessToCheckout(product, selectedOptions, safeQuantity)
               }
               disabled={isOutOfStock}
             >
@@ -255,6 +229,7 @@ export default function ProductDetailMain({
         </div>
       </div>
 
+      {/* Lightbox */}
       {isZoomed && (
         <div className="pdp-lightbox" onClick={() => setIsZoomed(false)}>
           <div
@@ -271,6 +246,7 @@ export default function ProductDetailMain({
               src={currentMainImage}
               alt={product.name}
               className="pdp-lightbox-img"
+              onError={handleImageError}
             />
           </div>
         </div>

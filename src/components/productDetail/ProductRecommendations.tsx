@@ -2,6 +2,7 @@
 import { useRef } from "react";
 import { useProductRecommendations } from "../../hooks/productDetail/useProductRecommendations";
 import ProductCard from "../products/ProductCard";
+import type { ProductItem } from "../../hooks/products/useProductList";
 import "./ProductRecommendations.css";
 
 // component
@@ -39,9 +40,25 @@ export default function ProductRecommendations() {
           ⟨
         </button>
         <div className="pdp-recommend-grid" ref={gridRef}>
-          {recommendations.map((item) => (
-            <ProductCard key={item.id} product={item} />
-          ))}
+          {recommendations.map((item) => {
+            const productProps: ProductItem = {
+              id: item.id,
+              name: item.name,
+              slug: item.slug || "",
+              sku: item.sku || "",
+              hasVariants: !!item.hasVariants,
+              initialWishlisted: !!item.initialWishlisted,
+              imageUrl: item.imageUrl || item.image || "",
+              discountBadge: item.discountBadge,
+              desc: item.desc || item.description || "",
+              originalPrice: item.originalPrice,
+              price: item.price,
+              tags: item.tags || [],
+              type: item.type || "product",
+            };
+
+            return <ProductCard key={item.id} product={productProps} />;
+          })}
         </div>
         <button
           className="pdp-scroll-btn right"
