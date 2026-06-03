@@ -1,176 +1,51 @@
-import { useEffect, useRef, useState } from "react";
 import "./AccountInformationModal.css";
 import { ProfileModalPortal } from "./ProfileModalPortal";
 import type { UserProfile } from "../../../types/user";
+import {
+  useAccountInformationModal,
+  type ContactOtpType,
+} from "../../../hooks/profile/useAccountInformationModal";
 
-export type { UserProfile };
-
-export type ContactOtpType = "EMAIL" | "PHONE";
-
-export interface RequestContactOtpParams {
-  type: ContactOtpType;
-  newValue: string;
-  currentPassword: string;
-}
-
-export interface VerifyContactOtpParams {
-  code: string;
-  type: ContactOtpType;
-}
+export type { UserProfile, ContactOtpType };
 
 interface AccountModalProps {
   isOpen: boolean;
   mode: "edit" | "view";
   initialData: UserProfile | null;
   onClose: () => void;
-  onRequestContactOtp: (params: RequestContactOtpParams) => Promise<void>;
-  onVerifyContactOtp: (params: VerifyContactOtpParams) => Promise<void>;
-  isSubmitting?: boolean;
-  requestingOtpType?: ContactOtpType | null;
-  verifyingOtpType?: ContactOtpType | null;
+  onProfileUpdated?: (profile: UserProfile) => void;
+  refreshProfile?: () => Promise<UserProfile>;
 }
-
-const normalizePhone = (value: string) => value.trim();
 
 export default function AccountModal({
   isOpen,
   mode,
   initialData,
   onClose,
-  onRequestContactOtp,
-  onVerifyContactOtp,
-  isSubmitting = false,
-  requestingOtpType = null,
-  verifyingOtpType = null,
+  onProfileUpdated,
+  refreshProfile,
 }: AccountModalProps) {
-  const passwordRef = useRef<HTMLInputElement | null>(null);
-  const confirmedPasswordRef = useRef("");
-  const newEmailRef = useRef<HTMLInputElement | null>(null);
-  const newPhoneRef = useRef<HTMLInputElement | null>(null);
-  const emailOtpRef = useRef<HTMLInputElement | null>(null);
-  const phoneOtpRef = useRef<HTMLInputElement | null>(null);
-
-  const [passwordConfirmed, setPasswordConfirmed] = useState(false);
-  const [emailOtpSent, setEmailOtpSent] = useState(false);
-  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
-
-  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
-  const [prevInitialData, setPrevInitialData] = useState(initialData);
-
-  if (isOpen !== prevIsOpen || initialData !== prevInitialData) {
-    setPrevIsOpen(isOpen);
-    setPrevInitialData(initialData);
-
-    // reset các biến state ngay trong quá trình render để tránh cascading renders
-    setPasswordConfirmed(false);
-    setEmailOtpSent(false);
-    setPhoneOtpSent(false);
-  }
-
-  const currentEmail = (initialData?.email ?? "").trim();
-  const currentPhone = normalizePhone(initialData?.phone ?? "");
-
-  useEffect(() => {
-    // reset các ref và input dom bên trong effect để đảm bảo react render an toàn
-    confirmedPasswordRef.current = "";
-
-    if (isOpen) {
-      if (passwordRef.current) passwordRef.current.value = "";
-      if (newEmailRef.current) newEmailRef.current.value = "";
-      if (newPhoneRef.current) newPhoneRef.current.value = "";
-      if (emailOtpRef.current) emailOtpRef.current.value = "";
-      if (phoneOtpRef.current) phoneOtpRef.current.value = "";
-    }
-  }, [isOpen, initialData]);
-
-  const handleConfirmPassword = () => {
-    const currentPassword = (passwordRef.current?.value ?? "").trim();
-    if (!currentPassword) {
-      alert("Enter your current password first.");
-      return;
-    }
-
-    confirmedPasswordRef.current = currentPassword;
-    setPasswordConfirmed(true);
-    if (passwordRef.current) {
-      passwordRef.current.value = currentPassword;
-    }
-  };
-
-  const handleChangePassword = () => {
-    confirmedPasswordRef.current = "";
-    setPasswordConfirmed(false);
-    setEmailOtpSent(false);
-    setPhoneOtpSent(false);
-    if (emailOtpRef.current) emailOtpRef.current.value = "";
-    if (phoneOtpRef.current) phoneOtpRef.current.value = "";
-  };
-
-  const handleSendOtp = async (type: ContactOtpType) => {
-    if (!passwordConfirmed || !confirmedPasswordRef.current) {
-      alert("Confirm your current password first.");
-      return;
-    }
-
-    const newValue =
-      type === "EMAIL"
-        ? (newEmailRef.current?.value ?? "").trim()
-        : normalizePhone(newPhoneRef.current?.value ?? "");
-
-    if (!newValue) {
-      alert(
-        type === "EMAIL" ? "Enter a new email." : "Enter a new phone number.",
-      );
-      return;
-    }
-
-    if (type === "EMAIL" && newValue === currentEmail) {
-      alert("New email must be different from your current email.");
-      return;
-    }
-
-    if (type === "PHONE" && newValue === currentPhone) {
-      alert("New phone must be different from your current phone number.");
-      return;
-    }
-
-    try {
-      await onRequestContactOtp({
-        type,
-        newValue,
-        currentPassword: confirmedPasswordRef.current,
-      });
-      if (type === "EMAIL") setEmailOtpSent(true);
-      if (type === "PHONE") setPhoneOtpSent(true);
-    } catch {
-      // Hook shows toast.
-    }
-  };
-
-  const handleVerifyOtp = async (type: ContactOtpType) => {
-    const otpRef = type === "EMAIL" ? emailOtpRef : phoneOtpRef;
-    const code = (otpRef.current?.value ?? "").trim();
-
-    if (!code) {
-      alert("Enter the OTP sent to your new contact.");
-      return;
-    }
-
-    try {
-      await onVerifyContactOtp({ type, code });
-      if (type === "EMAIL") {
-        setEmailOtpSent(false);
-        if (newEmailRef.current) newEmailRef.current.value = "";
-      }
-      if (type === "PHONE") {
-        setPhoneOtpSent(false);
-        if (newPhoneRef.current) newPhoneRef.current.value = "";
-      }
-      if (otpRef.current) otpRef.current.value = "";
-    } catch {
-      // Hook shows toast.
-    }
-  };
+  const {
+    currentEmail,
+    currentPhone,
+    passwordRef,
+    newEmailRef,
+    newPhoneRef,
+    emailOtpRef,
+    phoneOtpRef,
+    emailOtpSent,
+    phoneOtpSent,
+    isSubmitting,
+    requestingOtpType,
+    verifyingOtpType,
+    handleSendOtp,
+    handleVerifyOtp,
+  } = useAccountInformationModal({
+    isOpen,
+    initialData,
+    onProfileUpdated,
+    refreshProfile,
+  });
 
   if (!isOpen) return null;
 
@@ -211,7 +86,7 @@ export default function AccountModal({
               aria-label="Password masked (read only)"
             />
             <p className="account-field-hint">
-              Password cannot be changed at this time.
+              Use forgot password on the login page to reset your password.
             </p>
           </div>
 
@@ -220,39 +95,17 @@ export default function AccountModal({
               <label>
                 Current password <span className="req">*</span>
               </label>
-              <div className="account-password-row">
-                <input
-                  ref={passwordRef}
-                  name="currentPassword"
-                  type="password"
-                  autoComplete="current-password"
-                  placeholder="Enter current password"
-                  disabled={isSubmitting || passwordConfirmed}
-                />
-                {!passwordConfirmed ? (
-                  <button
-                    type="button"
-                    className="um-btn-modal-submit account-password-confirm-btn"
-                    disabled={isSubmitting}
-                    onClick={handleConfirmPassword}
-                  >
-                    Confirm password
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="um-btn-modal-cancel account-password-confirm-btn"
-                    disabled={isSubmitting}
-                    onClick={handleChangePassword}
-                  >
-                    Change
-                  </button>
-                )}
-              </div>
+              <input
+                ref={passwordRef}
+                name="currentPassword"
+                type="password"
+                autoComplete="current-password"
+                placeholder="Enter current password"
+                disabled={isSubmitting}
+              />
               <p className="account-field-hint">
-                {passwordConfirmed
-                  ? "Password confirmed. You can update your email or phone below."
-                  : "Confirm your password before requesting an OTP."}
+                Required when sending an OTP. Your password is checked by the
+                server at that step.
               </p>
             </div>
           ) : null}
@@ -278,17 +131,13 @@ export default function AccountModal({
                   name="newEmail"
                   type="email"
                   placeholder="New email address"
-                  disabled={isSubmitting || !passwordConfirmed}
+                  disabled={isSubmitting}
                   aria-label="New email"
                 />
                 <button
                   type="button"
                   className="um-btn-modal-cancel account-otp-request-btn"
-                  disabled={
-                    isSubmitting ||
-                    !passwordConfirmed ||
-                    requestingOtpType === "EMAIL"
-                  }
+                  disabled={isSubmitting || requestingOtpType === "EMAIL"}
                   onClick={() => void handleSendOtp("EMAIL")}
                 >
                   {requestingOtpType === "EMAIL"
@@ -302,7 +151,7 @@ export default function AccountModal({
                       ref={emailOtpRef}
                       type="text"
                       className="account-otp-input"
-                      placeholder="OTP from new email"
+                      placeholder="6-digit OTP from new email"
                       inputMode="numeric"
                       autoComplete="one-time-code"
                       minLength={6}
@@ -346,18 +195,14 @@ export default function AccountModal({
                   ref={newPhoneRef}
                   name="newPhone"
                   type="text"
-                  placeholder="New phone number (10 digits, VN)"
-                  disabled={isSubmitting || !passwordConfirmed}
+                  placeholder="New phone (10 digits, e.g. 09xxxxxxxx)"
+                  disabled={isSubmitting}
                   aria-label="New phone"
                 />
                 <button
                   type="button"
                   className="um-btn-modal-cancel account-otp-request-btn"
-                  disabled={
-                    isSubmitting ||
-                    !passwordConfirmed ||
-                    requestingOtpType === "PHONE"
-                  }
+                  disabled={isSubmitting || requestingOtpType === "PHONE"}
                   onClick={() => void handleSendOtp("PHONE")}
                 >
                   {requestingOtpType === "PHONE"
@@ -371,7 +216,7 @@ export default function AccountModal({
                       ref={phoneOtpRef}
                       type="text"
                       className="account-otp-input"
-                      placeholder="OTP from new phone"
+                      placeholder="6-digit OTP from new phone"
                       inputMode="numeric"
                       autoComplete="one-time-code"
                       minLength={6}

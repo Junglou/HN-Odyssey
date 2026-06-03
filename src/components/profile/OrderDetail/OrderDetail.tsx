@@ -15,6 +15,8 @@ import { mapOrderStatusLabel } from "../../../utils/mapCustomerOrder";
 interface OrderDetailProps {
   orderId: string;
   order: UserOrder | UserOrderDetail | null;
+  loading?: boolean;
+  onRefresh?: () => void;
 }
 
 const formatMoney = (value: number) =>
@@ -97,9 +99,41 @@ const formatDisplayDate = (value: string) => {
   return parsed.toLocaleString();
 };
 
-const OrderDetail = ({ orderId, order }: OrderDetailProps) => {
-  const isValidOrder =
-    order != null && (order.id === orderId || order.orderCode === orderId);
+const orderMatchesRoute = (
+  order: UserOrder | UserOrderDetail,
+  routeOrderId: string,
+): boolean => {
+  const id = routeOrderId.trim();
+  if (!id) return false;
+  return order.id === id || order.orderCode === id;
+};
+
+const OrderDetail = ({
+  orderId,
+  order,
+  loading = false,
+  onRefresh,
+}: OrderDetailProps) => {
+  if (loading) {
+    return (
+      <div className="pod-page" aria-busy="true">
+        <div className="pod-header">
+          <div className="pod-title-group">
+            <h1 className="pod-title">Order details</h1>
+          </div>
+          <Link to="/profile/orders" className="pod-back-link">
+            <BackArrowIcon className="pod-back-link-icon" aria-hidden />
+            Back to orders
+          </Link>
+        </div>
+        <div className="pod-body pod-body-empty">
+          <p className="pod-loading-message">Loading order details…</p>
+        </div>
+      </div>
+    );
+  }
+
+  const isValidOrder = order != null && orderMatchesRoute(order, orderId);
 
   if (!isValidOrder) {
     return (
@@ -116,9 +150,18 @@ const OrderDetail = ({ orderId, order }: OrderDetailProps) => {
         <div className="pod-body pod-body-empty">
           <div className="pod-col-info">
             <p className="pod-empty-message">
-              This order is unavailable. Open it from your order list to view
-              details.
+              We could not load this order. It may not exist, or you may not
+              have access to view it.
             </p>
+            {onRefresh ? (
+              <button
+                type="button"
+                className="pod-retry-btn"
+                onClick={onRefresh}
+              >
+                Try again
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -240,7 +283,11 @@ const OrderDetail = ({ orderId, order }: OrderDetailProps) => {
             ) : (
               lineItems.map((item, index) => (
                 <div key={`${item.id}-${index}`} className="pod-item-card">
-                  <img src={item.image} alt={item.name} className="pod-item-img" />
+                  <img
+                    src={item.image}
+                    alt={item.name}
+                    className="pod-item-img"
+                  />
                   <div className="pod-item-details">
                     <p className="pod-item-name">{item.name}</p>
 
@@ -260,7 +307,9 @@ const OrderDetail = ({ orderId, order }: OrderDetailProps) => {
                           {formatMoney(item.price)}
                         </span>
                       </div>
-                      <span className="pod-item-qty">x{item.quantity ?? 1}</span>
+                      <span className="pod-item-qty">
+                        x{item.quantity ?? 1}
+                      </span>
                     </div>
                   </div>
                 </div>

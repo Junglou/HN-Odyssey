@@ -191,7 +191,7 @@
   max-width: 100%;
 }
 
-/* Recommendation visuals live in ProfileRecommendations.css (via RecommendationList) */
+/* Recommendation visuals live in common/RecommendationList.css (via RecommendationList) */
 
 /* Ensure pagination inside .section-order spans all columns */
 .section-order .order-pagination {

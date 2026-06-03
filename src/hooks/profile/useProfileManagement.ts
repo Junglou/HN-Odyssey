@@ -12,11 +12,6 @@ import type {
   ProfileWishlistItem,
 } from "../../types/user";
 import type { UserProfileFormData } from "../../components/profile/ProfileModal/MyProfileModal";
-import type {
-  ContactOtpType,
-  RequestContactOtpParams,
-  VerifyContactOtpParams,
-} from "../../components/profile/ProfileModal/AccountInformationModal";
 import type { AvatarFormData } from "../../components/profile/ProfileModal/AvatarModal";
 
 /** Alias kept for existing imports (e.g. loyalty hook). Same shape as API profile. */
@@ -290,7 +285,7 @@ const mapProfileFromApi = (raw: ApiProfilePayload): UserProfile => {
   };
 };
 
-const refreshProfileFromApi = async (): Promise<UserProfile> => {
+export const refreshProfileFromApi = async (): Promise<UserProfile> => {
   const res = await axiosClient.get("/users/customers/profile");
   const payload: ApiProfilePayload = res.data?.data ?? res.data ?? {};
   return mapProfileFromApi(payload);
@@ -298,11 +293,6 @@ const refreshProfileFromApi = async (): Promise<UserProfile> => {
 
 export function useProfileManagement() {
   const [user, setUser] = useState<UserProfile>(createEmptyUserProfile);
-  const [isAccountSubmitting, setIsAccountSubmitting] = useState(false);
-  const [requestingContactOtpType, setRequestingContactOtpType] =
-    useState<ContactOtpType | null>(null);
-  const [verifyingContactOtpType, setVerifyingContactOtpType] =
-    useState<ContactOtpType | null>(null);
 
   const [modalConfig, setModalConfig] = useState<ModalConfig>({
     isOpen: false,
@@ -335,59 +325,9 @@ export function useProfileManagement() {
     }
   };
 
-  const requestContactOtp = async (params: RequestContactOtpParams) => {
-    setRequestingContactOtpType(params.type);
-    try {
-      const res = await axiosClient.post<{ message?: string }>(
-        "/users/customers/request-change-contact",
-        {
-          type: params.type,
-          newValue: params.newValue.trim(),
-          currentPassword: params.currentPassword,
-        },
-      );
-
-      toast.success(
-        res.data?.message ??
-          `Verification code sent to ${params.newValue.trim()}.`,
-      );
-    } catch (error: unknown) {
-      console.error("Failed to request contact OTP:", error);
-      toast.error(getErrorMessage(error, "Could not send verification code"));
-      throw error;
-    } finally {
-      setRequestingContactOtpType(null);
-    }
-  };
-
-  const verifyContactOtp = async (params: VerifyContactOtpParams) => {
-    setIsAccountSubmitting(true);
-    setVerifyingContactOtpType(params.type);
-    try {
-      const res = await axiosClient.post<{ message?: string }>(
-        "/users/customers/verify-change-contact",
-        {
-          code: params.code.trim(),
-        },
-      );
-
-      const updated = await refreshProfileFromApi();
-      setUser(updated);
-      setModalConfig((prev) => ({ ...prev, editingUser: updated }));
-      toast.success(
-        res.data?.message ??
-          (params.type === "EMAIL"
-            ? "Email updated successfully."
-            : "Phone number updated successfully."),
-      );
-    } catch (error: unknown) {
-      console.error("Failed to verify contact OTP:", error);
-      toast.error(getErrorMessage(error, "Could not verify the OTP code"));
-      throw error;
-    } finally {
-      setIsAccountSubmitting(false);
-      setVerifyingContactOtpType(null);
-    }
+  const handleAccountProfileUpdated = (updated: UserProfile) => {
+    setUser(updated);
+    setModalConfig((prev) => ({ ...prev, editingUser: updated }));
   };
 
   const submitAvatar = async (data: AvatarFormData) => {
@@ -475,11 +415,8 @@ export function useProfileManagement() {
       mode: modalConfig.mode,
       initialData: modalConfig.editingUser,
       onClose: closeModal,
-      onRequestContactOtp: requestContactOtp,
-      onVerifyContactOtp: verifyContactOtp,
-      isSubmitting: isAccountSubmitting,
-      requestingOtpType: requestingContactOtpType,
-      verifyingOtpType: verifyingContactOtpType,
+      onProfileUpdated: handleAccountProfileUpdated,
+      refreshProfile: refreshProfileFromApi,
     },
 
     avatarModal: {
@@ -495,8 +432,6 @@ export function useProfileManagement() {
     openAvatarEdit: () => openModal("avatar", "edit"),
     closeModal,
     submitProfile,
-    requestContactOtp,
-    verifyContactOtp,
     submitAvatar,
   };
 }
