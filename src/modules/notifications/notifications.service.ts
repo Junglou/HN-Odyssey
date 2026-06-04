@@ -109,7 +109,7 @@ export class NotificationsService {
       metadata: {
         order_id: String(order._id),
         order_code: order.order_code,
-        target_url: `/portal/orders/${String(order._id)}`,
+        target_url: `/portal/orders`,
       },
     });
   }
@@ -190,6 +190,13 @@ export class NotificationsService {
           'new_notification',
           payload,
         );
+      } else {
+        // Chỉ gửi vào phòng chung nếu KHÔNG CÓ kho cụ thể
+        this.gateway.sendToRoom(
+          `role_${data.recipient_role}`,
+          'new_notification',
+          payload,
+        );
       }
       this.gateway.sendToRoom(
         `role_${data.recipient_role}`,
@@ -265,16 +272,41 @@ export class NotificationsService {
   async getNotificationsForUser(
     userId: string,
     roles: string[],
+    warehouseId?: string,
     page: number = 1,
     limit: number = 10,
   ) {
     const skip = (page - 1) * limit;
-    const query = {
-      $or: [
-        { recipient_id: new Types.ObjectId(userId) },
-        { recipient_role: { $in: roles } },
-      ],
-    };
+
+    const orConditions: any[] = [{ recipient_id: new Types.ObjectId(userId) }];
+
+    if (roles && roles.length > 0) {
+      if (roles.includes('SUPER_ADMIN')) {
+        orConditions.push({ recipient_role: { $in: roles } });
+      } else {
+        const whCondition = warehouseId
+          ? {
+              $or: [
+                { warehouse_id: null },
+                { warehouse_id: { $exists: false } },
+                { warehouse_id: new Types.ObjectId(warehouseId) },
+              ],
+            }
+          : {
+              $or: [
+                { warehouse_id: null },
+                { warehouse_id: { $exists: false } },
+              ],
+            };
+
+        orConditions.push({
+          recipient_role: { $in: roles },
+          ...whCondition,
+        });
+      }
+    }
+
+    const query = { $or: orConditions };
 
     const [items, totalItems] = await Promise.all([
       this.model
@@ -394,13 +426,42 @@ export class NotificationsService {
     }
   }
 
-  async getUnreadCount(userId: string, roles: string[]): Promise<number> {
+  async getUnreadCount(
+    userId: string,
+    roles: string[],
+    warehouseId?: string,
+  ): Promise<number> {
+    const orConditions: any[] = [{ recipient_id: new Types.ObjectId(userId) }];
+
+    if (roles && roles.length > 0) {
+      if (roles.includes('SUPER_ADMIN')) {
+        orConditions.push({ recipient_role: { $in: roles } });
+      } else {
+        const whCondition = warehouseId
+          ? {
+              $or: [
+                { warehouse_id: null },
+                { warehouse_id: { $exists: false } },
+                { warehouse_id: new Types.ObjectId(warehouseId) },
+              ],
+            }
+          : {
+              $or: [
+                { warehouse_id: null },
+                { warehouse_id: { $exists: false } },
+              ],
+            };
+
+        orConditions.push({
+          recipient_role: { $in: roles },
+          ...whCondition,
+        });
+      }
+    }
+
     return this.model
       .countDocuments({
-        $or: [
-          { recipient_id: new Types.ObjectId(userId) },
-          { recipient_role: { $in: roles } },
-        ],
+        $or: orConditions,
         is_read: false,
       })
       .exec();
@@ -475,9 +536,8 @@ export class NotificationsService {
     priority: NotificationPriority;
     metadata: Record<string, any>;
   }) {
-    // 1. Check spam: Tạo object tạm khớp với interface CreateNotificationData để tránh ép kiểu any
     const checkData: CreateNotificationData = {
-      recipient_role: data.roles[0], // Lấy role đầu tiên làm đại diện
+      recipient_role: data.roles[0],
       type: data.type,
       metadata: data.metadata,
       title: data.title,
@@ -486,22 +546,25 @@ export class NotificationsService {
 
     const isSpam = await this.checkSpamSafe(checkData);
     if (isSpam) {
-      console.log('--- [STOP] BỊ CHẶN BỞI CHỐNG SPAM ---');
       return;
     }
 
-    // 2. Lưu record vào DB (Dùng SUPER_ADMIN làm bản ghi gốc)
-    const log = await new this.model({
-      ...data,
-      recipient_role: 'SUPER_ADMIN',
-      is_read: false,
-    }).save();
+    // TẠO BẢN GHI RIÊNG CHO TỪNG ROLE (Khắc phục lỗi hardcode SUPER_ADMIN)
+    const logs = await Promise.all(
+      data.roles.map((role) => {
+        return new this.model({
+          ...data,
+          recipient_role: role,
+          is_read: false,
+        }).save();
+      }),
+    );
 
-    if (data.type === NotificationType.STOCK) {
+    if (data.type === NotificationType.STOCK && logs.length > 0) {
       await this.auditLogsService.log({
         action: 'STOCK_ALERT_SENT',
         collection_name: Resource.INVENTORY,
-        target_id: log._id,
+        target_id: logs[0]._id,
         department: Department.WAREHOUSE,
         detail: {
           sku: typeof data.metadata?.sku === 'string' ? data.metadata.sku : '',
@@ -510,29 +573,33 @@ export class NotificationsService {
       });
     }
 
-    // 3. Ép kiểu an toàn để lấy Object từ Mongoose mà không bị lỗi unsafe-assignment
-    const logData = log.toObject() as unknown as INotificationLogLean;
+    // BẮN SOCKET TƯƠNG ỨNG VỚI TỪNG ROLE
+    for (let i = 0; i < data.roles.length; i++) {
+      const role = data.roles[i];
+      const logData = logs[i].toObject() as unknown as INotificationLogLean;
 
-    const payload = {
-      id: logData._id.toString(),
-      title: logData.title,
-      message: logData.message,
-      type: logData.type,
-      priority: logData.priority,
-      metadata: logData.metadata,
-      createdAt: logData.createdAt
-        ? new Date(logData.createdAt).toISOString()
-        : new Date().toISOString(),
-    };
+      const payload = {
+        id: logData._id.toString(),
+        title: logData.title,
+        message: logData.message,
+        type: logData.type,
+        priority: logData.priority,
+        metadata: logData.metadata,
+        createdAt: logData.createdAt
+          ? new Date(logData.createdAt).toISOString()
+          : new Date().toISOString(),
+      };
 
-    // 4. Bắn Socket cho từng Role và Room tương ứng
-    for (const role of data.roles) {
       const warehouseId =
-        role === 'SUPER_ADMIN' ? '' : String(data.warehouse_id);
+        role === 'SUPER_ADMIN'
+          ? ''
+          : data.warehouse_id
+            ? String(data.warehouse_id)
+            : '';
       const room = `role_${role}${warehouseId ? `_area_${warehouseId}` : ''}`;
-      console.log(`--- [EMIT] Đang gửi thông báo đến Room: ${room} ---`);
+
       this.gateway.sendToRoom(room, 'new_notification', payload);
     }
-    return log;
+    return logs[0];
   }
 }

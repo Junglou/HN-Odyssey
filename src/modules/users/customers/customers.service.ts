@@ -386,7 +386,11 @@ export class CustomersService {
     };
 
     if (status && status !== OrderStatus.ALL) {
-      query.status = status;
+      if (String(status) === 'COMPLETED' || String(status) === 'DELIVERED') {
+        query.status = { $in: ['COMPLETED', 'DELIVERED'] };
+      } else {
+        query.status = status;
+      }
     }
 
     if (keyword) {

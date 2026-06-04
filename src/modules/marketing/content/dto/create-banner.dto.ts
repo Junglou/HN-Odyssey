@@ -13,12 +13,12 @@ export class CreateBannerDto {
   @IsNotEmpty()
   title: string;
 
-  // AC5: Cho phép lưu cả đường dẫn tuyệt đối (HTTP/HTTPS) và đường dẫn tương đối nội bộ
+  // AC5: Cho phép lưu đường dẫn tuyệt đối (HTTP/HTTPS), đường dẫn nội bộ (/), HOẶC mã định danh vị trí (chứa chữ và dấu _)
   @IsString({ message: 'Đường dẫn phải là một chuỗi ký tự' })
   @IsNotEmpty({ message: 'Đường dẫn không được để trống' })
-  @Matches(/^(https?:\/\/[^\s]+|^\/[^\s]*)$/, {
+  @Matches(/^(https?:\/\/[^\s]+|\/[^\s]*|[a-zA-Z0-9_-]+)$/, {
     message:
-      'Đường dẫn không hợp lệ. Phải là URL chuẩn (http/https) hoặc đường dẫn nội bộ (bắt đầu bằng /)',
+      'Đường dẫn không hợp lệ. Phải là URL chuẩn (http/https), đường dẫn nội bộ (bắt đầu bằng /) hoặc mã vị trí (chỉ chứa chữ, số, dấu _ hoặc -).',
   })
   link: string;
 

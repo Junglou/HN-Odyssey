@@ -76,7 +76,7 @@ export class PaymentMonitorListener {
         priority: NotificationPriority.HIGH,
         metadata: {
           order_code: payload.order_code,
-          target_url: `/portal/orders?code=${payload.order_code}`, // Hành động khắc phục nhanh (AC5)
+          target_url: `/portal/orders`,
         },
       });
 
@@ -108,7 +108,7 @@ export class PaymentMonitorListener {
         type: NotificationType.SYSTEM,
         priority: NotificationPriority.CRITICAL,
         metadata: {
-          target_url: `/portal/settings/payment-gateways?provider=${provider}`, // AC5
+          target_url: `/portal/system`,
         },
       });
     }

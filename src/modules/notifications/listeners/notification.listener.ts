@@ -174,9 +174,8 @@ export class NotificationListener {
         severity: data.severity,
         user_id: data.user_id,
         ip: data.ip,
-        target_url: data.user_id
-          ? `/portal/system/audit-logs?userId=${data.user_id}`
-          : `/portal/system/audit-logs`,
+        // Cập nhật target_url đúng với định tuyến frontend
+        target_url: '/portal/system',
       },
     });
   }
@@ -245,7 +244,12 @@ export class NotificationListener {
         data.severity === 'CRITICAL'
           ? NotificationPriority.CRITICAL
           : NotificationPriority.HIGH,
-      metadata: { error_code: data.error_code, stack: data.stack_trace },
+      metadata: {
+        error_code: data.error_code,
+        stack: data.stack_trace,
+        // Bổ sung target_url cho lỗi hệ thống
+        target_url: '/portal/system',
+      },
     });
   }
 
@@ -263,7 +267,8 @@ export class NotificationListener {
       message: `Bạn vừa được cộng thêm ${data.pointsAmount} điểm từ đơn hàng ${data.orderId}.`,
       type: NotificationType.LOYALTY, // Dùng đúng Type chuẩn xác
       priority: NotificationPriority.LOW, // Sự kiện bình thường
-      metadata: { target_url: '/wallet/loyalty', order_id: data.orderId },
+      // Cập nhật target_url đúng với định tuyến frontend
+      metadata: { target_url: '/profile/loyalty', order_id: data.orderId },
     });
   }
 
@@ -282,7 +287,8 @@ export class NotificationListener {
       message: `Bạn đã nhận được 1 Voucher giảm ${data.rewardValue}${symbol}. Kiểm tra Kho Voucher ngay nhé!`,
       type: NotificationType.LOYALTY,
       priority: NotificationPriority.HIGH, // Ưu tiên cao để đẩy nổi bật
-      metadata: { target_url: '/wallet/vouchers' },
+      // Cập nhật target_url đúng với định tuyến frontend
+      metadata: { target_url: '/profile/coupon' },
     });
   }
 
@@ -301,7 +307,8 @@ export class NotificationListener {
       message: `Bạn đã sử dụng ${data.pointsUsed} điểm để đổi ${itemName}.`,
       type: NotificationType.LOYALTY,
       priority: NotificationPriority.MEDIUM,
-      metadata: { target_url: '/wallet/loyalty' },
+      // Cập nhật target_url đúng với định tuyến frontend
+      metadata: { target_url: '/profile/loyalty' },
     });
   }
 
@@ -324,7 +331,8 @@ export class NotificationListener {
       message: message,
       type: NotificationType.LOYALTY,
       priority: NotificationPriority.HIGH,
-      metadata: { target_url: '/wallet/vouchers', event: 'birthday' },
+      // Cập nhật target_url đúng với định tuyến frontend
+      metadata: { target_url: '/profile/coupon', event: 'birthday' },
     });
   }
 
@@ -337,7 +345,8 @@ export class NotificationListener {
       message: `Sản phẩm ${data.product_name} đã được định giá ${data.final_value}đ. Mã vận đơn ngược: ${data.rma_order_code}. Shipper sẽ sớm liên hệ bạn!`,
       type: NotificationType.ORDER,
       priority: NotificationPriority.HIGH,
-      metadata: { target_url: `/trade-in/history/${data.request_id}` },
+      // Cập nhật target_url đúng với định tuyến frontend
+      metadata: { target_url: '/profile/orders' },
     });
   }
 
@@ -355,7 +364,8 @@ export class NotificationListener {
       message: msg,
       type: NotificationType.ORDER,
       priority: NotificationPriority.HIGH,
-      metadata: { target_url: `/trade-in/history/${data.request_id}` },
+      // Cập nhật target_url đúng với định tuyến frontend
+      metadata: { target_url: '/profile/orders' },
     });
   }
 
@@ -368,7 +378,8 @@ export class NotificationListener {
       message: `Hệ thống đã tiếp nhận yêu cầu thu mua sản phẩm ${data.product_name}. Định giá sơ bộ: ${data.estimated_value.toLocaleString()}đ.`,
       type: NotificationType.ORDER,
       priority: NotificationPriority.MEDIUM,
-      metadata: { target_url: `/trade-in/history/${data.request_id}` },
+      // Cập nhật target_url đúng với định tuyến frontend
+      metadata: { target_url: '/profile/orders' },
     });
   }
 
@@ -381,7 +392,8 @@ export class NotificationListener {
       message: `Sản phẩm của bạn có sai lệch tình trạng sau khi kiểm định tại kho. Đề xuất giá mới: ${data.proposed_price.toLocaleString()}đ. Vui lòng kiểm tra và xác nhận!`,
       type: NotificationType.ORDER,
       priority: NotificationPriority.HIGH,
-      metadata: { target_url: `/trade-in/history/${data.request_id}` },
+      // Cập nhật target_url đúng với định tuyến frontend
+      metadata: { target_url: '/profile/orders' },
     });
   }
 
@@ -394,7 +406,8 @@ export class NotificationListener {
       message: `Tuyệt vời! Sản phẩm của bạn khớp hoàn toàn với mô tả. Đã chốt giá thu mua: ${data.final_value.toLocaleString()}đ.`,
       type: NotificationType.ORDER,
       priority: NotificationPriority.HIGH,
-      metadata: { target_url: `/trade-in/history/${data.request_id}` },
+      // Cập nhật target_url đúng với định tuyến frontend
+      metadata: { target_url: '/profile/orders' },
     });
   }
 
@@ -411,7 +424,8 @@ export class NotificationListener {
       message: `Khách hàng (${data.email}) vừa gửi lời nhắn: "${data.content.substring(0, 50)}..."`,
       type: NotificationType.SYSTEM,
       priority: NotificationPriority.HIGH,
-      metadata: { target_url: `/crm/support/chats/${data.ticketId}` },
+      // Cập nhật target_url đúng với định tuyến frontend
+      metadata: { target_url: '/portal/live-chat' },
     });
 
     // 2. (Tùy chọn) Gửi Email thông báo cho Trưởng bộ phận CSKH / Email dùng chung
@@ -422,7 +436,7 @@ export class NotificationListener {
     await this.emailService.sendRaw(
       supportEmail,
       `[H&N Odyssey - CSKH] Ticket hỗ trợ mới từ ${data.email}`,
-      `Hệ thống vừa ghi nhận một Ticket hỗ trợ Offline.\n\n- Khách hàng: ${data.email}\n- Nội dung: ${data.content}\n- Link xử lý: /crm/support/chats/${data.ticketId}`,
+      `Hệ thống vừa ghi nhận một Ticket hỗ trợ Offline.\n\n- Khách hàng: ${data.email}\n- Nội dung: ${data.content}\n- Link xử lý: /portal/live-chat`,
     );
   }
 }

@@ -99,37 +99,43 @@ export class ProductSeederService {
       this.attributeModel.deleteMany({}),
     ]);
 
-    // 1. Đồng bộ danh mục chuẩn trekking gear
+    // 1. Đồng bộ danh mục chuẩn 6 hạng mục chính của Header
     const categoryData = [
       {
-        name: 'Backpacks',
-        slug: 'backpacks',
-        description: 'Trekking & Hiking Backpacks',
+        name: 'Featured',
+        slug: 'featured',
+        description: 'Các bộ sưu tập và sản phẩm nổi bật nhất',
         display_order: 1,
       },
       {
-        name: 'Tents & Shelters',
-        slug: 'tents-shelters',
-        description: 'Camping Tents and Shelters',
+        name: 'Men',
+        slug: 'men',
+        description: 'Trang phục và phụ kiện dã ngoại dành cho Nam',
         display_order: 2,
       },
       {
-        name: 'Footwear',
-        slug: 'footwear',
-        description: 'Hiking Boots and Shoes',
+        name: 'Women',
+        slug: 'women',
+        description: 'Trang phục và phụ kiện dã ngoại dành cho Nữ',
         display_order: 3,
       },
       {
-        name: 'Apparel',
-        slug: 'apparel',
-        description: 'Outdoor Clothing & Jackets',
+        name: 'Kid',
+        slug: 'kid',
+        description: 'Trang bị an toàn và thoải mái cho trẻ em',
         display_order: 4,
       },
       {
-        name: 'Accessories',
-        slug: 'accessories',
-        description: 'Navigation, Hydration & Gears',
+        name: 'Equipment',
+        slug: 'equipment',
+        description: 'Dụng cụ cắm trại, balo và phụ kiện sinh tồn',
         display_order: 5,
+      },
+      {
+        name: 'Emergency Packs',
+        slug: 'emergency-packs',
+        description: 'Bộ dụng cụ y tế và cấp cứu khẩn cấp',
+        display_order: 6,
       },
     ];
     await this.categoryModel.insertMany(categoryData);
@@ -173,17 +179,25 @@ export class ProductSeederService {
     const dbAttributes = await this.attributeModel.find().exec();
 
     const mockProducts: IMockProduct[] = [];
+
+    // Đã cấu hình thêm phân loại showcaseTag để liên kết với UI Category Showcase
     const itemTypes = [
-      'Jacket',
-      'Backpack',
-      'Base Layer',
-      'Hiking Boots',
-      'Tent',
-      'Fleece',
+      { type: 'Jacket', showcaseTag: 'top' },
+      { type: 'Fleece', showcaseTag: 'top' },
+      { type: 'Base Layer', showcaseTag: 'top' },
+      { type: 'Cargo Pants', showcaseTag: 'bottom' },
+      { type: 'Trekking Leggings', showcaseTag: 'bottom' },
+      { type: 'Hiking Boots', showcaseTag: 'footwear' },
+      { type: 'Trail Shoes', showcaseTag: 'footwear' },
+      { type: 'Backpack', showcaseTag: 'accessory' },
+      { type: 'Tent', showcaseTag: 'accessory' },
     ];
 
     for (let i = 0; i < count; i++) {
-      const type = faker.helpers.arrayElement(itemTypes);
+      const selectedItem = faker.helpers.arrayElement(itemTypes);
+      const type = selectedItem.type;
+      const showcaseTag = selectedItem.showcaseTag;
+
       const activity = faker.helpers.arrayElement([
         'Alpine',
         'Trail',
@@ -212,18 +226,25 @@ export class ProductSeederService {
         max: 350,
         fractionDigits: 2,
       });
-      let forcedTags: string[] = [];
+
+      // Khởi tạo mảng tag bắt buộc phải có showcaseTag để lọc ra sản phẩm
+      let forcedTags: string[] = [showcaseTag];
 
       if (i === 0) {
         name = `${this.MY_BRAND} Merino Wool Hiking Socks`;
-        forcedTags = ['phu-kien', 'Trending'];
+        // Gắn cứng cả 2 tag cho sản phẩm đầu tiên để chắc chắn search là ra
+        forcedTags = ['phu-kien', 'Trending', 'New Arrivals', 'accessory'];
       } else if (i === 1) {
         name = `Extended 12-Month Warranty Pack`;
-        forcedTags = ['service', 'warranty'];
+        forcedTags = ['service', 'warranty', 'New Arrivals', 'accessory'];
       } else {
-        // Rải ngẫu nhiên tag Trending cho khoảng 30% sản phẩm để đảm bảo AI Engine luôn có Data Fallback
+        // Rải ngẫu nhiên tag Trending cho khoảng 30% sản phẩm
         if (faker.datatype.boolean({ probability: 0.3 })) {
           forcedTags.push('Trending');
+        }
+        // Rải ngẫu nhiên tag New Arrivals cho khoảng 35% sản phẩm
+        if (faker.datatype.boolean({ probability: 0.35 })) {
+          forcedTags.push('New Arrivals');
         }
       }
 

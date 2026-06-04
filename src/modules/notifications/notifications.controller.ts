@@ -25,6 +25,7 @@ interface RequestUser {
   userId: string;
   email: string;
   roles: string[];
+  warehouseId?: string;
 }
 
 interface RequestWithUser extends Request {
@@ -47,6 +48,7 @@ export class NotificationsController {
     const { items, meta } = await this.service.getNotificationsForUser(
       req.user.userId,
       req.user.roles,
+      req.user.warehouseId,
       Number(page),
       Number(limit),
     );
@@ -84,6 +86,7 @@ export class NotificationsController {
     const count = await this.service.getUnreadCount(
       req.user.userId,
       req.user.roles,
+      req.user.warehouseId,
     );
     return new BaseResponse(true, 'Lấy số lượng chưa đọc thành công', {
       count,

@@ -76,7 +76,7 @@ export class SecurityMonitorListener {
         priority: NotificationPriority.CRITICAL,
         metadata: {
           error_code: payload.error_code,
-          target_url: `/portal/settings/payment-gateways?provider=${provider}`, // Link khắc phục nhanh
+          target_url: `/portal/system`,
         },
       });
     }
@@ -159,7 +159,7 @@ export class SecurityMonitorListener {
         type: NotificationType.SECURITY,
         priority: NotificationPriority.CRITICAL,
         metadata: {
-          target_url: '/portal/system/audit-logs?action=LOGIN_FAILED',
+          target_url: '/portal/system',
         },
       });
     }
@@ -189,7 +189,11 @@ export class SecurityMonitorListener {
           message: `Hệ thống đã gửi ${currentUsage}/${QUOTA_LIMIT} tin nhắn Twilio trong tháng này. Vui lòng nạp thêm tiền.`,
           type: NotificationType.SYSTEM,
           priority: NotificationPriority.HIGH,
-          metadata: { provider: 'TWILIO', current_usage: currentUsage },
+          metadata: {
+            provider: 'TWILIO',
+            current_usage: currentUsage,
+            target_url: '/portal/system',
+          },
         });
       } else if (currentUsage === Math.floor(QUOTA_LIMIT * 0.9)) {
         await this.notificationsService.createAndSendToMultipleRoles({
@@ -198,7 +202,11 @@ export class SecurityMonitorListener {
           message: `Hệ thống đã gửi ${currentUsage}/${QUOTA_LIMIT} tin nhắn Twilio. Tính năng đăng ký/quên mật khẩu qua SĐT sắp bị gián đoạn!`,
           type: NotificationType.SYSTEM,
           priority: NotificationPriority.CRITICAL,
-          metadata: { provider: 'TWILIO', current_usage: currentUsage },
+          metadata: {
+            provider: 'TWILIO',
+            current_usage: currentUsage,
+            target_url: '/portal/system',
+          },
         });
       } else if (currentUsage >= QUOTA_LIMIT && currentUsage % 50 === 0) {
         // Vượt 100%, cứ lố 50 tin nhắn báo lại 1 lần

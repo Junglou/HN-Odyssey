@@ -170,7 +170,7 @@ export class ReviewEventListener {
         type: NotificationType.ORDER, // Hoặc type SYSTEM tùy bạn
         priority: NotificationPriority.MEDIUM,
         metadata: {
-          target_url: `/product/${payload.productId}#reviews`,
+          target_url: `/products/${payload.productId}`,
           review_id: payload.reviewId,
         },
       });

@@ -118,7 +118,7 @@ export class WarrantyListener {
             priority: NotificationPriority.MEDIUM,
             metadata: {
               order_code: item.order_code,
-              target_url: `/warranty/lookup?order_code=${String(item.order_code)}&phone=${String(item.customer_phone)}`,
+              target_url: `/profile/orders`,
             },
           });
         } catch (error) {

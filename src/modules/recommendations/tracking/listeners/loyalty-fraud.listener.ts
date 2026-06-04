@@ -87,7 +87,11 @@ export class LoyaltyFraudListener {
       message: `Phát hiện hành vi tích điểm bất thường từ khách hàng ID: ${customerId}. Lý do: ${reason}. Vui lòng kiểm tra đối soát!`,
       type: NotificationType.SECURITY,
       priority: NotificationPriority.CRITICAL,
-      metadata: { user_id: customerId, error_code: 'LOYALTY_FRAUD_DETECTED' },
+      metadata: {
+        user_id: customerId,
+        error_code: 'LOYALTY_FRAUD_DETECTED',
+        target_url: '/portal/customers',
+      },
     });
   }
 }

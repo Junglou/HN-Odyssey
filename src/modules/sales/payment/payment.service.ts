@@ -158,7 +158,7 @@ export class PaymentService {
         return { RspCode: '00', Message: 'Order already confirmed' };
       }
 
-      if (responseCode === '00') {
+      if (responseCode === '00' || responseCode === '0') {
         if (
           order.status === 'CANCELLED' &&
           String(order.cancel_reason).includes('timeout')

@@ -1888,13 +1888,23 @@ export class OrdersService {
       order.status = finalStatusToSave;
       if (dto.note) order.internal_note = dto.note;
 
+      // Tự động cập nhật mọi đơn hàng thành PAID khi giao thành công
       if (
         (finalStatusToSave === OrderStatus.DELIVERED ||
           finalStatusToSave === OrderStatus.COMPLETED) &&
-        order.payment.method === 'COD' &&
         order.payment.status === 'PENDING'
       ) {
         order.payment.status = 'PAID';
+
+        // Ghi chú thêm vào timeline để biết là do hệ thống tự chuyển đổi
+        if (!order.timeline) order.timeline = [];
+        order.timeline.push({
+          status: finalStatusToSave,
+          timestamp: new Date(),
+          actor: 'SYSTEM_FIREFIGHTING',
+          note: `Tự động ghi nhận thanh toán thành công (PAID) khi đơn hàng chuyển sang ${finalStatusToSave}.`,
+        });
+
         (order as unknown as OrderDocument).markModified('payment');
       }
 
