@@ -291,6 +291,8 @@ function BannerDrawerContent({
                     "Homepage Slider",
                     "Category",
                     "Promotion",
+                    "hero_banner",
+                    "category_showcase",
                   ] as BannerPosition[]
                 ).map((opt) => (
                   <div

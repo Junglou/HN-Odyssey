@@ -21,12 +21,13 @@ export interface DetailedCartItem {
 export interface RecommendItem {
   id: string;
   productId: string;
-  variantId?: string; // Dùng để gửi API Wishlist
+  variantId?: string;
   name: string;
   description: string;
   price: number;
   image: string;
-  sku: string; // Dùng để gửi API Cart
+  sku: string;
+  slug?: string;
 }
 
 interface ApiCartItemAttribute {
@@ -64,13 +65,14 @@ interface ApiRecommendation {
   _id?: string;
   productId?: string;
   sku?: string;
+  slug?: string;
   has_variants?: boolean;
   name: string;
   description?: string;
   sale_price?: number;
   price: number;
   thumbnail?: string;
-  variants?: { _id: string; sku: string; active?: boolean }[]; // BE trả về _id
+  variants?: { _id: string; sku: string; active?: boolean }[];
 }
 
 interface RecParams {
@@ -85,7 +87,7 @@ interface ApiError {
 
 interface ApiWishlistItem {
   productId: string;
-  variantId?: string; // Hứng variantId từ BE
+  variantId?: string;
 }
 
 const getOrCreateGuestSessionId = (): string => {
@@ -115,7 +117,6 @@ export function useShoppingCart() {
       const isLogged = !!tokenStorage.getToken();
       const guestSessionId = isLogged ? undefined : getOrCreateGuestSessionId();
 
-      // 1. LẤY DANH SÁCH WISHLIST (GHÉP CẢ PRODUCT VÀ VARIANT ĐỂ ĐỐI CHIẾU 100% CHÍNH XÁC)
       const wishlistSet = new Set<string>();
       if (isLogged) {
         try {
@@ -123,7 +124,6 @@ export function useShoppingCart() {
           if (wlRes.data?.success && Array.isArray(wlRes.data.data)) {
             wlRes.data.data.forEach((wItem: ApiWishlistItem) => {
               if (wItem.productId) {
-                // Key định dạng: "ProductId|VariantId"
                 const key = `${wItem.productId}|${wItem.variantId || "null"}`;
                 wishlistSet.add(key);
               }
@@ -134,7 +134,6 @@ export function useShoppingCart() {
         }
       }
 
-      // 2. LẤY GIỎ HÀNG
       const cartResponse = await axiosClient.get<ApiCartData>("/cart", {
         params: { guestSessionId },
       });
@@ -149,7 +148,6 @@ export function useShoppingCart() {
           );
           const sizeVal = sizeAttr ? sizeAttr.v || sizeAttr.value : item.sku;
 
-          // Kiểm tra chuẩn xác cả ProductID và VariantID
           const checkKey = `${item.productId}|${item.variantId || "null"}`;
           const isWishlisted = wishlistSet.has(checkKey);
 
@@ -192,7 +190,6 @@ export function useShoppingCart() {
         recParams.session_id = guestSessionId;
       }
 
-      // 3. LẤY GỢI Ý (RECOMMENDATIONS)
       const recResponse = await axiosClient.get<ApiRecommendation[]>(
         "/recommendations/cart",
         {
@@ -205,7 +202,6 @@ export function useShoppingCart() {
           let realSku = r.sku || "";
           let realVariantId: string | undefined = undefined;
 
-          // TRÍCH XUẤT OBJECT ID CỦA VARIANT ĐỂ GỬI WISHLIST
           if (r.has_variants && r.variants && r.variants.length > 0) {
             const validVariant =
               r.variants.find((v) => v.active) || r.variants[0];
@@ -214,10 +210,11 @@ export function useShoppingCart() {
           }
 
           return {
-            id: r._id || r.productId || "", // Đây thực chất là ProductID
+            id: r._id || r.productId || "",
             productId: r._id || r.productId || "",
-            variantId: realVariantId, // Đã lấy được ObjectId thật sự
+            variantId: realVariantId,
             sku: realSku,
+            slug: r.slug || "",
             name: r.name,
             description: r.description || "Sản phẩm gợi ý",
             price: r.sale_price && r.sale_price > 0 ? r.sale_price : r.price,
@@ -235,14 +232,25 @@ export function useShoppingCart() {
 
   useEffect(() => {
     let isMounted = true;
+
     const loadInitialData = async () => {
       if (isMounted) {
         await fetchCartAndRecommendations();
       }
     };
+
     void loadInitialData();
+
+    const handleCartUpdate = () => {
+      if (isMounted) {
+        void fetchCartAndRecommendations();
+      }
+    };
+    window.addEventListener("cart_updated", handleCartUpdate);
+
     return () => {
       isMounted = false;
+      window.removeEventListener("cart_updated", handleCartUpdate);
     };
   }, [fetchCartAndRecommendations]);
 
@@ -256,7 +264,9 @@ export function useShoppingCart() {
         data: { productId, variantSku, guestSessionId },
       });
       toast.info("Đã xóa sản phẩm khỏi giỏ hàng");
+
       await fetchCartAndRecommendations();
+      window.dispatchEvent(new Event("cart_updated"));
     } catch (error: unknown) {
       const err = error as ApiError;
       toast.error(err?.message || "Lỗi xử lý xóa sản phẩm");
@@ -275,12 +285,14 @@ export function useShoppingCart() {
 
       await axiosClient.post("/cart/add", {
         productId: recItem.productId,
-        variantSku: recItem.sku, // Cart API dùng SKU
+        variantSku: recItem.sku,
         quantity: 1,
         guestSessionId,
       });
       toast.success("Đã thêm sản phẩm gợi ý vào giỏ hàng!");
+
       await fetchCartAndRecommendations();
+      window.dispatchEvent(new Event("cart_updated"));
     } catch (error: unknown) {
       const err = error as ApiError;
       toast.error(err?.message || "Lỗi khi thêm gợi ý giỏ hàng");
@@ -303,7 +315,9 @@ export function useShoppingCart() {
         quantity: newQuantity,
         guestSessionId,
       });
+
       await fetchCartAndRecommendations();
+      window.dispatchEvent(new Event("cart_updated"));
     } catch (error: unknown) {
       const err = error as ApiError;
       toast.error(err?.message || "Số lượng cập nhật không hợp lệ");
@@ -335,14 +349,13 @@ export function useShoppingCart() {
         return;
       }
 
-      // TRUYỀN CHUẨN XÁC PRODUCT_ID VÀ VARIANT_ID THEO ĐÚNG API TOGGLE
       const res = await axiosClient.post("/users/wishlist/toggle", {
         productId: item.productId,
         variantId: item.variantId || undefined,
       });
 
       toast.success(res.data.message || "Thao tác thành công!");
-      await fetchCartAndRecommendations(); // Tải lại state ngầm để chuyển đổi Text "Add / Remove"
+      await fetchCartAndRecommendations();
     } catch (error: unknown) {
       const err = error as ApiError;
       toast.error(err?.message || "Lỗi khi cập nhật wishlist");

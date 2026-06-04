@@ -19,11 +19,14 @@ interface OrderDetailProps {
   onRefresh?: () => void;
 }
 
-const formatMoney = (value: number) =>
-  `$${value.toLocaleString("en-US", {
+// FIX: Cập nhật hàm formatMoney để xử lý an toàn undefined/null/NaN
+const formatMoney = (value?: number) => {
+  const safeValue = typeof value === "number" && !isNaN(value) ? value : 0;
+  return `$${safeValue.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+};
 
 const isUserOrderDetail = (
   order: UserOrder | UserOrderDetail,
@@ -169,17 +172,23 @@ const OrderDetail = ({
   }
 
   const lineItems = getLineItems(order);
+
+  // FIX: Bổ sung (item.price || 0) để phòng hờ API trả về price bị thiếu
   const subtotal = lineItems.reduce(
-    (sum, item) => sum + item.price * (item.quantity ?? 1),
+    (sum, item) => sum + (item.price || 0) * (item.quantity ?? 1),
     0,
   );
-  const shipFee = isUserOrderDetail(order)
-    ? order.actualShippingFee
-    : (order.shippingFee ?? 0);
+
+  // FIX: Ràng buộc nghiêm ngặt fallback về 0 nếu toàn bộ đều undefined
+  const shipFee =
+    (isUserOrderDetail(order) ? order.actualShippingFee : order.shippingFee) ??
+    0;
+
   const total =
     typeof order.totalAmount === "number" && order.totalAmount > 0
       ? order.totalAmount
       : subtotal + shipFee;
+
   const shipping = order.shippingInfo;
   const payment = isUserOrderDetail(order) ? order.payment : null;
   const timeline = buildTimeline(order);

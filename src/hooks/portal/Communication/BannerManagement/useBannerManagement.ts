@@ -3,7 +3,12 @@ import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
 
 export type BannerStatus = "Active" | "Inactive" | "Pending";
-export type BannerPosition = "Homepage Slider" | "Category" | "Promotion";
+export type BannerPosition =
+  | "Homepage Slider"
+  | "Category"
+  | "Promotion"
+  | "hero_banner"
+  | "category_showcase";
 export type DrawerMode = "create" | "edit" | "view";
 
 export interface BannerRecord {

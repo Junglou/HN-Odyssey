@@ -17,6 +17,7 @@ interface RecentViewProps {
     startIndex: number;
   };
   onPageChange?: (page: number) => void;
+  onRemoveItem?: (productId: string) => void;
 }
 
 const RecentView = ({
@@ -25,6 +26,7 @@ const RecentView = ({
   loading = false,
   pagination,
   onPageChange,
+  onRemoveItem,
 }: RecentViewProps) => {
   return (
     <div className="my-order-card order-management-layout profile-ultra-wide-grid-card">
@@ -39,6 +41,7 @@ const RecentView = ({
               key={`${product.id}-${product.variantId ?? "default"}`}
               product={product}
               onRecordView={recordRecentViewProduct}
+              onRemove={() => onRemoveItem?.(product.id)}
             />
           ))}
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
 import tokenStorage from "../../utils/tokenStorage";
+import { toast } from "react-toastify"; // Đảm bảo bạn đã cài và setup react-toastify trong project
 
 // --- Types ---
 interface ReviewUser {
@@ -55,8 +56,8 @@ const MOCK_FILTERS = [
   "5 Stars",
   "4 Stars",
   "3 Stars",
-  "Comfort",
-  "Value",
+  "2 Stars",
+  "1 Stars",
 ];
 
 const SORT_OPTIONS = [
@@ -116,6 +117,8 @@ export function useProductReviews() {
     if (activeFilter === "5 Stars") starFilter = 5;
     if (activeFilter === "4 Stars") starFilter = 4;
     if (activeFilter === "3 Stars") starFilter = 3;
+    if (activeFilter === "2 Stars") starFilter = 2; // Đã bổ sung logic cho 2 Stars
+    if (activeFilter === "1 Stars") starFilter = 1; // Đã bổ sung logic cho 1 Stars
 
     try {
       const response = await axiosClient.get<ReviewResponse>(
@@ -222,11 +225,11 @@ export function useProductReviews() {
   const setIsWritingReview = (val: boolean) => {
     if (val) {
       if (!tokenStorage.getToken()) {
-        alert("Vui lòng đăng nhập để viết đánh giá.");
+        toast.warning("Vui lòng đăng nhập để viết đánh giá.");
         return;
       }
       if (!eligibility.isEligible) {
-        alert(
+        toast.warning(
           "Bạn cần mua và nhận sản phẩm này thành công trước khi đánh giá. Nếu đã mua, có thể bạn đã đánh giá sản phẩm này rồi.",
         );
         return;
@@ -251,8 +254,14 @@ export function useProductReviews() {
       handleCancelReview();
       fetchReviews();
       checkReviewEligibility(); // Check lại để xem còn order nào khác hợp lệ không
-    } catch (error: any) {
-      alert(error?.message || "Đã xảy ra lỗi khi gửi đánh giá.");
+      toast.success("Gửi đánh giá thành công!");
+    } catch (error: unknown) {
+      // Đổi thành unknown để tránh lỗi ESLint any
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Đã xảy ra lỗi khi gửi đánh giá.";
+      toast.error(errorMessage);
     }
   };
 

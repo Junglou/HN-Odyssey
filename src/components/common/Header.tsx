@@ -111,22 +111,22 @@ export default function Header() {
 
         {/* khối giữa */}
         <nav className="header-nav">
-          <Link to="/featured" className="nav-link">
+          <Link to="/products?category=featured" className="nav-link">
             Featured
           </Link>
-          <Link to="/men" className="nav-link">
+          <Link to="/products?category=men" className="nav-link">
             Men
           </Link>
-          <Link to="/women" className="nav-link">
+          <Link to="/products?category=women" className="nav-link">
             Women
           </Link>
-          <Link to="/kid" className="nav-link">
+          <Link to="/products?category=kid" className="nav-link">
             Kid
           </Link>
-          <Link to="/equipment" className="nav-link">
+          <Link to="/products?category=equipment" className="nav-link">
             Equipment
           </Link>
-          <Link to="/emergency" className="nav-link">
+          <Link to="/products?category=emergency-packs" className="nav-link">
             Emergency Packs
           </Link>
         </nav>
@@ -205,34 +205,42 @@ export default function Header() {
       <div className={`mobile-drawer ${isMobileMenuOpen ? "open" : ""}`}>
         <nav className="mobile-nav">
           <Link
-            to="/featured"
+            to="/products?category=featured"
             className="mobile-nav-link"
             onClick={closeMobileMenu}
           >
             Featured
           </Link>
-          <Link to="/men" className="mobile-nav-link" onClick={closeMobileMenu}>
+          <Link
+            to="/products?category=men"
+            className="mobile-nav-link"
+            onClick={closeMobileMenu}
+          >
             Men
           </Link>
           <Link
-            to="/women"
+            to="/products?category=women"
             className="mobile-nav-link"
             onClick={closeMobileMenu}
           >
             Women
           </Link>
-          <Link to="/kid" className="mobile-nav-link" onClick={closeMobileMenu}>
+          <Link
+            to="/products?category=kid"
+            className="mobile-nav-link"
+            onClick={closeMobileMenu}
+          >
             Kid
           </Link>
           <Link
-            to="/equipment"
+            to="/products?category=equipment"
             className="mobile-nav-link"
             onClick={closeMobileMenu}
           >
             Equipment
           </Link>
           <Link
-            to="/emergency"
+            to="/products?category=emergency-packs"
             className="mobile-nav-link"
             onClick={closeMobileMenu}
           >

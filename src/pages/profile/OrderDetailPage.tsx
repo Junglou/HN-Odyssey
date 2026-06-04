@@ -5,7 +5,7 @@ import OrderDetail from "../../components/profile/OrderDetail/OrderDetail";
 import { useOrderDetail } from "../../hooks/profile/useOrderDetail";
 
 const OrderDetailPage = () => {
-  const { orderId = "" } = useParams<{ orderId: string }>();
+  const { id: orderId = "" } = useParams<{ id: string }>();
   const { order, loading, refresh } = useOrderDetail(orderId);
 
   return (

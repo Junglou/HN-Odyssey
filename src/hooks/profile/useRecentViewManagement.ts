@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axios from "axios";
+import axiosClient from "../../api/axiosClient"; // SỬ DỤNG AXIOS CLIENT
 import type { Product } from "../../types/product";
 import tokenStorage from "../../utils/tokenStorage";
 import {
@@ -16,9 +17,15 @@ const MAX_RECENT_ITEMS = 12;
 
 const OBJECT_ID_RE = /^[a-fA-F0-9]{24}$/;
 
+// Dùng cho User ID (vẫn giữ nguyên sự nghiêm ngặt)
 export const isValidMongoObjectId = (
   value: string | undefined | null,
 ): boolean => !!value && OBJECT_ID_RE.test(value);
+
+// FIX 1: Thêm hàm kiểm tra linh hoạt cho Sản phẩm (Chấp nhận cả Mongo ID và Slug)
+export const isValidProductIdentifier = (
+  value: string | undefined | null,
+): boolean => !!value && value.trim().length > 0;
 
 const getOrCreateSessionId = (): string => {
   const existing = localStorage.getItem(SESSION_KEY);
@@ -39,7 +46,8 @@ const readStoredRecentViews = (): Product[] => {
     if (!raw) return [];
     const parsed = JSON.parse(raw) as Product[];
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item) => isValidMongoObjectId(item?.id));
+    // Sử dụng hàm kiểm tra mới
+    return parsed.filter((item) => isValidProductIdentifier(item?.id));
   } catch {
     return [];
   }
@@ -52,15 +60,15 @@ const writeStoredRecentViews = (items: Product[]) => {
   );
 };
 
-/** Remember a product id from a product-detail visit (valid MongoDB id only). */
 export const rememberLastViewedProductId = (productId: string) => {
-  if (!isValidMongoObjectId(productId)) return;
+  // Sử dụng hàm kiểm tra mới để cho phép lưu Slug
+  if (!isValidProductIdentifier(productId)) return;
   sessionStorage.setItem(LAST_VIEWED_PRODUCT_KEY, productId);
 };
 
-/** Persist a product the user viewed (valid MongoDB id only). */
 export const recordRecentViewProduct = (product: Product) => {
-  if (!isValidMongoObjectId(product.id)) return;
+  // Sử dụng hàm kiểm tra mới
+  if (!isValidProductIdentifier(product.id)) return;
 
   const next = [
     product,
@@ -124,7 +132,8 @@ export function useRecentViewManagement() {
 
   const syncRecentViewProductById = useCallback(
     async (productId: string) => {
-      if (!isValidMongoObjectId(productId)) return;
+      // Dùng hàm kiểm tra mới
+      if (!isValidProductIdentifier(productId)) return;
 
       const existing = readStoredRecentViews().find(
         (item) => item.id === productId,
@@ -136,7 +145,9 @@ export function useRecentViewManagement() {
       }
 
       try {
-        const res = await axios.get(`${API_URL}/products/${productId}`);
+        // FIX 2: Đổi từ axios.get thành axiosClient.get để nối đúng Base URL (/api)
+        // LƯU Ý: Nếu backend của bạn dùng prefix store, hãy đổi thành `/products/store/${productId}`
+        const res = await axiosClient.get(`/products/${productId}`);
         const raw = (res.data?.data ?? res.data) as {
           _id?: string;
           id?: string;
@@ -190,11 +201,26 @@ export function useRecentViewManagement() {
 
   useEffect(() => {
     const pendingId = sessionStorage.getItem(LAST_VIEWED_PRODUCT_KEY);
-    if (!pendingId || !isValidMongoObjectId(pendingId)) return;
+    // Dùng hàm kiểm tra mới
+    if (!pendingId || !isValidProductIdentifier(pendingId)) return;
     sessionStorage.removeItem(LAST_VIEWED_PRODUCT_KEY);
     void syncRecentViewProductById(pendingId);
   }, [syncRecentViewProductById]);
 
+  const removeRecentItem = useCallback(
+    async (productId: string) => {
+      const stored = readStoredRecentViews();
+      const next = stored.filter(
+        (item) => String(item.id) !== String(productId),
+      );
+      writeStoredRecentViews(next);
+      await fetchRecentView(); // Refresh lại danh sách hiển thị
+      toast.success("Đã xóa khỏi danh sách vừa xem");
+    },
+    [fetchRecentView],
+  );
+
+  // ... (Phần clearRecentView và return giữ nguyên)
   const clearRecentView = async () => {
     writeStoredRecentViews([]);
     setTotalFiltered(0);
@@ -239,5 +265,6 @@ export function useRecentViewManagement() {
     refresh: fetchRecentView,
     recordRecentViewProduct,
     syncRecentViewProductById,
+    removeRecentItem,
   };
 }

@@ -1,1 +1,29 @@
 @import "../../ProfileModal/profileModal.shared.css";
+
+/* --- Checkbox Styling (Default Address) --- */
+.um-form-group.um-checkbox-group {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start; /* Đã sửa thành flex-start để ép sát lề trái */
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+/* Các đoạn CSS dưới của checkbox bạn vẫn giữ nguyên không cần thay đổi */
+.um-form-group.um-checkbox-group input[type="checkbox"].um-checkbox-input {
+  width: 1.2rem;
+  height: 1.2rem;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  accent-color: #000;
+}
+
+.um-form-group.um-checkbox-group .um-checkbox-label {
+  margin: 0;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+  width: auto;
+}

@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-// 1. THÊM IMPORT useSearchParams
 import { useSearchParams } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
 import tokenStorage from "../../utils/tokenStorage";
@@ -118,9 +117,16 @@ export type CategoryTab = {
 };
 
 export function useProductList() {
-  // 2. LẤY KEYWORD TỪ URL
   const [searchParams] = useSearchParams();
   const keyword = searchParams.get("keyword") || "";
+  const categoryFromUrl = searchParams.get("category") || "all";
+  const filterFromUrl = searchParams.get("filter");
+
+  // 1. NHẬN DIỆN THÔNG MINH KEYWORD ĐỂ CHUYỂN THÀNH STATE BỘ LỌC (SORT)
+  const normalizedKeyword = keyword.trim().toLowerCase();
+  let initialSort = "Newest";
+  if (normalizedKeyword === "trending") initialSort = "Trending";
+  else if (normalizedKeyword === "new arrivals") initialSort = "Newest";
 
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage] = useState<number>(12);
@@ -128,11 +134,15 @@ export function useProductList() {
   const [tabs, setTabs] = useState<CategoryTab[]>([
     { name: "All", slug: "all" },
   ]);
-  const [activeTabSlug, setActiveTabSlug] = useState<string>("all");
 
-  const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
+  const [activeTabSlug, setActiveTabSlug] = useState<string>(categoryFromUrl);
+  const [selectedFilters, setSelectedFilters] = useState<string[]>(
+    filterFromUrl ? [filterFromUrl] : [],
+  );
   const [priceRange, setPriceRange] = useState<[number, number] | null>(null);
-  const [sortValue, setSortValue] = useState<string>("Newest");
+
+  // 2. TỰ ĐỘNG GÁN GIÁ TRỊ BAN ĐẦU CHO DROPDOWN BỘ LỌC
+  const [sortValue, setSortValue] = useState<string>(initialSort);
 
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [filterSections, setFilterSections] = useState<FilterSection[]>([]);
@@ -141,7 +151,22 @@ export function useProductList() {
   const [totalItems, setTotalItems] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // 3. TỰ ĐỘNG RESET VỀ TRANG 1 KHI USER TÌM TỪ KHÓA MỚI
+  // 3. ĐỒNG BỘ URL VÀ GIAO DIỆN BỘ LỌC MỖI KHI CLICK CHUYỂN TRANG
+  useEffect(() => {
+    const cat = searchParams.get("category") || "all";
+    setActiveTabSlug(cat);
+
+    // Xử lý tự động tick/bỏ tick khi URL thay đổi
+    const filter = searchParams.get("filter");
+    if (filter) {
+      setSelectedFilters([filter]);
+    } else {
+      setSelectedFilters([]);
+    }
+
+    setCurrentPage(1);
+  }, [searchParams]);
+
   useEffect(() => {
     setCurrentPage(1);
   }, [keyword]);
@@ -174,10 +199,19 @@ export function useProductList() {
           limit: itemsPerPage,
         };
 
-        if (keyword) params.keyword = keyword;
+        // 4. CHẶN GỬI "TRENDING" / "NEW ARRIVALS" THÀNH CHUỖI TÌM KIẾM ĐỂ TRÁNH LỖI 0 KẾT QUẢ
+        const currentNormalizedKw = keyword.trim().toLowerCase();
+        const isSpecialSortKeyword =
+          currentNormalizedKw === "trending" ||
+          currentNormalizedKw === "new arrivals";
+
+        if (keyword && !isSpecialSortKeyword) {
+          params.keyword = keyword;
+        }
+
         if (activeTabSlug !== "all") params.categorySlug = activeTabSlug;
 
-        // Bổ sung mapping cho Trending
+        // Bắt giá trị Sort hiện tại để API xử lý
         if (sortValue === "Trending") params.sort = "trending";
         else if (sortValue === "Price: Low to High") params.sort = "price_asc";
         else if (sortValue === "Price: High to Low") params.sort = "price_desc";
@@ -293,21 +327,17 @@ export function useProductList() {
         if (shouldShowBanners && bannerRes?.data?.data?.length > 0) {
           const fetchedBanners = bannerRes.data.data;
 
-          // Trộn và bốc ngẫu nhiên 2 banner từ API
           const randomBanners = [...fetchedBanners]
             .sort(() => 0.5 - Math.random())
             .slice(0, 2);
 
-          // THỦ THUẬT: Khai báo các "Cặp hình dáng" có tổng số ô chia hết cho 4
-          // horizontal (2 ô), vertical (2 ô), square (4 ô)
           const shapePairs = [
-            ["horizontal", "horizontal"], // Tổng = 4 ô
-            ["vertical", "vertical"], // Tổng = 4 ô
-            ["horizontal", "vertical"], // Tổng = 4 ô
-            ["square", "square"], // Tổng = 8 ô
+            ["horizontal", "horizontal"],
+            ["vertical", "vertical"],
+            ["horizontal", "vertical"],
+            ["square", "square"],
           ];
 
-          // Bốc ngẫu nhiên 1 cặp hình dáng
           const selectedPair =
             shapePairs[Math.floor(Math.random() * shapePairs.length)];
 
@@ -318,7 +348,6 @@ export function useProductList() {
               title: b.title || "Ưu đãi đặc biệt",
               subtitle: "Khám phá ngay các ưu đãi hấp dẫn dành riêng cho bạn.",
               btnText: "Khám phá",
-              // Gán hình dáng từ cặp đã bốc (Nếu API chỉ trả 1 banner thì lấy cái đầu tiên của cặp)
               shape: (selectedPair[index] || "square") as
                 | "square"
                 | "horizontal"
@@ -349,7 +378,7 @@ export function useProductList() {
     selectedFilters,
     priceRange,
     sortValue,
-    keyword, // 5. QUAN TRỌNG: Nạp keyword vào mảng dependency để tự gọi lại API khi keyword đổi
+    keyword,
   ]);
 
   const mixedItems = useMemo(() => {
@@ -357,9 +386,7 @@ export function useProductList() {
 
     const mixed: GridItem[] = [...products];
 
-    // Chèn banner vào vị trí ngẫu nhiên
     banners.forEach((banner) => {
-      // Chừa 2 ô đầu tiên cho sản phẩm
       const minPos = Math.min(2, mixed.length);
       const maxPos = mixed.length;
 
@@ -368,7 +395,6 @@ export function useProductList() {
       mixed.splice(randomPos, 0, banner);
     });
 
-    // Css grid-auto-flow: dense sẽ tự hút sản phẩm lấp vào mọi khoảng trống!
     return mixed;
   }, [products, banners]);
 

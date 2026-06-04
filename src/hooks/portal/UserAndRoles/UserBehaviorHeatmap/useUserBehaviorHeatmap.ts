@@ -1,18 +1,17 @@
 import { useState, useEffect } from "react";
 import axiosClient from "../../../../api/axiosClient";
 
-export type DeviceType = "Desktop" | "Mobile" | "Tablet";
+export type DeviceType = "ALL" | "Desktop" | "Mobile" | "Tablet";
 export type InteractionType = string;
 
 export function useUserBehaviorHeatmap() {
-  // State filter
-  const [selectedPage, setSelectedPage] = useState<string>("");
-  const [device, setDevice] = useState<DeviceType>("Desktop");
-  const [interactionType, setInteractionType] = useState<InteractionType>("");
+  const [selectedPage, setSelectedPage] = useState<string>("ALL");
+  const [device, setDevice] = useState<DeviceType>("ALL");
+  const [interactionType, setInteractionType] =
+    useState<InteractionType>("ALL");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
-  // State lưu danh sách options động từ BE
   const [pageOptions, setPageOptions] = useState<
     { label: string; value: string }[]
   >([]);
@@ -24,7 +23,6 @@ export function useUserBehaviorHeatmap() {
     duration: "0s",
   });
 
-  // Gọi API lấy danh sách Filters động ngay khi vào trang
   useEffect(() => {
     const fetchFilters = async () => {
       try {
@@ -33,12 +31,12 @@ export function useUserBehaviorHeatmap() {
         );
         const data = response.data?.data || response.data;
 
-        if (data.pages) setPageOptions(data.pages);
-        if (data.interactions) setInteractionOptions(data.interactions);
-
-        if (data.pages?.length > 0) setSelectedPage(data.pages[0].value);
-        if (data.interactions?.length > 0)
-          setInteractionType(data.interactions[0]);
+        if (data.pages) {
+          setPageOptions([{ label: "ALL", value: "ALL" }, ...data.pages]);
+        }
+        if (data.interactions) {
+          setInteractionOptions(["ALL", ...data.interactions]);
+        }
       } catch (error) {
         console.error("Lỗi khi lấy filters:", error);
       }
@@ -46,7 +44,6 @@ export function useUserBehaviorHeatmap() {
     fetchFilters();
   }, []);
 
-  // Tự động gọi API số liệu khi các filter thay đổi
   useEffect(() => {
     if (!selectedPage || !interactionType) return;
 
@@ -54,18 +51,17 @@ export function useUserBehaviorHeatmap() {
       try {
         setStats({ visits: "...", clicks: "...", duration: "..." });
 
-        const queryParams: Record<string, string> = {
-          page: selectedPage,
-          device: device,
-          interaction_type: interactionType,
-        };
+        const queryParams: Record<string, string> = {};
+
+        if (selectedPage !== "ALL") queryParams.page = selectedPage;
+        if (device !== "ALL") queryParams.device = device;
+        if (interactionType !== "ALL")
+          queryParams.interaction_type = interactionType;
 
         if (startDate) queryParams.start_date = startDate;
         if (endDate) queryParams.end_date = endDate;
 
         if (startDate && endDate) {
-          queryParams.start_date = startDate;
-          queryParams.end_date = endDate;
           queryParams.time_filter = "CUSTOM";
         }
 
@@ -85,8 +81,7 @@ export function useUserBehaviorHeatmap() {
             ? `${Math.floor(data.avg_duration_seconds / 60)}m ${data.avg_duration_seconds % 60}s`
             : data?.avg_duration || "0s",
         });
-      } catch (error) {
-        console.error("Lỗi khi lấy dữ liệu User Behavior Heatmap:", error);
+      } catch {
         setStats({ visits: "0", clicks: "0", duration: "0s" });
       }
     };

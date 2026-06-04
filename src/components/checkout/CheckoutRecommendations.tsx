@@ -1,4 +1,5 @@
 // imports
+import { useNavigate } from "react-router-dom"; // 1. Thêm import
 import type { CheckoutItem } from "../../hooks/checkout/useCheckout";
 import "./CheckoutRecommendations.css";
 
@@ -11,6 +12,8 @@ interface CheckoutRecommendationsProps {
 export default function CheckoutRecommendations({
   items,
 }: CheckoutRecommendationsProps) {
+  const navigate = useNavigate(); // 2. Khởi tạo navigate
+
   // render
   return (
     <div className="checkout-recommend-container">
@@ -18,7 +21,12 @@ export default function CheckoutRecommendations({
 
       <div className="checkout-recommend-list">
         {items.map((item) => (
-          <div key={item.id} className="checkout-recommend-card">
+          <div
+            key={item.id}
+            className="checkout-recommend-card"
+            onClick={() => navigate(`/products/${item.slug || item.id}`)} // 3. Gắn click chuyển trang
+            style={{ cursor: "pointer" }}
+          >
             <div className="checkout-recommend-img-box">
               <img src={item.image} alt={item.name} />
             </div>
