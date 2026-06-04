@@ -8,4 +8,5 @@ export interface Product {
   variantId?: string | null;
   sku?: string;
   hasVariants?: boolean;
+  slug?: string;
 }

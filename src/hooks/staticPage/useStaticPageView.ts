@@ -1,43 +1,26 @@
-// imports
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
+import axiosClient from "../../api/axiosClient";
 
-// interfaces
 export interface StaticPageData {
   title: string;
   content: string;
 }
 
-// mock data
-const MOCK_DB: Record<string, StaticPageData> = {
-  "shipping-policy": {
-    title: "Shipping Policy",
-    content:
-      "<h2>Chính sách giao hàng</h2><p>Đơn hàng sẽ được xử lý trong vòng 24h. Hình ảnh minh họa:</p><img src='https://placehold.co/800x400/png?text=Shipping+Banner' alt='Shipping' />",
-  },
-  faqs: {
-    title: "Frequently Asked Questions",
-    content:
-      "<h2>Câu hỏi thường gặp</h2><ul><li><strong>Hàng bao lâu thì tới?</strong> Thường là 3-5 ngày.</li><li><strong>Có được kiểm tra hàng không?</strong> Có, bạn được phép đồng kiểm.</li></ul>",
-  },
-  about: {
-    title: "About Us",
-    content:
-      "<h2>Về H&N Odyssey</h2><p>Chúng tôi là đội ngũ đam mê công nghệ và khám phá. Dưới đây là bảng thông tin:</p><table border='1'><tr><th>Năm</th><th>Thành tựu</th></tr><tr><td>2026</td><td>Ra mắt website</td></tr></table>",
-  },
-};
+interface ApiResponse {
+  success: boolean;
+  message: string;
+  data: StaticPageData;
+}
 
-// hook
 export function useStaticPageView() {
-  // hooks/states
   const { slug } = useParams<{ slug: string }>();
   const [data, setData] = useState<StaticPageData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // side effects
   useEffect(() => {
-    const fetchPageData = () => {
+    const fetchPageData = async () => {
       setIsLoading(true);
       setError(null);
       setData(null);
@@ -45,28 +28,34 @@ export function useStaticPageView() {
       if (!slug) {
         setError("Không tìm thấy đường dẫn.");
         setIsLoading(false);
-        return null;
+        return;
       }
 
-      const fetchTimer = setTimeout(() => {
-        const foundPage = MOCK_DB[slug];
+      try {
+        // Lấy dữ liệu trang tĩnh từ API public
+        const response = await axiosClient.get<ApiResponse>(
+          `/marketing/content/public/pages/${slug}`,
+        );
 
-        if (foundPage) {
-          setData(foundPage);
+        if (response.data && response.data.data) {
+          setData(response.data.data);
         } else {
-          setError("Trang bạn tìm kiếm không tồn tại hoặc đã bị gỡ bỏ.");
+          setError("Dữ liệu trang không hợp lệ.");
         }
+      } catch (err: unknown) {
+        // Xử lý lỗi an toàn, tránh sử dụng kiểu any
+        const errorObj = err as { message?: string };
+        const errorMessage =
+          errorObj.message ||
+          "Trang bạn tìm kiếm không tồn tại hoặc đã bị gỡ bỏ.";
+        setError(errorMessage);
+      } finally {
         setIsLoading(false);
-      }, 800);
-      return fetchTimer;
-    };
-
-    const timerId = fetchPageData();
-    return () => {
-      if (timerId) {
-        clearTimeout(timerId);
       }
     };
+
+    // Khởi chạy hàm lấy dữ liệu
+    void fetchPageData();
   }, [slug]);
 
   return {

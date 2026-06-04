@@ -1,24 +1,26 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
-import axios from "axios";
+import axiosClient from "../../api/axiosClient";
 import type { UserAddress } from "../../types/user";
-import type { AddressFormData } from "../../components/profile/AddressManagement/AddressModal/AddressModal";
-import {
-  type CustomerAddressApiResponse,
-  mapCustomerAddressFromApi,
-  mapFormDataToCreatePayload,
-  mapFormDataToUpdatePayload,
-} from "../../utils/mapCustomerAddress";
-import tokenStorage from "../../utils/tokenStorage";
+import { mapCustomerAddressFromApi } from "../../utils/mapCustomerAddress";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+// Định nghĩa cấu trúc dữ liệu địa lý của GHN
+export interface LocationItem {
+  code: string;
+  name: string;
+  name_with_type?: string;
+}
 
-const getAuthHeaders = () => {
-  const token = tokenStorage.getToken();
-  return {
-    headers: { Authorization: token ? `Bearer ${token}` : undefined },
-  };
-};
+// Định nghĩa State cho Form theo chuẩn Backend DTO (AC1, AC2, AC3)
+export interface AddressFormState {
+  name: string;
+  phone: string;
+  street: string;
+  provinceCode: string;
+  districtCode: string;
+  wardCode: string;
+  isDefault: boolean;
+}
 
 type ModalMode = "add" | "edit" | "view";
 
@@ -27,6 +29,13 @@ interface ModalConfig {
   mode: ModalMode;
   editingAddress: UserAddress | null;
   editingIndex: number | null;
+}
+
+// Chuẩn hóa Error từ interceptor trả về để né strict 'any' của ESLint
+interface NormalizedError {
+  status?: number;
+  message?: string;
+  data?: unknown;
 }
 
 export function useAddressManagement() {
@@ -40,12 +49,27 @@ export function useAddressManagement() {
     editingIndex: null,
   });
 
+  // States quản lý Dropdown địa lý GHN
+  const [provinces, setProvinces] = useState<LocationItem[]>([]);
+  const [districts, setDistricts] = useState<LocationItem[]>([]);
+  const [wards, setWards] = useState<LocationItem[]>([]);
+
+  // Controlled State quản lý Form Data
+  const [formData, setFormData] = useState<AddressFormState>({
+    name: "",
+    phone: "",
+    street: "",
+    provinceCode: "",
+    districtCode: "",
+    wardCode: "",
+    isDefault: false,
+  });
+
+  // --- GET ADDRESSES ---
   const fetchAddresses = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_URL}/users/addresses`, {
-        ...getAuthHeaders(),
-      });
+      const res = await axiosClient.get("/users/addresses");
 
       const payload = res.data;
       const list = Array.isArray(payload?.data)
@@ -54,24 +78,12 @@ export function useAddressManagement() {
           ? payload
           : [];
 
-      const mapped = (list as CustomerAddressApiResponse[]).map(
-        mapCustomerAddressFromApi,
-      );
-
+      const mapped = list.map(mapCustomerAddressFromApi);
       setAddresses(mapped);
-    } catch (err: unknown) {
+    } catch (error: unknown) {
+      const err = error as NormalizedError;
       console.error("Không thể tải địa chỉ:", err);
-      if (axios.isAxiosError(err)) {
-        const msg =
-          (err.response?.data as { message?: string })?.message ||
-          err.message ||
-          "Lỗi khi tải địa chỉ";
-        toast.error(msg);
-      } else if (err instanceof Error && err.message) {
-        toast.error(err.message);
-      } else {
-        toast.error("Không thể tải địa chỉ.");
-      }
+      toast.error(err.message || "Đã xảy ra lỗi khi tải sổ địa chỉ.");
       setAddresses([]);
     } finally {
       setLoading(false);
@@ -82,11 +94,71 @@ export function useAddressManagement() {
     void fetchAddresses();
   }, [fetchAddresses]);
 
+  // --- GHN LOGIC: FETCH PROVINCES ---
+  useEffect(() => {
+    axiosClient
+      .get("/shipping/locations/provinces")
+      .then((res) => setProvinces(res.data || []))
+      .catch(console.error);
+  }, []);
+
+  // --- GHN LOGIC: FETCH DISTRICTS KHI PROVINCE THAY ĐỔI ---
+  useEffect(() => {
+    if (formData.provinceCode) {
+      axiosClient
+        .get(`/shipping/locations/districts/${formData.provinceCode}`)
+        .then((res) => setDistricts(res.data || []))
+        .catch(() => setDistricts([]));
+    } else {
+      setDistricts([]);
+      setWards([]);
+    }
+  }, [formData.provinceCode]);
+
+  // --- GHN LOGIC: FETCH WARDS KHI DISTRICT THAY ĐỔI ---
+  useEffect(() => {
+    if (formData.districtCode) {
+      axiosClient
+        .get(`/shipping/locations/wards/${formData.districtCode}`)
+        .then((res) => setWards(res.data || []))
+        .catch(() => setWards([]));
+    } else {
+      setWards([]);
+    }
+  }, [formData.districtCode]);
+
+  // --- HANDLERS ---
+  const handleChange = (
+    field: keyof AddressFormState,
+    value: string | boolean,
+  ) => {
+    setFormData((prev) => {
+      const newData = { ...prev, [field]: value };
+      // Logic reset chuỗi dữ liệu (hệ quả kéo theo) khi đổi địa điểm gốc
+      if (field === "provinceCode") {
+        newData.districtCode = "";
+        newData.wardCode = "";
+      } else if (field === "districtCode") {
+        newData.wardCode = "";
+      }
+      return newData;
+    });
+  };
+
   const closeModal = () => {
     setModalConfig((prev) => ({ ...prev, isOpen: false }));
   };
 
   const openAddModal = () => {
+    setFormData({
+      name: "",
+      phone: "",
+      street: "",
+      provinceCode: "",
+      districtCode: "",
+      wardCode: "",
+      isDefault: addresses.length === 0, // Dựa theo rule backend (AC5): nếu danh sách trống, ép thành mặc định
+    });
     setModalConfig({
       isOpen: true,
       mode: "add",
@@ -98,6 +170,16 @@ export function useAddressManagement() {
   const openEditModal = (index: number) => {
     const address = addresses[index];
     if (!address) return;
+
+    setFormData({
+      name: address.receiverName,
+      phone: address.phone, // Đã lấy ở fetch
+      street: address.address,
+      provinceCode: address.cityCode,
+      districtCode: address.districtCode,
+      wardCode: address.wardCode,
+      isDefault: address.isDefault,
+    });
 
     setModalConfig({
       isOpen: true,
@@ -111,6 +193,16 @@ export function useAddressManagement() {
     const address = addresses[index];
     if (!address) return;
 
+    setFormData({
+      name: address.receiverName,
+      phone: address.phone,
+      street: address.address,
+      provinceCode: address.cityCode,
+      districtCode: address.districtCode,
+      wardCode: address.wardCode,
+      isDefault: address.isDefault,
+    });
+
     setModalConfig({
       isOpen: true,
       mode: "view",
@@ -119,13 +211,44 @@ export function useAddressManagement() {
     });
   };
 
-  const handleModalSubmit = async (data: AddressFormData) => {
+  const handleModalSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    // 1. Validation Null
+    if (
+      !formData.name.trim() ||
+      !formData.street.trim() ||
+      !formData.provinceCode ||
+      !formData.districtCode ||
+      !formData.wardCode
+    ) {
+      toast.warning("Vui lòng điền đầy đủ các thông tin bắt buộc (*)");
+      return;
+    }
+
+    // 2. Validation SĐT chuẩn nhà mạng VN (Theo AC3 CreateAddressDto)
+    const phoneRegex = /^(0[3|5|7|8|9])+([0-9]{8})$/;
+    if (!phoneRegex.test(formData.phone)) {
+      toast.warning(
+        "Số điện thoại không hợp lệ (Phải là 10 số và bắt đầu bằng đầu số VN).",
+      );
+      return;
+    }
+
+    setLoading(true);
     try {
+      const payload = {
+        name: formData.name.trim(),
+        phone: formData.phone.trim(),
+        street: formData.street.trim(),
+        city_code: formData.provinceCode,
+        district_code: formData.districtCode,
+        ward_code: formData.wardCode,
+        is_default: formData.isDefault,
+      };
+
       if (modalConfig.mode === "add") {
-        const body = mapFormDataToCreatePayload(data);
-        const res = await axios.post(`${API_URL}/users/addresses`, body, {
-          ...getAuthHeaders(),
-        });
+        const res = await axiosClient.post("/users/addresses", payload);
         toast.success(
           (res.data as { message?: string })?.message ||
             "Thêm địa chỉ mới thành công!",
@@ -134,35 +257,24 @@ export function useAddressManagement() {
         modalConfig.mode === "edit" &&
         modalConfig.editingAddress?.id
       ) {
-        const body = mapFormDataToUpdatePayload(
-          data,
-          modalConfig.editingAddress,
-        );
-        const res = await axios.patch(
-          `${API_URL}/users/addresses/${modalConfig.editingAddress.id}`,
-          body,
-          { ...getAuthHeaders() },
+        const res = await axiosClient.patch(
+          `/users/addresses/${modalConfig.editingAddress.id}`,
+          payload,
         );
         toast.success(
           (res.data as { message?: string })?.message ||
             "Cập nhật địa chỉ thành công!",
         );
       }
+
       closeModal();
       await fetchAddresses();
-    } catch (err: unknown) {
+    } catch (error: unknown) {
+      const err = error as NormalizedError;
       console.error("Lỗi lưu địa chỉ:", err);
-      if (axios.isAxiosError(err)) {
-        const msg =
-          (err.response?.data as { message?: string })?.message ||
-          err.message ||
-          "Không thể lưu địa chỉ";
-        toast.error(msg);
-      } else if (err instanceof Error && err.message) {
-        toast.error(err.message);
-      } else {
-        toast.error("Không thể lưu địa chỉ.");
-      }
+      toast.error(err.message || "Không thể lưu địa chỉ.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -170,29 +282,23 @@ export function useAddressManagement() {
     const target = addresses[index];
     if (!target?.id) return;
 
+    // Backend (AC7): Không cho phép xóa địa chỉ mặc định
+    if (target.isDefault) {
+      toast.warning("Không thể xóa địa chỉ đang được đặt làm mặc định.");
+      return;
+    }
+
     try {
-      const res = await axios.delete(
-        `${API_URL}/users/addresses/${target.id}`,
-        { ...getAuthHeaders() },
-      );
+      const res = await axiosClient.delete(`/users/addresses/${target.id}`);
       toast.success(
         (res.data as { message?: string })?.message ||
           "Đã xóa địa chỉ thành công!",
       );
       await fetchAddresses();
-    } catch (err: unknown) {
+    } catch (error: unknown) {
+      const err = error as NormalizedError;
       console.error("Lỗi xóa địa chỉ:", err);
-      if (axios.isAxiosError(err)) {
-        const msg =
-          (err.response?.data as { message?: string })?.message ||
-          err.message ||
-          "Không thể xóa địa chỉ";
-        toast.error(msg);
-      } else if (err instanceof Error && err.message) {
-        toast.error(err.message);
-      } else {
-        toast.error("Không thể xóa địa chỉ.");
-      }
+      toast.error(err.message || "Không thể xóa địa chỉ.");
     }
   };
 
@@ -200,12 +306,17 @@ export function useAddressManagement() {
     addresses,
     loading,
     modalConfig,
+    formData,
+    provinces,
+    districts,
+    wards,
     closeModal,
     openAddModal,
     openEditModal,
     openViewModal,
     handleModalSubmit,
     deleteAddress,
+    handleChange,
     refresh: fetchAddresses,
   };
 }

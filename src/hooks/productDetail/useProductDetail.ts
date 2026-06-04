@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
+import { recordRecentViewProduct } from "../profile/useRecentViewManagement";
 
 // --- HÀM XỬ LÝ ẢNH CHUẨN HOÁ TỪ BACKEND ---
 const getFullImageUrl = (url?: string): string => {
@@ -253,6 +254,14 @@ export function useProductDetail() {
         };
 
         setProduct(formattedProduct);
+
+        recordRecentViewProduct({
+          id: beData._id,
+          name: beData.name,
+          description: formattedProduct.desc,
+          price: formattedProduct.price,
+          image: uiImages[0] || "",
+        });
 
         // TÌM BIẾN THỂ CÓ ẢNH TRÙNG VỚI ẢNH THUMBNAIL CỦA SẢN PHẨM MẸ
         let defaultVariant = null;

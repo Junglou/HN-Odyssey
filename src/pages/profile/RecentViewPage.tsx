@@ -5,7 +5,7 @@ import { useRecentViewManagement } from "../../hooks/profile/useRecentViewManage
 import { useRecommendProduct } from "../../hooks/profile/useRecommendProduct";
 
 const RecentViewPage = () => {
-  const { recentView, loading, pagination, actions } =
+  const { recentView, loading, pagination, actions, removeRecentItem } =
     useRecentViewManagement();
   const { products: recommendations } = useRecommendProduct();
 
@@ -22,6 +22,7 @@ const RecentViewPage = () => {
           loading={loading}
           pagination={pagination}
           onPageChange={(p) => actions.changePage(p)}
+          onRemoveItem={removeRecentItem}
         />
       </div>
     </div>

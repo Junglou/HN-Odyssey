@@ -61,7 +61,23 @@ const PortalLayout = () => {
   const location = useLocation();
 
   // Menu States
-  const { notifications, unreadCount, markAsRead } = usePortalNotifications();
+  const {
+    notifications,
+    unreadCount,
+    markAsReadAndNavigate,
+    hasMore,
+    isLoading,
+    loadMore,
+  } = usePortalNotifications();
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, clientHeight, scrollHeight } = e.currentTarget;
+    // Kích hoạt khi cuộn cách đáy 10px
+    if (scrollHeight - scrollTop <= clientHeight + 10) {
+      if (hasMore && !isLoading) {
+        loadMore();
+      }
+    }
+  };
   const [isUsersRolesOpen, setIsUsersRolesOpen] = useState(false);
   const [isProductCatalogOpen, setIsProductCatalogOpen] = useState(false);
   const [isCustomerCRMOpen, setIsCustomerCRMOpen] = useState(false);
@@ -642,7 +658,7 @@ const PortalLayout = () => {
             ✕
           </button>
         </div>
-        <div className="p-noti-body">
+        <div className="p-noti-body" onScroll={handleScroll}>
           {notifications.length === 0 ? (
             <div
               style={{ textAlign: "center", padding: "20px", color: "#666" }}
@@ -655,12 +671,14 @@ const PortalLayout = () => {
                 key={noti._id}
                 className={`p-noti-item ${!noti.is_read ? "unread" : ""}`}
                 onClick={() => {
+                  const targetUrl = noti.metadata?.target_url;
+
                   if (!noti.is_read) {
-                    markAsRead(noti._id);
+                    markAsReadAndNavigate(noti._id, targetUrl);
+                  } else if (targetUrl) {
+                    navigate(targetUrl);
                   }
-                  if (noti.metadata?.target_url) {
-                    navigate(noti.metadata.target_url);
-                  }
+
                   setIsNotiOpen(false);
                 }}
               >

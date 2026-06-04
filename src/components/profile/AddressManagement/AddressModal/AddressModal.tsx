@@ -1,91 +1,35 @@
-import { useEffect, useRef } from "react";
+import React from "react";
 import "./AddressModal.css";
 import { ProfileModalPortal } from "../../ProfileModal/ProfileModalPortal";
-import type { UserAddress } from "../../../../types/user";
-
-export type { UserAddress };
-
-// schema form để trả dữ liệu về component cha
-export interface AddressFormData {
-  receiverName: string;
-  address: string;
-  city: string;
-  country: string;
-}
+import type {
+  LocationItem,
+  AddressFormState,
+} from "../../../../hooks/profile/useAddressManagement";
 
 interface AddressModalProps {
   isOpen: boolean;
   mode: "add" | "edit" | "view";
-  initialData: UserAddress | null;
   onClose: () => void;
-  onSubmit: (data: AddressFormData) => void;
+  onSubmit: (e?: React.FormEvent) => void;
+  // Các props mới lấy từ hook truyền xuống
+  formData: AddressFormState;
+  provinces: LocationItem[];
+  districts: LocationItem[];
+  wards: LocationItem[];
+  onChange: (field: keyof AddressFormState, value: string | boolean) => void;
 }
 
-// modal form popup
 export default function AddressModal({
   isOpen,
   mode,
-  initialData,
   onClose,
   onSubmit,
+  formData,
+  provinces,
+  districts,
+  wards,
+  onChange,
 }: AddressModalProps) {
-  // khởi tạo state form; đồng bộ lại khi mở modal / initialData đổi (xem useEffect)
-  // (phiên bản hiện tại dùng uncontrolled input bằng refs để không dùng setFormData)
-  const receiverNameRef = useRef<HTMLInputElement | null>(null);
-  const addressRef = useRef<HTMLInputElement | null>(null);
-  const cityRef = useRef<HTMLInputElement | null>(null);
-  const countryRef = useRef<HTMLInputElement | null>(null);
-
-  // đổ form từ initialData mỗi khi mở modal hoặc initialData thay đổi
-  useEffect(() => {
-    if (!isOpen) return;
-
-    // Nếu là mode add, xóa các input
-    if (mode === "add") {
-      if (receiverNameRef.current) receiverNameRef.current.value = "";
-      if (addressRef.current) addressRef.current.value = "";
-      if (cityRef.current) cityRef.current.value = "";
-      if (countryRef.current) countryRef.current.value = "";
-      return;
-    }
-
-    // Nếu là mode edit hoặc view, populate dữ liệu từ initialData
-    if (!initialData) return;
-    if (receiverNameRef.current)
-      receiverNameRef.current.value = initialData.receiverName ?? "";
-    if (addressRef.current)
-      addressRef.current.value = initialData.address ?? "";
-    if (cityRef.current) cityRef.current.value = initialData.city ?? "";
-    if (countryRef.current)
-      countryRef.current.value = initialData.country ?? "";
-  }, [isOpen, initialData, mode]);
-
-  // validate trước khi trả data ra ngoài
-  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    const fd = new FormData(e.currentTarget);
-
-    const data: AddressFormData = {
-      receiverName: String(fd.get("receiverName") ?? ""),
-      address: String(fd.get("address") ?? ""),
-      city: String(fd.get("city") ?? ""),
-      country: String(fd.get("country") ?? ""),
-    };
-
-    // validate dữ liệu trước khi trả lên cha
-    if (
-      !data.receiverName?.trim() ||
-      !data.address?.trim() ||
-      !data.city?.trim() ||
-      !data.country?.trim()
-    ) {
-      alert("Please fill in all required fields (*)");
-      return;
-    }
-    onSubmit(data);
-  };
-
   if (!isOpen) return null;
 
   return (
@@ -99,78 +43,138 @@ export default function AddressModal({
               : "Address details"}
         </h2>
 
-        <form onSubmit={handleFormSubmit} className="um-modal-form">
-          {/* các field profile */}
+        {/* Form gọi thẳng hàm onSubmit của hook, hook sẽ lo việc preventDefault và validate */}
+        <form onSubmit={onSubmit} className="um-modal-form">
           <div className="um-form-group">
             <label>
               Receiver name <span className="req">*</span>
             </label>
             <input
-              name="receiverName"
+              name="name"
               type="text"
-              ref={receiverNameRef}
-              defaultValue={initialData?.receiverName ?? ""}
+              value={formData.name}
+              onChange={(e) => onChange("name", e.target.value)}
               placeholder="Receiver name"
+              disabled={mode === "view"}
               required
             />
           </div>
 
           <div className="um-form-group">
             <label>
-              Address <span className="req">*</span>
+              Phone number <span className="req">*</span>
             </label>
             <input
-              name="address"
+              name="phone"
               type="text"
-              ref={addressRef}
-              defaultValue={initialData?.address ?? ""}
-              placeholder="Address"
+              value={formData.phone}
+              onChange={(e) => onChange("phone", e.target.value)}
+              placeholder="09xx xxx xxx"
+              disabled={mode === "view"}
               required
             />
           </div>
 
           <div className="um-form-group">
             <label>
-              City <span className="req">*</span>
+              Street Address <span className="req">*</span>
             </label>
             <input
-              name="city"
+              name="street"
               type="text"
-              ref={cityRef}
-              defaultValue={initialData?.city ?? ""}
-              placeholder="City"
+              value={formData.street}
+              onChange={(e) => onChange("street", e.target.value)}
+              placeholder="House number, street name..."
+              disabled={mode === "view"}
               required
             />
           </div>
 
           <div className="um-form-group">
             <label>
-              Country <span className="req">*</span>
+              Province / City <span className="req">*</span>
             </label>
-            <input
-              name="country"
-              type="text"
-              ref={countryRef}
-              defaultValue={initialData?.country ?? ""}
-              placeholder="Country"
+            <select
+              value={formData.provinceCode}
+              onChange={(e) => onChange("provinceCode", e.target.value)}
+              disabled={mode === "view"}
               required
-            />
+            >
+              <option value="">Select Province / City</option>
+              {provinces.map((p) => (
+                <option key={p.code} value={p.code}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* cụm nút */}
+          <div className="um-form-group">
+            <label>
+              District <span className="req">*</span>
+            </label>
+            <select
+              value={formData.districtCode}
+              onChange={(e) => onChange("districtCode", e.target.value)}
+              disabled={mode === "view" || !formData.provinceCode}
+              required
+            >
+              <option value="">Select District</option>
+              {districts.map((d) => (
+                <option key={d.code} value={d.code}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="um-form-group">
+            <label>
+              Ward / Commune <span className="req">*</span>
+            </label>
+            <select
+              value={formData.wardCode}
+              onChange={(e) => onChange("wardCode", e.target.value)}
+              disabled={mode === "view" || !formData.districtCode}
+              required
+            >
+              <option value="">Select Ward / Commune</option>
+              {wards.map((w) => (
+                <option key={w.code} value={w.code}>
+                  {w.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Cụm Checkbox đã gỡ bỏ inline-style */}
+          <div className="um-form-group um-checkbox-group">
+            <input
+              type="checkbox"
+              id="isDefaultAddress"
+              className="um-checkbox-input"
+              checked={formData.isDefault}
+              onChange={(e) => onChange("isDefault", e.target.checked)}
+              disabled={mode === "view"}
+            />
+            <label htmlFor="isDefaultAddress" className="um-checkbox-label">
+              Set as default address
+            </label>
+          </div>
+
           <div className="um-modal-actions">
-            <>
+            {mode !== "view" && (
               <button type="submit" className="um-btn-modal-submit">
                 {mode === "add" ? "Add address" : "Save changes"}
               </button>
-              <button
-                type="button"
-                className="um-btn-modal-cancel"
-                onClick={onClose}
-              >
-                Cancel
-              </button>
-            </>
+            )}
+            <button
+              type="button"
+              className="um-btn-modal-cancel"
+              onClick={onClose}
+            >
+              {mode === "view" ? "Close" : "Cancel"}
+            </button>
           </div>
         </form>
       </div>

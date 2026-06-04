@@ -190,7 +190,14 @@ export default function BannerManagement({
                 className={`bm-dropdown-options ${isPositionOpen ? "open" : hasPositionOpened ? "closed" : ""}`}
               >
                 {(
-                  ["All", "Homepage Slider", "Category", "Promotion"] as const
+                  [
+                    "All",
+                    "Homepage Slider",
+                    "Category",
+                    "Promotion",
+                    "hero_banner",
+                    "category_showcase",
+                  ] as const
                 ).map((opt) => (
                   <div
                     key={opt}

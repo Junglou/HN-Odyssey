@@ -84,7 +84,8 @@
   margin-left: 2px;
 }
 
-.um-form-group input {
+.um-form-group input,
+.um-form-group select {
   width: 100%;
   padding: 12px 16px;
   border: 1px solid #d1d5db;
@@ -97,11 +98,13 @@
   transition: border-color 0.2s ease;
 }
 
-.um-form-group input:focus {
+.um-form-group input:focus,
+.um-form-group select:focus {
   border-color: #000000;
 }
 
-.um-form-group input:disabled {
+.um-form-group input:disabled,
+.um-form-group select:disabled {
   background-color: #f9fafb;
   color: #6b7280;
   cursor: not-allowed;
@@ -361,7 +364,8 @@
     font-size: 1.35rem;
   }
 
-  .um-form-group input {
+  .um-form-group input,
+  .um-form-group select {
     padding: 10px 14px;
     font-size: 0.9rem;
   }

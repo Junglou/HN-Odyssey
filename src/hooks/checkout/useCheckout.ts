@@ -6,6 +6,7 @@ import tokenStorage from "../../utils/tokenStorage";
 export interface CheckoutItem {
   id: string;
   sku?: string;
+  slug?: string;
   name: string;
   description: string;
   price: number;
@@ -59,6 +60,7 @@ interface ApiCartItem {
 
 interface ApiRecommendationItem {
   _id: string;
+  slug?: string;
   name: string;
   short_description?: string;
   variants?: Array<{ sale_price?: number; price?: number }>;
@@ -296,6 +298,7 @@ export function useCheckout() {
               .slice(0, 6)
               .map((p: ApiRecommendationItem) => ({
                 id: p._id,
+                slug: p.slug || "",
                 name: p.name,
                 description: p.short_description || "Sản phẩm gợi ý",
                 price:
@@ -347,7 +350,6 @@ export function useCheckout() {
 
     const FREESHIP_THRESHOLD_USD = 200;
 
-    // Nếu tổng tiền hàng >= 150$ thì set phí ship = 0 và ngưng gọi API
     if (summary.subtotal >= FREESHIP_THRESHOLD_USD) {
       setShippingFee(0);
       return;
@@ -371,14 +373,12 @@ export function useCheckout() {
       .catch(() => setShippingFee(0));
   }, [formData.provinceCode, formData.districtCode, items, summary.subtotal]);
 
-  // KHÔI PHỤC LẠI: TỰ ĐỘNG ÁP MÃ ĐỂ UI CLICK CHỌN HOẠT ĐỘNG
   useEffect(() => {
     if (!promoCode) {
       setVoucherDiscount(0);
       return;
     }
 
-    // Thời gian chờ nâng lên 0.8s để bớt call API khi đang gõ dở
     const timer = setTimeout(() => {
       if (summary.subtotal > 0) {
         axiosClient
@@ -580,7 +580,6 @@ export function useCheckout() {
     window.location.href = "/";
   };
 
-  // Vẫn xuất hàm này ra trong trường hợp sau này bạn muốn đổi sang cơ chế dùng Nút bấm.
   const handleApplyPromoCode = (inputCode: string) => {
     if (!inputCode || inputCode.trim() === "") {
       setVoucherDiscount(0);

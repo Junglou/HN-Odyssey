@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom"; // 1. Thêm import
 import "./RecommendationList.css";
 import type { Product } from "../../types/product";
 
@@ -10,12 +11,19 @@ const RecommendationList = ({
   title = "Recommend for you",
   products,
 }: RecommendationListProps) => {
+  const navigate = useNavigate(); // 2. Khởi tạo navigate
+
   return (
     <div className="recommendation-container">
       <h3 className="reco-title">{title}</h3>
       <div className="reco-list">
         {products.map((item) => (
-          <div key={item.id} className="reco-card">
+          <div
+            key={item.id}
+            className="reco-card"
+            onClick={() => navigate(`/products/${item.slug || item.id}`)} // 3. Gắn click chuyển trang
+            style={{ cursor: "pointer" }} // 4. Thêm hiệu ứng con trỏ chuột
+          >
             {/* Ảnh sản phẩm */}
             <img src={item.image} alt={item.name} className="reco-img" />
 

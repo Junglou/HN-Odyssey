@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 import axiosClient from "../../api/axiosClient";
 import tokenStorage from "../../utils/tokenStorage";
+import type { UserProfile } from "../../types/user";
 
 // 1. Tách riêng interface cho metadata để dùng chung, loại bỏ hoàn toàn "any"
 export interface MessageMetadata {
@@ -59,10 +60,10 @@ export function useChatSupport() {
 
     const initChatAndSocket = async () => {
       try {
-        const user = tokenStorage.getUser();
+        const user = tokenStorage.getUser<UserProfile>();
         const initPayload = {
           sessionId: sessionIdRef.current,
-          ...(user?.id && { customerId: user.id }),
+          ...(user?._id && { customerId: user._id }),
         };
 
         // Bước 1: Khởi tạo hoặc lấy lại phiên chat từ Backend
