@@ -211,13 +211,20 @@
   cursor: pointer;
   flex-shrink: 0;
   padding: 0;
+  outline: none;
   transition:
     transform 0.2s,
     box-shadow 0.2s;
 }
 
+.pdp-color-btn:focus,
+.pdp-color-btn:focus-visible {
+  outline: none;
+}
+
 .pdp-color-btn:hover {
   transform: scale(1.1);
+  border-color: #000000;
 }
 
 .pdp-color-btn.active {
@@ -239,25 +246,27 @@
   min-width: clamp(44px, 4vw, 72px);
   height: clamp(32px, 2.8vw, 44px);
   padding: 0 clamp(10px, 1.2vw, 18px);
-  background: #f3f4f6;
+  background: #ffffff;
   border-radius: 999px;
-  border: 1.5px solid transparent;
+  border: 1px solid #000000; /* viền ở mức tối thiểu 1px */
   font-size: clamp(12px, 1vw, 16px);
-  font-weight: 400;
-  color: #374151;
+  font-weight: 400; /* độ đậm chữ bình thường */
+  color: #000000;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .pdp-size-btn:hover {
-  background: #e5e7eb;
-  border-color: #9ca3af;
+  background: #f3f4f6;
+  border-color: #000000;
 }
 
 .pdp-size-btn.active {
-  background: #000000;
-  color: #ffffff;
-  border-color: #000000;
+  background: #ffffff;
+  color: #000000;
+  font-weight: 600; /* in đậm chữ khi chọn để tăng độ tương phản */
+  border: 2.5px solid #000000; /* viền tăng lên 3px để phân biệt rõ với 1px mặc định */
+  padding: 0 calc(clamp(10px, 1.2vw, 18px) - 2px); /* bù trừ 2px độ dày viền tăng thêm để không làm thay đổi kích thước tổng thể của nút */
 }
 
 /* quantity */

@@ -3,50 +3,24 @@ import {
   WarningAlertIcon,
   CheckCircleIcon,
 } from "../../../assets/icons/SystemIcons";
+import { useSystem } from "../../../hooks/portal/System/useSystem";
 
-const MOCK_PAYMENT_LOGS = [
-  {
-    id: 1,
-    time: "10:45 AM",
-    orderId: "#DH10025",
-    gateway: "VNPAY",
-    code: "99",
-    reason: "Khách hàng hủy giao dịch",
-    status: "User Error",
-  },
-  {
-    id: 2,
-    time: "10:30 AM",
-    orderId: "#DH10024",
-    gateway: "Momo",
-    code: "11",
-    reason: "Giao dịch Timeout (API Disconnected)",
-    status: "System Error",
-  },
-  {
-    id: 3,
-    time: "09:15 AM",
-    orderId: "#DH10021",
-    gateway: "VNPAY",
-    code: "97",
-    reason: "Sai Checksum / Chữ ký không hợp lệ",
-    status: "Critical",
-  },
-  {
-    id: 4,
-    time: "08:50 AM",
-    orderId: "#DH10018",
-    gateway: "ZaloPay",
-    code: "-49",
-    reason: "Khách hàng nhập sai OTP quá số lần",
-    status: "User Error",
-  },
-];
+type SystemData = ReturnType<typeof useSystem>["data"];
 
-export default function PaymentLogsTab() {
+interface PaymentLogsTabProps {
+  data: SystemData;
+}
+
+export default function PaymentLogsTab({ data }: PaymentLogsTabProps) {
+  const { paymentLogs } = data;
+
+  const failedTransactionsToday = paymentLogs.length;
+  const hasCriticalSpike = paymentLogs.some(
+    (log) => log.status === "System Error" || log.status === "Critical",
+  );
+
   return (
     <div className="sys-payment-container">
-      {/* khối thông tin tổng quan các lỗi thanh toán */}
       <div className="sys-card">
         <h3 className="sys-card-title">Payment Overview</h3>
         <div className="sys-payment-kpi-grid">
@@ -56,21 +30,28 @@ export default function PaymentLogsTab() {
               <span className="sys-info-label">
                 Failed Transactions (Today)
               </span>
-              <span className="sys-info-value">12</span>
+              <span className="sys-info-value">{failedTransactionsToday}</span>
             </div>
           </div>
 
-          <div className="sys-info-card success">
-            <CheckCircleIcon className="sys-info-icon" />
+          <div
+            className={`sys-info-card ${hasCriticalSpike ? "warning" : "success"}`}
+          >
+            {hasCriticalSpike ? (
+              <WarningAlertIcon className="sys-info-icon" />
+            ) : (
+              <CheckCircleIcon className="sys-info-icon" />
+            )}
             <div className="sys-info-text">
               <span className="sys-info-label">Spike Alert Status</span>
-              <span className="sys-info-value">Normal</span>
+              <span className="sys-info-value">
+                {hasCriticalSpike ? "Alert Triggered" : "Normal"}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* bảng danh sách chi tiết các giao dịch bị lỗi */}
       <div className="sys-card">
         <h3 className="sys-card-title">Recent Error Logs</h3>
         <div className="sys-payment-table-wrapper">
@@ -85,7 +66,7 @@ export default function PaymentLogsTab() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_PAYMENT_LOGS.map((log) => (
+              {paymentLogs.map((log) => (
                 <tr key={log.id}>
                   <td style={{ color: "#6b7280", fontWeight: 600 }}>
                     {log.time}
@@ -100,7 +81,13 @@ export default function PaymentLogsTab() {
                   </td>
                   <td>
                     <span
-                      className={`sys-payment-badge ${log.status === "Critical" ? "critical" : log.status === "System Error" ? "warning" : "neutral"}`}
+                      className={`sys-payment-badge ${
+                        log.status === "Critical"
+                          ? "critical"
+                          : log.status === "System Error"
+                            ? "warning"
+                            : "neutral"
+                      }`}
                     >
                       {log.status}
                     </span>

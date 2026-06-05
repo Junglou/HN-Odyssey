@@ -27,7 +27,6 @@ function GradientGauge({
   const radius = 80;
   const circumference = Math.PI * radius;
 
-  // Tính toán giá trị và góc quay
   const safeValue = Math.min(Math.max(value, 0), 100);
   const strokeDashoffset = circumference - (safeValue / 100) * circumference;
   const angle = (safeValue / 100) * 180 - 180;
@@ -68,7 +67,12 @@ function GradientGauge({
       />
 
       {/* Vạch chia ngưỡng */}
-      <g transform={`rotate(${thresholdAngle}, 100, 100)`}>
+      <g
+        style={{
+          transform: `rotate(${thresholdAngle}deg)`,
+          transformOrigin: "100px 100px", // tâm xoay = cx cy của gauge
+        }}
+      >
         <line
           x1="171"
           y1="100"
@@ -101,10 +105,12 @@ function GradientGauge({
         100
       </text>
 
-      {/* Kim chỉ */}
       <g
-        transform={`rotate(${angle}, 100, 100)`}
-        style={{ transition: "transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)" }}
+        style={{
+          transform: `rotate(${angle}deg)`,
+          transformOrigin: "100px 100px", // tâm xoay khớp với tâm gauge
+          transition: "transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
+        }}
       >
         <polygon points="100,96 100,104 172,100" fill="#111827" />
         <circle cx="100" cy="100" r="8" fill="#111827" />
