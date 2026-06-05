@@ -1,4 +1,3 @@
-// src/components/portal/System/NetworkApiTab.tsx
 import {
   LineChart,
   Line,
@@ -12,64 +11,28 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import "./NetworkApiTab.css";
+import { useSystem } from "../../../hooks/portal/System/useSystem";
 
-const MOCK_NETWORK = [
-  { time: "0", value: 10 },
-  { time: "1", value: 50 },
-  { time: "2", value: 15 },
-  { time: "3", value: 20 },
-  { time: "4", value: 10 },
-  { time: "5", value: 40 },
-  { time: "6", value: 15 },
-];
+type SystemData = ReturnType<typeof useSystem>["data"];
 
-const MOCK_ERROR_RATE = [
-  { time: "0", value: 1 },
-  { time: "1", value: 1 },
-  { time: "2", value: 1 },
-  { time: "3", value: 1 },
-  { time: "4", value: 1 },
-  { time: "5", value: 5 },
-  { time: "6", value: 1 },
-];
+interface NetworkApiTabProps {
+  data: SystemData;
+}
 
-const MOCK_API_STATUS = [
-  {
-    id: "1",
-    service: "Payment Gateway",
-    severity: "Stable",
-    avgLatency: "120ms",
-    lastCheck: "1 min ago",
-  },
-  {
-    id: "2",
-    service: "Shipping API",
-    severity: "Stable",
-    avgLatency: "95ms",
-    lastCheck: "1 min ago",
-  },
-  {
-    id: "3",
-    service: "SMS Service",
-    severity: "Warning",
-    avgLatency: "450ms (Slow)",
-    lastCheck: "30s ago",
-  },
-];
+export default function NetworkApiTab({ data }: NetworkApiTabProps) {
+  const { networkData, errorRateData, apiStatusList } = data;
 
-export default function NetworkApiTab() {
   return (
     <div className="na-tab-layout">
       <h2 className="na-section-title mb-0">Network & API Health</h2>
 
       <div className="na-bottom-row">
-        {/* Sử dụng class CSS cho flexbox thay vì inline style */}
         <div className="na-chart-card na-chart-flex">
           <div className="na-chart-col">
             <h3 className="na-section-title">Network Throughput (Mbps)</h3>
             <div className="na-chart-container small">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={MOCK_NETWORK}>
+                <LineChart data={networkData}>
                   <CartesianGrid
                     strokeDasharray="3 3"
                     vertical={false}
@@ -104,7 +67,7 @@ export default function NetworkApiTab() {
             <h3 className="na-section-title">API Error Rate</h3>
             <div className="na-chart-container small">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={MOCK_ERROR_RATE}>
+                <BarChart data={errorRateData}>
                   <CartesianGrid
                     strokeDasharray="3 3"
                     vertical={false}
@@ -125,10 +88,10 @@ export default function NetworkApiTab() {
                     }}
                   />
                   <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]}>
-                    {MOCK_ERROR_RATE.map((entry, index) => (
+                    {errorRateData.map((entry, index) => (
                       <Cell
                         key={`cell-${index}`}
-                        fill={entry.value > 2 ? "#ef4444" : "#3b82f6"}
+                        fill={entry.value > 10 ? "#ef4444" : "#3b82f6"}
                       />
                     ))}
                   </Bar>
@@ -150,7 +113,7 @@ export default function NetworkApiTab() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_API_STATUS.map((api) => (
+              {apiStatusList.map((api) => (
                 <tr key={api.id}>
                   <td>{api.service}</td>
                   <td>

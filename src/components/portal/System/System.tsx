@@ -299,11 +299,14 @@ export default function System({ state, data, actions }: SystemProps) {
         </div>
 
         <div className="sys-content-area">
+          {/* Truyền toàn bộ data xuống các Tab để hiển thị dữ liệu thật */}
           {state.visibleSections.overview && <OverviewTab data={data} />}
-          {state.visibleSections.cpuRam && <CpuRamTab />}
-          {state.visibleSections.networkApi && <NetworkApiTab />}
-          {state.visibleSections.paymentLogs && <PaymentLogsTab />}
-          {state.visibleSections.securityLogs && <SecurityLogsTab />}
+          {state.visibleSections.cpuRam && <CpuRamTab data={data} />}
+          {state.visibleSections.networkApi && <NetworkApiTab data={data} />}
+          {state.visibleSections.paymentLogs && <PaymentLogsTab data={data} />}
+          {state.visibleSections.securityLogs && (
+            <SecurityLogsTab data={data} />
+          )}
         </div>
       </div>
     </div>

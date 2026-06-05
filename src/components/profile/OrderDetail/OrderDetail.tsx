@@ -11,6 +11,11 @@ import {
 import { TimelineCheckIcon } from "../../../assets/icons/OrderManagementIcons";
 import { BackArrowIcon } from "../../../assets/icons/CategoryIcons";
 import { mapOrderStatusLabel } from "../../../utils/mapCustomerOrder";
+import {
+  useOrderFBT,
+  useLookingSimilar,
+} from "../../../hooks/profile/useOrderDetail";
+import RecommendationList from "../../common/RecommendationList";
 
 interface OrderDetailProps {
   orderId: string;
@@ -19,7 +24,6 @@ interface OrderDetailProps {
   onRefresh?: () => void;
 }
 
-// FIX: Cập nhật hàm formatMoney để xử lý an toàn undefined/null/NaN
 const formatMoney = (value?: number) => {
   const safeValue = typeof value === "number" && !isNaN(value) ? value : 0;
   return `$${safeValue.toLocaleString("en-US", {
@@ -117,6 +121,20 @@ const OrderDetail = ({
   loading = false,
   onRefresh,
 }: OrderDetailProps) => {
+  const lineItems = order ? getLineItems(order) : [];
+  const firstProductId = lineItems.length > 0 ? lineItems[0].id : undefined;
+
+  const isCompleted = order
+    ? ["COMPLETED", "DELIVERED"].includes(String(order.status).toUpperCase())
+    : false;
+
+  const { fbtProducts } = useOrderFBT(
+    !isCompleted ? firstProductId : undefined,
+  );
+  const { similarProducts } = useLookingSimilar(
+    isCompleted ? firstProductId : undefined,
+  );
+
   if (loading) {
     return (
       <div className="pod-page" aria-busy="true">
@@ -171,15 +189,11 @@ const OrderDetail = ({
     );
   }
 
-  const lineItems = getLineItems(order);
-
-  // FIX: Bổ sung (item.price || 0) để phòng hờ API trả về price bị thiếu
   const subtotal = lineItems.reduce(
     (sum, item) => sum + (item.price || 0) * (item.quantity ?? 1),
     0,
   );
 
-  // FIX: Ràng buộc nghiêm ngặt fallback về 0 nếu toàn bộ đều undefined
   const shipFee =
     (isUserOrderDetail(order) ? order.actualShippingFee : order.shippingFee) ??
     0;
@@ -358,6 +372,24 @@ const OrderDetail = ({
           </div>
         </div>
       </div>
+
+      {!isCompleted && fbtProducts.length > 0 && (
+        <div style={{ marginTop: "2rem", width: "100%" }}>
+          <RecommendationList
+            title="Frequently Bought Together"
+            products={fbtProducts}
+          />
+        </div>
+      )}
+
+      {isCompleted && similarProducts.length > 0 && (
+        <div style={{ marginTop: "2rem", width: "100%" }}>
+          <RecommendationList
+            title="Similar Products"
+            products={similarProducts}
+          />
+        </div>
+      )}
     </div>
   );
 };

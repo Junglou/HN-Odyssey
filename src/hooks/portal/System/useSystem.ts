@@ -1,4 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import axiosClient from "../../../api/axiosClient";
+
+// 1. CÁC INTERFACE GIAO TIẾP VỚI COMPONENT UI
 
 export interface SystemStatus {
   overall: "Operational" | "Warning" | "Critical";
@@ -33,63 +36,87 @@ export interface Thresholds {
   disk: number;
 }
 
-const MOCK_STATUS: SystemStatus = {
+export interface ApiStatusItem {
+  id: string;
+  service: string;
+  severity: string;
+  avgLatency: string;
+  lastCheck: string;
+}
+
+export interface PaymentLogItem {
+  id: string;
+  time: string;
+  orderId: string;
+  gateway: string;
+  code: string;
+  reason: string;
+  status: string;
+}
+
+export interface SecurityLogItem {
+  id: string;
+  time: string;
+  ip: string;
+  target: string;
+  attempts: number;
+  status: string;
+}
+
+// 2. CÁC INTERFACE MAP DỮ LIỆU THÔ TỪ BACKEND
+
+interface RawResourceHistory {
+  time: string;
+  cpu: number;
+  ram: number;
+}
+
+interface RawPerformanceHistory {
+  hour: string;
+  avg_latency: number;
+  error_rate: number;
+}
+
+interface RawThirdPartyStatus {
+  provider: string;
+  status: string;
+  avg_latency: number;
+}
+
+interface RawPaymentLog {
+  _id: string;
+  date: string;
+  order_code: string;
+  provider: string;
+  error_type: string;
+  error_message: string;
+}
+
+interface RawAggregatedSecurityLog {
+  id: string;
+  time: string;
+  ip: string;
+  target: string;
+  attempts: number;
+  status: string;
+}
+
+// 3. GIÁ TRỊ KHỞI TẠO MẶC ĐỊNH
+
+const INITIAL_STATUS: SystemStatus = {
   overall: "Operational",
-  uptime: "99.98%",
-  activeIncidents: 2,
+  uptime: "100%",
+  activeIncidents: 0,
 };
 
-const MOCK_MINI_LATENCY: MetricDataPoint[] = [
-  { time: "0", value: 40 },
-  { time: "1", value: 30 },
-  { time: "2", value: 80 },
-  { time: "3", value: 160 },
-  { time: "4", value: 50 },
-  { time: "5", value: 40 },
-  { time: "6", value: 60 },
-];
-
-const INITIAL_GAUGE_DATA = {
-  cpu: { current: 45, peak: 62 },
-  ram: { percent: 65, text: "5.2/8GB" },
-  disk: { percent: 78, text: "390GB" },
+const INITIAL_GAUGE = {
+  cpu: { current: 0, peak: 0 },
+  ram: { percent: 0, text: "N/A" },
+  disk: { percent: 0, text: "N/A" },
 };
-
-const MOCK_PAGE_LOAD_DATA: MetricDataPoint[] = [
-  { time: "0s", value: 100 },
-  { time: "5s", value: 150 },
-  { time: "10s", value: 600 },
-  { time: "15s", value: 120 },
-  { time: "20s", value: 300 },
-  { time: "25s", value: 100 },
-  { time: "30s", value: 150 },
-];
-
-const MOCK_INCIDENT_LOGS: IncidentLog[] = [
-  {
-    id: "1",
-    time: "10:15 AM",
-    severity: "Warning",
-    component: "CPU",
-    message: "Load > 60% Sustained",
-  },
-  {
-    id: "2",
-    time: "09:45 AM",
-    severity: "Resolved",
-    component: "Payment API",
-    message: "Connection Restored",
-  },
-  {
-    id: "3",
-    time: "09:15 AM",
-    severity: "Warning",
-    component: "CPU",
-    message: "Load > 65% Sustained",
-  },
-];
 
 export function useSystem() {
+  // State điều khiển UI giao diện
   const [visibleSections, setVisibleSections] = useState<VisibleSections>({
     overview: true,
     cpuRam: false,
@@ -98,13 +125,12 @@ export function useSystem() {
     securityLogs: false,
   });
 
-  // State cho Header Toolbars
   const [serverNode, setServerNode] = useState("Primary Node");
   const [timeframe, setTimeframe] = useState("Last Hour (Real-time)");
   const [refreshRate, setRefreshRate] = useState("30s");
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // State cho Threshold Settings
   const [thresholds, setThresholds] = useState<Thresholds>({
     cpu: 90,
     ram: 90,
@@ -112,30 +138,223 @@ export function useSystem() {
   });
   const [isEditingThresholds, setIsEditingThresholds] = useState(false);
 
-  // State cho Health Check Toast
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // State lưu trữ dữ liệu thực từ API với kiểu dữ liệu chuẩn xác
+  const [systemStatus, setSystemStatus] =
+    useState<SystemStatus>(INITIAL_STATUS);
+  const [gaugeData, setGaugeData] = useState(INITIAL_GAUGE);
+  const [cpuHistory, setCpuHistory] = useState<MetricDataPoint[]>([]);
+  const [ramHistory, setRamHistory] = useState<MetricDataPoint[]>([]);
+  const [pageLoadData, setPageLoadData] = useState<MetricDataPoint[]>([]);
+  const [networkData, setNetworkData] = useState<MetricDataPoint[]>([]);
+  const [errorRateData, setErrorRateData] = useState<MetricDataPoint[]>([]);
+  const [apiStatusList, setApiStatusList] = useState<ApiStatusItem[]>([]);
+  const [paymentLogs, setPaymentLogs] = useState<PaymentLogItem[]>([]);
+  const [securityLogs, setSecurityLogs] = useState<SecurityLogItem[]>([]);
+  const [incidentLogs, setIncidentLogs] = useState<IncidentLog[]>([]);
 
-  // State cho dữ liệu Real-time (Đồng hồ Gauge)
-  const [gaugeData, setGaugeData] = useState(INITIAL_GAUGE_DATA);
+  // Hàm gọi tổng hợp các API
+  const fetchSystemData = useCallback(async () => {
+    try {
+      const params = {
+        node: serverNode,
+        timeframe: timeframe,
+      };
+      const responses = await Promise.allSettled([
+        axiosClient.get("/admin/system-monitoring/status-widget", { params }),
+        axiosClient.get("/admin/system-monitoring/resources-current", {
+          params,
+        }),
+        axiosClient.get("/admin/system-monitoring/resources-history-24h", {
+          params,
+        }),
+        axiosClient.get("/admin/system-monitoring/performance-history-24h", {
+          params,
+        }),
+        axiosClient.get("/admin/system-monitoring/third-party-status", {
+          params,
+        }),
+        axiosClient.get("/admin/system-monitoring/payment-errors", {
+          params: { ...params, limit: 10 },
+        }),
+        // SỬA LỖI URL Ở ĐÂY: Dùng đúng endpoint của Monitoring thay vì /audit-logs
+        axiosClient.get("/admin/system-monitoring/security-logs-recent", {
+          params: { ...params, limit: 10 },
+        }),
+      ]);
 
-  // Giả lập Real-time Update
+      // 0. Widget Tổng quan
+      if (
+        responses[0].status === "fulfilled" &&
+        responses[0].value.data?.data
+      ) {
+        const widgetData = responses[0].value.data.data;
+        setSystemStatus({
+          overall:
+            widgetData.status === "RED"
+              ? "Critical"
+              : widgetData.status === "YELLOW"
+                ? "Warning"
+                : "Operational",
+          uptime: widgetData.uptime || "100%",
+          activeIncidents: widgetData.error_rate > 5 ? 1 : 0,
+        });
+      }
+
+      // 1. Đồng hồ Gauge ổ cứng
+      if (
+        responses[1].status === "fulfilled" &&
+        responses[1].value.data?.data
+      ) {
+        setGaugeData(responses[1].value.data.data);
+      }
+
+      // 2. Lịch sử CPU & RAM
+      if (
+        responses[2].status === "fulfilled" &&
+        responses[2].value.data?.data
+      ) {
+        const historyData = responses[2].value.data.data;
+        setCpuHistory(
+          historyData.map((item: RawResourceHistory) => ({
+            time: item.time,
+            value: item.cpu,
+          })),
+        );
+        setRamHistory(
+          historyData.map((item: RawResourceHistory) => ({
+            time: item.time,
+            value: item.ram,
+          })),
+        );
+      }
+
+      // 3. API & Network
+      if (
+        responses[3].status === "fulfilled" &&
+        responses[3].value.data?.data
+      ) {
+        const perfHistory = responses[3].value.data.data;
+        setPageLoadData(
+          perfHistory.map((item: RawPerformanceHistory) => ({
+            time: item.hour,
+            value: item.avg_latency,
+          })),
+        );
+        setNetworkData(
+          perfHistory.map((item: RawPerformanceHistory) => ({
+            time: item.hour,
+            value: item.avg_latency,
+          })),
+        );
+        setErrorRateData(
+          perfHistory.map((item: RawPerformanceHistory) => ({
+            time: item.hour,
+            value: item.error_rate,
+          })),
+        );
+      }
+
+      // 4. Đối tác thứ 3
+      if (
+        responses[4].status === "fulfilled" &&
+        responses[4].value.data?.data
+      ) {
+        const thirdParty = responses[4].value.data.data;
+        setApiStatusList(
+          thirdParty.map((item: RawThirdPartyStatus, index: number) => ({
+            id: index.toString(),
+            service: item.provider,
+            severity:
+              item.status === "RED"
+                ? "Critical"
+                : item.status === "YELLOW"
+                  ? "Warning"
+                  : "Stable",
+            avgLatency: `${item.avg_latency}ms`,
+            lastCheck: "Vừa xong",
+          })),
+        );
+      }
+
+      // 5. Thanh toán
+      if (
+        responses[5].status === "fulfilled" &&
+        responses[5].value.data?.data?.items
+      ) {
+        const payments = responses[5].value.data.data.items;
+        setPaymentLogs(
+          payments.map((item: RawPaymentLog) => ({
+            id: item._id,
+            time: new Date(item.date).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            orderId: item.order_code,
+            gateway: item.provider,
+            code: item.error_type === "TECHNICAL_ERROR" ? "Tech" : "User",
+            reason: item.error_message,
+            status:
+              item.error_type === "TECHNICAL_ERROR"
+                ? "System Error"
+                : "User Error",
+          })),
+        );
+      }
+
+      // 6. Security Logs đã Aggregate
+      if (
+        responses[6].status === "fulfilled" &&
+        responses[6].value.data?.data
+      ) {
+        const logs = responses[6].value.data.data;
+        setSecurityLogs(
+          logs.map((item: RawAggregatedSecurityLog) => ({
+            id: item.id,
+            time: new Date(item.time).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            ip: item.ip,
+            target: item.target,
+            attempts: item.attempts,
+            status: item.status,
+          })),
+        );
+
+        // Map một phần vào log incident cho OverviewTab
+        setIncidentLogs(
+          logs.slice(0, 5).map((err: RawAggregatedSecurityLog) => ({
+            id: err.id,
+            time: new Date(err.time).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            severity: err.status === "IP Blocked" ? "Critical" : "Warning",
+            component: "Security",
+            message: `Truy cập bất thường từ ${err.ip} (${err.attempts} lần)`,
+          })),
+        );
+      }
+    } catch (error) {
+      console.error("Lỗi khi tải dữ liệu giám sát hệ thống", error);
+    }
+  }, [serverNode, timeframe]);
+
+  // Xử lý chu kỳ làm mới dữ liệu
   useEffect(() => {
-    let intervalMs = 30000; // Mặc định 30s
+    fetchSystemData();
+
+    let intervalMs = 30000;
     if (refreshRate === "10s") intervalMs = 10000;
     if (refreshRate === "5s") intervalMs = 5000;
 
     const timer = setInterval(() => {
-      setGaugeData((prev) => ({
-        ...prev,
-        cpu: { ...prev.cpu, current: Math.floor(Math.random() * 20) + 40 }, // Ngẫu nhiên 40-60%
-        ram: { ...prev.ram, percent: Math.floor(Math.random() * 10) + 60 }, // Ngẫu nhiên 60-70%
-      }));
+      fetchSystemData();
     }, intervalMs);
 
     return () => clearInterval(timer);
-  }, [refreshRate]);
+  }, [refreshRate, fetchSystemData]);
 
-  // Actions
   const toggleSection = (section: keyof VisibleSections) => {
     setVisibleSections((prev) => ({ ...prev, [section]: !prev[section] }));
   };
@@ -151,12 +370,20 @@ export function useSystem() {
     }
   };
 
-  const runHealthCheck = () => {
-    setToastMessage("Initiating full system health check... Please wait.");
-    setTimeout(() => {
-      setToastMessage("Health check completed. System is Operational.");
-      setTimeout(() => setToastMessage(null), 3000); // Ẩn sau 3s
-    }, 2000);
+  const runHealthCheck = async () => {
+    setToastMessage("Đang kiểm tra toàn diện hệ thống...");
+    try {
+      await axiosClient.get("/admin/system-monitoring/health");
+      await fetchSystemData();
+      setToastMessage("Hoàn tất kiểm tra. Hệ thống hoạt động ổn định.");
+    } catch {
+      // Đã loại bỏ biến error không sử dụng để tránh lỗi eslint no-unused-vars
+      setToastMessage(
+        "Hoàn tất kiểm tra. Phát hiện một số dịch vụ phản hồi chậm.",
+      );
+    } finally {
+      setTimeout(() => setToastMessage(null), 3000);
+    }
   };
 
   return {
@@ -171,13 +398,20 @@ export function useSystem() {
       toastMessage,
     },
     data: {
-      status: MOCK_STATUS,
-      miniLatency: MOCK_MINI_LATENCY,
+      status: systemStatus,
+      miniLatency: networkData,
       overview: {
         gauge: gaugeData,
-        pageLoad: MOCK_PAGE_LOAD_DATA,
-        logs: MOCK_INCIDENT_LOGS,
+        pageLoad: pageLoadData,
+        logs: incidentLogs,
       },
+      cpuHistory,
+      ramHistory,
+      networkData,
+      errorRateData,
+      apiStatusList,
+      paymentLogs,
+      securityLogs,
     },
     actions: {
       toggleSection,
