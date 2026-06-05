@@ -78,7 +78,7 @@ export class PerformanceMonitorInterceptor implements NestInterceptor {
     //   this.logger.error(
     //     `[CẢNH BÁO] Tài nguyên cạn kiệt! CPU: ${cpuUsagePercent.toFixed(1)}%, RAM: ${ramUsagePercent.toFixed(1)}%`,
     //   );
-    // }
+    // } // tat đi để tránh spam log khi đang phát triển, sẽ bật lại khi deploy sản phẩm
 
     const metric = new this.metricModel({
       path: req.url, // Không còn lỗi unsafe-member-access
@@ -88,6 +88,7 @@ export class PerformanceMonitorInterceptor implements NestInterceptor {
       is_slow: isSlow,
       cpu_usage_percent: Number(cpuUsagePercent.toFixed(2)),
       ram_usage_percent: Number(ramUsagePercent.toFixed(2)),
+      node: process.env.SERVER_NODE || 'Primary Node',
     });
 
     // Ghi log không đồng bộ để không chặn Request

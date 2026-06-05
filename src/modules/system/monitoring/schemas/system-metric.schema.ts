@@ -26,6 +26,9 @@ export class SystemMetric {
   @Prop()
   ram_usage_percent: number; // AC4: Thông số RAM
 
+  @Prop({ default: 'Primary Node', index: true })
+  node: string;
+
   @Prop()
   createdAt: Date;
 }

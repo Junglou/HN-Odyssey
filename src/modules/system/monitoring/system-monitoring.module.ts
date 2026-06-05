@@ -17,6 +17,10 @@ import { MonitoringController } from './monitoring.controller';
 import { AxiosMonitorSetup } from './axios-monitor.setup';
 import { NotificationsModule } from 'src/modules/notifications/notifications.module';
 import { MonitoringService } from './monitoring.service';
+import {
+  AuditLog,
+  AuditLogSchema,
+} from '../audit-logs/schemas/audit-log.schema';
 
 @Module({
   imports: [
@@ -26,6 +30,7 @@ import { MonitoringService } from './monitoring.service';
       { name: SystemMetric.name, schema: SystemMetricSchema },
       { name: IntegrationLog.name, schema: IntegrationLogSchema },
       { name: AuthSession.name, schema: AuthSessionSchema },
+      { name: AuditLog.name, schema: AuditLogSchema },
     ]),
   ],
   controllers: [MonitoringController],

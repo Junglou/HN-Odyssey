@@ -36,8 +36,14 @@ export class MonitoringController {
   @Get('performance-stats')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @RequirePermissions(Resource.SYSTEM, Action.READ)
-  async getPerformanceStats() {
-    const data = await this.monitoringService.getPerformanceStats();
+  async getPerformanceStats(
+    @Query('timeframe') timeframe?: string,
+    @Query('node') node?: string,
+  ) {
+    const data = await this.monitoringService.getPerformanceStats(
+      timeframe,
+      node,
+    );
     return new BaseResponse(true, 'Lấy hiệu năng hệ thống thành công', data);
   }
 
@@ -45,8 +51,8 @@ export class MonitoringController {
   @Get('third-party-status')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @RequirePermissions(Resource.SYSTEM, Action.READ)
-  async getThirdPartyStatus() {
-    const data = await this.monitoringService.getThirdPartyStatus();
+  async getThirdPartyStatus(@Query('timeframe') timeframe?: string) {
+    const data = await this.monitoringService.getThirdPartyStatus(timeframe);
     return new BaseResponse(true, 'Lấy trạng thái đối tác thành công', data);
   }
 
@@ -54,8 +60,14 @@ export class MonitoringController {
   @Get('status-widget')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @RequirePermissions(Resource.SYSTEM, Action.READ)
-  async getSystemStatusWidget() {
-    const data = await this.monitoringService.getSystemStatusWidget();
+  async getSystemStatusWidget(
+    @Query('timeframe') timeframe?: string,
+    @Query('node') node?: string,
+  ) {
+    const data = await this.monitoringService.getSystemStatusWidget(
+      timeframe,
+      node,
+    );
     return new BaseResponse(true, 'Lấy trạng thái hệ thống thành công', data);
   }
 
@@ -63,9 +75,15 @@ export class MonitoringController {
   @Get('performance-history-24h')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @RequirePermissions(Resource.SYSTEM, Action.READ)
-  async getPerformanceHistory() {
-    const data = await this.monitoringService.getPerformanceHistory24h();
-    return new BaseResponse(true, 'Lấy lịch sử hiệu năng 24h thành công', data);
+  async getPerformanceHistory(
+    @Query('timeframe') timeframe?: string,
+    @Query('node') node?: string,
+  ) {
+    const data = await this.monitoringService.getPerformanceHistory24h(
+      timeframe,
+      node,
+    );
+    return new BaseResponse(true, 'Lấy lịch sử hiệu năng thành công', data);
   }
 
   // US3 - AC6: Lấy lịch sử lỗi giao dịch thanh toán
@@ -76,19 +94,54 @@ export class MonitoringController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('provider') provider?: string,
+    @Query('timeframe') timeframe?: string,
   ) {
     const p = page ? parseInt(page, 10) : 1;
     const l = limit ? parseInt(limit, 10) : 20;
-
     const data = await this.monitoringService.getPaymentErrorLogs(
       p,
       l,
       provider,
+      timeframe,
     );
     return new BaseResponse(
       true,
       'Lấy lịch sử lỗi thanh toán thành công',
       data,
     );
+  }
+
+  // Cung cấp dữ liệu cho Gauge overview
+  @Get('resources-current')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @RequirePermissions(Resource.SYSTEM, Action.READ)
+  async getCurrentResources(@Query('node') node?: string) {
+    const data = await this.monitoringService.getCurrentResources(node);
+    return new BaseResponse(true, 'Lấy tài nguyên hiện tại thành công', data);
+  }
+
+  // Cung cấp dữ liệu cho biểu đồ LineChart CPU/RAM
+  @Get('resources-history-24h')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @RequirePermissions(Resource.SYSTEM, Action.READ)
+  async getResourceHistory(
+    @Query('timeframe') timeframe?: string,
+    @Query('node') node?: string,
+  ) {
+    const data = await this.monitoringService.getResourceHistory24h(
+      timeframe,
+      node,
+    );
+    return new BaseResponse(true, 'Lấy lịch sử tài nguyên thành công', data);
+  }
+
+  // US4 - Lấy log bảo mật đã được gom nhóm số lần vi phạm
+  @Get('security-logs-recent')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @RequirePermissions(Resource.SYSTEM, Action.READ)
+  async getSecurityLogsRecent(@Query('timeframe') timeframe?: string) {
+    const data =
+      await this.monitoringService.getAggregatedSecurityLogs(timeframe);
+    return new BaseResponse(true, 'Lấy log bảo mật thành công', data);
   }
 }

@@ -221,11 +221,27 @@ export class PersonalizedService {
         type: 'LOOKING_SIMILAR',
         products,
       };
-    } catch (error) {
+    } catch (error: unknown) {
+      // FIX LỖI [object Object]: Ép JSON stringify để bóc trần nguyên nhân thật từ Algolia
+      let errorDetail = 'Lỗi không xác định';
+      if (error instanceof Error) {
+        errorDetail = error.message;
+      } else if (typeof error === 'object' && error !== null) {
+        // Lấy chi tiết message lỗi từ response của Algolia
+        const algoliaError = error as {
+          message?: string;
+          status?: number;
+          name?: string;
+        };
+        errorDetail = algoliaError.message || JSON.stringify(error, null, 2);
+      } else {
+        errorDetail = String(error);
+      }
+
       this.logger.error(
-        'Lỗi lấy Looking Similar',
-        error instanceof Error ? error.message : String(error),
+        `[Looking Similar] Lỗi khi gọi Algolia: ${errorDetail}`,
       );
+
       return { title: '', type: 'ERROR', products: [] };
     }
   }
