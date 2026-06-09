@@ -25,6 +25,7 @@ export class OrdersCronService {
       .find({
         status: { $in: [OrderStatus.PENDING, OrderStatus.TEMPORARY] },
         hold_expires_at: { $lte: now },
+        'payment.status': { $ne: 'PAID' },
       })
       .limit(50);
 

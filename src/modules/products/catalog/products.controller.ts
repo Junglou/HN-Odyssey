@@ -328,7 +328,7 @@ export class ProductsController {
   bulkApprovePrice(
     @Body()
     body: {
-      product_ids: string[];
+      items: { product_id: string; sku: string }[]; // Đổi từ product_ids thành items
       action: 'approve' | 'reject';
       reason?: string;
     },
@@ -337,7 +337,7 @@ export class ProductsController {
     @HttpHeaders('user-agent') userAgent: string,
   ) {
     return this.productsService.bulkApprovePriceChanges(
-      body.product_ids,
+      body.items, // Truyền trực tiếp mảng items xuống service
       body.action === 'approve',
       body.reason || '',
       user._id,

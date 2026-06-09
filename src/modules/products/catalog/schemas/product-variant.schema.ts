@@ -29,9 +29,9 @@ export class ProductVariant {
   @Prop({ required: true, default: 0 })
   stock: number;
 
-  // AC4: Ảnh riêng cho biến thể (Ví dụ chọn màu Đỏ ra ảnh áo Đỏ)
-  @Prop()
-  image: string;
+  // AC4: Ảnh riêng cho biến thể (Ví dụ chọn màu Đỏ ra ảnh áo Đỏ) Hỗ trợ nhiều ảnh cho biến thể
+  @Prop({ type: [String], default: [] })
+  images: string[];
 
   @Prop({ type: [VariantAttribute], default: [] })
   attributes: VariantAttribute[];

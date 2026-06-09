@@ -20,7 +20,7 @@ export class PriceHistory {
   @Prop({ required: true })
   new_price: number;
 
-  @Prop({ default: 'VND' })
+  @Prop({ default: 'USD' })
   currency: string;
 
   @Prop({ required: true })

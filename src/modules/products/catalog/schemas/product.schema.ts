@@ -79,7 +79,7 @@ export class PendingVariantPrice {
 export class PriceRequest {
   @Prop({ required: true }) price: number;
 
-  @Prop({ default: 'VND' })
+  @Prop({ default: 'USD' })
   currency: string;
 
   @Prop({ type: [PendingVariantPrice], default: [] })
@@ -195,7 +195,7 @@ export class Product {
   @Prop({ required: true, default: 0 })
   price: number;
 
-  @Prop({ default: 'VND' })
+  @Prop({ default: 'USD' })
   currency: string;
 
   @Prop({ default: 0 })

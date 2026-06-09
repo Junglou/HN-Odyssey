@@ -29,7 +29,7 @@ load_dotenv()
 MONGO_URI = os.getenv("MONGO_URL", "mongodb://localhost:27017")
 DB_NAME = os.getenv("MONGO_DB_NAME", "hn-odyssey")
 # Lấy cổng (port) chạy server từ biến môi trường, mặc định là 8000
-PORT = int(os.getenv("PORT", 8000))
+PORT = int(os.getenv("ML_PORT", 8000))
 
 # Khởi tạo ứng dụng FastAPI với tên và phiên bản
 app = FastAPI(title="H&N Odyssey ML Engine", version="1.0")

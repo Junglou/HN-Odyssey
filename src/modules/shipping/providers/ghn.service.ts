@@ -113,7 +113,7 @@ export class GhnService {
           length: orderData.length || 15,
           width: orderData.width || 15,
           height: orderData.height || 15,
-          cod_amount: orderData.codAmount,
+          cod_amount: Math.round(orderData.codAmount),
 
           items: orderData.items.map((item) => ({
             name: item.name,

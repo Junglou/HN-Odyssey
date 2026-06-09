@@ -1095,7 +1095,7 @@ export class StockService {
       this.orderModel
         .find(filter)
         .populate('items.product_id', 'name')
-        .sort({ created_at: -1 })
+        .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit))
         .lean<PopulatedOrder[]>(),

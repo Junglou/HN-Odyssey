@@ -264,20 +264,29 @@ export class ProductsService {
     ip: string,
     userAgent: string,
   ) {
-    await this.checkSkuExists(createProductDto.sku);
+    // 1. TÌM KIẾM STUB ĐƯỢC TẠO TỪ KHO
+    const stubProduct = await this.productModel.findOne({
+      sku: createProductDto.sku,
+      tags: 'wms-stub',
+    });
 
-    const variants = createProductDto.variants || [];
-
-    createProductDto.price = 0;
-    createProductDto.sale_price = 0;
-
-    if (variants.length > 0) {
-      variants.forEach((v) => {
-        v.price = 0;
-        v.sale_price = 0;
+    if (!stubProduct) {
+      const isExist = await this.productModel.exists({
+        sku: createProductDto.sku,
       });
+      if (isExist)
+        throw new ConflictException(
+          `Mã SKU '${createProductDto.sku}' đã được PIM định danh trước đó!`,
+        );
+      throw new BadRequestException(
+        `Mã SKU '${createProductDto.sku}' chưa được khởi tạo. Vui lòng yêu cầu Kho nhập phiếu nháp cho SKU này trước!`,
+      );
     }
 
+    const variants = createProductDto.variants || [];
+    const variantStubsToDelete: Types.ObjectId[] = [];
+
+    // 2. CHECK STUB CỦA CÁC BIẾN THỂ (NẾU CÓ)
     if (variants.length > 0) {
       const variantSkus = variants.map((v) => v.sku);
       if (new Set(variantSkus).size !== variantSkus.length) {
@@ -299,37 +308,45 @@ export class ProductsService {
         .join(',');
 
       for (const variant of variants) {
-        await this.checkSkuExists(variant.sku);
-
         const currentKeys = variant.attributes
           .map((a) => a.code)
           .sort()
           .join(',');
-
         if (currentKeys !== standardKeys) {
           throw new BadRequestException(
             `Lỗi cấu trúc biến thể (SKU: ${variant.sku}): Các biến thể phải có cùng nhóm thuộc tính.`,
           );
         }
+
+        const stubVar = await this.productModel.findOne({
+          sku: variant.sku,
+          tags: 'wms-stub',
+        });
+        if (!stubVar) {
+          const isExist = await this.productModel.exists({
+            $or: [{ sku: variant.sku }, { 'variants.sku': variant.sku }],
+          });
+          if (isExist)
+            throw new ConflictException(
+              `SKU biến thể '${variant.sku}' đã tồn tại.`,
+            );
+          throw new BadRequestException(
+            `SKU biến thể '${variant.sku}' chưa có trong Kho!`,
+          );
+        }
+
+        // Hút tồn kho từ kho sang biến thể
+        variant.stock = stubVar.stock;
+        variant.price = 0;
+        variant.sale_price = 0;
+        variantStubsToDelete.push(stubVar._id);
       }
     }
 
+    // 3. XỬ LÝ DỮ LIỆU CHUNG
     if (!createProductDto.sale_price || createProductDto.sale_price === 0) {
-      createProductDto.sale_price = createProductDto.price;
+      createProductDto.sale_price = createProductDto.price || 0;
     }
-
-    if (createProductDto.variants) {
-      createProductDto.variants.forEach((v) => {
-        if (!v.sale_price || v.sale_price === 0) {
-          v.sale_price = v.price;
-        }
-      });
-    }
-
-    const slug =
-      createProductDto.slug || this.createSlug(createProductDto.name);
-    const slugExists = await this.productModel.exists({ slug });
-    if (slugExists) throw new ConflictException('Đường dẫn (Slug) đã tồn tại');
 
     const specs = this.calculateSpecs(variants);
     const flatAttributes = this.flattenAttributes(variants);
@@ -339,44 +356,63 @@ export class ProductsService {
       cleanDescription = this.sanitizeContent(cleanDescription);
     }
 
-    const newProduct = new this.productModel({
-      ...createProductDto,
+    const slug =
+      createProductDto.slug || this.createSlug(createProductDto.name);
+    const slugExists = await this.productModel.exists({
+      slug,
+      _id: { $ne: stubProduct._id },
+    });
+    if (slugExists) throw new ConflictException('Đường dẫn (Slug) đã tồn tại');
+
+    // 4. GHI ĐÈ DỮ LIỆU PIM LÊN STUB CỦA KHO VÀ ĐỔI TRẠNG THÁI
+    const cleanTags = createProductDto.tags.filter((t) => t !== 'wms-stub');
+    if (cleanTags.length === 0) cleanTags.push('uncategorized');
+
+    Object.assign(stubProduct, {
+      name: createProductDto.name,
+      slug: slug,
+      description: cleanDescription,
       categories: createProductDto.category_ids.map(
         (id) => new Types.ObjectId(id),
       ),
-      slug,
+      tags: cleanTags,
       status: ProductStatus.DRAFT,
       has_variants: variants.length > 0,
       specs,
       attributes: flatAttributes,
       created_by: new Types.ObjectId(userId),
-      is_deleted: false,
-      description: cleanDescription,
-      price: createProductDto.price,
+      price: createProductDto.price || 0,
       sale_price: createProductDto.sale_price,
       variants: variants,
       weight: createProductDto.weight ?? 0.5,
     });
 
-    await newProduct.save();
+    await stubProduct.save();
 
+    // 5. DỌN DẸP RÁC BIẾN THỂ TRONG DB
+    if (variantStubsToDelete.length > 0) {
+      await this.productModel.deleteMany({
+        _id: { $in: variantStubsToDelete },
+      });
+    }
+
+    // 6. LOG AUDIT
     await this.auditLogsService.log({
       action: 'CREATE_PRODUCT',
       collection_name: 'products',
       actor_id: userId,
-      target_id: newProduct._id,
+      target_id: stubProduct._id.toString(),
       department: Department.WAREHOUSE,
       detail: {
-        sku: newProduct.sku,
-        name: newProduct.name,
+        sku: stubProduct.sku,
+        name: stubProduct.name,
         is_price_reset: true,
-        initial_price: newProduct.price,
       },
       ip: ip,
       user_agent: userAgent,
     });
 
-    return newProduct;
+    return stubProduct;
   }
 
   async findAll(query: ProductQueryParam) {
@@ -640,6 +676,12 @@ export class ProductsService {
     const product = await this.productModel.findById(id);
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
+    if (product.status === ProductStatus.ACTIVE) {
+      throw new BadRequestException(
+        'Sản phẩm đang hoạt động. Vui lòng tắt hoạt động (Inactive) trước khi chỉnh sửa.',
+      );
+    }
+
     delete updateDto['price'];
     delete updateDto['sale_price'];
     delete updateDto['status'];
@@ -690,17 +732,13 @@ export class ProductsService {
       product.has_variants = updateDto.variants.length > 0;
       product.specs = this.calculateSpecs(updateDto.variants);
 
-      // ==========================================
       // FIX: GIỮ LẠI IMAGE CŨ CỦA VARIANT KHI UPDATE
-      // ==========================================
+
       const oldVariants = product.variants || [];
       updateDto.variants = updateDto.variants.map((newVar) => {
-        // Tìm biến thể cũ trong DB dựa vào sku
         const oldVar = oldVariants.find((v) => v.sku === newVar.sku);
-
-        // Nếu biến thể cũ có ảnh, phải giữ lại url ảnh đó truyền sang data mới
-        if (oldVar && oldVar.image) {
-          return { ...newVar, image: oldVar.image };
+        if (oldVar && oldVar.images && oldVar.images.length > 0) {
+          return { ...newVar, images: oldVar.images };
         }
         return newVar;
       });
@@ -1120,7 +1158,7 @@ export class ProductsService {
   }
 
   async bulkApprovePriceChanges(
-    productIds: string[],
+    items: { product_id: string; sku: string }[], // Nhận mảng object
     isApproved: boolean,
     reason: string,
     userId: string,
@@ -1128,11 +1166,12 @@ export class ProductsService {
     userAgent: string,
   ) {
     let successCount = 0;
-    for (const id of productIds) {
+    for (const item of items) {
+      // Lặp qua từng item
       try {
         await this.approvePriceChange(
-          id,
-          undefined, // Bổ sung undefined cho tham số sku
+          item.product_id, // Truyền đúng ID sản phẩm
+          item.sku, // Truyền đúng SKU thay vì undefined
           isApproved,
           userId,
           ip,
@@ -1143,11 +1182,14 @@ export class ProductsService {
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
-        console.error(`Bulk action failed for product ${id}:`, errorMessage);
+        console.error(
+          `Bulk action failed for product ${item.product_id} - SKU ${item.sku}:`,
+          errorMessage,
+        );
       }
     }
     return {
-      message: `Đã xử lý thành công ${successCount}/${productIds.length} bản ghi.`,
+      message: `Đã xử lý thành công ${successCount}/${items.length} bản ghi.`,
     };
   }
 
@@ -1190,24 +1232,17 @@ export class ProductsService {
       throw new NotFoundException('Sản phẩm không tồn tại');
     }
 
-    const hasOrders = await this.orderModel.exists({
-      'items.product_id': new Types.ObjectId(id),
-    });
-
-    if (hasOrders) {
-      throw new BadRequestException(
-        'Sản phẩm đã có phát sinh đơn hàng, không thể xóa. Vui lòng chuyển sang trạng thái Ngừng kinh doanh.',
-      );
-    }
-
+    // Thực hiện Soft Delete: Ẩn khỏi UI, đổi trạng thái và giữ lại data cho lịch sử đơn hàng
     product.is_deleted = true;
-    product.status = ProductStatus.DRAFT;
+    product.status = ProductStatus.INACTIVE;
     await product.save();
 
+    // Tự động ẩn hình ảnh/media liên quan
     this.mediaService.bulkUpdateStatusByTarget(id, 'Hidden').catch((err) => {
       console.error('Lỗi tự động ẩn media khi soft delete:', err);
     });
 
+    // Xóa dữ liệu trên search engine Algolia
     try {
       await this.algoliaService.removeProduct(id);
       console.log(`[Algolia] Đã gỡ sản phẩm ${id} do bị xóa.`);
@@ -1215,6 +1250,7 @@ export class ProductsService {
       console.error('Lỗi xóa Algolia khi Soft Delete:', err);
     }
 
+    // Ghi log hệ thống cho Audit
     await this.auditLogsService.log({
       action: 'SOFT_DELETE_PRODUCT',
       collection_name: 'products',
@@ -1230,7 +1266,7 @@ export class ProductsService {
       user_agent: userAgent,
     });
 
-    return { message: 'Đã xóa vĩnh viễn sản phẩm và dữ liệu liên quan.' };
+    return { message: 'Đã đưa sản phẩm vào thùng rác thành công.' };
   }
 
   async updateTags(

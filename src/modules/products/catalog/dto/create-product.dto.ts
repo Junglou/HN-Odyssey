@@ -70,7 +70,7 @@ export class CreateProductVariantDto {
   @Min(0)
   stock: number; // Tồn kho riêng từng biến thể
 
-  @IsOptional() @IsString() image?: string; // URL ảnh riêng
+  @IsOptional() @IsString() images: string[];
   @IsOptional() @IsNumber() image_index?: number; // Index ảnh trong mảng images cha
 
   @IsOptional() @IsBoolean() active?: boolean;
@@ -122,7 +122,10 @@ export class CreateProductDto {
   margin_tier?: number;
 
   // US.73: Media
-  @IsOptional() @IsArray() @IsString({ each: true }) images?: string[];
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  images?: string[];
   @IsOptional() @IsString() thumbnail?: string;
   @IsOptional() @IsString() video?: string;
 

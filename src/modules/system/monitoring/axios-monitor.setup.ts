@@ -102,6 +102,8 @@ export class AxiosMonitorSetup implements OnModuleInit {
     else if (url.includes('ghtklab')) provider = 'GHTK';
     else if (url.includes('momo.vn')) provider = 'MOMO';
     else if (url.includes('vnpay.vn')) provider = 'VNPAY';
+    else if (url.includes('127.0.0.1') || url.includes('localhost'))
+      provider = 'ML_ENGINE';
 
     let requestData: Record<string, unknown> = {};
     if (typeof config.data === 'string') {

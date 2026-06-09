@@ -6,7 +6,7 @@ export const PERMISSION_METADATA = [
     resources: [
       {
         code: Resource.SYSTEM,
-        name: 'Cấu hình hệ thống',
+        name: 'Cấu hình & Giám sát hệ thống',
         availableActions: [Action.READ, Action.UPDATE],
       },
       {
@@ -38,11 +38,10 @@ export const PERMISSION_METADATA = [
   },
   {
     group: 'MARKETING & SẢN PHẨM (CATALOG)',
-    //Nhóm này thuộc về Marketing/Sales quản lý nội dung
     resources: [
       {
         code: Resource.PRODUCTS,
-        name: 'Thông tin Sản phẩm (Tên, Giá, Ảnh)',
+        name: 'Thông tin Sản phẩm',
         availableActions: [
           Action.READ,
           Action.CREATE,
@@ -64,7 +63,7 @@ export const PERMISSION_METADATA = [
       },
       {
         code: Resource.ATTRIBUTES,
-        name: 'Thuộc tính (Size, Màu) & Tag',
+        name: 'Thuộc tính & Nhãn (Tags)',
         availableActions: [
           Action.READ,
           Action.CREATE,
@@ -85,7 +84,7 @@ export const PERMISSION_METADATA = [
       },
       {
         code: Resource.BLOG,
-        name: 'Tin tức & Bài viết',
+        name: 'Tin tức & Trang tĩnh (Media)',
         availableActions: [
           Action.READ,
           Action.CREATE,
@@ -133,11 +132,16 @@ export const PERMISSION_METADATA = [
       {
         code: Resource.TRADE_IN,
         name: 'Thu cũ đổi mới',
-        availableActions: [Action.READ, Action.UPDATE, Action.APPROVE],
+        availableActions: [
+          Action.READ,
+          Action.UPDATE,
+          Action.APPROVE,
+          Action.EXPORT,
+        ],
       },
       {
         code: Resource.CUSTOMERS,
-        name: 'Khách hàng',
+        name: 'Hồ sơ Khách hàng',
         availableActions: [
           Action.READ,
           Action.CREATE,
@@ -151,7 +155,6 @@ export const PERMISSION_METADATA = [
   },
   {
     group: 'KHO VẬN (WAREHOUSE)',
-    // Kho chỉ lo về số lượng và luân chuyển
     resources: [
       {
         code: Resource.INVENTORY,
@@ -164,6 +167,7 @@ export const PERMISSION_METADATA = [
         availableActions: [
           Action.READ,
           Action.CREATE,
+          Action.UPDATE, // Đã bổ sung cho chức năng completeTicket
           Action.APPROVE,
           Action.CANCEL,
           Action.EXPORT,
@@ -196,7 +200,7 @@ export const PERMISSION_METADATA = [
       },
       {
         code: Resource.WARRANTY,
-        name: 'Bảo hành',
+        name: 'Bảo hành điện tử',
         availableActions: [
           Action.READ,
           Action.CREATE,
@@ -231,7 +235,6 @@ export const PERMISSION_METADATA = [
       },
     ],
   },
-  // Dashboard để phân quyền xem trang chủ Admin
   {
     group: 'TỔNG QUAN (DASHBOARD)',
     resources: [

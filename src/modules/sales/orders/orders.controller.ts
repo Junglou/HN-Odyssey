@@ -92,7 +92,7 @@ export class OrdersController {
   // 6. IN HÀNG LOẠT (TRẢ VỀ FILE PDF)
   @Post('print-bulk')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.ORDERS, Action.READ)
+  @RequirePermissions(Resource.ORDERS, Action.EXPORT)
   @ApiOperation({ summary: 'In nhiều đơn hàng cùng lúc (Tải PDF)' })
   async printBulk(
     @Body('ids') ids: string[],

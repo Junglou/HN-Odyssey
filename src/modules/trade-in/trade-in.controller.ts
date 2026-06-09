@@ -121,7 +121,7 @@ export class TradeInController {
   // 2. API Xuất Excel
   @Get('admin/export/excel')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.TRADE_IN, Action.READ)
+  @RequirePermissions(Resource.TRADE_IN, Action.EXPORT)
   async exportExcel(
     @Req() req: RequestWithUser,
     @Query() query: QueryAdminTradeInDto,

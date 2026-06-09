@@ -28,7 +28,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 export interface ProcessedTransactionItem {
-  product_id: Types.ObjectId;
+  product_id?: Types.ObjectId;
   sku: string;
   quantity: number;
   note: string;
@@ -273,6 +273,7 @@ export class TransactionsService {
     const processedItems: ProcessedTransactionItem[] = [];
 
     for (const item of dto.items) {
+      // Tìm sản phẩm nhưng không ném lỗi nếu không có (cho phép tạo mới)
       const product = await this.productModel
         .findOne({
           $or: [{ sku: item.sku }, { 'variants.sku': item.sku }],
@@ -280,15 +281,9 @@ export class TransactionsService {
         })
         .lean();
 
-      if (!product) {
-        throw new BadRequestException(
-          `SKU ${item.sku} không tồn tại trong hệ thống.`,
-        );
-      }
-
       totalQuantity += item.quantity;
       processedItems.push({
-        product_id: product._id,
+        product_id: product ? product._id : undefined,
         sku: item.sku,
         quantity: item.quantity,
         note: item.reason || '',
@@ -322,7 +317,7 @@ export class TransactionsService {
         total: totalQuantity,
       },
       ip,
-      user_agent: userAgent, // LỖI 2: Sửa userAgent thành user_agent
+      user_agent: userAgent,
     });
 
     return newTransaction;
@@ -470,8 +465,10 @@ export class TransactionsService {
       );
 
       if (!found) {
-        rowResult.status = 'INVALID';
-        rowResult.errors.push('SKU không tồn tại');
+        // Cho phép import SKU mới, không đánh lỗi
+        rowResult.note = rowResult.note
+          ? `${rowResult.note} (SKU mới)`
+          : 'SKU mới';
       } else {
         rowResult.product_id = found._id.toString();
       }
@@ -1491,7 +1488,9 @@ export class TransactionsService {
     doc.y = startInfoY + infoBoxHeight + 20;
 
     const tableTop = doc.y;
-    const col = { stt: 40, sku: 80, name: 180, qty: 470 };
+
+    // đẩy tọa độ cột name sang phải để cấp phát 140 points khoảng trống cho SKU
+    const col = { stt: 40, sku: 80, name: 220, qty: 470 };
 
     doc.rect(40, tableTop, 515, 25).fill('#1A237E');
     doc.fillColor('#FFFFFF').font('Roboto-Bold');
@@ -1505,8 +1504,11 @@ export class TransactionsService {
 
     detail.items.forEach((item, index) => {
       const rowY = doc.y;
-      const nameHeight = doc.heightOfString(item.product_name, { width: 280 });
-      const rowHeight = Math.max(25, nameHeight + 10);
+
+      // tính toán chiều cao của cả 2 cột để khung viền bọc hết nếu chữ rớt dòng
+      const skuHeight = doc.heightOfString(item.sku, { width: 130 });
+      const nameHeight = doc.heightOfString(item.product_name, { width: 240 });
+      const rowHeight = Math.max(25, nameHeight + 10, skuHeight + 10);
 
       if (rowY + rowHeight > 760) {
         doc.addPage();
@@ -1523,8 +1525,11 @@ export class TransactionsService {
         width: 30,
         align: 'center',
       });
-      doc.text(item.sku, col.sku, rowY + 7);
-      doc.text(item.product_name, col.name, rowY + 7, { width: 280 });
+
+      // cấp phát width cứng để ép pdfkit tự xuống dòng thay vì đè lên cột kế tiếp
+      doc.text(item.sku, col.sku, rowY + 7, { width: 130 });
+      doc.text(item.product_name, col.name, rowY + 7, { width: 240 });
+
       doc.text(item.quantity_exported.toString(), col.qty, rowY + 7, {
         width: 80,
         align: 'center',
@@ -1655,7 +1660,7 @@ export class TransactionsService {
     doc
       .font('Roboto-Bold')
       .fontSize(22)
-      .fillColor('#1976D2') // Phân biệt màu sắc với phiếu xuất (E65100)
+      .fillColor('#1976D2')
       .text('PHIẾU NHẬP KHO', { align: 'center' });
     doc
       .font('Roboto')
@@ -1717,7 +1722,7 @@ export class TransactionsService {
     doc.y = startInfoY + infoBoxHeight + 20;
 
     const tableTop = doc.y;
-    const col = { stt: 40, sku: 80, name: 180, qty: 470 };
+    const col = { stt: 40, sku: 80, name: 220, qty: 470 };
 
     doc.rect(40, tableTop, 515, 25).fill('#1A237E');
     doc.fillColor('#FFFFFF').font('Roboto-Bold');
@@ -1731,8 +1736,10 @@ export class TransactionsService {
 
     detail.items.forEach((item, index) => {
       const rowY = doc.y;
-      const nameHeight = doc.heightOfString(item.product_name, { width: 280 });
-      const rowHeight = Math.max(25, nameHeight + 10);
+
+      const skuHeight = doc.heightOfString(item.sku, { width: 130 });
+      const nameHeight = doc.heightOfString(item.product_name, { width: 240 });
+      const rowHeight = Math.max(25, nameHeight + 10, skuHeight + 10);
 
       if (rowY + rowHeight > 760) {
         doc.addPage();
@@ -1749,8 +1756,8 @@ export class TransactionsService {
         width: 30,
         align: 'center',
       });
-      doc.text(item.sku, col.sku, rowY + 7);
-      doc.text(item.product_name, col.name, rowY + 7, { width: 280 });
+      doc.text(item.sku, col.sku, rowY + 7, { width: 130 });
+      doc.text(item.product_name, col.name, rowY + 7, { width: 240 });
       doc.text(item.quantity_imported.toString(), col.qty, rowY + 7, {
         width: 80,
         align: 'center',
@@ -1813,17 +1820,33 @@ export class TransactionsService {
       const updatedProducts: UpdatedProductInfo[] = [];
 
       for (const item of transaction.items) {
-        const product = await this.productModel
-          .findById(item.product_id)
+        let product = await this.productModel
+          .findOne({ $or: [{ sku: item.sku }, { 'variants.sku': item.sku }] })
           .session(session);
+
+        // NẾU SKU CHƯA TỒN TẠI, HỆ THỐNG TỰ ĐỘNG TẠO "STUB PRODUCT"
         if (!product) {
-          const safeId = item.product_id
-            ? item.product_id.toString()
-            : 'Không xác định';
-          throw new BadRequestException(`Sản phẩm ID ${safeId} không tồn tại.`);
+          if (transaction.action_type === 'IMPORT') {
+            const newStub = new this.productModel({
+              name: `Chưa định danh - ${item.sku}`,
+              sku: item.sku,
+              slug: `stub-${item.sku}-${Date.now()}`,
+              status: 'DRAFT',
+              categories: [],
+              tags: ['wms-stub'], // Đánh dấu là hàng xuất phát từ Kho
+              stock: 0,
+              price: 0,
+              has_variants: false,
+            });
+            product = await newStub.save({ session });
+          } else {
+            throw new BadRequestException(
+              `SKU ${item.sku} không tồn tại để xuất kho.`,
+            );
+          }
         }
 
-        const filter: FilterQuery<ProductDocument> = { _id: item.product_id };
+        const filter: FilterQuery<ProductDocument> = { _id: product._id };
         const updateQuery: UpdateQuery<ProductDocument> = {};
 
         const multiplier = transaction.action_type === 'IMPORT' ? 1 : -1;
@@ -1888,7 +1911,7 @@ export class TransactionsService {
           action: transaction.action_type,
         },
         ip,
-        user_agent: userAgent, // LỖI 2
+        user_agent: userAgent,
       });
 
       await session.commitTransaction();

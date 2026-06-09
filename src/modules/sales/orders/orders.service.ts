@@ -494,7 +494,15 @@ export class OrdersService {
       const usedCountByUser = await this.orderModel.countDocuments({
         user_id: new Types.ObjectId(userId),
         voucher_code: code.toUpperCase(),
-        status: { $nin: ['CANCELLED', 'TEMPORARY'] },
+        status: {
+          $nin: [
+            'CANCELLED',
+            'TEMPORARY',
+            'REFUND_PENDING',
+            'REFUNDED',
+            'RETURNED',
+          ],
+        },
       });
 
       // Sử dụng extendedVoucher thay cho voucher để TypeScript không báo lỗi
@@ -902,7 +910,7 @@ export class OrdersService {
         // Tìm variant để lấy giá chính xác
         const variant = product.variants.find((v) => v.sku === cartItem.sku);
         const realPrice = variant ? variant.sale_price || variant.price : 0;
-        const realImage = variant?.image || product.thumbnail || '';
+        const realImage = variant?.images?.[0] || product.thumbnail || '';
 
         return {
           product_id: cartItem.product_id,
@@ -1110,6 +1118,7 @@ export class OrdersService {
         };
 
         order.status = 'PENDING';
+        order.hold_expires_at = undefined;
         order.total_amount = finalOrderTotal;
         order.shipping_fee = shippingFee;
         (
@@ -1330,6 +1339,7 @@ export class OrdersService {
         tempOrder.shipping_fee = shippingFeeGuest;
         tempOrder.voucher_code = dto.voucherCode || '';
         tempOrder.status = 'PENDING';
+        tempOrder.hold_expires_at = undefined; // BỔ SUNG DÒNG NÀY ĐỂ XÓA HẸN GIỜ HỦY ĐƠN
 
         if (!tempOrder.timeline) tempOrder.timeline = [];
         tempOrder.timeline.push({
