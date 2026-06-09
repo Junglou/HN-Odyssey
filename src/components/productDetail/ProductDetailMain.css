@@ -9,7 +9,6 @@
   box-sizing: border-box;
 }
 
-/* khi viewport hẹp (<= ~700px): stack dọc */
 @media (max-width: 700px) {
   .pdp-main-section {
     grid-template-columns: 1fr;
@@ -28,26 +27,27 @@
 .pdp-main-image-wrap {
   position: relative;
   width: 100%;
-  aspect-ratio: 3 / 4;
+  height: clamp(400px, 70vh, 850px);
   border: 1px solid #e5e7eb;
   border-radius: clamp(8px, 1vw, 14px);
   overflow: hidden;
   background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* mobile: đổi ratio sang vuông để không chiếm quá nhiều màn hình */
 @media (max-width: 700px) {
   .pdp-main-image-wrap {
-    aspect-ratio: 1 / 1;
+    height: clamp(300px, 50vh, 500px);
   }
 }
 
 .pdp-main-image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain; /* toàn bộ ảnh luôn hiển thị, không crop */
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: scale-down;
   object-position: center;
-  background-color: #f8f8f8;
   cursor: zoom-in;
   display: block;
 }
@@ -83,10 +83,13 @@
 .pdp-thumbnail-list {
   display: flex;
   flex-direction: row;
+  flex-wrap: nowrap;
   gap: clamp(6px, 1vw, 14px);
   width: 100%;
   overflow-x: auto;
   scrollbar-width: none;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .pdp-thumbnail-list::-webkit-scrollbar {
@@ -94,9 +97,8 @@
 }
 
 .pdp-thumbnail-wrap {
-  flex: 1;
-  min-width: clamp(60px, 10vw, 120px);
-  aspect-ratio: 3 / 4;
+  flex: 0 0 calc(20% - 12px);
+  aspect-ratio: 16 / 9;
   border: 1.5px solid #e5e7eb;
   border-radius: clamp(6px, 0.8vw, 10px);
   overflow: hidden;
@@ -123,6 +125,18 @@
   object-position: center;
   background-color: #f8f8f8;
   display: block;
+}
+
+@media (max-width: 1024px) {
+  .pdp-thumbnail-wrap {
+    flex: 0 0 calc(25% - 10px);
+  }
+}
+
+@media (max-width: 700px) {
+  .pdp-thumbnail-wrap {
+    flex: 0 0 25vw;
+  }
 }
 
 /* info panel */
@@ -248,9 +262,9 @@
   padding: 0 clamp(10px, 1.2vw, 18px);
   background: #ffffff;
   border-radius: 999px;
-  border: 1px solid #000000; /* viền ở mức tối thiểu 1px */
+  border: 1px solid #000000;
   font-size: clamp(12px, 1vw, 16px);
-  font-weight: 400; /* độ đậm chữ bình thường */
+  font-weight: 400;
   color: #000000;
   cursor: pointer;
   transition: all 0.2s;
@@ -264,9 +278,9 @@
 .pdp-size-btn.active {
   background: #ffffff;
   color: #000000;
-  font-weight: 600; /* in đậm chữ khi chọn để tăng độ tương phản */
-  border: 2.5px solid #000000; /* viền tăng lên 3px để phân biệt rõ với 1px mặc định */
-  padding: 0 calc(clamp(10px, 1.2vw, 18px) - 2px); /* bù trừ 2px độ dày viền tăng thêm để không làm thay đổi kích thước tổng thể của nút */
+  font-weight: 600;
+  border: 2.5px solid #000000;
+  padding: 0 calc(clamp(10px, 1.2vw, 18px) - 2px);
 }
 
 /* quantity */
@@ -361,6 +375,7 @@
 .pdp-btn-add:hover,
 .pdp-btn-checkout:hover {
   opacity: 0.8;
+  border-color: #575757;
 }
 
 .pdp-btn-add {
