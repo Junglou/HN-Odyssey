@@ -43,6 +43,12 @@
   padding: 1rem 0;
 }
 
+.add-new-address-txt-container .lbl-text {
+  display: inline-block;
+  width: auto;
+  text-align: center;
+}
+
 .address-box-content {
   width: fit-content;
   height: 100%;

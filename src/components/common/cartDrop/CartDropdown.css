@@ -10,12 +10,15 @@
   flex-direction: column;
   z-index: 1000;
   cursor: default;
-
   opacity: 0;
   visibility: hidden;
-  transform: translateY(15px);
-  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+  transform: translateY(-20px);
   pointer-events: none;
+
+  transition:
+    opacity 0.3s cubic-bezier(0.25, 1, 0.5, 1),
+    transform 0.3s cubic-bezier(0.25, 1, 0.5, 1),
+    visibility 0s linear 0.3s;
 }
 
 .cart-dropdown-wrapper.open {
@@ -23,6 +26,10 @@
   visibility: visible;
   transform: translateY(0);
   pointer-events: auto;
+  transition:
+    opacity 0.3s cubic-bezier(0.25, 1, 0.5, 1),
+    transform 0.3s cubic-bezier(0.25, 1, 0.5, 1),
+    visibility 0s linear 0s;
 }
 
 .cart-dropdown-items {
