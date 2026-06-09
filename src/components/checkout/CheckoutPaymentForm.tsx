@@ -5,6 +5,7 @@ import {
 } from "../../assets/icons/CheckoutIcons";
 import type { CheckoutPaymentData } from "../../hooks/checkout/useCheckout";
 import "./CheckoutPaymentForm.css";
+import MoMoLogo from "../../assets/images/momo-logo.png";
 
 // interfaces
 interface CheckoutPaymentFormProps {
@@ -123,7 +124,7 @@ export default function CheckoutPaymentForm({
           <div className="checkout-payment-body">
             <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
               <img
-                src="https://upload.wikimedia.org/wikipedia/vi/f/fe/MoMo_Logo.png"
+                src={MoMoLogo} // Đổi src thành biến đã import
                 alt="MoMo"
                 style={{ height: "35px", objectFit: "contain" }}
               />

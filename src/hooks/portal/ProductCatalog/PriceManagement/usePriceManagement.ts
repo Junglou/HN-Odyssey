@@ -74,11 +74,10 @@ export function usePriceManagement() {
     products.forEach((p) => {
       if (p.has_variants && p.variants && p.variants.length > 0) {
         p.variants.forEach((v, index) => {
-          // Trạng thái mặc định là DRAFT thay vì APPROVED để bắt buộc quy trình phê duyệt
           let currentStatus = "DRAFT";
           let displayPrice = v.price;
           const displayCurrency =
-            p.price_request?.currency || p.currency || "VND";
+            p.price_request?.currency || p.currency || "USD";
 
           if (p.price_request) {
             const reqVar = p.price_request.variants?.find(
@@ -114,7 +113,7 @@ export function usePriceManagement() {
         let currentStatus = "DRAFT";
         let displayPrice = p.price;
         const displayCurrency =
-          p.price_request?.currency || p.currency || "VND";
+          p.price_request?.currency || p.currency || "USD";
 
         if (p.price_request) {
           currentStatus = p.price_request.status || "PENDING";
@@ -291,18 +290,59 @@ export function usePriceManagement() {
     }
   };
 
-  const getUniqueProductIds = () => {
+  const getSelectedItems = () => {
     const ids = Array.from(selectedIds);
-    const productIds = records
+    return records
       .filter((r) => ids.includes(r.id))
-      .map((r) => r.productId);
-    return Array.from(new Set(productIds));
+      .map((r) => ({
+        product_id: r.productId,
+        sku: r.sku,
+      }));
+  };
+
+  const bulkActions = {
+    bulkApprove: async () => {
+      const targets = getSelectedItems();
+      if (targets.length === 0) return;
+      try {
+        await axiosClient.patch(`/products/price-requests/bulk-action`, {
+          items: targets,
+          action: "approve",
+        });
+        toast.success(`Đã duyệt ${targets.length} mục được chọn!`);
+        setSelectedIds(new Set());
+        refreshData();
+      } catch (error) {
+        const err = error as ApiError;
+        const msg = err.response?.data?.message;
+        toast.error(
+          Array.isArray(msg) ? msg.join(", ") : msg || "Lỗi duyệt hàng loạt",
+        );
+      }
+    },
+    bulkReject: async () => {
+      const targets = getSelectedItems();
+      if (targets.length === 0) return;
+      try {
+        await axiosClient.patch(`/products/price-requests/bulk-action`, {
+          items: targets,
+          action: "reject",
+        });
+        toast.warning(`Đã từ chối ${targets.length} mục được chọn!`);
+        setSelectedIds(new Set());
+        refreshData();
+      } catch (error) {
+        const err = error as ApiError;
+        const msg = err.response?.data?.message;
+        toast.error(
+          Array.isArray(msg) ? msg.join(", ") : msg || "Lỗi từ chối hàng loạt",
+        );
+      }
+    },
   };
 
   const rowActions = {
-    // Nhận thêm params sku để xử lý riêng biệt
     submitPrice: async (productId: string, sku: string) => {
-      // Tìm xem record đang được click có giá hiện tại là bao nhiêu
       const targetRecord = records.find(
         (r) =>
           r.sku === sku ||
@@ -324,15 +364,12 @@ export function usePriceManagement() {
         refreshData();
       } catch (error) {
         const err = error as ApiError;
-
-        // Bắt lỗi 404 (Chưa có nháp trong DB) để nhắc nhở thân thiện
         if (err.response?.status === 404) {
           toast.error(
             "Chưa có bản nháp trên hệ thống. Vui lòng nhấn 'Edit' và 'Save Price' trước khi Submit.",
           );
           return;
         }
-
         const msg = err.response?.data?.message;
         toast.error(
           Array.isArray(msg) ? msg.join(", ") : msg || "Lỗi gửi duyệt",
@@ -367,48 +404,6 @@ export function usePriceManagement() {
         const err = error as ApiError;
         const msg = err.response?.data?.message;
         toast.error(Array.isArray(msg) ? msg.join(", ") : msg || "Lỗi từ chối");
-      }
-    },
-  };
-
-  const bulkActions = {
-    // BE cần được update logic để xử lý bulk theo danh sách SKU thay vì ProductID thuần túy
-    bulkApprove: async () => {
-      const targets = getUniqueProductIds();
-      if (targets.length === 0) return;
-      try {
-        await axiosClient.patch(`/products/price-requests/bulk-action`, {
-          product_ids: targets,
-          action: "approve",
-        });
-        toast.success(`Đã duyệt ${targets.length} mục được chọn!`);
-        setSelectedIds(new Set());
-        refreshData();
-      } catch (error) {
-        const err = error as ApiError;
-        const msg = err.response?.data?.message;
-        toast.error(
-          Array.isArray(msg) ? msg.join(", ") : msg || "Lỗi duyệt hàng loạt",
-        );
-      }
-    },
-    bulkReject: async () => {
-      const targets = getUniqueProductIds();
-      if (targets.length === 0) return;
-      try {
-        await axiosClient.patch(`/products/price-requests/bulk-action`, {
-          product_ids: targets,
-          action: "reject",
-        });
-        toast.warning(`Đã từ chối ${targets.length} mục được chọn!`);
-        setSelectedIds(new Set());
-        refreshData();
-      } catch (error) {
-        const err = error as ApiError;
-        const msg = err.response?.data?.message;
-        toast.error(
-          Array.isArray(msg) ? msg.join(", ") : msg || "Lỗi từ chối hàng loạt",
-        );
       }
     },
   };

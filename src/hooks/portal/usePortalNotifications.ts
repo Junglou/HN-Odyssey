@@ -120,11 +120,16 @@ export function usePortalNotifications() {
     const token = localStorage.getItem("access_token");
     if (!token) return;
 
-    const socketUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
+    // 1. Lấy URL gốc và loại bỏ đuôi "/api" (nếu có) để khớp với NestJS Gateway
+    const rawApiUrl =
+      import.meta.env.VITE_API_URL || "http://localhost:8080/api";
+    const socketBaseUrl = rawApiUrl.replace(/\/api\/?$/, "");
 
-    const socket: Socket = io(`${socketUrl}/notifications`, {
+    // 2. Khởi tạo Socket, trỏ vào đúng namespace /notifications
+    const socket: Socket = io(`${socketBaseUrl}/notifications`, {
       auth: { token },
-      transports: ["websocket"],
+      // LƯU Ý: Tạm thời bỏ 'transports: ["websocket"]' để Socket.IO tự động
+      // dùng HTTP Polling trước rồi mới upgrade lên WS, giúp kết nối ổn định hơn qua proxy.
     });
 
     // map lại raw payload để lấy id đồng bộ với logic _id của frontend
@@ -140,7 +145,7 @@ export function usePortalNotifications() {
 
       setNotifications((prev) => [data, ...prev]);
       setUnreadCount((prev) => prev + 1);
-      toast.info(`thông báo mới: ${data.title}`);
+      toast.info(`Thông báo mới: ${data.title}`);
     });
 
     return () => {

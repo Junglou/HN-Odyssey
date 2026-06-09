@@ -294,7 +294,7 @@ export default function ProductForm({
                 { label: "Inactive", value: "Inactive" },
               ]}
               onChange={(val) => actions.changeInput("status", val)}
-              disabled={isViewMode}
+              disabled={isViewMode || mode === "add"} // <--- KHÓA Ở ĐÂY
             />
           </div>
           <div className="pf-input-group pf-col-span-full">
@@ -415,19 +415,34 @@ export default function ProductForm({
                               <button
                                 type="button"
                                 className="pf-btn-action white"
+                                // KHÓA NÚT KHI ĐANG Ở CHẾ ĐỘ ADD
+                                disabled={mode === "add"}
+                                title={
+                                  mode === "add"
+                                    ? "Vui lòng lưu sản phẩm trước khi set giá"
+                                    : ""
+                                }
                                 onClick={(e) => {
                                   setEditingPriceItem(item);
                                   setIsSetPriceModalOpen(true);
                                   e.currentTarget.blur();
                                 }}
                               >
-                                <EditPenIcon />
-                                Edit
+                                <EditPenIcon /> Edit
                               </button>
+
                               <button
                                 type="button"
                                 className="pf-btn-action blue"
-                                disabled={item.status === "rejected"}
+                                // KHÓA NÚT KHI BỊ REJECT HOẶC KHI ĐANG Ở CHẾ ĐỘ ADD
+                                disabled={
+                                  item.status === "rejected" || mode === "add"
+                                }
+                                title={
+                                  mode === "add"
+                                    ? "Vui lòng lưu sản phẩm trước khi submit giá"
+                                    : ""
+                                }
                                 onClick={(e) => {
                                   actions.submitSinglePrice(item.id);
                                   e.currentTarget.blur();
@@ -665,7 +680,7 @@ export default function ProductForm({
             productName={formData.name || "N/A"}
             sku={formData.sku || "N/A"}
             initialPrice={editingPriceItem?.price || 0}
-            initialCurrency={editingPriceItem?.currency || "VND"}
+            initialCurrency={editingPriceItem?.currency || "USD"}
             // Thay vì nhận (newPrice, currency), ta nhận object data từ SetPriceModal
             onSave={(data) => {
               if (editingPriceItem) {

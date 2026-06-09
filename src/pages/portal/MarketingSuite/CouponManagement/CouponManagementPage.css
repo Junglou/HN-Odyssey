@@ -8,6 +8,4 @@
   box-sizing: border-box;
   padding: clamp(12px, 3vw, 32px);
   background-color: #f9fafb;
-  min-height: 100dvh;
-  overflow-x: hidden;
 }

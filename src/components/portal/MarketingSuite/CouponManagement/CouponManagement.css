@@ -379,8 +379,8 @@
 }
 
 .coupon-badge-inactive {
-  background-color: #f3f4f6;
-  color: #4b5563;
+  background-color: #fee2e2; /* Chuyển nền sang màu đỏ nhạt */
+  color: #991b1b; /* Chuyển chữ sang màu đỏ đậm để đảm bảo độ tương phản */
 }
 
 .coupon-badge-draft {

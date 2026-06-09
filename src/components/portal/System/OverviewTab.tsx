@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from "react";
 import {
   AreaChart,
   Area,
@@ -5,7 +6,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
 } from "recharts";
 import "./OverviewTab.css";
 import { useSystem } from "../../../hooks/portal/System/useSystem";
@@ -70,7 +70,7 @@ function GradientGauge({
       <g
         style={{
           transform: `rotate(${thresholdAngle}deg)`,
-          transformOrigin: "100px 100px", // tâm xoay = cx cy của gauge
+          transformOrigin: "100px 100px",
         }}
       >
         <line
@@ -108,7 +108,7 @@ function GradientGauge({
       <g
         style={{
           transform: `rotate(${angle}deg)`,
-          transformOrigin: "100px 100px", // tâm xoay khớp với tâm gauge
+          transformOrigin: "100px 100px",
           transition: "transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
         }}
       >
@@ -122,6 +122,32 @@ function GradientGauge({
 
 export default function OverviewTab({ data }: OverviewTabProps) {
   const { overview } = data;
+
+  // Custom logic thay thế ResponsiveContainer
+  const [chartWidth, setChartWidth] = useState(0);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const element = chartContainerRef.current;
+    if (!element) return;
+
+    // Tự động cập nhật lại chartWidth mỗi khi div cha bị co giãn
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width } = entry.contentRect;
+        // Chỉ lưu width khi nó là số dương hợp lệ
+        if (width > 0) {
+          setChartWidth(width);
+        }
+      }
+    });
+
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   return (
     <div className="ov-tab-layout">
@@ -180,9 +206,18 @@ export default function OverviewTab({ data }: OverviewTabProps) {
           <h3 className="ov-section-title sys-mb-0">
             Avg. Page Load Time (ms)
           </h3>
-          <div className="ov-chart-container">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={overview.pageLoad}>
+          <div
+            className="ov-chart-container"
+            ref={chartContainerRef}
+            style={{ width: "100%", height: 280 }}
+          >
+            {/* Truyền trực tiếp pixel thật vào AreaChart, dập tắt tận gốc component gây lỗi */}
+            {chartWidth > 0 && (
+              <AreaChart
+                width={chartWidth}
+                height={280}
+                data={overview.pageLoad}
+              >
                 <defs>
                   <linearGradient id="colorLoad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
@@ -203,7 +238,7 @@ export default function OverviewTab({ data }: OverviewTabProps) {
                   activeDot={{ r: 6 }}
                 />
               </AreaChart>
-            </ResponsiveContainer>
+            )}
           </div>
         </div>
 

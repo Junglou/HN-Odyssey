@@ -155,7 +155,7 @@ export function useProductManagement() {
         return sum + vPrice;
       }, 0);
     }
-    const currencyFormat = p.currency || "VND";
+    const currencyFormat = p.currency || "USD";
 
     return {
       id: p._id,
@@ -272,7 +272,13 @@ export function useProductManagement() {
 
     addProduct: () => navigate("/portal/products/add"),
     viewProduct: (id: string) => navigate(`/portal/products/${id}`),
-    editProduct: (id: string) => navigate(`/portal/products/${id}/edit`),
+    editProduct: (id: string, status: string) => {
+      if (status === "Active") {
+        toast.warning("Vui lòng tắt hoạt động (Inactive) trước khi chỉnh sửa!");
+        return;
+      }
+      navigate(`/portal/products/${id}/edit`);
+    },
     deleteSingle: (id: string) =>
       setDeleteConfig({ isOpen: true, type: "single", productId: id }),
   };
@@ -283,7 +289,6 @@ export function useProductManagement() {
         await axiosClient.delete(`/products/${deleteConfig.productId}`);
         toast.success("Đã xóa sản phẩm thành công.");
       } else if (deleteConfig.type === "bulk") {
-        // GỌI DUY NHẤT 1 REQUEST BULK DELETE XUỐNG BE
         const res = await axiosClient.delete(`/products/bulk/delete`, {
           data: { product_ids: selectedIds },
         });
@@ -294,10 +299,16 @@ export function useProductManagement() {
       setDeleteConfig({ isOpen: false, type: "single", productId: null });
       fetchProducts();
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Lỗi khi xóa sản phẩm. Có thể SP đã phát sinh đơn hàng.";
+      // CODE MỚI: Bắt và parse chính xác thông báo lỗi từ NestJS
+      const err = error as {
+        response?: { data?: { message?: string | string[] } };
+      };
+      const msg = err.response?.data?.message;
+
+      const errorMessage = Array.isArray(msg)
+        ? msg.join(", ")
+        : msg || "Đã xảy ra lỗi khi xóa sản phẩm.";
+
       toast.error(errorMessage);
       setDeleteConfig({ isOpen: false, type: "single", productId: null });
     }

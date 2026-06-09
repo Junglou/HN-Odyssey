@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
 import { recordRecentViewProduct } from "../profile/useRecentViewManagement";
 
-// --- HÀM XỬ LÝ ẢNH CHUẨN HOÁ TỪ BACKEND ---
+// helper: Xử lý ảnh chuẩn hóa từ Backend
 const getFullImageUrl = (url?: string): string => {
   if (!url) return "/Logo.png";
   if (
@@ -19,7 +19,6 @@ const getFullImageUrl = (url?: string): string => {
   return `${serverRootUrl}${formattedUrl}`;
 };
 
-// --- TYPES TƯƠNG THÍCH BACKEND ---
 export interface FormattedOptionValue {
   value: string;
   label: string;
@@ -44,7 +43,7 @@ export interface ProductDetailState {
   details: string;
   hasVariants: boolean;
   options: FormattedOption[];
-  images: string[]; // Mảng chứa TẤT CẢ ảnh (Gốc + Biến thể)
+  images: string[];
 }
 
 interface BeSpec {
@@ -63,7 +62,7 @@ interface BeVariant {
   price: number;
   sale_price: number;
   stock: number;
-  image?: string;
+  images?: string[]; // handle: Thay thế image thành images theo cấu trúc mới
   active: boolean;
   attributes: BeAttribute[];
 }
@@ -104,7 +103,6 @@ interface DbAttribute {
   display_type: string;
   values: DbAttributeValue[];
 }
-// -------------
 
 export function useProductDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -118,7 +116,7 @@ export function useProductDetail() {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [rawQuantity, setRawQuantity] = useState<number | string>(1);
 
-  // 1. FETCH DỮ LIỆU TẬN GỐC RỄ
+  // handle: Fetch dữ liệu chi tiết
   useEffect(() => {
     const fetchProductDetail = async () => {
       try {
@@ -200,10 +198,9 @@ export function useProductDetail() {
           });
         });
 
-        // TỰ ĐỘNG GOM TẤT CẢ ẢNH VÀO MỘT THƯ VIỆN CHUNG
+        // helper: Gom ảnh của sản phẩm mẹ làm fallback
         const uiImages: string[] = [];
 
-        // Bước A: Lấy ảnh của sản phẩm gốc
         if (beData.gallery?.length) {
           beData.gallery
             .sort((a, b) => a.display_order - b.display_order)
@@ -216,18 +213,20 @@ export function useProductDetail() {
             const url = getFullImageUrl(img);
             if (!uiImages.includes(url)) uiImages.push(url);
           });
-        } else {
+        } else if (beData.thumbnail) {
           uiImages.push(getFullImageUrl(beData.thumbnail));
         }
 
-        // Bước B: Lấy tất cả ảnh của Biến thể chèn nối tiếp vào
+        // helper: Lấy tất cả ảnh của Biến thể chèn nối tiếp vào thư viện
         if (beData.has_variants && beData.variants) {
           beData.variants.forEach((v) => {
-            if (v.image) {
-              const vUrl = getFullImageUrl(v.image);
-              if (!uiImages.includes(vUrl)) {
-                uiImages.push(vUrl);
-              }
+            if (v.images && v.images.length > 0) {
+              v.images.forEach((img) => {
+                const vUrl = getFullImageUrl(img);
+                if (!uiImages.includes(vUrl)) {
+                  uiImages.push(vUrl);
+                }
+              });
             }
           });
         }
@@ -263,13 +262,15 @@ export function useProductDetail() {
           image: uiImages[0] || "",
         });
 
-        // TÌM BIẾN THỂ CÓ ẢNH TRÙNG VỚI ẢNH THUMBNAIL CỦA SẢN PHẨM MẸ
+        // helper: Tìm biến thể có ảnh đầu tiên trùng với thumbnail
         let defaultVariant = null;
         if (beData.has_variants && beData.variants && beData.thumbnail) {
           defaultVariant = beData.variants.find(
             (v) =>
-              v.image &&
-              getFullImageUrl(v.image) === getFullImageUrl(beData.thumbnail),
+              v.images &&
+              v.images.length > 0 &&
+              getFullImageUrl(v.images[0]) ===
+                getFullImageUrl(beData.thumbnail),
           );
         }
 
@@ -277,7 +278,6 @@ export function useProductDetail() {
         builtOptions.forEach((opt) => {
           if (opt.values.length > 0) {
             if (defaultVariant) {
-              // Nếu tìm thấy variant khớp ảnh, lấy giá trị của variant đó gán làm mặc định
               const matchedAttr = defaultVariant.attributes.find(
                 (a) => a.code.toLowerCase() === opt.code.toLowerCase(),
               );
@@ -285,7 +285,6 @@ export function useProductDetail() {
                 ? matchedAttr.value
                 : opt.values[0].value;
             } else {
-              // Fallback: Nếu không có hoặc lỗi, cứ lấy phần tử đầu tiên
               initialSelections[opt.code] = opt.values[0].value;
             }
           }
@@ -305,8 +304,12 @@ export function useProductDetail() {
             );
           });
 
-          if (matchedVariant && matchedVariant.image) {
-            const vUrl = getFullImageUrl(matchedVariant.image);
+          if (
+            matchedVariant &&
+            matchedVariant.images &&
+            matchedVariant.images.length > 0
+          ) {
+            const vUrl = getFullImageUrl(matchedVariant.images[0]);
             const index = uiImages.indexOf(vUrl);
             setActiveImageIndex(index !== -1 ? index : 0);
           }
@@ -318,7 +321,7 @@ export function useProductDetail() {
     fetchProductDetail();
   }, [slug]);
 
-  // 2. TỰ ĐỘNG TÍNH TOÁN KHI ĐỔI BIẾN THỂ (Memo)
+  // handle: Tính toán động thông số và bộ sưu tập ảnh theo biến thể
   const derivedProduct = useMemo(() => {
     if (!product) return null;
 
@@ -326,6 +329,7 @@ export function useProductDetail() {
     let finalOriginalPrice = product.originalPrice;
     let finalStock = product.stock;
     let finalSku = product.sku;
+    let filteredImages: string[] = [];
 
     if (
       product.hasVariants &&
@@ -338,6 +342,28 @@ export function useProductDetail() {
         );
       });
 
+      // helper: Lọc nhóm biến thể có chung thuộc tính chính để gom ảnh
+      const primaryOptionCode = product.options[0]?.code.toLowerCase();
+      const primaryOptionValue = primaryOptionCode
+        ? selectedOptions[primaryOptionCode]
+        : null;
+
+      const relatedVariants = rawBeProduct.variants.filter((v) => {
+        return v.attributes.some(
+          (attr) =>
+            attr.code.toLowerCase() === primaryOptionCode &&
+            attr.value === primaryOptionValue,
+        );
+      });
+
+      const uniqueImages = new Set<string>();
+      relatedVariants.forEach((v) => {
+        if (v.images && v.images.length > 0) {
+          v.images.forEach((img) => uniqueImages.add(getFullImageUrl(img)));
+        }
+      });
+      filteredImages = Array.from(uniqueImages);
+
       if (matchedVariant) {
         finalPrice = matchedVariant.sale_price || matchedVariant.price;
         finalOriginalPrice =
@@ -347,11 +373,23 @@ export function useProductDetail() {
             : undefined;
         finalStock = matchedVariant.active === false ? 0 : matchedVariant.stock;
         finalSku = matchedVariant.sku || product.sku;
+
+        // helper: Đẩy ảnh đại diện của biến thể khớp chính xác lên index 0
+        if (matchedVariant.images && matchedVariant.images.length > 0) {
+          const primaryImgUrl = getFullImageUrl(matchedVariant.images[0]);
+          filteredImages = [
+            primaryImgUrl,
+            ...filteredImages.filter((img) => img !== primaryImgUrl),
+          ];
+        }
       } else {
-        // Khách chọn 1 tổ hợp không tồn tại trong DB, phải ép Stock về 0
         finalStock = 0;
-        finalSku = ""; // Có thể reset SKU để chắc chắn không add to cart nhầm
+        finalSku = "";
       }
+    }
+
+    if (filteredImages.length === 0) {
+      filteredImages = product.images;
     }
 
     return {
@@ -360,6 +398,7 @@ export function useProductDetail() {
       originalPrice: finalOriginalPrice,
       stock: finalStock,
       sku: finalSku,
+      images: filteredImages,
     };
   }, [product, rawBeProduct, selectedOptions]);
 
@@ -377,37 +416,11 @@ export function useProductDetail() {
     return q;
   }, [rawQuantity, derivedProduct?.stock]);
 
-  // --- HANDLERS ---
+  // handle: Các sự kiện thay đổi
   const handleOptionChange = (code: string, value: string) => {
     const nextOptions = { ...selectedOptions, [code]: value };
     setSelectedOptions(nextOptions);
-
-    // GIẢI QUYẾT LỖI ESLINT: Tự dò tìm biến thể tương ứng và chuyển slide ảnh ngay trong lúc click
-    if (
-      product?.hasVariants &&
-      rawBeProduct?.variants &&
-      rawBeProduct.variants.length > 0
-    ) {
-      const matchedVariant = rawBeProduct.variants.find((v) => {
-        return v.attributes.every(
-          (attr) => nextOptions[attr.code.toLowerCase()] === attr.value,
-        );
-      });
-
-      if (matchedVariant && matchedVariant.image) {
-        const vUrl = getFullImageUrl(matchedVariant.image);
-        const index = product.images.indexOf(vUrl);
-        if (index !== -1) {
-          setActiveImageIndex(index);
-        } else {
-          setActiveImageIndex(0);
-        }
-      } else {
-        setActiveImageIndex(0);
-      }
-    } else {
-      setActiveImageIndex(0);
-    }
+    setActiveImageIndex(0);
   };
 
   const handleImageChange = (index: number) => setActiveImageIndex(index);

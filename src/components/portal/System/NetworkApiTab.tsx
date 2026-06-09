@@ -28,10 +28,15 @@ export default function NetworkApiTab({ data }: NetworkApiTabProps) {
 
       <div className="na-bottom-row">
         <div className="na-chart-card na-chart-flex">
+          {/* Cột 1: Biểu đồ Line */}
           <div className="na-chart-col">
             <h3 className="na-section-title">Network Throughput (Mbps)</h3>
-            <div className="na-chart-container small">
-              <ResponsiveContainer width="100%" height="100%">
+            <div
+              className="na-chart-container small"
+              style={{ width: "100%", height: 240, minHeight: 240 }}
+            >
+              {/* FIX RECHARTS BUG: Dùng width 99% và truyền trực tiếp height dạng số */}
+              <ResponsiveContainer width="99%" height={240} minWidth={100}>
                 <LineChart data={networkData}>
                   <CartesianGrid
                     strokeDasharray="3 3"
@@ -63,10 +68,15 @@ export default function NetworkApiTab({ data }: NetworkApiTabProps) {
             </div>
           </div>
 
+          {/* Cột 2: Biểu đồ Bar */}
           <div className="na-chart-col">
             <h3 className="na-section-title">API Error Rate</h3>
-            <div className="na-chart-container small">
-              <ResponsiveContainer width="100%" height="100%">
+            <div
+              className="na-chart-container small"
+              style={{ width: "100%", height: 240, minHeight: 240 }}
+            >
+              {/* FIX RECHARTS BUG: Dùng width 99% và truyền trực tiếp height dạng số */}
+              <ResponsiveContainer width="99%" height={240} minWidth={100}>
                 <BarChart data={errorRateData}>
                   <CartesianGrid
                     strokeDasharray="3 3"
@@ -101,6 +111,7 @@ export default function NetworkApiTab({ data }: NetworkApiTabProps) {
           </div>
         </div>
 
+        {/* Bảng Table Log */}
         <div className="na-table-card">
           <h3 className="na-section-title">External API Status & Latency</h3>
           <table className="na-table">

@@ -93,7 +93,7 @@
   align-items: center;
 }
 
-/* Svg Gauge tự động co giãn */
+/* Svg Gauge tự tự động co giãn */
 .ov-gauge-svg {
   width: 100%;
   max-width: 180px;
@@ -139,6 +139,7 @@
 .ov-chart-container {
   width: 100%;
   height: 280px;
+  min-height: 280px; /* ĐÃ FIX: Chống co rút flexbox gây mất size */
   margin-top: 20px;
   padding-right: 20px;
 }

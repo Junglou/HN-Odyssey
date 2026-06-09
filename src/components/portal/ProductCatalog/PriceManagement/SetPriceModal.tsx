@@ -30,7 +30,7 @@ function SetPriceModalContent({
   productName,
   sku,
   initialPrice = 0,
-  initialCurrency = "VND",
+  initialCurrency = "USD",
   isSubmitting = false,
   onSave,
 }: Omit<SetPriceModalProps, "isOpen">) {

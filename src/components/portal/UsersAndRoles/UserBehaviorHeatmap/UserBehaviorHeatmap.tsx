@@ -113,7 +113,7 @@ export default function UserBehaviorHeatmap({
   interactionOptions,
 }: UserBehaviorHeatmapProps) {
   const clarityDashboardUrl =
-    "https://clarity.microsoft.com/projects/view/w8yhdqaiuo";
+    "https://clarity.microsoft.com/projects/view/w8yhdqaiuo/dashboard";
 
   return (
     <div className="ubh-container">

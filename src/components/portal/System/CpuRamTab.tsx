@@ -33,8 +33,16 @@ interface ChartCardProps {
 const ChartCard = memo(({ title, history, label, percent }: ChartCardProps) => (
   <div className="cr-chart-card">
     <h3 className="cr-section-title">{title}</h3>
-    <div className="cr-chart-container">
-      <ResponsiveContainer width="100%" height="100%">
+
+    <div
+      className="cr-chart-container"
+      style={{ width: "100%", height: 240, minHeight: 240 }}
+    >
+      {/* TRỊ LỖI RECHARTS: 
+        1. width="99%" chống lỗi tính toán vòng lặp flexbox
+        2. Truyền cứng height={240} và minWidth={100} để chặn tuyệt đối cảnh báo -1
+      */}
+      <ResponsiveContainer width="99%" height={240} minWidth={100}>
         <LineChart data={history}>
           <CartesianGrid
             strokeDasharray="3 3"
@@ -66,6 +74,7 @@ const ChartCard = memo(({ title, history, label, percent }: ChartCardProps) => (
         </LineChart>
       </ResponsiveContainer>
     </div>
+
     <div className="cr-progress-section">
       <div className="cr-progress-label">
         <span>{label}</span>

@@ -6,7 +6,7 @@ import axiosClient from "../../../../api/axiosClient";
 export interface ProductData {
   sku: string;
   name: string;
-  status: "Active" | "Inactive" | "Draft";
+  status: "Active" | "Inactive" | "Draft" | "Loading...";
   description: string;
   categoryIds: string[];
 }
@@ -140,19 +140,23 @@ export function useProductForm() {
   const [formData, setFormData] = useState<ProductData>({
     sku: "",
     name: "",
-    status: "Draft",
+    status: mode === "add" ? "Draft" : "Loading...",
     description: "",
     categoryIds: [],
   });
 
-  const [pricingList, setPricingList] = useState<PricingItem[]>([
-    {
-      id: "p1",
-      variantName: "Default / Base Product",
-      price: 0,
-      status: "draft",
-    },
-  ]);
+  const [pricingList, setPricingList] = useState<PricingItem[]>(
+    mode === "add"
+      ? [
+          {
+            id: "p1",
+            variantName: "Default / Base Product",
+            price: 0,
+            status: "draft",
+          },
+        ]
+      : [],
+  );
 
   const [tags, setTags] = useState<string[]>([]);
   const [productVariants, setProductVariants] = useState<VariantAttribute[]>(
@@ -300,6 +304,8 @@ export function useProductForm() {
                       | "rejected";
                     displayPrice = reqVar.price;
                   }
+                } else if (v.price > 0) {
+                  currentStatus = "approved";
                 }
 
                 return {
@@ -324,6 +330,8 @@ export function useProductForm() {
                 | "approved"
                 | "rejected";
               displayPrice = p.price_request.price;
+            } else if (p.price > 0) {
+              currentStatus = "approved";
             }
 
             setPricingList([

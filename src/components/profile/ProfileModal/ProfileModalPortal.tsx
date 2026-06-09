@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 
 type ProfileModalPortalProps = {
   isOpen: boolean;
@@ -13,10 +13,29 @@ export function ProfileModalPortal({
   onClose,
   children,
 }: ProfileModalPortalProps) {
+  const pointerStartedOnOverlay = useRef(false);
+
   if (!isOpen) return null;
 
+  const handleOverlayMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    pointerStartedOnOverlay.current = event.target === event.currentTarget;
+  };
+
+  const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const releasedOnOverlay = event.target === event.currentTarget;
+    if (pointerStartedOnOverlay.current && releasedOnOverlay) {
+      onClose();
+    }
+    pointerStartedOnOverlay.current = false;
+  };
+
   return createPortal(
-    <div className="um-modal-overlay" onClick={onClose} role="presentation">
+    <div
+      className="um-modal-overlay"
+      onMouseDown={handleOverlayMouseDown}
+      onClick={handleOverlayClick}
+      role="presentation"
+    >
       {children}
     </div>,
     document.body,

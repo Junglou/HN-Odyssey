@@ -210,7 +210,11 @@ export function useLiveChatSupport() {
   // 1. KHỞI TẠO SOCKET.IO
   useEffect(() => {
     const token = tokenStorage.getToken();
-    const user = tokenStorage.getUser();
+    const user = tokenStorage.getUser() as {
+      id: string;
+      fullName?: string;
+      email?: string;
+    } | null;
     if (!token) return;
 
     const baseUrl = import.meta.env.VITE_API_URL.split("/api")[0];
@@ -327,7 +331,11 @@ export function useLiveChatSupport() {
   useEffect(() => {
     const fetchConversations = async () => {
       try {
-        const user = tokenStorage.getUser();
+        const user = tokenStorage.getUser() as {
+          id: string;
+          fullName?: string;
+          email?: string;
+        } | null;
         const queryParams: {
           limit: number;
           page: number;
@@ -391,13 +399,24 @@ export function useLiveChatSupport() {
             }
           }
 
+          // Lấy Base URL của Backend (Loại bỏ /api ở đuôi)
+          const baseUrl = import.meta.env.VITE_API_URL.replace("/api", "");
+
+          // Xử lý đường dẫn Avatar
+          let finalAvatar = undefined;
+          if (customer?.avatar) {
+            finalAvatar = customer.avatar.startsWith("http")
+              ? customer.avatar
+              : `${baseUrl}${customer.avatar.startsWith("/") ? "" : "/"}${customer.avatar}`;
+          }
+
           return {
             id: conv._id,
             customerId: customer?._id || conv.session_id,
             customerName: displayName,
             customerHandle:
               customer?.email || `#${conv.session_id.substring(0, 8)}`,
-            customerAvatar: customer?.avatar,
+            customerAvatar: finalAvatar,
             departmentTag: conv.department_tag,
             status: activeTab,
             lastMessageTime: timeString,
@@ -524,7 +543,11 @@ export function useLiveChatSupport() {
 
     acceptConsultant: async (sessionId: string) => {
       try {
-        const user = tokenStorage.getUser();
+        const user = tokenStorage.getUser() as {
+          id: string;
+          fullName?: string;
+          email?: string;
+        } | null;
         await axiosClient.patch(
           `/support/chats/${sessionId}/assign`,
           {},
@@ -585,7 +608,11 @@ export function useLiveChatSupport() {
 
     sendTyping: (sessionId: string, isTyping: boolean) => {
       if (!socketRef.current) return;
-      const user = tokenStorage.getUser();
+      const user = tokenStorage.getUser() as {
+        id: string;
+        fullName?: string;
+        email?: string;
+      } | null;
       socketRef.current.emit("typing", {
         conversation_id: sessionId,
         user_name: user?.fullName || "Agent",

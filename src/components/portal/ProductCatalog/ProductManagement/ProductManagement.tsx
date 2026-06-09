@@ -48,7 +48,7 @@ interface ProductManagementProps {
     bulk: (action: BulkAction) => void;
     addProduct: () => void;
     viewProduct: (id: string) => void; // Đã đổi thành string
-    editProduct: (id: string) => void; // Đã đổi thành string
+    editProduct: (id: string, status: string) => void; // Đã đổi thành string
     deleteSingle: (id: string) => void; // Đã đổi thành string
   };
 }
@@ -337,10 +337,24 @@ export default function ProductManagement({
                         <button
                           type="button"
                           className="pm-icon-btn"
-                          onClick={() => actions.editProduct(prod.id)}
+                          // Truyền thêm tham số trạng thái vào đây
+                          onClick={() =>
+                            actions.editProduct(prod.id, prod.status)
+                          }
                           aria-label="Edit product"
+                          // Thêm title để khi hover chuột vào thấy cảnh báo
+                          title={
+                            prod.status === "Active"
+                              ? "Tắt hoạt động để chỉnh sửa"
+                              : "Edit product"
+                          }
                         >
-                          <EditIcon stroke="#111827" />
+                          {/* Làm mờ icon nếu đang bị khóa */}
+                          <EditIcon
+                            stroke={
+                              prod.status === "Active" ? "#9ca3af" : "#111827"
+                            }
+                          />
                         </button>
 
                         <button

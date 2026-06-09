@@ -15,9 +15,9 @@ import type {
 
 // options
 const DISPLAY_TYPE_OPTIONS = [
-  { value: "BUTTON", label: "BUTTON (Text Swatch)" },
-  { value: "COLOR", label: "COLOR (Color Swatch)" },
-  { value: "DROPDOWN", label: "DROPDOWN (Select List)" },
+  { value: "button", label: "BUTTON (Text Swatch)" },
+  { value: "color_swatch", label: "COLOR (Color Swatch)" },
+  { value: "text", label: "DROPDOWN (Select List)" },
 ];
 
 interface VariantDrawerProps {
@@ -131,7 +131,7 @@ function VariantDrawerContent({
     return {
       name: "",
       code: "",
-      display_type: "BUTTON",
+      display_type: "button",
       description: "",
       values: [],
       is_active: true,
@@ -308,7 +308,7 @@ function VariantDrawerContent({
                     }
                     disabled={isSubmitting}
                   />
-                  {formData.display_type === "COLOR" && (
+                  {formData.display_type === "color_swatch" && (
                     <input
                       type="color"
                       className="vd-color-picker"

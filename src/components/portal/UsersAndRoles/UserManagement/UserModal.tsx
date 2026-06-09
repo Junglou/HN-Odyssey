@@ -214,6 +214,7 @@ function ModalContent({
               onChange={handleChange}
               disabled={isViewOnly}
               placeholder="Ví dụ: Trần Văn A"
+              autoComplete="off"
               required={mode === "add"}
             />
           </div>
@@ -263,6 +264,7 @@ function ModalContent({
                       ? "••••••••"
                       : "Để trống nếu giữ nguyên mật khẩu"
                 }
+                autoComplete="new-password"
                 required={mode === "add"}
               />
             </div>

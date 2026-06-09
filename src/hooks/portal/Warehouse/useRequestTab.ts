@@ -41,7 +41,7 @@ export function useRequestTab() {
   const [filters, setFilters] = useState({
     search: "",
     type: "all" as "all" | "import" | "export",
-    status: "pending" as "all" | "pending" | "accepted" | "rejected",
+    status: "all" as "all" | "pending" | "accepted" | "rejected", // Sửa thành all
   });
 
   const [pagination, setPagination] = useState({
@@ -122,7 +122,7 @@ export function useRequestTab() {
   };
 
   const clearFilters = () => {
-    setFilters({ search: "", type: "all", status: "pending" });
+    setFilters({ search: "", type: "all", status: "all" }); // Sửa thành all
     setPagination((prev) => ({ ...prev, page: 1 }));
   };
 

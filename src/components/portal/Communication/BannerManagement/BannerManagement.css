@@ -338,7 +338,7 @@
 }
 /* Cập nhật lại màu chấm Inactive thành đỏ chuẩn theo thiết kế */
 .bm-status-dot.inactive {
-  background-color: #434447;
+  background-color: #991b1b;
 }
 .bm-status-dot.pending {
   background-color: #f59e0b;
@@ -352,7 +352,7 @@
 }
 /* Chữ của trạng thái Inactive thành đen theo yêu cầu */
 .bm-status-text.inactive {
-  color: #111827;
+  color: #991b1b;
 }
 .bm-status-text.pending {
   color: #f59e0b;
