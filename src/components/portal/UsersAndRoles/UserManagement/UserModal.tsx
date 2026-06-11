@@ -41,7 +41,7 @@ interface UserModalProps {
   onSubmit: (data: UserFormData) => void;
 }
 
-// helpers
+// helper
 function CustomModalSelect({
   name,
   value,
@@ -59,8 +59,10 @@ function CustomModalSelect({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [hasOpened, setHasOpened] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  // handle
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
@@ -71,18 +73,28 @@ function CustomModalSelect({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // handle
+  useEffect(() => {
+    if (!isOpen && hasOpened) {
+      const timer = setTimeout(() => setIsMounted(false), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, hasOpened]);
+
   const selectedOption = options.find((o) => o.value === value);
 
   return (
     <div
-      className={`um-modal-custom-dropdown ${disabled ? "disabled" : ""}`}
+      className={`um-modal-custom-dropdown ${disabled ? "disabled" : ""} ${isOpen ? "is-open" : ""}`}
       ref={ref}
     >
       <div
         className={`um-modal-dropdown-trigger ${isOpen ? "active" : ""}`}
         onClick={() => {
           if (disabled) return;
-          setIsOpen(!isOpen);
+          const nextIsOpen = !isOpen;
+          setIsOpen(nextIsOpen);
+          if (nextIsOpen) setIsMounted(true);
           if (!hasOpened) setHasOpened(true);
         }}
       >
@@ -95,22 +107,25 @@ function CustomModalSelect({
           className={`um-modal-dropdown-arrow ${isOpen ? "open" : ""}`}
         />
       </div>
-      <div
-        className={`um-modal-dropdown-options ${isOpen ? "open" : hasOpened ? "closed" : ""}`}
-      >
-        {options.map((opt) => (
-          <div
-            key={opt.value}
-            className={`um-modal-dropdown-option ${value === opt.value ? "selected" : ""}`}
-            onClick={() => {
-              onChange(name, opt.value);
-              setIsOpen(false);
-            }}
-          >
-            {opt.label}
-          </div>
-        ))}
-      </div>
+
+      {isMounted && (
+        <div
+          className={`um-modal-dropdown-options ${isOpen ? "open" : "closed"}`}
+        >
+          {options.map((opt) => (
+            <div
+              key={opt.value}
+              className={`um-modal-dropdown-option ${value === opt.value ? "selected" : ""}`}
+              onClick={() => {
+                onChange(name, opt.value);
+                setIsOpen(false);
+              }}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
