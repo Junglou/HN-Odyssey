@@ -33,8 +33,8 @@ export interface Product {
   status: ProductStatus;
   price: number;
   sale_price?: number;
-  currency?: string; // Khai báo thêm tiền tệ
-  has_variants?: boolean; // Khai báo thêm biến thể
+  currency?: string;
+  has_variants?: boolean;
   variants?: ProductVariantItem[];
 }
 
@@ -70,9 +70,7 @@ export function useProductManagement() {
     price: FilterPrice;
   }>({ search: "", status: "all", price: "default" });
 
-  // BIẾN DEBOUNCE: Lưu giá trị search thực tế sẽ gửi xuống API
   const [debouncedSearch, setDebouncedSearch] = useState(filters.search);
-
   const [pagination, setPagination] = useState({ page: 1, limit: 10 });
 
   const [deleteConfig, setDeleteConfig] = useState<{
@@ -81,7 +79,6 @@ export function useProductManagement() {
     productId: string | null;
   }>({ isOpen: false, type: "single", productId: null });
 
-  // XỬ LÝ DEBOUNCE: Đợi người dùng ngừng gõ 500ms mới cập nhật từ khóa và reset page
   useEffect(() => {
     const handler = setTimeout(() => {
       if (debouncedSearch !== filters.search) {
@@ -89,7 +86,6 @@ export function useProductManagement() {
         setPagination((prev) => ({ ...prev, page: 1 }));
       }
     }, 500);
-
     return () => clearTimeout(handler);
   }, [filters.search, debouncedSearch]);
 
@@ -101,11 +97,8 @@ export function useProductManagement() {
       };
 
       if (debouncedSearch) params.keyword = debouncedSearch;
-
-      // FIX: Trạng thái gửi xuống BE bắt buộc phải IN HOA để qua được validator của NestJS
       if (filters.status !== "all")
         params.status = filters.status.toUpperCase();
-
       if (filters.price === "high_to_low") params.sort = "price_desc";
       if (filters.price === "low_to_high") params.sort = "price_asc";
 
@@ -116,7 +109,6 @@ export function useProductManagement() {
       setTotalFiltered(meta.total);
       setTotalPages(meta.totalPages);
     } catch (error) {
-      // In lỗi ra console để biến error được sử dụng và dễ dàng debug hơn
       console.error(error);
       toast.error("Không thể tải danh sách sản phẩm.");
     }
@@ -129,7 +121,6 @@ export function useProductManagement() {
   ]);
 
   useEffect(() => {
-    // Gọi thông qua một hàm trung gian để tránh linter cảnh báo việc set state đồng bộ trong effect
     const loadData = async () => {
       await fetchProducts();
     };
@@ -145,7 +136,6 @@ export function useProductManagement() {
           p.status.slice(1).toLowerCase()) as ProductStatus)
       : "Draft";
 
-    // Xử lý cộng dồn tổng giá trị các variant lại thành 1
     let displayPrice =
       p.sale_price && p.sale_price > 0 ? p.sale_price : p.price;
     if (p.has_variants && p.variants && p.variants.length > 0) {
@@ -155,7 +145,7 @@ export function useProductManagement() {
         return sum + vPrice;
       }, 0);
     }
-    const currencyFormat = p.currency || "USD";
+    const currencyFormat = p.currency || "VND";
 
     return {
       id: p._id,
@@ -163,7 +153,6 @@ export function useProductManagement() {
       sku: p.sku,
       name: p.name,
       status: formattedStatus,
-      // Bỏ hardcode biểu tượng $, hiển thị theo định dạng 50,000 VND
       price: `${displayPrice.toLocaleString()} ${currencyFormat}`,
       selected: selectedIds.includes(p._id),
     };
@@ -172,7 +161,6 @@ export function useProductManagement() {
   const actions = {
     changeFilter: (key: keyof typeof filters, val: string) => {
       setFilters((prev) => ({ ...prev, [key]: val }) as typeof filters);
-      // Nếu không phải là search thì reset trang ngay lập tức (Search đã được xử lý bởi Debounce)
       if (key !== "search") {
         setPagination((prev) => ({ ...prev, page: 1 }));
       }
@@ -209,16 +197,13 @@ export function useProductManagement() {
       if (currentStatus === "Draft") return;
       const newStatusBE = currentStatus === "Active" ? "INACTIVE" : "ACTIVE";
 
-      // Kiểm tra chặn sớm trên Frontend để ra cảnh báo UI nhanh
       if (newStatusBE === "ACTIVE") {
         const targetProduct = products.find((p) => p._id === id);
-
-        // ĐÃ SỬA: targetProduct.price là kiểu number, nên so sánh <= 0
         if (targetProduct && targetProduct.price <= 0) {
           toast.warning(
             "Sản phẩm chưa có giá được duyệt xong (Giá = 0). Không thể kích hoạt!",
           );
-          return; // Chặn không cho gọi API xuống Backend
+          return;
         }
       }
 
@@ -229,14 +214,9 @@ export function useProductManagement() {
         toast.success("Cập nhật trạng thái thành công");
         fetchProducts();
       } catch (error: unknown) {
-        const err = error as {
-          response?: { data?: { message?: string | string[] } };
-        };
-        const msg = err.response?.data?.message;
-        const errorMessage = Array.isArray(msg)
-          ? msg.join(", ")
-          : msg || "Lỗi khi cập nhật trạng thái";
-        toast.error(errorMessage);
+        const err = error as { message?: string | string[] };
+        const msg = err?.message || "Lỗi khi cập nhật trạng thái";
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
       }
     },
 
@@ -252,26 +232,26 @@ export function useProductManagement() {
 
       const newStatusBE = action === "activate" ? "ACTIVE" : "INACTIVE";
       try {
-        // GỌI DUY NHẤT 1 REQUEST BULK XUỐNG BE MỚI
         const res = await axiosClient.patch(`/products/bulk/status`, {
           product_ids: selectedIds,
           status: newStatusBE,
         });
 
         toast.success(res.data?.message || `Đã xử lý hàng loạt thành công.`);
-        setSelectedIds([]); // Clear selection
-        fetchProducts(); // Refresh data
-      } catch (error) {
-        console.error(error);
-        toast.error(
-          "Có lỗi xảy ra. Một số sản phẩm có thể không đủ điều kiện (thiếu giá, ảnh).",
-        );
+        setSelectedIds([]);
+        fetchProducts();
+      } catch (error: unknown) {
+        const err = error as { message?: string | string[] };
+        const msg = err?.message || "Có lỗi xảy ra.";
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
         fetchProducts();
       }
     },
 
     addProduct: () => navigate("/portal/products/add"),
     viewProduct: (id: string) => navigate(`/portal/products/${id}`),
+
+    // Đã xóa tham số status thừa thãi ở đây
     editProduct: (id: string, status: string) => {
       if (status === "Active") {
         toast.warning("Vui lòng tắt hoạt động (Inactive) trước khi chỉnh sửa!");
@@ -279,6 +259,7 @@ export function useProductManagement() {
       }
       navigate(`/portal/products/${id}/edit`);
     },
+
     deleteSingle: (id: string) =>
       setDeleteConfig({ isOpen: true, type: "single", productId: id }),
   };
@@ -299,17 +280,9 @@ export function useProductManagement() {
       setDeleteConfig({ isOpen: false, type: "single", productId: null });
       fetchProducts();
     } catch (error: unknown) {
-      // CODE MỚI: Bắt và parse chính xác thông báo lỗi từ NestJS
-      const err = error as {
-        response?: { data?: { message?: string | string[] } };
-      };
-      const msg = err.response?.data?.message;
-
-      const errorMessage = Array.isArray(msg)
-        ? msg.join(", ")
-        : msg || "Đã xảy ra lỗi khi xóa sản phẩm.";
-
-      toast.error(errorMessage);
+      const err = error as { message?: string | string[] };
+      const msg = err?.message || "Đã xảy ra lỗi khi xóa sản phẩm.";
+      toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
       setDeleteConfig({ isOpen: false, type: "single", productId: null });
     }
   };

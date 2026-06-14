@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
 
-// types
 export interface AttributeValue {
   label: string;
   value: string;
@@ -28,17 +27,7 @@ export interface AttributeFormData {
   is_active: boolean;
 }
 
-export interface ApiError {
-  response?: {
-    data?: {
-      message?: string | string[];
-    };
-  };
-}
-
-// hook
 export function useVariantManagement() {
-  // states
   const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [search, setSearch] = useState("");
   const [drawerConfig, setDrawerConfig] = useState<{
@@ -58,7 +47,6 @@ export function useVariantManagement() {
     isDeleting: boolean;
   }>({ isOpen: false, attributeId: null, isDeleting: false });
 
-  // api
   const fetchAttributesData = async () => {
     const res = await axiosClient.get("/attributes");
     const data = res.data?.data || res.data || [];
@@ -87,12 +75,11 @@ export function useVariantManagement() {
   const refreshData = useCallback(() => {
     fetchAttributesData()
       .then((data) => setAttributes(data))
-      .catch((error) => {
-        const err = error as ApiError;
-        toast.error(
-          (err.response?.data?.message as string) ||
-            "Lỗi tải danh sách thuộc tính",
-        );
+      .catch((error: unknown) => {
+        // Ép kiểu error để lấy message một cách an toàn
+        const err = error as { message?: string | string[] };
+        const msg = err?.message || "Lỗi tải danh sách thuộc tính";
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
       });
   }, []);
 
@@ -100,7 +87,6 @@ export function useVariantManagement() {
     refreshData();
   }, [refreshData]);
 
-  // helper
   const filteredAttributes = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
     if (!normalizedSearch) return attributes;
@@ -117,7 +103,6 @@ export function useVariantManagement() {
     );
   }, [search, attributes]);
 
-  // handle
   const actions = {
     changeSearch: (val: string) => setSearch(val),
     openDrawer: (mode: "add" | "edit", attribute?: Attribute) => {
@@ -162,12 +147,10 @@ export function useVariantManagement() {
       }
       refreshData();
       actions.closeDrawer();
-    } catch (error) {
-      const err = error as ApiError;
-      const msg = err.response?.data?.message;
-      toast.error(
-        Array.isArray(msg) ? msg[0] : (msg as string) || "Lỗi lưu dữ liệu",
-      );
+    } catch (error: unknown) {
+      const err = error as { message?: string | string[] };
+      const msg = err?.message || "Lỗi lưu dữ liệu";
+      toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
       setDrawerConfig((prev) => ({ ...prev, isSubmitting: false }));
     }
   };
@@ -180,9 +163,10 @@ export function useVariantManagement() {
       toast.success("Đã xóa thuộc tính!");
       refreshData();
       actions.closeDeleteModal();
-    } catch (error) {
-      const err = error as ApiError;
-      toast.error((err.response?.data?.message as string) || "Lỗi xóa dữ liệu");
+    } catch (error: unknown) {
+      const err = error as { message?: string | string[] };
+      const msg = err?.message || "Lỗi xóa dữ liệu";
+      toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
       setDeleteConfig((prev) => ({ ...prev, isDeleting: false }));
     }
   };

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
 import {
@@ -17,7 +17,6 @@ export interface CategoryFormData {
   status: CategoryStatus;
 }
 
-// định nghĩa kiểu dữ liệu trả về từ api
 interface CategoryApiResponse {
   _id: string;
   name: string;
@@ -31,16 +30,6 @@ interface CategoryApiResponse {
   children?: CategoryApiResponse[];
 }
 
-// định nghĩa kiểu dữ liệu cho lỗi axios
-interface ApiError {
-  response?: {
-    data?: {
-      message?: string;
-    };
-  };
-}
-
-// hàm chuyển đổi dữ liệu từ backend sang frontend
 const mapCategoryTree = (node: CategoryApiResponse): CategoryNode => {
   return {
     id: node._id,
@@ -55,7 +44,6 @@ const mapCategoryTree = (node: CategoryApiResponse): CategoryNode => {
 };
 
 export function useCategory() {
-  // states quản lý dữ liệu và ui
   const [categories, setCategories] = useState<CategoryNode[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -79,16 +67,16 @@ export function useCategory() {
     isDeleting: boolean;
   }>({ isOpen: false, categoryId: null, isDeleting: false });
 
-  // api calls để lấy danh sách
   const fetchCategories = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await axiosClient.get("/categories/admin/tree-view");
       const mappedData = (res.data || []).map(mapCategoryTree);
       setCategories(mappedData);
-    } catch (error) {
-      const err = error as ApiError;
-      toast.error(err.response?.data?.message || "Lỗi khi tải danh mục");
+    } catch (error: unknown) {
+      const err = error as { message?: string | string[] };
+      const msg = err?.message || "Lỗi khi tải danh mục";
+      toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
     } finally {
       setIsLoading(false);
     }
@@ -98,7 +86,6 @@ export function useCategory() {
     fetchCategories();
   }, [fetchCategories]);
 
-  // helpers xử lý ui hiển thị
   const toggleExpand = useCallback((id: string) => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
@@ -115,7 +102,6 @@ export function useCategory() {
     return searchCategoriesFlat(categories, searchQuery);
   }, [categories, expandedIds, searchQuery]);
 
-  // xử lý các thao tác với drawer
   const openAddDrawer = useCallback(() => {
     setDrawerConfig({ isOpen: true, mode: "add", isSubmitting: false });
   }, []);
@@ -169,7 +155,6 @@ export function useCategory() {
           toast.success("Cập nhật danh mục thành công!");
         }
 
-        // ux tự động mở danh mục cha sau khi thêm hoặc sửa thành công
         if (data.parentId) {
           setExpandedIds((prev) => {
             const next = new Set(prev);
@@ -180,9 +165,10 @@ export function useCategory() {
 
         closeDrawer();
         fetchCategories();
-      } catch (error) {
-        const err = error as ApiError;
-        toast.error(err.response?.data?.message || "Lỗi khi lưu danh mục");
+      } catch (error: unknown) {
+        const err = error as { message?: string | string[] };
+        const msg = err?.message || "Lỗi khi lưu danh mục";
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
       } finally {
         setDrawerConfig((prev) => ({ ...prev, isSubmitting: false }));
       }
@@ -190,7 +176,6 @@ export function useCategory() {
     [drawerConfig, closeDrawer, fetchCategories],
   );
 
-  // xử lý thao tác xóa an toàn
   const requestDelete = useCallback((id: string) => {
     setDeleteConfig({ isOpen: true, categoryId: id, isDeleting: false });
   }, []);
@@ -200,7 +185,6 @@ export function useCategory() {
   }, []);
 
   const confirmDelete = useCallback(async () => {
-    // chặn xóa nếu không có id hoặc đang trong quá trình xóa
     if (!deleteConfig.categoryId || deleteConfig.isDeleting) return;
 
     setDeleteConfig((prev) => ({ ...prev, isDeleting: true }));
@@ -209,15 +193,15 @@ export function useCategory() {
       toast.success("Đã xóa danh mục!");
       cancelDelete();
       fetchCategories();
-    } catch (error) {
-      const err = error as ApiError;
-      toast.error(err.response?.data?.message || "Không thể xóa danh mục này");
+    } catch (error: unknown) {
+      const err = error as { message?: string | string[] };
+      const msg = err?.message || "Không thể xóa danh mục này";
+      toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
     } finally {
       setDeleteConfig((prev) => ({ ...prev, isDeleting: false }));
     }
   }, [deleteConfig, cancelDelete, fetchCategories]);
 
-  // xử lý thao tác kéo thả danh mục
   const moveCategory = useCallback(
     async (draggedId: string, targetId: string) => {
       if (draggedId === targetId) return;
@@ -228,7 +212,6 @@ export function useCategory() {
       if (!draggedNode || !targetNode) return;
 
       try {
-        // cùng cấp cha thì chỉ đổi thứ tự reorder
         if (draggedNode.parentId === targetNode.parentId) {
           const parentChildren = targetNode.parentId
             ? findNodeInTree(categories, targetNode.parentId)?.children || []
@@ -245,9 +228,7 @@ export function useCategory() {
           await axiosClient.patch("/categories/reorder", { items });
 
           toast.success("Đã thay đổi thứ tự!");
-        }
-        // khác cấp cha thì đổi danh mục cha reparent
-        else {
+        } else {
           await axiosClient.patch(`/categories/update/${draggedId}`, {
             parent_id: targetNode.parentId || null,
           });
@@ -255,11 +236,10 @@ export function useCategory() {
         }
 
         fetchCategories();
-      } catch (error) {
-        const err = error as ApiError;
-        toast.error(
-          err.response?.data?.message || "Lỗi khi di chuyển danh mục",
-        );
+      } catch (error: unknown) {
+        const err = error as { message?: string | string[] };
+        const msg = err?.message || "Lỗi khi di chuyển danh mục";
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
       }
     },
     [categories, fetchCategories],

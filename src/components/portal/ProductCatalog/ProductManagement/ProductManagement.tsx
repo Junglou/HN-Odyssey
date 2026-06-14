@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import "./ProductManagement.css";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
+import { toast } from "react-toastify";
 
 import {
   ViewIcon,
@@ -10,7 +11,6 @@ import {
 } from "../../../../assets/icons/UserManagementIcons";
 import { ChevronDownIcon } from "../../../../assets/icons/HeaderIcons";
 
-// chỉ import type và cấu hình mảng tĩnh từ hook
 import {
   type FilterStatus,
   type FilterPrice,
@@ -21,7 +21,6 @@ import {
   PRICE_OPTIONS,
 } from "../../../../hooks/portal/ProductCatalog/ProductManagement/useProductManagement";
 
-// props
 interface ProductManagementProps {
   data: ProductRowData[];
   filters: {
@@ -42,18 +41,17 @@ interface ProductManagementProps {
     clearFilter: () => void;
     changePage: (page: number) => void;
     changeLimit: (limit: number) => void;
-    selectProduct: (id: string) => void; // Đã đổi thành string
+    selectProduct: (id: string) => void;
     selectAll: (isAll: boolean) => void;
-    toggleStatus: (id: string, status: string) => void; // Đã đổi thành string
+    toggleStatus: (id: string, status: string) => void;
     bulk: (action: BulkAction) => void;
     addProduct: () => void;
-    viewProduct: (id: string) => void; // Đã đổi thành string
-    editProduct: (id: string, status: string) => void; // Đã đổi thành string
-    deleteSingle: (id: string) => void; // Đã đổi thành string
+    viewProduct: (id: string) => void;
+    editProduct: (id: string, status: string) => void;
+    deleteSingle: (id: string) => void;
   };
 }
 
-// component dropdown phụ trợ cho filter
 function CustomDropdown({
   value,
   options,
@@ -68,7 +66,6 @@ function CustomDropdown({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // tắt dropdown khi click ngoài vùng dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -122,16 +119,14 @@ export default function ProductManagement({
   pagination,
   actions,
 }: ProductManagementProps) {
-  // Đã sửa lỗi TypeScript: Đổi number thành string
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
   const limitRef = useRef<HTMLDivElement>(null);
   useClickOutside(limitRef, () => setIsLimitDropdownOpen(false));
 
-  // biến ui tính toán trạng thái
   const isAllSelected = data.length > 0 && data.every((p) => p.selected);
-  // biến kiểm tra để khóa các nút thao tác hàng loạt
   const hasSelection = data.some((p) => p.selected);
+
   return (
     <div className="pm-container">
       <div className="pm-header">
@@ -276,10 +271,8 @@ export default function ProductManagement({
                           aria-label={`Select product ${prod.name}`}
                         />
                         <div className="pm-img-placeholder" aria-hidden="true">
-                          {/* KIỂM TRA NẾU CÓ ẢNH THÌ RENDER THẺ IMG, KHÔNG THÌ RENDER MOCK XÁM */}
                           {prod.image ? (
                             <img
-                              // Nếu ảnh là link nội bộ (/uploads/...), tự động nối thêm domain của Backend vào
                               src={
                                 prod.image.startsWith("http")
                                   ? prod.image
@@ -293,7 +286,6 @@ export default function ProductManagement({
                                 borderRadius: "8px",
                               }}
                               onError={(e) => {
-                                // Nếu link ảnh bị lỗi (404), tự động fallback về ô xám
                                 (e.target as HTMLImageElement).style.display =
                                   "none";
                                 (
@@ -312,7 +304,6 @@ export default function ProductManagement({
                       </div>
                     </td>
                     <td data-label="SKU">{prod.sku}</td>
-                    {/* Đã gỡ bỏ khoảng trắng {" "} dư thừa gây lỗi Hydration ở dưới đây */}
                     <td className="pm-td-name" data-label="Product Name">
                       {prod.name}
                     </td>
@@ -337,19 +328,25 @@ export default function ProductManagement({
                         <button
                           type="button"
                           className="pm-icon-btn"
-                          // Truyền thêm tham số trạng thái vào đây
-                          onClick={() =>
-                            actions.editProduct(prod.id, prod.status)
-                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // CHẶN NGAY TẠI GIAO DIỆN CLICK
+                            if (prod.status === "Active") {
+                              toast.warning(
+                                "Sản phẩm đang BẬT BÁN (Active). Bạn không được phép vào trang chỉnh sửa, vui lòng tắt trạng thái hoạt động trước!",
+                              );
+                              return;
+                            }
+                            actions.editProduct(prod.id, prod.status);
+                          }}
                           aria-label="Edit product"
-                          // Thêm title để khi hover chuột vào thấy cảnh báo
                           title={
                             prod.status === "Active"
                               ? "Tắt hoạt động để chỉnh sửa"
                               : "Edit product"
                           }
                         >
-                          {/* Làm mờ icon nếu đang bị khóa */}
+                          {/* Làm mờ icon (gray-out) để báo hiệu nút đang bị khóa */}
                           <EditIcon
                             stroke={
                               prod.status === "Active" ? "#9ca3af" : "#111827"
@@ -393,8 +390,14 @@ export default function ProductManagement({
                             >
                               <button
                                 type="button"
-                                className="pm-dropdown-item pm-item-delete"
+                                className={`pm-dropdown-item pm-item-delete ${prod.status === "Active" ? "disabled" : ""}`}
                                 onClick={() => {
+                                  if (prod.status === "Active") {
+                                    toast.warning(
+                                      "Sản phẩm đang BẬT BÁN. Vui lòng tắt hoạt động trước khi xóa!",
+                                    );
+                                    return;
+                                  }
                                   actions.deleteSingle(prod.id);
                                   setOpenDropdownId(null);
                                 }}
@@ -427,7 +430,6 @@ export default function ProductManagement({
             {pagination.totalFiltered} products
           </div>
           <div className="pm-page-numbers">
-            {/* Nút lùi trang */}
             <button
               type="button"
               className="pm-page-num"
@@ -455,7 +457,6 @@ export default function ProductManagement({
                 </button>
               ),
             )}
-            {/* Nút tiến trang */}
             <button
               type="button"
               className="pm-page-num"
@@ -480,7 +481,6 @@ export default function ProductManagement({
               &gt;
             </button>
 
-            {/* pagination mới (vừa update, đổi tên) */}
             <div className="pm-limit-dropdown" ref={limitRef}>
               <div
                 className={`pm-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}

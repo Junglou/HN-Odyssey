@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
 
-// types
 export interface Tag {
   _id: string;
   name: string;
@@ -21,16 +20,12 @@ export interface TagFormData {
   text_color: string;
 }
 
+// Interface định nghĩa cấu trúc lỗi trả về từ API
 export interface ApiError {
-  response?: {
-    data?: {
-      message?: string;
-    };
-  };
+  message?: string | string[];
 }
 
 export function useTagManagement() {
-  // states
   const [tags, setTags] = useState<Tag[]>([]);
   const [search, setSearch] = useState("");
   const [drawerConfig, setDrawerConfig] = useState<{
@@ -39,20 +34,17 @@ export function useTagManagement() {
     editingTag: Tag | null;
   }>({ isOpen: false, mode: "add", editingTag: null });
 
-  // chú ý: đã đổi tagId từ number sang string để khớp với _id của MongoDB
   const [deleteConfig, setDeleteConfig] = useState<{
     isOpen: boolean;
     tagId: string | null;
   }>({ isOpen: false, tagId: null });
 
-  // effects: tải dữ liệu từ backend
   useEffect(() => {
     let isMounted = true;
     const fetchTags = async () => {
       try {
         const res = await axiosClient.get("/tags");
         if (isMounted && res.data) {
-          // tùy vào format response của backend, thường là mảng trực tiếp hoặc bọc trong data
           setTags(Array.isArray(res.data) ? res.data : res.data.data || []);
         }
       } catch (error) {
@@ -65,26 +57,20 @@ export function useTagManagement() {
     };
   }, []);
 
-  // derived state: lọc danh sách theo từ khóa tìm kiếm
   const filteredTags = useMemo(() => {
     return tags.filter((t) =>
       t.name.toLowerCase().includes(search.toLowerCase()),
     );
   }, [tags, search]);
 
-  // handlers
   const actions = {
     changeSearch: (val: string) => setSearch(val),
-
     openDrawer: (mode: "add" | "edit", tag?: Tag) => {
       setDrawerConfig({ isOpen: true, mode, editingTag: tag || null });
     },
-
     closeDrawer: () => {
       setDrawerConfig({ isOpen: false, mode: "add", editingTag: null });
     },
-
-    // đã xóa toggleStatus vì backend không dùng
     deleteSingle: (id: string) => {
       setDeleteConfig({ isOpen: true, tagId: id });
     },
@@ -113,9 +99,11 @@ export function useTagManagement() {
         }
       }
       actions.closeDrawer();
-    } catch (error) {
-      const err = error as ApiError;
-      toast.error(err.response?.data?.message || "có lỗi xảy ra khi lưu thẻ");
+    } catch (error: unknown) {
+      // Ép kiểu error từ unknown về ApiError để truy cập message an toàn
+      const err = error as { response?: { data?: ApiError } };
+      const msg = err.response?.data?.message || "có lỗi xảy ra khi lưu thẻ";
+      toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
     }
   };
 
@@ -125,9 +113,11 @@ export function useTagManagement() {
         await axiosClient.delete(`/tags/${deleteConfig.tagId}`);
         setTags((prev) => prev.filter((t) => t._id !== deleteConfig.tagId));
         toast.success("đã xóa thẻ!");
-      } catch (error) {
-        const err = error as ApiError;
-        toast.error(err.response?.data?.message || "không thể xóa thẻ này");
+      } catch (error: unknown) {
+        // Ép kiểu error từ unknown về ApiError để truy cập message an toàn
+        const err = error as { response?: { data?: ApiError } };
+        const msg = err.response?.data?.message || "không thể xóa thẻ này";
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
       }
     }
     setDeleteConfig({ isOpen: false, tagId: null });

@@ -234,46 +234,63 @@ function CreateTicketDrawerContent({
 
   // Hàm check SKU đơn lẻ
   const handleCheckSku = async () => {
-    if (!formSku.trim()) return;
+    const inputSku = formSku.trim();
+    if (!inputSku) return;
 
     try {
-      // Truyền search (hoặc sku) vào query param để tìm kiếm
+      // API search có thể trả về nhiều kết quả khớp một phần (tên, slug, tags...)
       const res = await axiosClient.get("/products", {
-        params: { search: formSku.trim() },
+        params: { search: inputSku },
       });
 
-      // Lấy sản phẩm đầu tiên match với kết quả tìm kiếm
-      const productsList = res.data?.data || res.data;
-      const p: BackendProduct =
-        productsList.length > 0 ? productsList[0] : null;
+      const productsList: BackendProduct[] = res.data?.data || res.data || [];
 
-      if (p) {
-        setFormName(p.name);
+      // 1. TÌM CHÍNH XÁC SẢN PHẨM CÓ MÃ SKU KHỚP 100%
+      // (Khớp SKU cha HOẶC khớp SKU của một trong các biến thể)
+      const exactProduct = productsList.find(
+        (p) =>
+          p.sku === inputSku ||
+          (p.has_variants && p.variants?.some((v) => v.sku === inputSku)),
+      );
 
-        // Xử lý lấy tồn kho
-        if (p.has_variants && p.variants) {
-          // Bắt buộc SKU nhập vào phải khớp chính xác với SKU của biến thể
-          const variant = p.variants.find(
-            (v: BackendVariant) => v.sku === formSku.trim(),
+      // Nếu không có sản phẩm nào khớp chính xác mã SKU đã nhập
+      if (!exactProduct) {
+        throw new Error("SKU_NOT_FOUND");
+      }
+
+      setFormName(exactProduct.name);
+
+      // 2. NẾU LÀ SẢN PHẨM CÓ BIẾN THỂ
+      if (exactProduct.has_variants && exactProduct.variants) {
+        // Trường hợp user nhập đúng SKU của sản phẩm cha (đòi hỏi phải nhập SKU của biến thể)
+        if (exactProduct.sku === inputSku) {
+          toast.warning(
+            "Sản phẩm này có nhiều phân loại. Vui lòng nhập mã SKU của Biến thể (Size/Màu cụ thể), không nhập SKU Sản phẩm gốc!",
           );
+          setAvailableQty(null);
+          setFormName("");
+          return;
+        }
 
-          if (!variant) {
-            toast.warning(
-              "Vui lòng nhập SKU của Biến thể (Size/Màu cụ thể), không nhập SKU Sản phẩm cha!",
-            );
-            setAvailableQty(null);
-            return;
-          }
-
+        // Lấy đúng biến thể khớp SKU
+        const variant = exactProduct.variants.find((v) => v.sku === inputSku);
+        if (variant) {
           setAvailableQty(Number(variant.stock) || 0);
         } else {
-          setAvailableQty(Number(p.stock) || 0);
+          throw new Error("SKU_NOT_FOUND");
         }
-      } else {
-        throw new Error("Không tìm thấy");
+      }
+      // 3. NẾU LÀ SẢN PHẨM ĐƠN GIẢN (KHÔNG CÓ BIẾN THỂ)
+      else {
+        if (exactProduct.sku !== inputSku) {
+          throw new Error("SKU_NOT_FOUND");
+        }
+        setAvailableQty(Number(exactProduct.stock) || 0);
       }
     } catch {
-      toast.error("SKU không tồn tại hoặc đã bị xóa!");
+      toast.error(
+        "Mã SKU không tồn tại! Vui lòng yêu cầu bộ phận Sản phẩm tạo mã này trước.",
+      );
       setFormName("");
       setAvailableQty(null);
     }
@@ -285,8 +302,13 @@ function CreateTicketDrawerContent({
     availableQty !== null &&
     Number(formQuantity) + alreadyAddedQty > availableQty;
 
+  // [FIX]: Bổ sung điều kiện !formName để nút Add bị mờ nếu chưa Check thành công
   const isAddDisabled =
-    !formSku || !formQuantity || Number(formQuantity) <= 0 || isOverQty;
+    !formSku ||
+    !formName ||
+    !formQuantity ||
+    Number(formQuantity) <= 0 ||
+    isOverQty;
 
   const isSubmitDisabled =
     items.length === 0 ||
@@ -581,18 +603,22 @@ function CreateTicketDrawerContent({
                     type="text"
                     className="ctd-input"
                     value={formSku}
-                    onChange={(e) => setFormSku(e.target.value)}
+                    onChange={(e) => {
+                      setFormSku(e.target.value);
+                      // [FIX]: Bắt buộc reset name khi đổi SKU để ép user phải Check lại
+                      setFormName("");
+                      setAvailableQty(null);
+                    }}
                     placeholder="Enter SKU..."
                   />
-                  {currentType === "export" && (
-                    <button
-                      type="button"
-                      className="ctd-btn-outline"
-                      onClick={handleCheckSku}
-                    >
-                      Check
-                    </button>
-                  )}
+                  {/* [FIX]: Bỏ check currentType, luôn hiện nút Check cho cả Import và Export */}
+                  <button
+                    type="button"
+                    className="ctd-btn-outline"
+                    onClick={handleCheckSku}
+                  >
+                    Check
+                  </button>
                 </div>
               </div>
               <div className="ctd-form-group">
@@ -602,14 +628,15 @@ function CreateTicketDrawerContent({
                   className="ctd-input"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  placeholder="Enter name..."
-                  readOnly={currentType === "export"}
+                  placeholder="Click Check to get name..."
+                  readOnly // [FIX]: Luôn ReadOnly, chỉ hệ thống tự điền khi Check thành công
                 />
               </div>
               <div className="ctd-form-group">
                 <label className="ctd-label ctd-label-flex">
                   <span>Qty *</span>
-                  {currentType === "export" && availableQty !== null && (
+                  {/* [FIX]: Luôn hiện tồn kho hiện tại cho cả Nhập và Xuất để làm thông tin tham khảo */}
+                  {availableQty !== null && (
                     <span className="ctd-avail-text">
                       (Avail: {availableQty})
                     </span>

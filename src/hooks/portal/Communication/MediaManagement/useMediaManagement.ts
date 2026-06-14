@@ -225,12 +225,13 @@ export function useMediaManagement() {
         }
 
         if (type === "Variant") {
+          // Trích xuất mã SKU mẹ để tìm kiếm chính xác
+          const baseKeyword = keyword.split("-")[0];
           const res = await axiosClient.get(`/products`, {
-            params: { keyword: keyword, limit: 10 },
+            params: { keyword: baseKeyword, limit: 15 },
           });
 
           const productsArray = (res.data.data || []) as ProductApiItem[];
-
           const uniqueVariants = new Map<string, TargetOption>();
 
           productsArray.forEach((product) => {
@@ -240,10 +241,16 @@ export function useMediaManagement() {
               product.variants.length > 0
             ) {
               product.variants.forEach((v) => {
-                uniqueVariants.set(v.sku, {
-                  id: v.sku,
-                  label: `${product.name} - [${v.sku}]`,
-                });
+                // Lọc lại ở Frontend để đảm bảo khớp đúng Variant SKU hoặc tên sản phẩm
+                if (
+                  v.sku.toLowerCase().includes(keyword.toLowerCase()) ||
+                  product.name.toLowerCase().includes(keyword.toLowerCase())
+                ) {
+                  uniqueVariants.set(v.sku, {
+                    id: v.sku,
+                    label: `${product.name} - [${v.sku}]`,
+                  });
+                }
               });
             }
           });
@@ -272,16 +279,25 @@ export function useMediaManagement() {
         }
 
         if (type === "Variant") {
+          // Trích xuất mã SKU mẹ để lấy danh sách biến thể
+          const baseKeyword = id.split("-")[0];
           const res = await axiosClient.get(`/products`, {
-            params: { keyword: id, limit: 1 },
+            params: { keyword: baseKeyword, limit: 10 },
           });
 
           const productsArray = (res.data.data || []) as Array<{
             name: string;
+            variants?: Array<{ sku: string }>;
           }>;
 
-          if (productsArray.length > 0) {
-            return `${productsArray[0].name} - [${id}]`;
+          // Duyệt qua kết quả để tìm đích danh sản phẩm chứa biến thể này
+          for (const product of productsArray) {
+            if (
+              product.variants &&
+              product.variants.some((v) => v.sku === id)
+            ) {
+              return `${product.name} - [${id}]`;
+            }
           }
           return id;
         }
@@ -542,11 +558,12 @@ export function useMediaManagement() {
           formData.append("files", draft.file);
         });
 
+        // handle: Map payload cho Bulk Upload chuẩn xác
         const metadataPayload = formArray.map((form) => ({
           type: form.type,
           targetId: form.targetId,
           altText: form.altText.trim(),
-          status: form.status,
+          status: form.status as MediaStatus,
         }));
 
         formData.append("metadata", JSON.stringify(metadataPayload));
@@ -571,10 +588,11 @@ export function useMediaManagement() {
           return;
         }
 
+        // handle: Map chuẩn xác các trường cập nhật (đặc biệt là Toggle Status)
         const payload = {
           type: singleData.type,
           targetId: singleData.targetId,
-          status: singleData.status,
+          status: singleData.status as MediaStatus,
           altText: singleData.altText.trim(),
         };
 

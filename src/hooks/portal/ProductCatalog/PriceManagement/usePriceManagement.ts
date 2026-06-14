@@ -21,15 +21,6 @@ export interface PriceFormData {
   effectiveDate: string;
 }
 
-export interface ApiError {
-  response?: {
-    status?: number;
-    data?: {
-      message?: string | string[];
-    };
-  };
-}
-
 export interface ApiVariant {
   sku: string;
   price: number;
@@ -50,6 +41,15 @@ export interface ApiProduct {
     variants?: { sku: string; price: number; status?: string }[];
   };
   variants?: ApiVariant[];
+}
+
+export interface ApiError {
+  response?: {
+    status?: number;
+    data?: {
+      message?: string | string[];
+    };
+  };
 }
 
 export function usePriceManagement() {
@@ -140,16 +140,15 @@ export function usePriceManagement() {
 
   const refreshData = useCallback(() => {
     fetchProductsData()
-      .then((data) => {
-        setRecords(data);
-      })
-      .catch((error) => {
+      .then((data) => setRecords(data))
+      .catch((error: unknown) => {
         const err = error as ApiError;
-        const msg = err.response?.data?.message;
-        toast.error(
-          (Array.isArray(msg) ? msg.join(", ") : msg) ||
-            "Lỗi tải danh sách sản phẩm",
-        );
+        const msg =
+          err.response?.data?.message ||
+          (error instanceof Error
+            ? error.message
+            : "Lỗi tải danh sách sản phẩm");
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
       });
   }, []);
 
@@ -218,7 +217,6 @@ export function usePriceManagement() {
     },
     changePage: (page: number) => setPagination((p) => ({ ...p, page })),
     changeLimit: (limit: number) => setPagination({ page: 1, limit }),
-
     openSetPriceModal: (record: PriceRecord) => {
       setModalConfig({
         isOpen: true,
@@ -263,12 +261,7 @@ export function usePriceManagement() {
       };
 
       if (targetRecord.variant !== "Single") {
-        payload.variants = [
-          {
-            sku: targetRecord.sku,
-            price: data.priceAmount,
-          },
-        ];
+        payload.variants = [{ sku: targetRecord.sku, price: data.priceAmount }];
       }
 
       await axiosClient.post(
@@ -278,14 +271,12 @@ export function usePriceManagement() {
       toast.success("Đã tạo yêu cầu giá (Draft)!");
       refreshData();
       actions.closeSetPriceModal();
-    } catch (error) {
+    } catch (error: unknown) {
       const err = error as ApiError;
-      const errorMsg = err.response?.data?.message;
-      toast.error(
-        Array.isArray(errorMsg)
-          ? errorMsg.join(", ")
-          : errorMsg || "Lỗi lưu giá",
-      );
+      const msg =
+        err.response?.data?.message ||
+        (error instanceof Error ? error.message : "Lỗi lưu giá");
+      toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
       setModalConfig((prev) => ({ ...prev, isSubmitting: false }));
     }
   };
@@ -294,10 +285,7 @@ export function usePriceManagement() {
     const ids = Array.from(selectedIds);
     return records
       .filter((r) => ids.includes(r.id))
-      .map((r) => ({
-        product_id: r.productId,
-        sku: r.sku,
-      }));
+      .map((r) => ({ product_id: r.productId, sku: r.sku }));
   };
 
   const bulkActions = {
@@ -312,12 +300,12 @@ export function usePriceManagement() {
         toast.success(`Đã duyệt ${targets.length} mục được chọn!`);
         setSelectedIds(new Set());
         refreshData();
-      } catch (error) {
+      } catch (error: unknown) {
         const err = error as ApiError;
-        const msg = err.response?.data?.message;
-        toast.error(
-          Array.isArray(msg) ? msg.join(", ") : msg || "Lỗi duyệt hàng loạt",
-        );
+        const msg =
+          err.response?.data?.message ||
+          (error instanceof Error ? error.message : "Lỗi duyệt hàng loạt");
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
       }
     },
     bulkReject: async () => {
@@ -331,12 +319,12 @@ export function usePriceManagement() {
         toast.warning(`Đã từ chối ${targets.length} mục được chọn!`);
         setSelectedIds(new Set());
         refreshData();
-      } catch (error) {
+      } catch (error: unknown) {
         const err = error as ApiError;
-        const msg = err.response?.data?.message;
-        toast.error(
-          Array.isArray(msg) ? msg.join(", ") : msg || "Lỗi từ chối hàng loạt",
-        );
+        const msg =
+          err.response?.data?.message ||
+          (error instanceof Error ? error.message : "Lỗi từ chối hàng loạt");
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
       }
     },
   };
@@ -362,18 +350,12 @@ export function usePriceManagement() {
         });
         toast.success("Đã gửi yêu cầu duyệt giá!");
         refreshData();
-      } catch (error) {
+      } catch (error: unknown) {
         const err = error as ApiError;
-        if (err.response?.status === 404) {
-          toast.error(
-            "Chưa có bản nháp trên hệ thống. Vui lòng nhấn 'Edit' và 'Save Price' trước khi Submit.",
-          );
-          return;
-        }
-        const msg = err.response?.data?.message;
-        toast.error(
-          Array.isArray(msg) ? msg.join(", ") : msg || "Lỗi gửi duyệt",
-        );
+        const msg =
+          err.response?.data?.message ||
+          (error instanceof Error ? error.message : "Lỗi gửi duyệt");
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
       }
     },
     approvePrice: async (productId: string, sku: string) => {
@@ -384,12 +366,12 @@ export function usePriceManagement() {
         });
         toast.success("Đã duyệt giá thành công!");
         refreshData();
-      } catch (error) {
+      } catch (error: unknown) {
         const err = error as ApiError;
-        const msg = err.response?.data?.message;
-        toast.error(
-          Array.isArray(msg) ? msg.join(", ") : msg || "Lỗi duyệt giá",
-        );
+        const msg =
+          err.response?.data?.message ||
+          (error instanceof Error ? error.message : "Lỗi duyệt giá");
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
       }
     },
     rejectPrice: async (productId: string, sku: string) => {
@@ -400,10 +382,12 @@ export function usePriceManagement() {
         });
         toast.warning("Đã từ chối giá!");
         refreshData();
-      } catch (error) {
+      } catch (error: unknown) {
         const err = error as ApiError;
-        const msg = err.response?.data?.message;
-        toast.error(Array.isArray(msg) ? msg.join(", ") : msg || "Lỗi từ chối");
+        const msg =
+          err.response?.data?.message ||
+          (error instanceof Error ? error.message : "Lỗi từ chối");
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
       }
     },
   };

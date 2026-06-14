@@ -53,7 +53,6 @@ export default function MediaManagement({
   pagination,
   actions,
 }: MediaManagementProps) {
-  // dropdown state
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [hasStatusOpened, setHasStatusOpened] = useState(false);
   const [isTypeOpen, setIsTypeOpen] = useState(false);
@@ -72,7 +71,6 @@ export default function MediaManagement({
 
   const [replacingId, setReplacingId] = useState<string | null>(null);
 
-  // click outside
   useClickOutside(statusRef, () => setIsStatusOpen(false));
   useClickOutside(typeRef, () => setIsTypeOpen(false));
   useClickOutside(limitRef, () => setIsLimitDropdownOpen(false));
@@ -295,7 +293,7 @@ export default function MediaManagement({
                       <img
                         src={record.url}
                         alt={record.altText || record.fileName}
-                        onClick={() => actions.openEditDrawer(record)}
+                        onClick={() => actions.openEditDrawer(record)} // helper: Mở lại quyền truy cập Drawer
                         style={{ cursor: "pointer" }}
                         title="Click to edit info"
                         onError={(e) => {
@@ -325,7 +323,7 @@ export default function MediaManagement({
 
                   <div
                     className="mm-card-info"
-                    onClick={() => actions.openEditDrawer(record)}
+                    onClick={() => actions.openEditDrawer(record)} // helper: Mở lại quyền truy cập Drawer
                     style={{ cursor: "pointer" }}
                     title="Click to edit media info"
                   >
@@ -360,28 +358,54 @@ export default function MediaManagement({
                     >
                       Set Primary
                     </button>
+
                     <button
                       type="button"
-                      className={`mm-action-btn ${isVideo ? "disabled" : ""}`}
+                      className={`mm-action-btn ${record.isPrimary || isVideo ? "disabled" : ""}`}
                       onClick={() => {
-                        if (!isVideo) actions.openCropModal(record);
+                        if (!record.isPrimary && !isVideo)
+                          actions.openCropModal(record);
                       }}
-                      disabled={isVideo}
-                      title={isVideo ? "Không thể cắt video" : "Crop"}
+                      disabled={record.isPrimary || isVideo}
+                      title={
+                        record.isPrimary
+                          ? "Bỏ chọn Primary trước khi cắt ảnh"
+                          : isVideo
+                            ? "Không thể cắt video"
+                            : "Crop"
+                      }
                     >
                       <CropIcon /> Crop
                     </button>
+
                     <button
                       type="button"
-                      className="mm-action-btn"
-                      onClick={() => triggerReplaceInput(record.id)}
+                      className={`mm-action-btn ${record.isPrimary ? "disabled" : ""}`}
+                      onClick={() => {
+                        if (!record.isPrimary) triggerReplaceInput(record.id);
+                      }}
+                      disabled={record.isPrimary}
+                      title={
+                        record.isPrimary
+                          ? "Bỏ chọn Primary trước khi thay thế"
+                          : "Replace"
+                      }
                     >
                       <ReplaceIcon /> Replace
                     </button>
+
                     <button
                       type="button"
-                      className="mm-action-btn delete-btn"
-                      onClick={() => actions.deleteMedia(record.id)}
+                      className={`mm-action-btn delete-btn ${record.isPrimary ? "disabled" : ""}`}
+                      onClick={() => {
+                        if (!record.isPrimary) actions.deleteMedia(record.id);
+                      }}
+                      disabled={record.isPrimary}
+                      title={
+                        record.isPrimary
+                          ? "Bỏ chọn Primary trước khi xóa"
+                          : "Delete"
+                      }
                     >
                       <TrashIcon />
                     </button>

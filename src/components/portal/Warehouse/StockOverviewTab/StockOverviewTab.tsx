@@ -245,9 +245,23 @@ export default function StockOverviewTab({
                     <td className="sot-cell-sku">{item.sku}</td>
                     <td>
                       <div className="sot-product-info">
-                        {item.thumbnail && (
+                        {item.thumbnail ? (
                           <img
-                            src={item.thumbnail}
+                            src={
+                              item.thumbnail.startsWith("http")
+                                ? item.thumbnail
+                                : `${import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:8080"}${item.thumbnail}`
+                            }
+                            alt=""
+                            className="sot-product-img"
+                            onError={(e) => {
+                              e.currentTarget.src =
+                                "https://placehold.co/400x300/f3f4f6/9ca3af?text=Image+Not+Found";
+                            }}
+                          />
+                        ) : (
+                          <img
+                            src="https://placehold.co/400x300/f3f4f6/9ca3af?text=No+Image"
                             alt=""
                             className="sot-product-img"
                           />

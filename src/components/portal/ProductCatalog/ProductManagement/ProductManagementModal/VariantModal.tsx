@@ -35,27 +35,32 @@ export default function VariantModal({
   >({});
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
 
-  // cập nhật state trực tiếp trong quá trình render
-  if (isOpen !== prevIsOpen) {
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  const [prevInitialAttribute, setPrevInitialAttribute] =
+    useState(initialAttribute);
+
+  // Đồng bộ dữ liệu trực tiếp trong quá trình render để tránh cảnh báo cascading renders của ESLint
+  if (isOpen !== prevIsOpen || initialAttribute !== prevInitialAttribute) {
     setPrevIsOpen(isOpen);
+    setPrevInitialAttribute(initialAttribute);
+
     if (isOpen) {
       if (initialAttribute) {
-        // Nếu là Edit mode: Đặt sẵn ID và mảng giá trị của dòng đang sửa
+        // Chế độ Edit: Đặt sẵn ID và mảng giá trị của thuộc tính đang được sửa
         setSelectedAttrIds([initialAttribute.id]);
         setSelectedValuesMap({
           [initialAttribute.id]: initialAttribute.values,
         });
         setStep("select-values");
       } else {
-        // Nếu là Add mode: Khôi phục lại trạng thái
+        // Chế độ Add: Khôi phục lại trạng thái ban đầu của bảng chọn
         setStep("select-attr");
 
-        // Đọc ID từ bảng để tick sẵn thuộc tính
+        // Đọc ID từ danh sách biến thể hiện tại để đánh dấu đã chọn
         setSelectedAttrIds(existingVariants.map((v) => v.id));
 
-        // Khôi phục các giá trị (S, M, L) đã tích
+        // Khôi phục các giá trị đã được tích chọn trước đó
         const map: Record<string, string[]> = {};
         existingVariants.forEach((v) => {
           map[v.id] = v.values;
@@ -73,14 +78,14 @@ export default function VariantModal({
     attr.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
-  // Click vào thuộc tính
+  // Xử lý sự kiện click chọn hoặc bỏ chọn một thuộc tính
   const handleToggleAttrSelection = (id: string) => {
     setSelectedAttrIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
   };
 
-  // Tích chọn giá trị thuộc tính
+  // Xử lý sự kiện tích chọn hoặc bỏ chọn một giá trị cụ thể của thuộc tính
   const handleToggleValue = (attrId: string, val: string, checked: boolean) => {
     setSelectedValuesMap((prev) => {
       const currentVals = prev[attrId] || [];
@@ -92,10 +97,10 @@ export default function VariantModal({
     });
   };
 
-  // Gom toàn bộ dữ liệu thuộc tính đã chọn thành mảng trả về form
+  // Gom toàn bộ dữ liệu thuộc tính đã chọn thành mảng để trả về form cha
   const handleFinalConfirm = () => {
     const results: VariantAttribute[] = selectedAttrIds.map((id) => {
-      // Lấy tên và cấu trúc gốc từ danh sách (ưu tiên availableAttributes, fallback initialAttribute nếu có)
+      // Lấy tên và cấu trúc gốc từ danh sách ưu tiên availableAttributes, fallback initialAttribute nếu có
       const attrDef =
         availableAttributes.find((a) => a.id === id) || initialAttribute;
       return {
@@ -148,7 +153,6 @@ export default function VariantModal({
                   return (
                     <div
                       key={attr.id}
-                      // render class selected để tô xanh khi được chọn
                       className={`vm-attr-item ${isSelected ? "selected" : ""}`}
                       onClick={() => handleToggleAttrSelection(attr.id)}
                     >
@@ -163,7 +167,7 @@ export default function VariantModal({
 
           {step === "select-values" && (
             <div className="vm-step2-container">
-              {/* hiển thị ra thành danh sách toàn bộ thuộc tính đã chọn */}
+              {/* Hiển thị danh sách toàn bộ thuộc tính đã chọn */}
               {selectedAttrIds.map((attrId) => {
                 const attrDef =
                   availableAttributes.find((a) => a.id === attrId) ||

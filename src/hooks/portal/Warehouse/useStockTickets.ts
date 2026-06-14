@@ -104,7 +104,7 @@ export function useStockTickets() {
 
       // Gọi API Get All History đã tạo ở BE
       const response = await axiosClient.get(
-        `/inventory/transactions/history/all?${queryParams.toString()}`,
+        `/inventory/transactions/history/all?${queryParams.toString()}&_t=${Date.now()}`,
       );
 
       const resultData: BackendTransaction[] = response.data.data;
@@ -198,6 +198,7 @@ export function useStockTickets() {
             note: payload.note,
             items: payload.items.map((i) => ({
               sku: i.sku,
+              product_name: i.productName,
               quantity: i.quantity,
               reason: i.reason,
             })),
@@ -210,6 +211,7 @@ export function useStockTickets() {
             note: payload.note,
             items: payload.items.map((i) => ({
               sku: i.sku,
+              product_name: i.productName,
               quantity: i.quantity,
               reason: i.reason,
             })),

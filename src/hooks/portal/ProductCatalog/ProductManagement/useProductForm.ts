@@ -80,6 +80,16 @@ export interface ApiCategoryNode {
   children?: ApiCategoryNode[];
 }
 
+// Interface chuẩn hóa lỗi từ Backend/Axios
+export interface ApiError {
+  response?: {
+    data?: {
+      message?: string | string[];
+    };
+  };
+  message?: string;
+}
+
 const generatePricingVariants = (
   variants: VariantAttribute[],
   currentPricing: PricingItem[],
@@ -444,7 +454,6 @@ export function useProductForm() {
         );
         const basePrice = baseProduct ? baseProduct.price : targetItem.price;
 
-        // Bổ sung type chặt chẽ, lấy currency đã setup thay vì hardcode VND
         const payload: {
           price: number;
           currency: string;
@@ -483,18 +492,12 @@ export function useProductForm() {
           `Đã gửi yêu cầu phê duyệt giá cho biến thể ${targetItem.variantName}`,
         );
       } catch (error: unknown) {
-        let errorMsg = "Lỗi khi gửi yêu cầu giá";
-        const err = error as {
-          response?: { data?: { message?: string | string[] } };
-        };
-        const msg = err.response?.data?.message;
-
-        if (Array.isArray(msg)) {
-          errorMsg = msg.join(", ");
-        } else if (typeof msg === "string") {
-          errorMsg = msg;
-        }
-        toast.error(errorMsg);
+        const err = error as ApiError;
+        const msg =
+          err.response?.data?.message ||
+          err.message ||
+          "Lỗi khi gửi yêu cầu giá";
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
       }
     },
 
@@ -518,8 +521,10 @@ export function useProductForm() {
           `Duyệt giá thành công cho biến thể ${targetItem.variantName}`,
         );
       } catch (error: unknown) {
-        console.error(error);
-        toast.error("Lỗi khi duyệt giá");
+        const err = error as ApiError;
+        const msg =
+          err.response?.data?.message || err.message || "Lỗi khi duyệt giá";
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
       }
     },
 
@@ -541,8 +546,10 @@ export function useProductForm() {
         );
         toast.success(`Đã từ chối giá cho biến thể ${targetItem.variantName}`);
       } catch (error: unknown) {
-        console.error(error);
-        toast.error("Lỗi khi từ chối giá");
+        const err = error as ApiError;
+        const msg =
+          err.response?.data?.message || err.message || "Lỗi khi từ chối giá";
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
       }
     },
 
@@ -607,13 +614,14 @@ export function useProductForm() {
             });
             toast.success("Cập nhật thông tin và trạng thái thành công!");
           } catch (statusError: unknown) {
-            const err = statusError as { message?: string | string[] };
+            const err = statusError as ApiError;
+            const msg = err.response?.data?.message || err.message;
             let errorMsg =
-              "Lưu thông tin thành công, nhưng không thể đổi trạng thái!";
-            if (Array.isArray(err.message)) {
-              errorMsg += ` Lỗi: ${err.message.join(", ")}`;
-            } else if (typeof err.message === "string") {
-              errorMsg += ` Lỗi: ${err.message}`;
+              "Lưu thông tin thành công, nhưng không thể đổi trạng thái! ";
+            if (Array.isArray(msg)) {
+              errorMsg += msg.join(", ");
+            } else if (typeof msg === "string") {
+              errorMsg += msg;
             }
             toast.warning(errorMsg);
           }
@@ -621,12 +629,12 @@ export function useProductForm() {
         navigate("/portal/products");
         return true;
       } catch (error: unknown) {
-        console.error(error);
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "Có lỗi xảy ra khi lưu sản phẩm",
-        );
+        const err = error as ApiError;
+        const msg =
+          err.response?.data?.message ||
+          err.message ||
+          "Có lỗi xảy ra khi lưu sản phẩm";
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
         return false;
       }
     },

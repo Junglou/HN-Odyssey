@@ -112,12 +112,13 @@ export function useStockOverview() {
       const params: Record<string, string | number | boolean> = {
         page: pagination.page,
         limit: pagination.limit,
+        _t: Date.now(),
       };
 
       if (filters.search) params.search = filters.search;
       if (filters.category !== "all") params.category = filters.category;
       if (filters.status !== "all") {
-        params.status = filters.status; // Truyền trực tiếp 'IN_STOCK', 'LOW_STOCK', hoặc 'OUT_OF_STOCK'
+        params.status = filters.status;
       }
 
       const response = await axiosClient.get("/inventory/stock", { params });
