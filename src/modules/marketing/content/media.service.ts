@@ -305,7 +305,6 @@ export class MediaService {
   }
 
   // AC5: Xóa phương tiện hoàn toàn khỏi bộ nhớ
-  // AC5: Xóa phương tiện hoàn toàn khỏi bộ nhớ
   async hardDeleteMedia(id: string) {
     const media = await this.mediaModel.findById(id);
     if (!media) throw new NotFoundException('Không tìm thấy phương tiện.');
@@ -329,6 +328,27 @@ export class MediaService {
     });
 
     return { message: 'Đã xóa hoàn toàn phương tiện khỏi hệ thống và bộ nhớ.' };
+  }
+
+  // Xóa toàn bộ phương tiện liên kết với một đối tượng khi đối tượng đó bị xóa
+  async deleteMediaByTarget(targetId: string, type: string): Promise<void> {
+    const medias = await this.mediaModel.find({
+      targetId: String(targetId),
+      type: String(type),
+    });
+
+    for (const media of medias) {
+      this.deletePhysicalFile(media.url);
+    }
+
+    await this.mediaModel.deleteMany({
+      targetId: String(targetId),
+      type: String(type),
+    });
+
+    this.logger.log(
+      `Đã dọn dẹp toàn bộ phương tiện của ${type} có ID: ${targetId}`,
+    );
   }
 
   private deletePhysicalFile(relativePath: string) {

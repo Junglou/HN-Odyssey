@@ -94,6 +94,19 @@ export class ProductsService {
     private readonly mediaService: MediaService,
   ) {}
 
+  // Chỉ tính các đơn hàng đang trong quá trình (Chưa Done)
+  private readonly ONGOING_ORDER_STATUSES = [
+    'PENDING',
+    'CONFIRMED',
+    'PROCESSING',
+    'READY_TO_SHIP',
+    'SHIPPING',
+    'ON_HOLD',
+    'TRADE_IN_REVIEW',
+    'REFUND_PENDING',
+    'REFUND_NEEDED',
+  ];
+
   async syncToSearchEngine(product: ProductDocument) {
     const populatedProduct = await this.productModel
       .findById(product._id)
@@ -108,10 +121,31 @@ export class ProductsService {
       return;
     }
 
+    // [FIX 2]: Lọc bỏ các biến thể chưa duyệt giá (active = false) trước khi đẩy lên Algolia
+    if (populatedProduct.has_variants && populatedProduct.variants) {
+      const activeVariants = populatedProduct.variants.filter(
+        (v) => v.active === true || v.price > 0,
+      );
+      populatedProduct.variants = activeVariants;
+
+      // Xóa sổ tùy chọn (VD: Nút bấm màu Xanh) khỏi Algolia nếu không có biến thể nào chứa nó đang active
+      const activeAttrSet = new Set<string>();
+      activeVariants.forEach((v) => {
+        v.attributes.forEach((attr) => {
+          activeAttrSet.add(`${attr.code}_${attr.value}`);
+        });
+      });
+
+      populatedProduct.attributes = populatedProduct.attributes.filter((attr) =>
+        activeAttrSet.has(`${attr.code}_${attr.value}`),
+      );
+    }
+
     const categoryHierarchy: string[] = populatedProduct.categories.map(
       (c) => c.name,
     );
 
+    // Sử dụng biến product gốc thay vì populatedProduct
     await this.algoliaService.syncProduct(product, categoryHierarchy);
 
     console.log(
@@ -264,34 +298,24 @@ export class ProductsService {
     ip: string,
     userAgent: string,
   ) {
-    // 1. TÌM KIẾM STUB ĐƯỢC TẠO TỪ KHO
-    const stubProduct = await this.productModel.findOne({
+    // 1. Kiểm tra SKU cha đã tồn tại chưa
+    const isExist = await this.productModel.exists({
       sku: createProductDto.sku,
-      tags: 'wms-stub',
     });
-
-    if (!stubProduct) {
-      const isExist = await this.productModel.exists({
-        sku: createProductDto.sku,
-      });
-      if (isExist)
-        throw new ConflictException(
-          `Mã SKU '${createProductDto.sku}' đã được PIM định danh trước đó!`,
-        );
-      throw new BadRequestException(
-        `Mã SKU '${createProductDto.sku}' chưa được khởi tạo. Vui lòng yêu cầu Kho nhập phiếu nháp cho SKU này trước!`,
+    if (isExist) {
+      throw new ConflictException(
+        `Mã SKU '${createProductDto.sku}' đã tồn tại trên hệ thống!`,
       );
     }
 
     const variants = createProductDto.variants || [];
-    const variantStubsToDelete: Types.ObjectId[] = [];
 
-    // 2. CHECK STUB CỦA CÁC BIẾN THỂ (NẾU CÓ)
+    // 2. Xử lý và Validate Biến thể (Variants)
     if (variants.length > 0) {
       const variantSkus = variants.map((v) => v.sku);
       if (new Set(variantSkus).size !== variantSkus.length) {
         throw new BadRequestException(
-          'Danh sách biến thể có chứa SKU trùng nhau',
+          'Danh sách biến thể có chứa các SKU trùng nhau',
         );
       }
 
@@ -318,101 +342,93 @@ export class ProductsService {
           );
         }
 
-        const stubVar = await this.productModel.findOne({
-          sku: variant.sku,
-          tags: 'wms-stub',
+        // Kiểm tra SKU biến thể đã tồn tại chưa
+        const isVarExist = await this.productModel.exists({
+          $or: [{ sku: variant.sku }, { 'variants.sku': variant.sku }],
         });
-        if (!stubVar) {
-          const isExist = await this.productModel.exists({
-            $or: [{ sku: variant.sku }, { 'variants.sku': variant.sku }],
-          });
-          if (isExist)
-            throw new ConflictException(
-              `SKU biến thể '${variant.sku}' đã tồn tại.`,
-            );
-          throw new BadRequestException(
-            `SKU biến thể '${variant.sku}' chưa có trong Kho!`,
+        if (isVarExist) {
+          throw new ConflictException(
+            `SKU biến thể '${variant.sku}' đã tồn tại trên hệ thống.`,
           );
         }
 
-        // Hút tồn kho từ kho sang biến thể
-        variant.stock = stubVar.stock;
+        // Khởi tạo mặc định số lượng và giá khi tạo mới từ Product Management
+        variant.stock = variant.stock || 0;
         variant.price = 0;
         variant.sale_price = 0;
-        variantStubsToDelete.push(stubVar._id);
+        variant.active = false;
       }
     }
 
-    // 3. XỬ LÝ DỮ LIỆU CHUNG
+    // 3. Xử lý giá của sản phẩm cha
     if (!createProductDto.sale_price || createProductDto.sale_price === 0) {
       createProductDto.sale_price = createProductDto.price || 0;
     }
 
+    // 4. Xử lý Specs và Attributes từ Variants
     const specs = this.calculateSpecs(variants);
     const flatAttributes = this.flattenAttributes(variants);
 
+    // 5. Làm sạch Description chống XSS
     let cleanDescription = createProductDto.description;
     if (cleanDescription) {
       cleanDescription = this.sanitizeContent(cleanDescription);
     }
 
+    // 6. Xử lý Slug cho Product
     const slug =
       createProductDto.slug || this.createSlug(createProductDto.name);
-    const slugExists = await this.productModel.exists({
-      slug,
-      _id: { $ne: stubProduct._id },
-    });
-    if (slugExists) throw new ConflictException('Đường dẫn (Slug) đã tồn tại');
+    const slugExists = await this.productModel.exists({ slug });
+    if (slugExists) {
+      throw new ConflictException('Đường dẫn (Slug) đã tồn tại');
+    }
 
-    // 4. GHI ĐÈ DỮ LIỆU PIM LÊN STUB CỦA KHO VÀ ĐỔI TRẠNG THÁI
-    const cleanTags = createProductDto.tags.filter((t) => t !== 'wms-stub');
+    // 7. Xử lý Tags (Dành cho thuật toán AI và Search Engine)
+    const cleanTags = createProductDto.tags || [];
     if (cleanTags.length === 0) cleanTags.push('uncategorized');
 
-    Object.assign(stubProduct, {
+    // 8. Khởi tạo trực tiếp Document mới thay vì cập nhật Stub
+    const newProduct = new this.productModel({
       name: createProductDto.name,
+      sku: createProductDto.sku,
       slug: slug,
       description: cleanDescription,
       categories: createProductDto.category_ids.map(
         (id) => new Types.ObjectId(id),
       ),
       tags: cleanTags,
-      status: ProductStatus.DRAFT,
+      status: ProductStatus.DRAFT, // Sản phẩm mới luôn tạo ở trạng thái DRAFT
       has_variants: variants.length > 0,
       specs,
       attributes: flatAttributes,
       created_by: new Types.ObjectId(userId),
-      price: createProductDto.price || 0,
-      sale_price: createProductDto.sale_price,
+      price: 0,
+      sale_price: 0,
       variants: variants,
       weight: createProductDto.weight ?? 0.5,
+      stock: createProductDto.stock || 0, // Gán số lượng mặc định từ DTO (nếu có) hoặc 0
     });
 
-    await stubProduct.save();
+    // 9. Lưu vào Cơ sở dữ liệu
+    await newProduct.save();
 
-    // 5. DỌN DẸP RÁC BIẾN THỂ TRONG DB
-    if (variantStubsToDelete.length > 0) {
-      await this.productModel.deleteMany({
-        _id: { $in: variantStubsToDelete },
-      });
-    }
-
-    // 6. LOG AUDIT
+    // 10. Ghi nhận nhật ký hệ thống (Audit Log)
     await this.auditLogsService.log({
       action: 'CREATE_PRODUCT',
       collection_name: 'products',
       actor_id: userId,
-      target_id: stubProduct._id.toString(),
-      department: Department.WAREHOUSE,
+      target_id: newProduct._id.toString(),
+      department: Department.WAREHOUSE, // Hoặc Department tương ứng với Product
       detail: {
-        sku: stubProduct.sku,
-        name: stubProduct.name,
+        sku: newProduct.sku,
+        name: newProduct.name,
         is_price_reset: true,
       },
       ip: ip,
       user_agent: userAgent,
     });
 
-    return stubProduct;
+    return newProduct;
   }
 
   async findAll(query: ProductQueryParam) {
@@ -446,7 +462,6 @@ export class ProductsService {
     if (sort === 'price_asc') sortOption = { price: 1 };
     if (sort === 'price_desc') sortOption = { price: -1 };
 
-    // Bổ sung price_request vào đây để giải quyết vấn đề
     const selectFields =
       'name sku price sale_price thumbnail slug categories status stock rating_average created_at has_variants variants price_request';
 
@@ -556,10 +571,8 @@ export class ProductsService {
   }
 
   async findBySlug(slug: string, userId?: string) {
-    // khai báo kiểu record để tránh lỗi type mismatch và không vi phạm quy tắc no-explicit-any của eslint
     let product: Product | null = null;
 
-    // hỗ trợ fallback tìm theo id nếu frontend truyền nhầm id thay vì slug
     if (Types.ObjectId.isValid(slug)) {
       product = (await this.productModel
         .findOne({ _id: slug, status: ProductStatus.ACTIVE, is_deleted: false })
@@ -568,7 +581,6 @@ export class ProductsService {
         .exec()) as unknown as Product;
     }
 
-    // nếu không tìm thấy bằng id, thực hiện tìm theo slug thông thường
     if (!product) {
       product = (await this.productModel
         .findOne({ slug, status: ProductStatus.ACTIVE, is_deleted: false })
@@ -589,6 +601,26 @@ export class ProductsService {
         );
       }
       throw new NotFoundException('Sản phẩm không tìm thấy');
+    }
+
+    // [FIX 2 Client]: Cắt bỏ các biến thể chưa duyệt giá (active = false) trước khi trả về Storefront
+    if (product.has_variants && product.variants) {
+      const activeVariants = product.variants.filter(
+        (v) => v.active === true || v.price > 0,
+      );
+      product.variants = activeVariants;
+
+      // Đồng thời cắt bỏ luôn nút bấm Tùy chọn (Color/Size) nếu nó không thuộc về bất kỳ biến thể nào đang active
+      const activeAttrSet = new Set<string>();
+      activeVariants.forEach((v) => {
+        v.attributes.forEach((attr) => {
+          activeAttrSet.add(`${attr.code}_${attr.value}`);
+        });
+      });
+
+      product.attributes = product.attributes.filter((attr) =>
+        activeAttrSet.has(`${attr.code}_${attr.value}`),
+      );
     }
 
     let estimatedPoints = 0;
@@ -676,9 +708,35 @@ export class ProductsService {
     const product = await this.productModel.findById(id);
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
+    // Kiểm tra chặn thao tác nếu có đơn hàng đang chạy
+    const hasActiveOrder = await this.orderModel.exists({
+      'items.product_id': new Types.ObjectId(id),
+      status: { $in: this.ONGOING_ORDER_STATUSES },
+    });
+
+    if (hasActiveOrder) {
+      if (updateDto.sku && updateDto.sku !== product.sku) {
+        throw new BadRequestException(
+          'Sản phẩm đang có đơn hàng ĐANG XỬ LÝ. KHÔNG ĐƯỢC PHÉP thay đổi mã SKU gốc.',
+        );
+      }
+
+      if (updateDto.variants) {
+        const newSkus = updateDto.variants.map((v) => v.sku);
+        const missingOldVariant = product.variants.find(
+          (v) => !newSkus.includes(v.sku),
+        );
+        if (missingOldVariant) {
+          throw new BadRequestException(
+            `Sản phẩm đang có đơn hàng chưa giao xong. KHÔNG ĐƯỢC XÓA BIẾN THỂ [${missingOldVariant.sku}]. Hãy Tắt (Inactive) biến thể đó thay vì Xóa!`,
+          );
+        }
+      }
+    }
+
     if (product.status === ProductStatus.ACTIVE) {
       throw new BadRequestException(
-        'Sản phẩm đang hoạt động. Vui lòng tắt hoạt động (Inactive) trước khi chỉnh sửa.',
+        'Sản phẩm đang BẬT BÁN (Active). Vui lòng Tắt hoạt động (Inactive) trước khi chỉnh sửa thông tin.',
       );
     }
 
@@ -732,16 +790,108 @@ export class ProductsService {
       product.has_variants = updateDto.variants.length > 0;
       product.specs = this.calculateSpecs(updateDto.variants);
 
-      // FIX: GIỮ LẠI IMAGE CŨ CỦA VARIANT KHI UPDATE
-
       const oldVariants = product.variants || [];
+      const newSkus = updateDto.variants.map((newVar) => newVar.sku);
+      const deletedVariants = oldVariants.filter(
+        (oldV) => !newSkus.includes(oldV.sku),
+      );
+
+      // Xử lý dọn dẹp phương tiện cho biến thể bị xóa với cơ chế xử lý đồng bộ
+      if (deletedVariants.length > 0) {
+        const deleteMediaPromises = deletedVariants.map((deletedVar) =>
+          this.mediaService.deleteMediaByTarget(deletedVar.sku, 'Variant'),
+        );
+
+        const deleteResults = await Promise.allSettled(deleteMediaPromises);
+
+        deleteResults.forEach((result, index) => {
+          if (result.status === 'rejected') {
+            const sku = deletedVariants[index].sku;
+            console.error(
+              `Lỗi dọn dẹp phương tiện cho biến thể bị xóa ${sku}:`,
+              result.reason instanceof Error
+                ? result.reason.stack
+                : String(result.reason),
+            );
+          }
+        });
+      }
+
+      const oldVariantsMap = new Map(oldVariants.map((v) => [v.sku, v]));
+
+      const variantsToHide: string[] = [];
+      const variantsToPublish: string[] = [];
+
       updateDto.variants = updateDto.variants.map((newVar) => {
-        const oldVar = oldVariants.find((v) => v.sku === newVar.sku);
+        const oldVar = oldVariantsMap.get(newVar.sku);
+
+        if (oldVar) {
+          newVar.price = oldVar.price;
+          newVar.sale_price = oldVar.sale_price;
+        } else {
+          newVar.price = 0;
+          newVar.sale_price = 0;
+        }
+
+        const currentPrice = newVar.price;
+
+        if (currentPrice <= 0) {
+          newVar.active = false;
+        } else if (oldVar) {
+          newVar.active = oldVar.active;
+        } else {
+          newVar.active = true;
+        }
+
+        // Bắt sự kiện đổi trạng thái hoạt động của biến thể để đồng bộ ẩn/hiện hình ảnh
+        if (oldVar && oldVar.active !== newVar.active) {
+          if (newVar.active === false) {
+            variantsToHide.push(newVar.sku);
+          } else {
+            variantsToPublish.push(newVar.sku);
+          }
+        }
+
         if (oldVar && oldVar.images && oldVar.images.length > 0) {
           return { ...newVar, images: oldVar.images };
         }
         return newVar;
       });
+
+      // Thực thi đồng bộ Media cho các biến thể bị đổi trạng thái mà không bị xóa
+      if (variantsToHide.length > 0) {
+        const hidePromises = variantsToHide.map((sku) =>
+          this.mediaService.bulkUpdateStatusByTarget(sku, 'Hidden'),
+        );
+        const hideResults = await Promise.allSettled(hidePromises);
+        hideResults.forEach((result, index) => {
+          if (result.status === 'rejected') {
+            console.error(
+              `Lỗi ẩn Media cho biến thể SKU ${variantsToHide[index]}:`,
+              result.reason instanceof Error
+                ? result.reason.stack
+                : String(result.reason),
+            );
+          }
+        });
+      }
+
+      if (variantsToPublish.length > 0) {
+        const publishPromises = variantsToPublish.map((sku) =>
+          this.mediaService.bulkUpdateStatusByTarget(sku, 'Published'),
+        );
+        const publishResults = await Promise.allSettled(publishPromises);
+        publishResults.forEach((result, index) => {
+          if (result.status === 'rejected') {
+            console.error(
+              `Lỗi mở khóa Media cho biến thể SKU ${variantsToPublish[index]}:`,
+              result.reason instanceof Error
+                ? result.reason.stack
+                : String(result.reason),
+            );
+          }
+        });
+      }
 
       product.attributes = this.flattenAttributes(
         updateDto.variants,
@@ -798,58 +948,70 @@ export class ProductsService {
 
     const oldStatus = product.status;
 
+    if (oldStatus === status) {
+      return product;
+    }
+
     if (status === ProductStatus.ACTIVE) {
-      // 1. Chặn nếu có yêu cầu giá chưa duyệt xong (Draft, Pending, Rejected)
       if (
         product.price_request &&
-        product.price_request.status !== PriceRequestStatus.APPROVED
+        product.price_request.status === PriceRequestStatus.PENDING
       ) {
         throw new BadRequestException(
-          'Sản phẩm đang có yêu cầu giá chưa được duyệt hoàn tất. Vui lòng duyệt giá trước khi kích hoạt.',
+          'Sản phẩm đang có yêu cầu thay đổi giá chờ phê duyệt. Vui lòng xử lý yêu cầu giá trước khi kích hoạt lại!',
         );
       }
 
-      // 2. Chặn nếu giá gốc bằng 0 (chưa từng được duyệt giá hợp lệ)
-      if (
-        product.price <= 0 &&
-        (!product.variants || product.variants.length === 0)
-      ) {
-        throw new BadRequestException(
-          'Sản phẩm chưa có giá bán (Giá = 0). Vui lòng cập nhật và duyệt giá trước khi kích hoạt.',
-        );
-      }
-
-      // 3. Nếu là sản phẩm có biến thể, BẮT BUỘC tất cả biến thể phải có giá > 0
-      if (product.has_variants) {
-        const invalidVariant = product.variants.find((v) => v.price <= 0);
-        if (invalidVariant) {
+      if (!product.has_variants) {
+        if (product.price <= 0) {
           throw new BadRequestException(
-            `Biến thể [${invalidVariant.sku}] chưa được duyệt giá (Giá = 0). Tất cả biến thể phải được duyệt giá xong mới có thể kích hoạt sản phẩm.`,
+            'Sản phẩm này chưa từng được duyệt giá bán (Giá gốc = 0). Vui lòng cập nhật và duyệt giá thành công trước khi kích hoạt bán!',
           );
+        }
+      } else {
+        const hasValidPrice = product.variants.some((v) => v.price > 0);
+        if (!hasValidPrice) {
+          throw new BadRequestException(
+            'Sản phẩm không có bất kỳ biến thể nào được duyệt giá (Tất cả giá = 0). Vui lòng duyệt giá ít nhất 1 biến thể để kích hoạt lại!',
+          );
+        }
+
+        let isModified = false;
+        product.variants.forEach((v) => {
+          if (v.price <= 0 && v.active !== false) {
+            v.active = false;
+            isModified = true;
+          }
+          // BỔ SUNG ĐOẠN ELSE IF NÀY VÀO:
+          else if (v.price > 0 && v.active === false) {
+            v.active = true; // Tự động bật biến thể nếu đã được duyệt giá
+            isModified = true;
+          }
+        });
+
+        if (isModified) {
+          product.markModified('variants');
         }
       }
 
-      // 4. Validate ảnh
       if (
         !product.thumbnail &&
         (!product.images || product.images.length === 0)
       ) {
         throw new BadRequestException(
-          'Sản phẩm chưa có hình ảnh. Không thể kích hoạt bán.',
+          'Sản phẩm chưa có hình ảnh đại diện hoặc thư viện ảnh. Không thể bật hoạt động bán!',
         );
       }
 
-      // 5. Validate Danh mục
       if (!product.categories || product.categories.length === 0) {
         throw new BadRequestException(
-          'Sản phẩm chưa có Danh mục. Không thể kích hoạt.',
+          'Sản phẩm chưa được gán vào bất kỳ Danh mục nào. Không thể bật hoạt động bán!',
         );
       }
 
-      // 6. Validate Tags
       if (!product.tags || product.tags.length === 0) {
         throw new BadRequestException(
-          'Sản phẩm chưa có Tags từ khóa. Thuật toán AI cần ít nhất 1 Tag để hoạt động.',
+          'Sản phẩm chưa có thẻ từ khóa (Tags). AI cần ít nhất 1 Tag để phân tích!',
         );
       }
     }
@@ -858,29 +1020,87 @@ export class ProductsService {
     await product.save();
 
     if (status === ProductStatus.ACTIVE) {
-      this.syncToSearchEngine(product).catch((err) => {
-        console.error('Lỗi đồng bộ Algolia:', err);
+      this.syncToSearchEngine(product).catch((err: unknown) => {
+        console.error(
+          'Lỗi đồng bộ dữ liệu lên hệ thống tìm kiếm Algolia:',
+          err instanceof Error ? err.stack : String(err),
+        );
+      });
+
+      this.mediaService
+        .bulkUpdateStatusByTarget(product._id.toString(), 'Published')
+        .catch((err: unknown) => {
+          console.error(
+            'Lỗi tự động mở khóa (Publish) media:',
+            err instanceof Error ? err.stack : String(err),
+          );
+        });
+
+      // Mở khóa phương tiện biến thể song song với cơ chế an toàn
+      const variantMediaPromises = product.variants.map((variant) =>
+        this.mediaService.bulkUpdateStatusByTarget(variant.sku, 'Published'),
+      );
+
+      const syncResults = await Promise.allSettled(variantMediaPromises);
+
+      syncResults.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          const sku = product.variants[index].sku;
+          console.error(
+            `Lỗi đồng bộ trạng thái phương tiện cho biến thể ${sku}:`,
+            result.reason instanceof Error
+              ? result.reason.stack
+              : String(result.reason),
+          );
+        }
       });
     } else if (
       status === ProductStatus.DRAFT ||
       status === ProductStatus.INACTIVE
     ) {
-      this.algoliaService.removeProduct(product._id.toString()).catch((err) => {
-        console.error('Lỗi xóa Algolia:', err);
-      });
+      this.algoliaService
+        .removeProduct(product._id.toString())
+        .catch((err: unknown) => {
+          console.error(
+            'Lỗi xóa sản phẩm khỏi hệ thống tìm kiếm Algolia:',
+            err instanceof Error ? err.stack : String(err),
+          );
+        });
 
       this.mediaService
         .bulkUpdateStatusByTarget(product._id.toString(), 'Hidden')
-        .catch((err) => {
-          console.error('Lỗi tự động ẩn media:', err);
+        .catch((err: unknown) => {
+          console.error(
+            'Lỗi tự động ẩn tệp tin truyền thông liên quan:',
+            err instanceof Error ? err.stack : String(err),
+          );
         });
+
+      // Ẩn phương tiện biến thể song song với cơ chế an toàn
+      const variantMediaPromises = product.variants.map((variant) =>
+        this.mediaService.bulkUpdateStatusByTarget(variant.sku, 'Hidden'),
+      );
+
+      const syncResults = await Promise.allSettled(variantMediaPromises);
+
+      syncResults.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          const sku = product.variants[index].sku;
+          console.error(
+            `Lỗi ẩn trạng thái phương tiện cho biến thể ${sku}:`,
+            result.reason instanceof Error
+              ? result.reason.stack
+              : String(result.reason),
+          );
+        }
+      });
     }
 
     await this.auditLogsService.log({
       action: 'UPDATE_PRODUCT_STATUS',
       collection_name: 'products',
       actor_id: userId,
-      target_id: product._id,
+      target_id: product._id.toString(),
       department: Department.WAREHOUSE,
       detail: {
         sku: product.sku,
@@ -907,8 +1127,40 @@ export class ProductsService {
     });
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
+    const hasActiveOrder = await this.orderModel.exists({
+      'items.product_id': new Types.ObjectId(id),
+      status: { $in: this.ONGOING_ORDER_STATUSES },
+    });
+
+    if (hasActiveOrder) {
+      if (
+        !product.has_variants &&
+        product.price > 0 &&
+        dto.price !== undefined &&
+        dto.price !== product.price
+      ) {
+        throw new BadRequestException(
+          'Sản phẩm đang có đơn hàng hoạt động. Phần Giá Gốc (đã duyệt) BỊ KHÓA, không được phép chỉnh sửa.',
+        );
+      }
+      if (product.has_variants && dto.variants) {
+        for (const v of dto.variants) {
+          const existingVar = product.variants.find((ex) => ex.sku === v.sku);
+          if (
+            existingVar &&
+            existingVar.price > 0 &&
+            v.price !== undefined &&
+            v.price !== existingVar.price
+          ) {
+            throw new BadRequestException(
+              `Biến thể [${v.sku}] đang có đơn hàng và đã được duyệt giá, phần giá này BỊ KHÓA. Bạn chỉ có thể duyệt giá cho biến thể mới.`,
+            );
+          }
+        }
+      }
+    }
+
     const currentRequest = product.price_request;
-    // Đã gỡ điều kiện chặn nếu đang ở trạng thái APPROVED hoặc REJECTED để cho phép sửa lại
     if (
       currentRequest &&
       currentRequest.status === PriceRequestStatus.PENDING
@@ -942,7 +1194,6 @@ export class ProductsService {
       const idx = mergedVariants.findIndex((ev) => ev.sku === nv.sku);
       if (idx !== -1) {
         mergedVariants[idx].price = nv.price;
-        // Bắt buộc đổi lại thành DRAFT khi user edit lại biến thể từng bị Reject
         mergedVariants[idx].status = PriceRequestStatus.DRAFT;
       } else {
         mergedVariants.push(nv);
@@ -951,10 +1202,10 @@ export class ProductsService {
 
     product.price_request = {
       price: dto.price,
-      currency: dto.currency || currentRequest?.currency || 'VND', // Cập nhật lại đúng currency
+      currency: dto.currency || currentRequest?.currency || 'VND',
       variants: mergedVariants,
       effective_date: effectiveDate,
-      status: PriceRequestStatus.DRAFT, // Đưa tổng request về DRAFT
+      status: PriceRequestStatus.DRAFT,
       requester_id: new Types.ObjectId(userId),
       requested_at: new Date(),
     } as PriceRequest;
@@ -1113,7 +1364,6 @@ export class ProductsService {
 
     product.price_request.approver_id = new Types.ObjectId(userId);
 
-    // Đồng bộ trạng thái tổng của price_request nếu tất cả biến thể đã được xử lý xong
     if (
       product.price_request.variants &&
       product.price_request.variants.length > 0
@@ -1158,7 +1408,7 @@ export class ProductsService {
   }
 
   async bulkApprovePriceChanges(
-    items: { product_id: string; sku: string }[], // Nhận mảng object
+    items: { product_id: string; sku: string }[],
     isApproved: boolean,
     reason: string,
     userId: string,
@@ -1167,11 +1417,10 @@ export class ProductsService {
   ) {
     let successCount = 0;
     for (const item of items) {
-      // Lặp qua từng item
       try {
         await this.approvePriceChange(
-          item.product_id, // Truyền đúng ID sản phẩm
-          item.sku, // Truyền đúng SKU thay vì undefined
+          item.product_id,
+          item.sku,
           isApproved,
           userId,
           ip,
@@ -1204,7 +1453,6 @@ export class ProductsService {
 
     for (const p of products) {
       const request = p.price_request;
-
       if (!request) continue;
 
       p.price = request.price;
@@ -1232,25 +1480,65 @@ export class ProductsService {
       throw new NotFoundException('Sản phẩm không tồn tại');
     }
 
-    // Thực hiện Soft Delete: Ẩn khỏi UI, đổi trạng thái và giữ lại data cho lịch sử đơn hàng
+    if (product.status === ProductStatus.ACTIVE) {
+      throw new BadRequestException(
+        'Sản phẩm đang được BẬT BÁN (Active). Vui lòng tắt hoạt động trước khi thực hiện đưa vào thùng rác.',
+      );
+    }
+
+    const hasActiveOrder = await this.orderModel.exists({
+      'items.product_id': new Types.ObjectId(id),
+      status: { $in: this.ONGOING_ORDER_STATUSES },
+    });
+
+    if (hasActiveOrder) {
+      throw new BadRequestException(
+        'Sản phẩm đang nằm trong đơn hàng hoạt động. KHÔNG ĐƯỢC PHÉP XÓA kể cả khi sản phẩm đã được tắt hoạt động (Inactive)!',
+      );
+    }
+
     product.is_deleted = true;
     product.status = ProductStatus.INACTIVE;
     await product.save();
 
-    // Tự động ẩn hình ảnh/media liên quan
-    this.mediaService.bulkUpdateStatusByTarget(id, 'Hidden').catch((err) => {
-      console.error('Lỗi tự động ẩn media khi soft delete:', err);
+    this.mediaService
+      .bulkUpdateStatusByTarget(id, 'Hidden')
+      .catch((err: unknown) => {
+        console.error(
+          'Lỗi tự động ẩn media khi soft delete:',
+          err instanceof Error ? err.stack : String(err),
+        );
+      });
+
+    // Ẩn phương tiện của các biến thể con một cách an toàn
+    const variantMediaPromises = product.variants.map((variant) =>
+      this.mediaService.bulkUpdateStatusByTarget(variant.sku, 'Hidden'),
+    );
+
+    const syncResults = await Promise.allSettled(variantMediaPromises);
+
+    syncResults.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        const sku = product.variants[index].sku;
+        console.error(
+          `Lỗi đồng bộ ẩn phương tiện cho biến thể khi xóa sản phẩm ${sku}:`,
+          result.reason instanceof Error
+            ? result.reason.stack
+            : String(result.reason),
+        );
+      }
     });
 
-    // Xóa dữ liệu trên search engine Algolia
     try {
       await this.algoliaService.removeProduct(id);
       console.log(`[Algolia] Đã gỡ sản phẩm ${id} do bị xóa.`);
-    } catch (err) {
-      console.error('Lỗi xóa Algolia khi Soft Delete:', err);
+    } catch (err: unknown) {
+      console.error(
+        'Lỗi xóa Algolia khi Soft Delete:',
+        err instanceof Error ? err.stack : String(err),
+      );
     }
 
-    // Ghi log hệ thống cho Audit
     await this.auditLogsService.log({
       action: 'SOFT_DELETE_PRODUCT',
       collection_name: 'products',
@@ -1343,7 +1631,6 @@ export class ProductsService {
   }
 
   async findByCategory(dto: FilterProductDto) {
-    // 1. CHÌA KHÓA: Lấy thêm keyword từ dto
     const { categorySlug, sort, attributes, keyword } = dto;
     const page = dto.page || 1;
     const limit = dto.limit || 20;
@@ -1353,20 +1640,18 @@ export class ProductsService {
       is_deleted: false,
     };
 
-    // 2. CHÌA KHÓA: Xử lý tìm kiếm theo keyword (từ thanh Header chuyển xuống)
     if (keyword && typeof keyword === 'string' && keyword.trim() !== '') {
       const cleanKeyword = keyword.trim();
       query.$or = [
-        { name: { $regex: cleanKeyword, $options: 'i' } }, // Tìm theo tên
-        { tags: { $regex: cleanKeyword, $options: 'i' } }, // Tìm theo từ khóa tag
-        { sku: { $regex: cleanKeyword, $options: 'i' } }, // Tìm theo mã sản phẩm
+        { name: { $regex: cleanKeyword, $options: 'i' } },
+        { tags: { $regex: cleanKeyword, $options: 'i' } },
+        { sku: { $regex: cleanKeyword, $options: 'i' } },
       ];
     }
 
     let category: ICategoryDoc | null = null;
     let subCategories: Partial<ICategoryDoc>[] = [];
 
-    // XỬ LÝ DANH MỤC (Hỗ trợ Tab "All")
     if (categorySlug && categorySlug !== 'all') {
       const foundCategory = await this.categoryModel
         .findOne({ slug: categorySlug })
@@ -1376,7 +1661,6 @@ export class ProductsService {
 
       category = foundCategory;
 
-      // Đã gỡ bỏ lệnh ép kiểu "as Types.ObjectId" dư thừa tại đây
       const allCategories = await this.categoriesService.getAllChildCategories(
         category._id,
       );
@@ -1391,14 +1675,12 @@ export class ProductsService {
       subCategories = subs;
     }
 
-    // XỬ LÝ LỌC ATTRIBUTES TỪ FRONTEND GỬI XUỐNG
     if (attributes) {
       const attributeFilters: FilterQuery<ProductDocument>[] = [];
 
       for (const [code, valuesStr] of Object.entries(attributes)) {
         if (!valuesStr) continue;
 
-        // Tách chuỗi filter
         const values = String(valuesStr)
           .split(',')
           .map((v) => v.trim())
@@ -1454,12 +1736,10 @@ export class ProductsService {
       }
 
       if (attributeFilters.length > 0) {
-        // Gán mảng điều kiện lọc vào $and (hoạt động độc lập với $or của keyword phía trên)
         query.$and = attributeFilters;
       }
     }
 
-    // XỬ LÝ SẮP XẾP (SORT)
     let sortOptions: { [key: string]: SortOrder } = {};
     switch (sort) {
       case SortOption.TRENDING:
@@ -1479,7 +1759,6 @@ export class ProductsService {
 
     const skip = (page - 1) * limit;
 
-    // TRUY VẤN MONGODB VỚI BỘ LỌC HOÀN CHỈNH
     const [products, total] = await Promise.all([
       this.productModel
         .find(query)
@@ -1493,7 +1772,6 @@ export class ProductsService {
       this.productModel.countDocuments(query),
     ]);
 
-    // Đã gỡ bỏ lệnh ép kiểu "as unknown as CategorySimple | null" dư thừa tại đây
     const breadcrumbs = await this.buildBreadcrumbs(
       category ? (category as unknown as CategorySimple) : null,
     );

@@ -19,6 +19,12 @@ function escapeRegExp(string: string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// Định nghĩa Interface để xử lý triệt để lỗi no-unsafe-member-access của ESLint
+interface TagUsageCount {
+  _id: string;
+  count: number;
+}
+
 @Injectable()
 export class TagsService {
   constructor(
@@ -27,10 +33,33 @@ export class TagsService {
     private readonly auditLogsService: AuditLogsService,
   ) {}
 
-  // AC1: Lấy danh sách
+  // FIX LỖI "USAGE COUNT": Tính toán động dựa trên thực tế số lượng SP đang gắn thay vì count ảo
   async findAll(scope?: TagScope) {
     const filter = scope ? { scope } : {};
-    return this.tagModel.find(filter).sort({ usage_count: -1, name: 1 }).lean();
+    const tags = await this.tagModel.find(filter).sort({ name: 1 }).lean();
+
+    // Đếm chính xác Live count đang áp dụng từ bảng Product
+    const tagNames = tags.map((t) => t.name);
+
+    // Gắn Generic Type <TagUsageCount> để tránh lỗi any từ MongoDB Aggregation
+    const usageCounts = await this.productModel.aggregate<TagUsageCount>([
+      { $match: { tags: { $in: tagNames }, is_deleted: false } },
+      { $unwind: '$tags' },
+      { $match: { tags: { $in: tagNames } } },
+      { $group: { _id: '$tags', count: { $sum: 1 } } },
+    ]);
+
+    // Ép kiểu Map rõ ràng để tránh lỗi no-unsafe-assignment
+    const countMap = new Map<string, number>(
+      usageCounts.map((u) => [String(u._id), Number(u.count)]),
+    );
+
+    return tags
+      .map((tag) => ({
+        ...tag,
+        usage_count: countMap.get(tag.name) || 0,
+      }))
+      .sort((a, b) => b.usage_count - a.usage_count);
   }
 
   async findOne(id: string) {
@@ -39,7 +68,6 @@ export class TagsService {
     return tag;
   }
 
-  // AC2: Tạo mới
   async create(
     createTagDto: CreateTagDto,
     actorId: string,
@@ -91,7 +119,6 @@ export class TagsService {
     return savedTag;
   }
 
-  // AC4: Cập nhật & Đồng bộ
   async update(
     id: string,
     updateDto: UpdateTagDto,
@@ -101,6 +128,17 @@ export class TagsService {
   ) {
     const tag = await this.tagModel.findById(id);
     if (!tag) throw new NotFoundException('Thẻ không tồn tại');
+
+    // KIỂM TRA RÀNG BUỘC: ĐANG ÁP DỤNG THÌ CẤM SỬA
+    const usageCount = await this.productModel.countDocuments({
+      tags: tag.name,
+      is_deleted: false,
+    });
+    if (usageCount > 0) {
+      throw new BadRequestException(
+        `Thẻ (Tag) '${tag.name}' đang được áp dụng cho ${usageCount} sản phẩm, KHÔNG ĐƯỢC PHÉP SỬA. Vui lòng gỡ thẻ khỏi các sản phẩm trước.`,
+      );
+    }
 
     const oldName = tag.name;
     let nameChanged = false;
@@ -124,18 +162,6 @@ export class TagsService {
     Object.assign(tag, updateDto);
     const savedTag = await tag.save();
 
-    let affectedProducts = 0;
-
-    // 3. REALTIME SYNC
-    if (nameChanged) {
-      const result = await this.productModel.updateMany(
-        { tags: oldName },
-        { $set: { 'tags.$': savedTag.name } },
-      );
-      affectedProducts = result.modifiedCount;
-    }
-
-    // [LOG]
     await this.auditLogsService.log({
       action: 'UPDATE_TAG',
       collection_name: 'tags',
@@ -146,7 +172,6 @@ export class TagsService {
         name_changed: nameChanged,
         old_name: oldName,
         new_name: savedTag.name,
-        synced_products: affectedProducts,
       },
       ip,
       user_agent: userAgent,
@@ -155,32 +180,23 @@ export class TagsService {
     return savedTag;
   }
 
-  // AC5: Xóa an toàn
   async remove(id: string, actorId: string, ip: string, userAgent: string) {
     const tag = await this.tagModel.findById(id);
     if (!tag) throw new NotFoundException('Thẻ không tồn tại');
 
-    if (tag.usage_count > 0) {
-      await this.auditLogsService.log({
-        action: 'DELETE_TAG_FAILED',
-        collection_name: 'tags',
-        actor_id: actorId,
-        target_id: id,
-        department: Department.MARKETING,
-        detail: { reason: 'Tag is in use', usage_count: tag.usage_count },
-        is_success: false,
-        ip,
-        user_agent: userAgent,
-      });
-
+    // KIỂM TRA RÀNG BUỘC: ĐANG ÁP DỤNG THÌ CẤM XÓA
+    const usageCount = await this.productModel.countDocuments({
+      tags: tag.name,
+      is_deleted: false,
+    });
+    if (usageCount > 0) {
       throw new BadRequestException(
-        `Không thể xóa: Thẻ đang gắn cho ${tag.usage_count} đối tượng. Hãy dùng chức năng 'Gộp thẻ'.`,
+        `Thẻ (Tag) '${tag.name}' đang được áp dụng cho ${usageCount} sản phẩm, KHÔNG ĐƯỢC PHÉP XÓA. Vui lòng gỡ thẻ khỏi các sản phẩm trước.`,
       );
     }
 
     await this.tagModel.findByIdAndDelete(id);
 
-    // [LOG]
     await this.auditLogsService.log({
       action: 'DELETE_TAG',
       collection_name: 'tags',
@@ -195,7 +211,6 @@ export class TagsService {
     return { message: 'Đã xóa thẻ thành công' };
   }
 
-  // AC6: Gộp Thẻ
   async mergeTags(
     targetTagId: string,
     sourceTagId: string,
@@ -218,26 +233,24 @@ export class TagsService {
       throw new BadRequestException('Chỉ có thể gộp 2 thẻ cùng phạm vi');
     }
 
-    // 1. Cộng dồn usage
-    target.usage_count += source.usage_count;
-    await target.save();
+    const sourceUsageCount = await this.productModel.countDocuments({
+      tags: source.name,
+      is_deleted: false,
+    });
 
-    // 2. Chuyển SP
-    // A. Thêm target
+    // Cập nhật sản phẩm
     await this.productModel.updateMany(
       { tags: source.name },
       { $addToSet: { tags: target.name } },
     );
-    // B. Xóa source
     const result = await this.productModel.updateMany(
       { tags: source.name },
       { $pull: { tags: source.name } },
     );
 
-    // 3. Xóa source tag
+    // Xóa source tag
     await this.tagModel.findByIdAndDelete(sourceTagId);
 
-    //Quan trọng
     await this.auditLogsService.log({
       action: 'MERGE_TAGS',
       collection_name: 'tags',
@@ -248,7 +261,7 @@ export class TagsService {
         source_tag: source.name,
         target_tag: target.name,
         products_updated: result.modifiedCount,
-        usage_merged: source.usage_count,
+        usage_merged: sourceUsageCount,
       },
       ip,
       user_agent: userAgent,
@@ -256,11 +269,10 @@ export class TagsService {
 
     return {
       message: `Đã gộp thẻ '${source.name}' vào '${target.name}' thành công`,
-      merged_count: source.usage_count,
+      merged_count: sourceUsageCount,
     };
   }
 
-  // Private Helper
   private createSlug(name: string): string {
     return defaultSlugify(name, { lower: true, strict: true, locale: 'vi' });
   }

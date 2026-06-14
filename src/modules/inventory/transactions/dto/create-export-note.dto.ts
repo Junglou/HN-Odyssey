@@ -14,6 +14,10 @@ export class ExportItemDto {
   @IsString()
   sku: string;
 
+  @IsOptional()
+  @IsString()
+  product_name?: string;
+
   @IsNotEmpty({ message: 'Số lượng xuất không được để trống' })
   @IsNumber({}, { message: 'Số lượng phải là một số' })
   @Min(1, { message: 'Số lượng xuất phải lớn hơn 0' })

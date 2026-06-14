@@ -27,18 +27,15 @@ export class AttributesService {
     private readonly searchService: SearchService,
   ) {}
 
-  //Validate mã màu Hex (Chuyển vào trong class)
   private isValidHex(hex: string): boolean {
     return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(hex);
   }
 
-  //Trigger Re-index (Mock cho AC12)
   private async triggerReindexSystem() {
     console.log('>> [SYSTEM] Triggering ElasticSearch/Algolia Re-indexing...');
     await this.searchService.reindexAttributes();
   }
 
-  // 1. TẠO MỚI (AC1, AC2, AC4, AC6, AC11, AC12)
   async create(
     createDto: CreateAttributeDto,
     actorId: string,
@@ -47,7 +44,6 @@ export class AttributesService {
   ) {
     const { code, display_type, values } = createDto;
 
-    //AC6: Trùng mã Code
     const existsCode = await this.attributeModel.findOne({ code });
     if (existsCode) {
       throw new ConflictException(`Mã thuộc tính '${code}' đã tồn tại.`);
@@ -62,16 +58,13 @@ export class AttributesService {
       );
     }
 
-    //AC4: Logic cho Màu sắc (Bắt buộc có mã Hex hợp lệ)
     if (display_type === AttributeType.COLOR_SWATCH) {
       if (!values || values.length === 0) {
         throw new BadRequestException(
           'Loại màu sắc bắt buộc phải có danh sách giá trị.',
         );
       }
-      // Loop check từng giá trị
       for (const val of values) {
-        // SỬA: Gọi this.isValidHex
         if (!val.meta || !this.isValidHex(val.meta)) {
           throw new BadRequestException(
             `Giá trị '${val.label}' thiếu mã màu Hex hợp lệ (VD: #FF0000).`,
@@ -80,7 +73,6 @@ export class AttributesService {
       }
     }
 
-    //AC11: Logic cho Range Slider (Min < Max)
     if (display_type === AttributeType.RANGE_SLIDER) {
       if (!values || values.length < 2) {
         throw new BadRequestException(
@@ -99,7 +91,6 @@ export class AttributesService {
       }
     }
 
-    //AC11: Trùng lặp giá trị con
     if (values && values.length > 0) {
       const distinctValues = new Set(values.map((v) => v.value));
       if (distinctValues.size !== values.length) {
@@ -112,12 +103,10 @@ export class AttributesService {
     const newAttr = new this.attributeModel(createDto);
     const savedAttr = await newAttr.save();
 
-    //AC12: Re-index nếu thuộc tính này cho phép lọc
     if (savedAttr.is_filterable) {
       await this.triggerReindexSystem();
     }
 
-    // Ghi Log
     await this.auditLogsService.log({
       action: 'CREATE_ATTRIBUTE',
       collection_name: 'attributes',
@@ -132,7 +121,6 @@ export class AttributesService {
     return savedAttr;
   }
 
-  // 2. DANH SÁCH
   async findAll() {
     return this.attributeModel
       .find()
@@ -140,14 +128,12 @@ export class AttributesService {
       .lean();
   }
 
-  // 3. CHI TIẾT
   async findOne(id: string) {
     const attr = await this.attributeModel.findById(id).lean();
     if (!attr) throw new NotFoundException('Không tìm thấy thuộc tính');
     return attr;
   }
 
-  // 4. CẬP NHẬT
   async update(
     id: string,
     updateDto: UpdateAttributeDto,
@@ -159,40 +145,37 @@ export class AttributesService {
     if (!attr) throw new NotFoundException('Không tìm thấy thuộc tính');
     const oldData = attr.toObject();
 
-    // Check trùng Code
-    if (updateDto.code && updateDto.code !== attr.code) {
-      // 1. Kiểm tra xem code cũ đã được dùng chưa
-      const isUsed = await this.productModel.exists({
-        'attributes.code': attr.code,
-      });
+    // KIỂM TRA RÀNG BUỘC: ĐANG ÁP DỤNG THÌ CẤM SỬA HOÀN TOÀN
+    const isUsed = await this.productModel.exists({
+      'attributes.code': attr.code,
+      is_deleted: false,
+    });
 
+    if (isUsed) {
+      throw new BadRequestException(
+        `Thuộc tính (Biến thể) '${attr.name}' đang được áp dụng cho sản phẩm, KHÔNG ĐƯỢC PHÉP SỬA. Vui lòng vào trang quản lý sản phẩm tắt/xóa biến thể này trước.`,
+      );
+    }
+
+    if (updateDto.code && updateDto.code !== attr.code) {
       if (updateDto.name && updateDto.name !== attr.name) {
         const existsName = await this.attributeModel.findOne({
           name: updateDto.name,
-          _id: { $ne: id }, // Bỏ qua chính nó
+          _id: { $ne: id },
         });
         if (existsName) {
           throw new ConflictException('Tên thuộc tính mới đã tồn tại');
         }
       }
 
-      if (isUsed) {
-        throw new BadRequestException(
-          `Không thể đổi mã Code '${attr.code}' vì đã được gán cho sản phẩm. Hãy tạo thuộc tính mới hoặc chỉ đổi Tên hiển thị.`,
-        );
-      }
-
-      // 2. Nếu chưa dùng thì mới check trùng code mới
       const exists = await this.attributeModel.findOne({
         code: updateDto.code,
       });
       if (exists) throw new ConflictException('Mã code mới đã tồn tại');
     }
 
-    // Validate Hex nếu update values của Color (Optional nhưng nên có)
     if (attr.display_type === AttributeType.COLOR_SWATCH && updateDto.values) {
       for (const val of updateDto.values) {
-        // Check nếu val là object đầy đủ (do DTO Partial)
         if (val['meta'] && !this.isValidHex(val['meta'])) {
           throw new BadRequestException(
             `Giá trị '${val['label']}' mã màu không hợp lệ.`,
@@ -203,10 +186,8 @@ export class AttributesService {
 
     Object.assign(attr, updateDto);
     const updatedAttr = await attr.save();
-
     const newData = updatedAttr.toObject();
 
-    // Re-index Check
     const isConfigChanged =
       oldData.is_filterable !== newData.is_filterable ||
       oldData.is_active !== newData.is_active ||
@@ -216,7 +197,6 @@ export class AttributesService {
       await this.triggerReindexSystem();
     }
 
-    // Log
     await this.auditLogsService.log({
       action: 'UPDATE_ATTRIBUTE',
       collection_name: 'attributes',
@@ -234,37 +214,23 @@ export class AttributesService {
     return updatedAttr;
   }
 
-  // 5. XÓA (AC9 & AC13)
   async remove(id: string, actorId: string, ip: string, userAgent: string) {
     const attr = await this.attributeModel.findById(id);
     if (!attr) throw new NotFoundException('Không tìm thấy thuộc tính');
 
-    //AC9: Kiểm tra Usage
+    // KIỂM TRA RÀNG BUỘC: ĐANG ÁP DỤNG THÌ CẤM XÓA HOÀN TOÀN
     const isUsed = await this.productModel.exists({
       'attributes.code': attr.code,
+      is_deleted: false,
     });
 
     if (isUsed) {
-      await this.auditLogsService.log({
-        action: 'DELETE_ATTRIBUTE_FAILED',
-        collection_name: 'attributes',
-        actor_id: actorId,
-        target_id: id,
-        department: Department.WAREHOUSE,
-        detail: { reason: 'In use by products', code: attr.code },
-        is_success: false,
-        ip,
-        user_agent: userAgent,
-      });
-
       throw new BadRequestException(
-        `Thuộc tính '${attr.name}' (${attr.code}) đang được dùng cho sản phẩm. Vui lòng chọn 'Vô hiệu hóa' (Inactive) thay vì xóa.`,
+        `Thuộc tính (Biến thể) '${attr.name}' đang được áp dụng cho sản phẩm, KHÔNG ĐƯỢC PHÉP XÓA. Vui lòng vào trang quản lý sản phẩm tắt/xóa biến thể này trước.`,
       );
     }
 
     await this.attributeModel.findByIdAndDelete(id);
-
-    // AC12: Re-index sau khi xóa
     await this.triggerReindexSystem();
 
     await this.auditLogsService.log({

@@ -14,6 +14,10 @@ export class ImportItemDto {
   @IsString()
   sku: string;
 
+  @IsOptional()
+  @IsString()
+  product_name?: string;
+
   @IsNotEmpty({ message: 'Số lượng nhập không được để trống' })
   @IsNumber({}, { message: 'Số lượng phải là một số' })
   @Min(1, { message: 'Số lượng nhập phải lớn hơn 0' })

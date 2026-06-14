@@ -30,6 +30,7 @@ import * as fs from 'fs';
 export interface ProcessedTransactionItem {
   product_id?: Types.ObjectId;
   sku: string;
+  product_name?: string;
   quantity: number;
   note: string;
 }
@@ -209,7 +210,8 @@ export class TransactionsService {
             (p.has_variants && p.variants?.some((v) => v.sku === item.sku)),
         );
 
-        let finalName = 'Sản phẩm không xác định';
+        // [FIX CHÍ MẠNG]: Lấy product_name lưu trong item làm fallback thay vì gán cứng chữ không xác định
+        let finalName = item.product_name || 'Sản phẩm không xác định';
         if (product) {
           finalName = product.name;
           // Bổ sung tên biến thể nếu sản phẩm là biến thể
@@ -273,7 +275,6 @@ export class TransactionsService {
     const processedItems: ProcessedTransactionItem[] = [];
 
     for (const item of dto.items) {
-      // Tìm sản phẩm nhưng không ném lỗi nếu không có (cho phép tạo mới)
       const product = await this.productModel
         .findOne({
           $or: [{ sku: item.sku }, { 'variants.sku': item.sku }],
@@ -281,10 +282,24 @@ export class TransactionsService {
         })
         .lean();
 
+      // KHÔNG CHO PHÉP TẠO MỚI TỪ KHO, NÉM LỖI NẾU KHÔNG TỒN TẠI
+      if (!product) {
+        throw new BadRequestException(
+          `SKU '${item.sku}' không tồn tại trong hệ thống. Vui lòng tạo sản phẩm trước khi nhập kho.`,
+        );
+      }
+
+      if (product.has_variants && product.sku === item.sku) {
+        throw new BadRequestException(
+          `SKU '${item.sku}' là mã gốc của sản phẩm có phân loại. Vui lòng dùng mã SKU của biến thể cụ thể.`,
+        );
+      }
+
       totalQuantity += item.quantity;
       processedItems.push({
         product_id: product ? product._id : undefined,
         sku: item.sku,
+        product_name: item.product_name,
         quantity: item.quantity,
         note: item.reason || '',
       });
@@ -458,19 +473,27 @@ export class TransactionsService {
         rowResult.errors.push('Số lượng không hợp lệ');
       }
 
-      const found = allProducts.find(
+      // 1. Tìm xem SKU có tồn tại (là SP cha hoặc SP biến thể)
+      const matchedProduct = allProducts.find(
         (p) =>
-          (!p.has_variants && p.sku === sku) ||
+          p.sku === sku ||
           (p.has_variants && p.variants?.some((v) => v.sku === sku)),
       );
 
-      if (!found) {
-        // Cho phép import SKU mới, không đánh lỗi
-        rowResult.note = rowResult.note
-          ? `${rowResult.note} (SKU mới)`
-          : 'SKU mới';
-      } else {
-        rowResult.product_id = found._id.toString();
+      if (!matchedProduct) {
+        rowResult.status = 'INVALID';
+        rowResult.errors.push('SKU không tồn tại trên hệ thống Sản phẩm');
+      }
+      // 2. Chặn nhập SKU gốc nếu Sản phẩm đó CÓ biến thể
+      else if (matchedProduct.has_variants && matchedProduct.sku === sku) {
+        rowResult.status = 'INVALID';
+        rowResult.errors.push(
+          'Sản phẩm có phân loại, vui lòng nhập mã SKU của Biến thể',
+        );
+      }
+      // 3. Hợp lệ (SP đơn giản hoặc đúng SKU biến thể)
+      else {
+        rowResult.product_id = matchedProduct._id.toString();
       }
 
       if (rowResult.status === 'INVALID') hasError = true;
@@ -714,6 +737,13 @@ export class TransactionsService {
         throw new BadRequestException(`SKU ${item.sku} không tồn tại.`);
 
       if (product.has_variants) {
+        // Chặn lỗi người dùng gửi request Postman dùng thẳng mã SKU mẹ
+        if (product.sku === item.sku) {
+          throw new BadRequestException(
+            `SKU '${item.sku}' là mã gốc của sản phẩm có phân loại. Vui lòng xuất kho bằng mã SKU biến thể.`,
+          );
+        }
+
         const variant = product.variants.find((v) => v.sku === item.sku);
         if (!variant || (variant.stock || 0) < item.quantity) {
           throw new BadRequestException(
@@ -732,6 +762,7 @@ export class TransactionsService {
       processedItems.push({
         product_id: product._id, // LỖI 1
         sku: item.sku,
+        product_name: item.product_name,
         quantity: item.quantity,
         note: item.reason || '',
       });
@@ -906,23 +937,34 @@ export class TransactionsService {
         rowResult.errors.push('Số lượng không hợp lệ');
       }
 
-      const foundProduct = allProducts.find(
+      // 1. Tìm xem SKU có tồn tại (là SP cha hoặc SP biến thể)
+      const matchedProduct = allProducts.find(
         (p) =>
-          (!p.has_variants && p.sku === sku) ||
+          p.sku === sku ||
           (p.has_variants && p.variants?.some((v) => v.sku === sku)),
       );
 
-      if (!foundProduct) {
+      if (!matchedProduct) {
         rowResult.status = 'INVALID';
-        rowResult.errors.push('SKU không tồn tại');
-      } else {
-        rowResult.product_id = foundProduct._id.toString();
+        rowResult.errors.push('SKU không tồn tại trên hệ thống');
+      }
+      // 2. Chặn nhập SKU gốc nếu Sản phẩm đó CÓ biến thể
+      else if (matchedProduct.has_variants && matchedProduct.sku === sku) {
+        rowResult.status = 'INVALID';
+        rowResult.errors.push(
+          'Sản phẩm có phân loại, vui lòng nhập mã SKU của Biến thể',
+        );
+      }
+      // 3. Hợp lệ -> Chuyển sang kiểm tra tồn kho hiện tại
+      else {
+        rowResult.product_id = matchedProduct._id.toString();
         let currentStock = 0;
-        if (foundProduct.has_variants) {
-          const v = foundProduct.variants.find((v) => v.sku === sku);
+
+        if (matchedProduct.has_variants) {
+          const v = matchedProduct.variants?.find((v) => v.sku === sku);
           currentStock = v?.stock || 0;
         } else {
-          currentStock = foundProduct.stock || 0;
+          currentStock = matchedProduct.stock || 0;
         }
 
         if (currentStock < qty) {
@@ -1820,30 +1862,14 @@ export class TransactionsService {
       const updatedProducts: UpdatedProductInfo[] = [];
 
       for (const item of transaction.items) {
-        let product = await this.productModel
+        const product = await this.productModel
           .findOne({ $or: [{ sku: item.sku }, { 'variants.sku': item.sku }] })
           .session(session);
 
-        // NẾU SKU CHƯA TỒN TẠI, HỆ THỐNG TỰ ĐỘNG TẠO "STUB PRODUCT"
         if (!product) {
-          if (transaction.action_type === 'IMPORT') {
-            const newStub = new this.productModel({
-              name: `Chưa định danh - ${item.sku}`,
-              sku: item.sku,
-              slug: `stub-${item.sku}-${Date.now()}`,
-              status: 'DRAFT',
-              categories: [],
-              tags: ['wms-stub'], // Đánh dấu là hàng xuất phát từ Kho
-              stock: 0,
-              price: 0,
-              has_variants: false,
-            });
-            product = await newStub.save({ session });
-          } else {
-            throw new BadRequestException(
-              `SKU ${item.sku} không tồn tại để xuất kho.`,
-            );
-          }
+          throw new BadRequestException(
+            `Lỗi nghiêm trọng: SKU '${item.sku}' không tồn tại trong hệ thống. Giao dịch bị từ chối.`,
+          );
         }
 
         const filter: FilterQuery<ProductDocument> = { _id: product._id };
@@ -2022,7 +2048,7 @@ export class TransactionsService {
             (p.has_variants && p.variants?.some((v) => v.sku === item.sku)),
         );
 
-        let finalName = 'Sản phẩm không xác định';
+        let finalName = item.product_name || 'Sản phẩm không xác định';
         if (product) {
           finalName = product.name;
           // Bổ sung tên biến thể nếu sản phẩm là biến thể

@@ -12,6 +12,9 @@ export class TransactionItem {
   @Prop({ required: true })
   sku: string;
 
+  @Prop()
+  product_name?: string;
+
   @Prop({ required: true, min: 1 })
   quantity: number;
 

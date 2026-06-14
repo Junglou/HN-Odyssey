@@ -6,7 +6,6 @@ import { Product, ProductDocument } from './schemas/product.schema';
 import { ProductStatus } from 'src/common/enums/product-status.enum';
 import { ProductsService } from './products.service';
 
-// Định nghĩa Interface tường minh để tránh lỗi no-explicit-any
 export interface ProductThumbnailPayload {
   productId: string;
   thumbnailUrl: string;
@@ -80,15 +79,15 @@ export class ProductListener {
   @OnEvent('variant.thumbnail.updated', { async: true })
   async handleVariantThumbnailUpdated(payload: VariantThumbnailPayload) {
     try {
-      // Query vào sub-document variants và update cột image
+      // handle: Đẩy ảnh primary vào mảng images của Variant bằng $addToSet (chống trùng lặp)
       const result = await this.productModel.updateOne(
         { 'variants.sku': payload.variantSku },
-        { $set: { 'variants.$.image': payload.thumbnailUrl } },
+        { $addToSet: { 'variants.$.images': payload.thumbnailUrl } },
       );
 
       if (result.modifiedCount > 0) {
         this.logger.log(
-          `[EVENT SUCCESS] Đã cập nhật ảnh cho Variant SKU: ${payload.variantSku}`,
+          `[EVENT SUCCESS] Đã thêm ảnh vào mảng images cho Variant SKU: ${payload.variantSku}`,
         );
       } else {
         this.logger.warn(
@@ -107,10 +106,9 @@ export class ProductListener {
   @OnEvent('media.bulk.uploaded', { async: true })
   async handleMediaBulkUploaded(payload: BulkMediaPayload) {
     try {
-      const safeType = payload.type.toUpperCase(); // Chuẩn hóa chuỗi để so sánh an toàn
+      const safeType = payload.type.toUpperCase();
 
       if (safeType === 'PRODUCT') {
-        // Dùng $push kèm $each để đẩy toàn bộ mảng ảnh mới vào đuôi mảng images hiện tại
         await this.productModel.findByIdAndUpdate(payload.targetId, {
           $push: { images: { $each: payload.urls } },
         });
@@ -118,13 +116,13 @@ export class ProductListener {
           `[EVENT SUCCESS] Đã thêm ${payload.urls.length} ảnh vào mảng images của Product ID: ${payload.targetId}`,
         );
       } else if (safeType === 'VARIANT' && payload.urls.length > 0) {
-        // Schema Variant chỉ lưu 1 ảnh (cột image), nên ta sẽ ghi đè ảnh đầu tiên nếu upload bulk
+        // handle: Cập nhật đẩy toàn bộ URL vào mảng images của Variant
         await this.productModel.updateOne(
           { 'variants.sku': payload.targetId },
-          { $set: { 'variants.$.image': payload.urls[0] } },
+          { $push: { 'variants.$.images': { $each: payload.urls } } },
         );
         this.logger.log(
-          `[EVENT SUCCESS] Đã lưu ảnh bulk vào Variant SKU: ${payload.targetId}`,
+          `[EVENT SUCCESS] Đã lưu ${payload.urls.length} ảnh bulk vào mảng images của Variant SKU: ${payload.targetId}`,
         );
       }
     } catch (error: unknown) {
@@ -147,13 +145,11 @@ export class ProductListener {
 
         let isModified = false;
 
-        // 1. Nếu ảnh bị xóa đang là ảnh đại diện -> Xóa trắng
         if (product.thumbnail === payload.url) {
           product.thumbnail = '';
           isModified = true;
         }
 
-        // 2. Xóa URL khỏi mảng images (nếu có)
         if (product.images && product.images.length > 0) {
           const originalLength = product.images.length;
           product.images = product.images.filter((img) => img !== payload.url);
@@ -169,23 +165,20 @@ export class ProductListener {
           );
         }
       } else if (safeType === 'VARIANT') {
-        // Xóa trắng trường image của Variant nếu URL trùng với ảnh vừa bị xóa
-        // Dùng arrayFilters để rà soát chính xác phần tử cần xóa bên trong mảng
+        // handle: Dùng $pull để xóa chính xác URL ra khỏi mảng images của Variant
         const result = await this.productModel.updateOne(
           { 'variants.sku': payload.targetId },
           {
-            $set: { 'variants.$[elem].image': '' },
+            $pull: { 'variants.$[elem].images': payload.url },
           },
           {
-            arrayFilters: [
-              { 'elem.sku': payload.targetId, 'elem.image': payload.url },
-            ],
+            arrayFilters: [{ 'elem.sku': payload.targetId }],
           },
         );
 
         if (result.modifiedCount > 0) {
           this.logger.log(
-            `[EVENT SUCCESS] Đã dọn dẹp ảnh cho Variant SKU: ${payload.targetId}`,
+            `[EVENT SUCCESS] Đã dọn dẹp ảnh khỏi mảng images cho Variant SKU: ${payload.targetId}`,
           );
         }
       }

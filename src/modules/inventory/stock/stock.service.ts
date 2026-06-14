@@ -535,39 +535,29 @@ export class StockService {
             // LUỒNG XUẤT KHO (Đơn hàng bán ra)
             // ==========================================
             let currentHold = 0;
-            let currentTotalStock = 0;
 
             if (product.has_variants) {
               const v = product.variants.find((x) => x.sku === item.sku);
               if (!v) throw new Error(`Không tìm thấy biến thể ${item.sku}`);
               currentHold = v.stock_on_hold ?? 0;
-              currentTotalStock = v.stock ?? 0;
             } else {
               currentHold = product.stock_on_hold ?? 0;
-              currentTotalStock = product.stock ?? 0;
             }
 
+            // Giải phóng lượng Hold (nếu có hold, không thì trừ 0)
             const holdToDeduct = Math.min(currentHold, item.quantity);
-            const missingHold = item.quantity - holdToDeduct;
-
-            if (missingHold > 0 && currentTotalStock < missingHold) {
-              throw new Error(
-                `Sản phẩm ${item.sku} đã hết hàng (Thực tế còn: ${currentTotalStock}, Cần xuất: ${item.quantity})`,
-              );
-            }
 
             if (product.has_variants) {
               filter['variants.sku'] = item.sku;
-              // Khởi tạo $inc object trước khi gán
               update.$inc = {
-                'variants.$.stock_on_hold': -holdToDeduct,
-                'variants.$.stock': -missingHold,
-                stock: -missingHold,
+                'variants.$.stock_on_hold': -holdToDeduct, // Giải phóng hold
+                'variants.$.stock': -item.quantity, // Trừ đứt số lượng khỏi kho vật lý
+                stock: -item.quantity, // Trừ số tổng
               };
             } else {
               update.$inc = {
-                stock_on_hold: -holdToDeduct,
-                stock: -missingHold,
+                stock_on_hold: -holdToDeduct, // Giải phóng hold
+                stock: -item.quantity, // Trừ đứt số lượng khỏi kho vật lý
               };
             }
           } else {
@@ -736,24 +726,35 @@ export class StockService {
     if (product.has_variants) {
       queryFilter['variants.sku'] = sku;
       queryFilter['$or'] = [
-        { 'variants.stock': { $gte: quantity } },
+        // Sửa lại logic: Tổng kho trừ đi số đang hold phải >= quantity mới cho mua
+        {
+          $expr: {
+            $gte: [
+              { $subtract: ['$variants.stock', '$variants.stock_on_hold'] },
+              quantity,
+            ],
+          },
+        },
         { allow_backorder: true },
       ];
+      // [FIX QUAN TRỌNG]: Chỉ giữ hàng, KHÔNG TRỪ STOCK TỔNG
       update = {
         $inc: {
-          'variants.$.stock': -quantity,
           'variants.$.stock_on_hold': quantity,
-          stock: -quantity,
         },
       };
     } else {
       queryFilter['$or'] = [
-        { stock: { $gte: quantity } },
+        {
+          $expr: {
+            $gte: [{ $subtract: ['$stock', '$stock_on_hold'] }, quantity],
+          },
+        },
         { allow_backorder: true },
       ];
+      // [FIX QUAN TRỌNG]: Chỉ giữ hàng, KHÔNG TRỪ STOCK TỔNG
       update = {
         $inc: {
-          stock: -quantity,
           stock_on_hold: quantity,
         },
       };
