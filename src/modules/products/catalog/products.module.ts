@@ -33,6 +33,7 @@ import { ProductSeederCommand } from './seedProduct/product-seeder.command';
 import { ProductSeederService } from './seedProduct/product-seeder.service';
 import { CommandModule } from 'nestjs-command';
 import { ProductListener } from './product.listener';
+import { UploadModule } from 'src/modules/system/upload/upload.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { ProductListener } from './product.listener';
     UsersModule,
     MarketingModule,
     CommandModule,
+    UploadModule,
   ],
   controllers: [ProductsController],
   providers: [

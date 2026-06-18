@@ -60,6 +60,7 @@ import {
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { AlgoliaService } from 'src/modules/search/algolia.service';
 import { MediaService } from 'src/modules/marketing/content/media.service';
+import { UploadService } from 'src/modules/system/upload/upload.service';
 
 interface PopulatedCategory {
   _id: Types.ObjectId;
@@ -92,6 +93,7 @@ export class ProductsService {
     @InjectModel(MemberTier.name) private tierModel: Model<MemberTierDocument>,
     private readonly algoliaService: AlgoliaService,
     private readonly mediaService: MediaService,
+    private readonly uploadService: UploadService,
   ) {}
 
   // Chỉ tính các đơn hàng đang trong quá trình (Chưa Done)
@@ -825,37 +827,61 @@ export class ProductsService {
       updateDto.variants = updateDto.variants.map((newVar) => {
         const oldVar = oldVariantsMap.get(newVar.sku);
 
+        // KHẮC PHỤC LỖI ESLINT: Dùng Intersection Type (&) thay vì 'any'
+        // Ép kiểu an toàn để TS hiểu biến này có chứa các trường của Tồn kho và Trạng thái
+        const safeVar = newVar as typeof newVar & {
+          stock: number;
+          stock_on_hold: number;
+          min_stock: number;
+          max_stock: number;
+          active: boolean;
+          images: string[];
+        };
+
         if (oldVar) {
-          newVar.price = oldVar.price;
-          newVar.sale_price = oldVar.sale_price;
+          safeVar.price = oldVar.price;
+          safeVar.sale_price = oldVar.sale_price;
+
+          // Bảo toàn dữ liệu tồn kho cũ
+          safeVar.stock = oldVar.stock;
+          safeVar.stock_on_hold = oldVar.stock_on_hold;
+          safeVar.min_stock = oldVar.min_stock;
+          safeVar.max_stock = oldVar.max_stock;
         } else {
-          newVar.price = 0;
-          newVar.sale_price = 0;
+          safeVar.price = 0;
+          safeVar.sale_price = 0;
+
+          // Khởi tạo mặc định cho biến thể mới
+          safeVar.stock = 0;
+          safeVar.stock_on_hold = 0;
+          safeVar.min_stock = 0;
+          safeVar.max_stock = 0;
         }
 
-        const currentPrice = newVar.price;
+        const currentPrice = safeVar.price;
 
         if (currentPrice <= 0) {
-          newVar.active = false;
+          safeVar.active = false;
         } else if (oldVar) {
-          newVar.active = oldVar.active;
+          safeVar.active = oldVar.active;
         } else {
-          newVar.active = true;
+          safeVar.active = true;
         }
 
         // Bắt sự kiện đổi trạng thái hoạt động của biến thể để đồng bộ ẩn/hiện hình ảnh
-        if (oldVar && oldVar.active !== newVar.active) {
-          if (newVar.active === false) {
-            variantsToHide.push(newVar.sku);
+        if (oldVar && oldVar.active !== safeVar.active) {
+          if (safeVar.active === false) {
+            variantsToHide.push(safeVar.sku);
           } else {
-            variantsToPublish.push(newVar.sku);
+            variantsToPublish.push(safeVar.sku);
           }
         }
 
         if (oldVar && oldVar.images && oldVar.images.length > 0) {
-          return { ...newVar, images: oldVar.images };
+          return { ...safeVar, images: oldVar.images };
         }
-        return newVar;
+
+        return safeVar;
       });
 
       // Thực thi đồng bộ Media cho các biến thể bị đổi trạng thái mà không bị xóa
@@ -1947,5 +1973,23 @@ export class ProductsService {
       message: `Đã xóa thành công ${successCount}/${productIds.length} sản phẩm.`,
       successCount,
     };
+  }
+
+  async hardDeleteProduct(id: string) {
+    const product = await this.productModel.findById(id);
+    if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
+
+    // Dọn dẹp toàn bộ Media của Product mẹ (Hàm này đã bao gồm xóa Cloud + xóa DB)
+    await this.mediaService.deleteMediaByTarget(id, 'Product');
+
+    // Dọn dẹp toàn bộ Media của các Variant con trực thuộc
+    if (product.variants && product.variants.length > 0) {
+      for (const variant of product.variants) {
+        await this.mediaService.deleteMediaByTarget(variant.sku, 'Variant');
+      }
+    }
+
+    // Cuối cùng tiến hành xóa sản phẩm khỏi MongoDB
+    return this.productModel.findByIdAndDelete(id);
   }
 }

@@ -634,9 +634,50 @@ export class BusinessReportsService {
             : 0,
       }));
 
+    const prevOrderAgg = await this.orderModel.aggregate<{
+      _id: string;
+      orderCount: number;
+    }>([
+      {
+        $match: {
+          status: { $nin: this.EXCLUDED_STATUSES },
+          createdAt: { $gte: dates.prevStart, $lte: dates.prevEnd },
+          user_id: { $exists: true, $ne: null },
+        },
+      },
+      {
+        $group: {
+          _id: '$user_id',
+          orderCount: { $sum: 1 },
+        },
+      },
+    ]);
+
+    let prevRetCustCount = 0;
+    let prevNewCustCount = 0;
+    prevOrderAgg.forEach((u) => {
+      if (u.orderCount > 1) prevRetCustCount++;
+      else prevNewCustCount++;
+    });
+
+    const prevTotalCust = prevNewCustCount + prevRetCustCount;
+    const prevRetentionRate =
+      prevTotalCust > 0 ? (prevRetCustCount / prevTotalCust) * 100 : 0;
+    const currentRetentionRate =
+      totalCust > 0 ? (retCustCount / totalCust) * 100 : 0;
+
+    let retentionGrowth = 0;
+    if (prevRetentionRate > 0) {
+      retentionGrowth =
+        ((currentRetentionRate - prevRetentionRate) / prevRetentionRate) * 100;
+    } else if (currentRetentionRate > 0) {
+      retentionGrowth = 100;
+    }
+
     return {
       newCustomers: newCustCount,
       returningCustomers: retCustCount,
+      retentionGrowth: Number(retentionGrowth.toFixed(2)),
       retentionRate:
         totalCust > 0
           ? Number(((retCustCount / totalCust) * 100).toFixed(2))
@@ -875,42 +916,84 @@ export class BusinessReportsService {
     };
     const cr = stat.total > 0 ? (stat.purchased / stat.total) * 100 : 0;
 
+    const prevAggResult = await this.behaviorModel.aggregate<{
+      _id: null;
+      total: number;
+      purchased: number;
+    }>([
+      { $match: { createdAt: { $gte: dates.prevStart, $lte: dates.prevEnd } } },
+      {
+        $group: {
+          _id: '$session_id',
+          actions: { $addToSet: '$action' },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          purchased: {
+            $sum: {
+              $cond: [{ $in: [BehaviorAction.PURCHASE, '$actions'] }, 1, 0],
+            },
+          },
+        },
+      },
+    ]);
+
+    const prevStat = prevAggResult[0] || { total: 0, purchased: 0 };
+    const prevCr =
+      prevStat.total > 0 ? (prevStat.purchased / prevStat.total) * 100 : 0;
+
+    let conversionGrowth = 0;
+    if (prevCr > 0) {
+      conversionGrowth = ((cr - prevCr) / prevCr) * 100;
+    } else if (cr > 0) {
+      conversionGrowth = 100;
+    }
+
     return {
       overallConversionRate: Number(cr.toFixed(2)),
+      conversionGrowth: Number(conversionGrowth.toFixed(2)),
       isBelowKpi: cr < targetKpi,
       targetKpi,
       funnel: [
         {
-          stepName: 'Xem SP',
-          userCount: stat.view,
+          stepName: 'Sessions', // Bổ sung bước tổng phiên
+          userCount: stat.total,
           dropOffRate:
             stat.total > 0
               ? Number(((1 - stat.view / stat.total) * 100).toFixed(2))
               : 0,
         },
         {
-          stepName: 'Giỏ hàng',
-          userCount: stat.cart,
+          stepName: 'View Product',
+          userCount: stat.view,
           dropOffRate:
             stat.view > 0
               ? Number(((1 - stat.cart / stat.view) * 100).toFixed(2))
               : 0,
         },
         {
-          stepName: 'Thanh toán',
-          userCount: stat.checkout,
+          stepName: 'Add to Cart',
+          userCount: stat.cart,
           dropOffRate:
             stat.cart > 0
               ? Number(((1 - stat.checkout / stat.cart) * 100).toFixed(2))
               : 0,
         },
         {
-          stepName: 'Mua',
-          userCount: stat.purchased,
+          stepName: 'Initiate Checkout',
+          userCount: stat.checkout,
           dropOffRate:
             stat.checkout > 0
               ? Number(((1 - stat.purchased / stat.checkout) * 100).toFixed(2))
               : 0,
+        },
+        {
+          stepName: 'Purchase',
+          userCount: stat.purchased,
+          dropOffRate: 0, // Bước cuối cùng không rớt khách
         },
       ],
       bySource: sourceAgg.map((s) => ({
@@ -945,6 +1028,7 @@ export class BusinessReportsService {
       trend: trendAgg.map((t) => ({
         label: isToday ? `${t._id}:00` : String(t._id),
         rate: t.total > 0 ? Number(((t.pur / t.total) * 100).toFixed(2)) : 0,
+        sessions: t.total,
       })),
     };
   }
@@ -1061,14 +1145,66 @@ export class BusinessReportsService {
       pur: 0,
     };
 
+    const prevMatchStage: FilterQuery<UserBehavior> = {
+      createdAt: { $gte: dates.prevStart, $lte: dates.prevEnd },
+    };
+    if (filter.page) prevMatchStage.path = filter.page;
+    if (filter.device)
+      prevMatchStage.device = filter.device.toUpperCase() as DeviceType;
+    if (filter.interaction_type)
+      prevMatchStage.action = filter.interaction_type;
+
+    const prevAgg = await this.behaviorModel.aggregate<{
+      _id: null;
+      tot: number;
+      bounce: number;
+    }>([
+      { $match: prevMatchStage },
+      {
+        $group: {
+          _id: '$session_id',
+          cnt: { $sum: 1 },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          tot: { $sum: 1 },
+          bounce: { $sum: { $cond: [{ $eq: ['$cnt', 1] }, 1, 0] } },
+        },
+      },
+    ]);
+
+    const prevSt = prevAgg[0] || { tot: 0, bounce: 0 };
+    const prevBounceRate =
+      prevSt.tot > 0 ? (prevSt.bounce / prevSt.tot) * 100 : 0;
+    const currentBounceRate = st.tot > 0 ? (st.bounce / st.tot) * 100 : 0;
+
+    let visitsGrowth = 0;
+    if (prevSt.tot > 0) {
+      visitsGrowth = ((st.tot - prevSt.tot) / prevSt.tot) * 100;
+    } else if (st.tot > 0) {
+      visitsGrowth = 100;
+    }
+
+    let bounceGrowth = 0;
+    if (prevBounceRate > 0) {
+      bounceGrowth =
+        ((currentBounceRate - prevBounceRate) / prevBounceRate) * 100;
+    } else if (currentBounceRate > 0) {
+      bounceGrowth = 100;
+    }
+
     return {
       // 3 thuộc tính bổ sung cho Portal Heatmap
       total_visits: st.tot,
+      visitsGrowth: Number(visitsGrowth.toFixed(2)),
       total_clicks: st.total_clicks,
       avg_duration_seconds: Math.round(st.avg_duration || 0),
 
       bounceRate:
         st.tot > 0 ? Number(((st.bounce / st.tot) * 100).toFixed(2)) : 0,
+      bounceGrowth: Number(bounceGrowth.toFixed(2)),
       trend: [],
       topBouncedPages: [],
       checkoutFunnel: {

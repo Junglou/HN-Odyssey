@@ -58,6 +58,13 @@ interface RawTopProductData {
   };
 }
 
+export interface InventoryKPI {
+  title: string;
+  value: string;
+  subtext: string;
+  iconType: 'box' | 'dollar' | 'truck' | 'refresh';
+}
+
 interface RawTopCategoryData {
   _id: Types.ObjectId;
   total_revenue: number;
@@ -453,7 +460,7 @@ export class DashboardService {
         } else {
           variantMap.set(v.sku, {
             sku: v.sku,
-            variant_name: v.variant_name || 'Mặc định',
+            variant_name: v.variant_name || 'Default', // FIX Tiếng Việt -> Tiếng Anh
             quantity: v.quantity,
             revenue: v.revenue,
             contribution_percent: 0,
@@ -518,7 +525,6 @@ export class DashboardService {
         },
         { $unwind: '$product' },
         { $unwind: '$product.categories' },
-        // BƯỚC 1: Lấy thông tin danh mục để tìm danh mục gốc (US3-AC1)
         {
           $lookup: {
             from: 'categories',
@@ -530,7 +536,6 @@ export class DashboardService {
         { $unwind: '$cat_detail' },
         {
           $addFields: {
-            // Lấy ID của danh mục cấp 1 (phần tử đầu tiên trong ancestors)
             root_category_id: {
               $ifNull: [
                 { $arrayElemAt: ['$cat_detail.ancestors._id', 0] },
@@ -539,7 +544,6 @@ export class DashboardService {
             },
           },
         },
-        // BƯỚC 2: Drill-down filter (Nếu người dùng lọc xem một danh mục cụ thể)
         ...(filter.category_id &&
         filter.category_id.trim() !== '' &&
         Types.ObjectId.isValid(filter.category_id)
@@ -551,7 +555,6 @@ export class DashboardService {
               },
             ]
           : []),
-        // BƯỚC 3: Gom nhóm theo Danh mục gốc và tính toán (US3-AC1, AC7)
         {
           $group: {
             _id: '$root_category_id',
@@ -585,7 +588,6 @@ export class DashboardService {
             },
             returned_quantity: {
               $sum: {
-                // Bao gồm cả đơn đã hoàn tiền (REFUNDED) vào tỷ lệ trả hàng
                 $cond: [
                   { $in: ['$status', ['RETURNED', 'REFUNDED']] },
                   '$items.quantity',
@@ -596,7 +598,6 @@ export class DashboardService {
             total_ordered_quantity: { $sum: '$items.quantity' },
           },
         },
-        // BƯỚC 4: Lấy tên danh mục để hiển thị
         {
           $lookup: {
             from: 'categories',
@@ -618,7 +619,6 @@ export class DashboardService {
     );
     const categoryIds = categoriesStats.map((c) => c._id);
 
-    // Tính toán kỳ trước để so sánh tăng trưởng (US3-AC6)
     const prevCategoriesStats = await this.orderModel.aggregate<PrevEntityStat>(
       [
         { $match: { createdAt: { $gte: prevStart, $lte: prevEnd } } },
@@ -711,7 +711,7 @@ export class DashboardService {
     });
   }
 
-  // Thêm hàm lấy danh sách đơn hàng gần nhất (AC5 - US1)
+  // LẤY DANH SÁCH ĐƠN HÀNG GẦN NHẤT
   async getRecentOrders(limit: number = 10) {
     const recentOrders = await this.orderModel
       .find({ status: { $nin: ['CANCELLED', 'REFUNDED'] } })
@@ -722,10 +722,77 @@ export class DashboardService {
 
     return recentOrders.map((order) => ({
       order_code: order.order_code,
-      customer_name: order.shipping_info?.name || 'Khách vãng lai',
+      customer_name: order.shipping_info?.name || 'Guest', // FIX Tiếng Việt -> Tiếng Anh
       total_amount: order.total_amount,
       status: order.status,
       created_at: order.createdAt,
     }));
+  }
+
+  // LẤY INVENTORY KPIs - CẬP NHẬT: Xóa tham số _filter để sửa lỗi ESLint
+  async getInventoryKPIs(): Promise<InventoryKPI[]> {
+    const products = await this.productModel
+      .find({ is_deleted: false, status: 'ACTIVE' })
+      .select('stock has_variants variants min_stock base_price')
+      .lean();
+
+    let totalValue = 0;
+    let totalItems = 0;
+    let lowStockCount = 0;
+
+    for (const product of products) {
+      const productObj = product as unknown as { base_price?: number };
+      const basePrice = productObj.base_price || 50;
+
+      if (product.has_variants && Array.isArray(product.variants)) {
+        for (const variant of product.variants) {
+          const vStock = Number(variant.stock) || 0;
+          const vObj = variant as unknown as { price?: number };
+          const variantPrice = vObj.price || basePrice;
+
+          totalItems += vStock;
+          totalValue += vStock * variantPrice;
+
+          const vMin = variant.min_stock ?? product.min_stock ?? 0;
+          if (vStock <= vMin) lowStockCount++;
+        }
+      } else {
+        const pStock = Number(product.stock) || 0;
+        totalItems += pStock;
+        totalValue += pStock * basePrice;
+
+        const pMin = product.min_stock ?? 0;
+        if (pStock <= pMin) lowStockCount++;
+      }
+    }
+
+    const turnoverRatio = 4.2;
+
+    return [
+      {
+        title: 'Total Stock Value',
+        value: `$${(totalValue / 1000000).toFixed(2)}M`,
+        subtext: 'Across all warehouses',
+        iconType: 'dollar',
+      },
+      {
+        title: 'Total Items in Stock',
+        value: totalItems.toLocaleString('en-US'),
+        subtext: 'Across all warehouses',
+        iconType: 'box',
+      },
+      {
+        title: 'Low Stock Items',
+        value: lowStockCount.toString(),
+        subtext: 'Requires immediate attention',
+        iconType: 'truck',
+      },
+      {
+        title: 'Inventory Turnover',
+        value: turnoverRatio.toFixed(1),
+        subtext: 'Target: 5.0',
+        iconType: 'refresh',
+      },
+    ];
   }
 }

@@ -20,8 +20,8 @@ export class MediaValidationPipe implements PipeTransform<
 
     const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
     const VIDEO_TYPES = ['video/mp4'];
-    const MAX_IMAGE_SIZE = 20 * 1024 * 1024; // 20MB
-    const MAX_VIDEO_SIZE = 200 * 1024 * 1024; // 200MB
+    const MAX_IMAGE_SIZE = 50 * 1024 * 1024;
+    const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
 
     for (const file of files) {
       const isImage = IMAGE_TYPES.includes(file.mimetype);
@@ -37,7 +37,7 @@ export class MediaValidationPipe implements PipeTransform<
       // AC1: Quá dung lượng ảnh
       if (isImage && file.size > MAX_IMAGE_SIZE) {
         throw new BadRequestException(
-          `Ảnh "${file.originalname}" vượt quá giới hạn 20MB.`,
+          `Ảnh "${file.originalname}" vượt quá giới hạn 50MB. Vui lòng chọn ảnh nhẹ hơn.`,
         );
       }
 

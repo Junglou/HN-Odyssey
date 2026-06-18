@@ -30,6 +30,7 @@ import {
   fileFilter,
 } from '../../../common/utils/file-upload.util';
 import { ApiOperation } from '@nestjs/swagger';
+import { UploadService } from 'src/modules/system/upload/upload.service';
 
 interface ICurrentUser {
   userId?: string;
@@ -37,14 +38,13 @@ interface ICurrentUser {
   sub?: string;
 }
 
-interface IUploadedFile extends Express.Multer.File {
-  filename: string;
-}
-
 @Controller('reviews')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ReviewsController {
-  constructor(private readonly reviewsService: ReviewsService) {}
+  constructor(
+    private readonly reviewsService: ReviewsService,
+    private readonly uploadService: UploadService,
+  ) {}
 
   private getUserId(user: ICurrentUser): string {
     const id = user.userId || user._id || user.sub;
@@ -104,20 +104,28 @@ export class ReviewsController {
   @Post('upload-media')
   @UseInterceptors(
     FilesInterceptor('files', 5, {
-      storage: storageConfig('reviews'),
+      storage: storageConfig(), // Gọi hàm rỗng để dùng memoryStorage
       fileFilter: fileFilter,
       limits: { fileSize: 5 * 1024 * 1024 },
     }),
   )
-  async uploadReviewMedia(@UploadedFiles() files: IUploadedFile[]) {
+  async uploadReviewMedia(@UploadedFiles() files: Express.Multer.File[]) {
+    // Đổi type về chuẩn của Express.Multer.File
     if (!files || files.length === 0) {
       throw new BadRequestException('Vui lòng chọn ảnh/video để tải lên');
     }
 
-    const processedFiles = files.map((file) => {
+    // Đẩy song song tất cả các file lên Cloudinary vào thư mục hn-odyssey/reviews
+    const uploadPromises = files.map((file) =>
+      this.uploadService.uploadFile(file, 'reviews'),
+    );
+
+    const results = await Promise.all(uploadPromises);
+
+    const processedFiles = files.map((file, index) => {
       const isImage = file.mimetype.startsWith('image/');
       return {
-        url: `/uploads/reviews/${file.filename}`,
+        url: results[index].secure_url, // Lấy link HTTPS trực tiếp từ Cloudinary
         type: isImage ? 'IMAGE' : 'VIDEO',
         thumbnail: null,
       };

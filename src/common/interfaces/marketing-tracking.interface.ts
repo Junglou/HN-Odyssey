@@ -9,6 +9,8 @@ export interface IUtmTag {
 export interface ICampaignReport {
   campaign_id: string;
   campaign_name: string;
+  status?: string;
+  budget?: number;
   utm: IUtmTag;
   sessions: number;
   orders: number;

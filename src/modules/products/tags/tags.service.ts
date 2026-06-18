@@ -38,18 +38,23 @@ export class TagsService {
     const filter = scope ? { scope } : {};
     const tags = await this.tagModel.find(filter).sort({ name: 1 }).lean();
 
-    // Đếm chính xác Live count đang áp dụng từ bảng Product
-    const tagNames = tags.map((t) => t.name);
+    // 1. Chuyển toàn bộ danh sách Tag name về chữ thường để làm mốc so sánh
+    const tagNamesLower = tags.map((t) => t.name.toLowerCase());
 
-    // Gắn Generic Type <TagUsageCount> để tránh lỗi any từ MongoDB Aggregation
     const usageCounts = await this.productModel.aggregate<TagUsageCount>([
-      { $match: { tags: { $in: tagNames }, is_deleted: false } },
+      { $match: { is_deleted: false } },
       { $unwind: '$tags' },
-      { $match: { tags: { $in: tagNames } } },
-      { $group: { _id: '$tags', count: { $sum: 1 } } },
+      // 2. Chuyển đổi tags đang lưu trong Product về chữ thường
+      {
+        $project: {
+          tagLower: { $toLower: '$tags' },
+        },
+      },
+      // 3. Match và đếm số lượng dựa trên mảng chữ thường
+      { $match: { tagLower: { $in: tagNamesLower } } },
+      { $group: { _id: '$tagLower', count: { $sum: 1 } } },
     ]);
 
-    // Ép kiểu Map rõ ràng để tránh lỗi no-unsafe-assignment
     const countMap = new Map<string, number>(
       usageCounts.map((u) => [String(u._id), Number(u.count)]),
     );
@@ -57,7 +62,8 @@ export class TagsService {
     return tags
       .map((tag) => ({
         ...tag,
-        usage_count: countMap.get(tag.name) || 0,
+        // 4. Map lại giá trị bằng cách lookup chữ thường
+        usage_count: countMap.get(tag.name.toLowerCase()) || 0,
       }))
       .sort((a, b) => b.usage_count - a.usage_count);
   }

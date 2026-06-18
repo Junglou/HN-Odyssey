@@ -295,6 +295,24 @@ export class TransactionsService {
         );
       }
 
+      let currentStock = 0;
+      let maxStock = 0;
+
+      if (product.has_variants) {
+        const variant = product.variants.find((v) => v.sku === item.sku);
+        currentStock = variant?.stock || 0;
+        maxStock = variant?.max_stock || 0;
+      } else {
+        currentStock = product.stock || 0;
+        maxStock = product.max_stock || 0;
+      }
+
+      if (maxStock > 0 && currentStock + item.quantity > maxStock) {
+        throw new BadRequestException(
+          `Sản phẩm [${item.sku}] vượt định mức lưu kho. (Hiện có: ${currentStock}, Nhập thêm: ${item.quantity}, Max: ${maxStock})`,
+        );
+      }
+
       totalQuantity += item.quantity;
       processedItems.push({
         product_id: product ? product._id : undefined,
@@ -442,7 +460,7 @@ export class TransactionsService {
 
     const allProducts = await this.productModel
       .find({ is_deleted: false })
-      .select('_id sku has_variants variants')
+      .select('_id sku has_variants variants stock max_stock')
       .lean();
 
     worksheet.eachRow((row, rowNumber) => {
@@ -955,21 +973,29 @@ export class TransactionsService {
           'Sản phẩm có phân loại, vui lòng nhập mã SKU của Biến thể',
         );
       }
-      // 3. Hợp lệ -> Chuyển sang kiểm tra tồn kho hiện tại
+      // 3. Hợp lệ -> Chuyển sang kiểm tra giới hạn Max Stock
       else {
         rowResult.product_id = matchedProduct._id.toString();
+
         let currentStock = 0;
+        let maxStock = 0;
 
         if (matchedProduct.has_variants) {
           const v = matchedProduct.variants?.find((v) => v.sku === sku);
           currentStock = v?.stock || 0;
+          maxStock = v?.max_stock || 0;
         } else {
           currentStock = matchedProduct.stock || 0;
+          maxStock = matchedProduct.max_stock || 0;
         }
 
-        if (currentStock < qty) {
+        // Logic check: Số lượng hiện tại + số lượng nhập thêm KHÔNG ĐƯỢC vượt quá Max Stock
+        // Chỉ check nếu maxStock > 0 (Đã được setup limit)
+        if (maxStock > 0 && currentStock + qty > maxStock) {
           rowResult.status = 'INVALID';
-          rowResult.errors.push(`Vượt tồn kho (Hiện có: ${currentStock})`);
+          rowResult.errors.push(
+            `Vượt giới hạn kho (Hiện có: ${currentStock}, Nhập: ${qty}, Max: ${maxStock})`,
+          );
         }
       }
 

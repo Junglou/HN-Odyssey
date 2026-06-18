@@ -26,7 +26,15 @@ export interface XntRecord {
   beginning_stock: number;
   in_period: number;
   out_period: number;
+  adjustments: number;
   ending_stock: number;
+  status: 'Safe' | 'Low Stock' | 'Out of Stock' | 'Overstock';
+}
+
+export interface StockTrendData {
+  date: string;
+  inward: number;
+  outward: number;
 }
 
 interface ParsedTx {
@@ -34,6 +42,7 @@ interface ParsedTx {
   qty: number;
   is_in: boolean;
   date: Date;
+  action_type: string;
 }
 
 @Injectable()
@@ -48,32 +57,33 @@ export class InventoryReportsService {
   // Hàm Parser bóc tách dữ liệu từ các loại Transaction khác nhau
   private parseTransactionData(tx: StockTransactionDocument): ParsedTx[] {
     const changes: ParsedTx[] = [];
-    const date = tx.created_at;
+    const date = new Date(tx.created_at);
 
-    // Các Transaction tạo từ StockService có changed_value ở root
     const rootSku = (tx as unknown as { sku?: string }).sku;
     const rootChangedValue = (tx as unknown as { changed_value?: number })
       .changed_value;
 
     if (tx.items && Array.isArray(tx.items) && tx.items.length > 0) {
       tx.items.forEach((item) => {
-        const isImport =
-          tx.action_type === 'IMPORT' || tx.action_type === 'RESTOCK';
+        const isImport = ['IMPORT', 'RESTOCK', 'RETURNED'].includes(
+          tx.action_type,
+        );
         changes.push({
           sku: String(item.sku),
           qty: Number(item.quantity),
           is_in: isImport,
           date,
+          action_type: tx.action_type,
         });
       });
     } else if (rootSku && rootChangedValue !== undefined) {
-      // Nhận diện MANUAL_ADJUST, ORDER_ACCEPTED
       const val = Number(rootChangedValue);
       changes.push({
         sku: String(rootSku),
         qty: Math.abs(val),
         is_in: val > 0,
         date,
+        action_type: tx.action_type,
       });
     }
 
@@ -133,12 +143,12 @@ export class InventoryReportsService {
       ];
     }
 
-    // Lấy data chuẩn
+    // Lấy data chuẩn có min/max stock
     const products = await this.productModel
       .find(productFilter)
       .setOptions({ strictQuery: false })
       .select(
-        'name sku stock has_variants variants categories specs attributes',
+        'name sku stock min_stock max_stock has_variants variants categories specs attributes',
       )
       .lean();
 
@@ -147,7 +157,10 @@ export class InventoryReportsService {
     }
 
     // 2. LỌC TRÊN RAM - 100% TYPE SAFE
-    const currentStockMap = new Map<string, { name: string; stock: number }>();
+    const currentStockMap = new Map<
+      string,
+      { name: string; stock: number; min: number; max: number }
+    >();
 
     products.forEach((p) => {
       const isMatchProductName =
@@ -183,10 +196,9 @@ export class InventoryReportsService {
             let isMatchAttr = false;
             if (Array.isArray(v.attributes)) {
               isMatchAttr = v.attributes.some((attr) => {
-                // Sử dụng đúng chuẩn Schema: attr.code và attr.value
                 const code = String(attr.code || '').toLowerCase();
                 const val = String(attr.value || '').toLowerCase();
-                const combined = `${code} ${val}`; // Nối lại: "color blue"
+                const combined = `${code} ${val}`;
 
                 return (
                   combined.includes(searchLower) ||
@@ -197,17 +209,18 @@ export class InventoryReportsService {
             }
 
             if (!isMatchSku && !isMatchProductName && !isMatchAttr) {
-              return; // Bỏ qua biến thể này
+              return;
             }
           }
 
           currentStockMap.set(String(v.sku), {
             name: `${p.name} - ${v.sku}`,
             stock: Number(v.stock) || 0,
+            min: Number(v.min_stock) || Number(p.min_stock) || 0,
+            max: Number(v.max_stock) || Number(p.max_stock) || 999999,
           });
         });
       } else {
-        // Xử lý cho sản phẩm đơn lẻ
         if (search) {
           const searchLower = String(search).trim().toLowerCase();
           let isMatchSpec = false;
@@ -223,9 +236,12 @@ export class InventoryReportsService {
 
           if (!isMatchProductName && !isMatchProductSku && !isMatchSpec) return;
         }
+
         currentStockMap.set(String(p.sku), {
           name: String(p.name),
           stock: Number(p.stock) || 0,
+          min: Number(p.min_stock) || 0,
+          max: Number(p.max_stock) || 999999,
         });
       }
     });
@@ -258,8 +274,10 @@ export class InventoryReportsService {
       const pInfo = currentStockMap.get(sku)!;
       let inPeriod = 0,
         outPeriod = 0,
+        adjustments = 0,
         inFuture = 0,
-        outFuture = 0;
+        outFuture = 0,
+        adjFuture = 0;
 
       transactions.forEach((tx) => {
         const changes = this.parseTransactionData(
@@ -269,23 +287,39 @@ export class InventoryReportsService {
 
         if (skuChange) {
           if (skuChange.date >= filterStart && skuChange.date <= filterEnd) {
-            if (skuChange.is_in) inPeriod += skuChange.qty;
-            else outPeriod += skuChange.qty;
+            if (skuChange.action_type === 'MANUAL_ADJUST') {
+              adjustments += skuChange.is_in ? skuChange.qty : -skuChange.qty;
+            } else {
+              if (skuChange.is_in) inPeriod += skuChange.qty;
+              else outPeriod += skuChange.qty;
+            }
           } else if (skuChange.date > filterEnd) {
-            if (skuChange.is_in) inFuture += skuChange.qty;
-            else outFuture += skuChange.qty;
+            if (skuChange.action_type === 'MANUAL_ADJUST') {
+              adjFuture += skuChange.is_in ? skuChange.qty : -skuChange.qty;
+            } else {
+              if (skuChange.is_in) inFuture += skuChange.qty;
+              else outFuture += skuChange.qty;
+            }
           }
         }
       });
 
-      const endingStock = pInfo.stock - inFuture + outFuture;
+      const endingStock = pInfo.stock - inFuture + outFuture - adjFuture;
+
+      let status: 'Safe' | 'Low Stock' | 'Out of Stock' | 'Overstock' = 'Safe';
+      if (endingStock <= 0) status = 'Out of Stock';
+      else if (endingStock <= pInfo.min) status = 'Low Stock';
+      else if (endingStock > pInfo.max) status = 'Overstock';
+
       reportData.push({
         sku,
         product_name: pInfo.name,
-        beginning_stock: endingStock - inPeriod + outPeriod,
+        beginning_stock: endingStock - inPeriod + outPeriod - adjustments,
         in_period: inPeriod,
         out_period: outPeriod,
+        adjustments,
         ending_stock: endingStock,
+        status,
       });
     }
 
@@ -763,5 +797,60 @@ export class InventoryReportsService {
     });
 
     doc.end();
+  }
+
+  async getInventoryTrend(
+    queryDto: GetXntReportDto,
+  ): Promise<StockTrendData[]> {
+    const start = queryDto.start_date
+      ? new Date(queryDto.start_date)
+      : new Date(new Date().setDate(new Date().getDate() - 14));
+    const end = queryDto.end_date ? new Date(queryDto.end_date) : new Date();
+    end.setHours(23, 59, 59, 999);
+
+    const transactions = await this.transactionModel
+      .find({
+        status: { $ne: 'CANCELLED' },
+        created_at: { $gte: start, $lte: end },
+      })
+      .lean();
+
+    const trendMap = new Map<string, { inward: number; outward: number }>();
+
+    transactions.forEach((tx) => {
+      const changes = this.parseTransactionData(
+        tx as unknown as StockTransactionDocument,
+      );
+      const txDate = new Date(tx.created_at);
+      // Format tiếng anh: Sep 25, Oct 04...
+      const dateStr = txDate.toLocaleDateString('en-US', {
+        month: 'short',
+        day: '2-digit',
+      });
+
+      if (!trendMap.has(dateStr)) {
+        trendMap.set(dateStr, { inward: 0, outward: 0 });
+      }
+
+      const dayData = trendMap.get(dateStr)!;
+
+      changes.forEach((c) => {
+        if (c.action_type === 'MANUAL_ADJUST') return; // Không tính adjustment vào cột In/Out
+        if (c.is_in) dayData.inward += c.qty;
+        else dayData.outward += c.qty;
+      });
+    });
+
+    const sortedDates = Array.from(trendMap.keys()).sort((a, b) => {
+      const dateA = new Date(`${a} ${new Date().getFullYear()}`).getTime();
+      const dateB = new Date(`${b} ${new Date().getFullYear()}`).getTime();
+      return dateA - dateB;
+    });
+
+    return sortedDates.map((date) => ({
+      date,
+      inward: trendMap.get(date)!.inward,
+      outward: trendMap.get(date)!.outward,
+    }));
   }
 }

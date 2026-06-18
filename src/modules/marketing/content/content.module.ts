@@ -16,6 +16,7 @@ import { PageConfig, PageConfigSchema } from './schemas/page-config.schema';
 import { Media, MediaSchema } from './schemas/media-record.schema';
 import { MediaController } from './media.controller';
 import { MediaService } from './media.service';
+import { UploadModule } from 'src/modules/system/upload/upload.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { MediaService } from './media.service';
     RolesModule,
     AuditLogsModule,
     ScheduleModule.forRoot(),
+    UploadModule,
   ],
   controllers: [ContentController, MediaController],
   providers: [ContentService, MediaService],

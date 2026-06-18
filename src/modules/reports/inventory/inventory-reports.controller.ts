@@ -30,6 +30,17 @@ interface RequestWithUser extends Request {
 export class InventoryReportsController {
   constructor(private readonly reportsService: InventoryReportsService) {}
 
+  @Get('trend')
+  @RequirePermissions(Resource.REPORTS, Action.READ)
+  async getInventoryTrend(@Query() query: GetXntReportDto) {
+    const data = await this.reportsService.getInventoryTrend(query);
+    return new BaseResponse(
+      true,
+      'Fetch stock movement trend successfully',
+      data,
+    );
+  }
+
   // F.112 & F.113: Xem và Lọc báo cáo XNT
   @Get('xnt')
   @RequirePermissions(Resource.REPORTS, Action.READ)

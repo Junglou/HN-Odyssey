@@ -29,6 +29,9 @@ export class AdCampaign {
 
   @Prop({ default: 'ACTIVE', enum: ['ACTIVE', 'PAUSED', 'COMPLETED'] })
   status: string;
+
+  @Prop({ required: false, default: 0 })
+  budget?: number;
 }
 
 export const AdCampaignSchema = SchemaFactory.createForClass(AdCampaign);

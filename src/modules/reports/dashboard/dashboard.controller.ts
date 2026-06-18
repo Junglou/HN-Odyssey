@@ -16,6 +16,14 @@ import {
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
+  @Get('inventory-kpis')
+  @RequirePermissions(Resource.DASHBOARD, Action.READ)
+  async getInventoryKPIs() {
+    // Đã xóa tham số query để khớp với logic Service (lấy dữ liệu kho hiện tại)
+    const data = await this.dashboardService.getInventoryKPIs();
+    return new BaseResponse(true, 'Fetch inventory KPIs successfully', data);
+  }
+
   // [US3 - AC3] Widget Cảnh báo tồn kho
   @Get('stock-alerts')
   @RequirePermissions(Resource.DASHBOARD, Action.READ)

@@ -31,6 +31,7 @@ import * as path from 'path';
 import sharp from 'sharp';
 import { UpdatePageConfigDto } from './dto/page-config.dto';
 import { PageConfig } from './schemas/page-config.schema';
+import { UploadService } from 'src/modules/system/upload/upload.service';
 
 export interface UploadOptions {
   subFolder: string; // Tên thư mục con (VD: 'products', 'users')
@@ -85,6 +86,7 @@ export class ContentService {
     @InjectModel(MenuConfig.name) private menuModel: Model<MenuConfig>,
     private readonly auditLogsService: AuditLogsService,
     @InjectModel(PageConfig.name) private pageConfigModel: Model<PageConfig>,
+    private readonly uploadService: UploadService,
   ) {}
 
   async findAllPages(query: QueryPageDto) {
@@ -687,7 +689,6 @@ export class ContentService {
   }
 
   // 1. Logic xử lý và lưu file
-  // 1. Logic xử lý và lưu file
   async processAndSaveFiles(
     files: Array<Express.Multer.File>,
     options: UploadOptions,
@@ -696,14 +697,7 @@ export class ContentService {
       throw new BadRequestException('Không có file nào được tải lên');
     }
 
-    // Đã thay thế any[] bằng mảng chứa Interface cụ thể
     const processedFiles: ProcessedFileResult[] = [];
-    const uploadDir = path.join(process.cwd(), `uploads/${options.subFolder}`);
-
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
     const maxImageSize = options.maxImageSize || 50 * 1024 * 1024;
     const maxVideoSize = options.maxVideoSize || 200 * 1024 * 1024;
 
@@ -717,88 +711,44 @@ export class ContentService {
         );
       }
 
-      if (!isVideo && file.size > maxImageSize) {
-        throw new BadRequestException(
-          `Ảnh "${file.originalname}" vượt quá giới hạn.`,
-        );
-      }
-      if (isVideo && file.size > maxVideoSize) {
-        throw new BadRequestException(
-          `Video "${file.originalname}" vượt giới hạn.`,
-        );
-      }
+      if (!isVideo && file.size > maxImageSize)
+        throw new BadRequestException(`Ảnh vượt quá giới hạn.`);
+      if (isVideo && file.size > maxVideoSize)
+        throw new BadRequestException(`Video vượt giới hạn.`);
 
-      const filename = `${options.subFolder}-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-      const ext = path.extname(file.originalname).toLowerCase();
-      const originalPath = path.join(uploadDir, `${filename}${ext}`);
-      const relativePath = `/uploads/${options.subFolder}/${filename}${ext}`;
+      // Đẩy thẳng buffer lên Cloudinary thông qua UploadService (Tự động nén WebP đã cấu hình trước đó)
+      const uploadResult = await this.uploadService.uploadFile(
+        file,
+        options.subFolder,
+      );
+      const secureUrl = uploadResult.secure_url;
 
-      if (isVideo) {
-        fs.writeFileSync(originalPath, file.buffer);
-        processedFiles.push({
-          originalName: file.originalname,
-          filename: `${filename}${ext}`,
-          path: relativePath,
-          thumbnail: relativePath,
-          medium: relativePath,
-          mimetype: file.mimetype,
-          size: file.size,
-          type: 'VIDEO',
-        });
-      } else {
-        await sharp(file.buffer).toFile(originalPath);
-
-        let thumbPathRelative = relativePath;
-        let mediumPathRelative = relativePath;
-
-        if (options.generateThumbnail) {
-          const thumbName = `${filename}-thumb${ext}`;
-          const thumbPath = path.join(uploadDir, thumbName);
-          await sharp(file.buffer)
-            .resize(200, 200, { fit: 'cover' })
-            .toFile(thumbPath);
-          thumbPathRelative = `/uploads/${options.subFolder}/${thumbName}`;
-        }
-
-        if (options.generateMedium) {
-          const mediumName = `${filename}-medium${ext}`;
-          const mediumPath = path.join(uploadDir, mediumName);
-          await sharp(file.buffer)
-            .resize(800, null, { withoutEnlargement: true })
-            .toFile(mediumPath);
-          mediumPathRelative = `/uploads/${options.subFolder}/${mediumName}`;
-        }
-
-        processedFiles.push({
-          originalName: file.originalname,
-          filename: `${filename}${ext}`,
-          path: relativePath,
-          thumbnail: thumbPathRelative,
-          medium: mediumPathRelative,
-          mimetype: file.mimetype,
-          size: file.size,
-          type: 'IMAGE',
-        });
-      }
+      processedFiles.push({
+        originalName: file.originalname,
+        filename: file.originalname,
+        path: secureUrl, // Trả link Cloudinary HTTPS
+        thumbnail: secureUrl,
+        medium: secureUrl,
+        mimetype: file.mimetype,
+        size: file.size,
+        type: isVideo ? 'VIDEO' : 'IMAGE',
+      });
     }
 
     return {
-      message: 'Tải lên và xử lý file thành công',
+      message: 'Tải lên Cloudinary thành công',
       data: processedFiles,
     };
   }
 
   // 2. Logic xóa file vật lý (Chuyển từ ProductsService sang)
-  deletePhysicalFile(relativePath: string) {
-    if (!relativePath) return;
+  async deletePhysicalFile(fileUrl: string) {
+    if (!fileUrl) return;
     try {
-      const absolutePath = path.join(process.cwd(), relativePath);
-      if (fs.existsSync(absolutePath)) {
-        fs.unlinkSync(absolutePath);
-        console.log(`[FILE] Deleted: ${absolutePath}`);
-      }
+      await this.uploadService.deleteFile(fileUrl);
+      console.log(`[CLOUD FILE] Deleted: ${fileUrl}`);
     } catch (error) {
-      console.error(`[FILE] Error deleting file: ${relativePath}`, error);
+      console.error(`[CLOUD FILE] Error deleting file: ${fileUrl}`, error);
     }
   }
 

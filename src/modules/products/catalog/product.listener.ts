@@ -110,7 +110,7 @@ export class ProductListener {
 
       if (safeType === 'PRODUCT') {
         await this.productModel.findByIdAndUpdate(payload.targetId, {
-          $push: { images: { $each: payload.urls } },
+          $addToSet: { images: { $each: payload.urls } }, // Sử dụng addToSet thay cho push để tránh lặp URL
         });
         this.logger.log(
           `[EVENT SUCCESS] Đã thêm ${payload.urls.length} ảnh vào mảng images của Product ID: ${payload.targetId}`,
@@ -119,7 +119,7 @@ export class ProductListener {
         // handle: Cập nhật đẩy toàn bộ URL vào mảng images của Variant
         await this.productModel.updateOne(
           { 'variants.sku': payload.targetId },
-          { $push: { 'variants.$.images': { $each: payload.urls } } },
+          { $addToSet: { 'variants.$.images': { $each: payload.urls } } }, // Sử dụng addToSet thay cho push để tránh lặp URL
         );
         this.logger.log(
           `[EVENT SUCCESS] Đã lưu ${payload.urls.length} ảnh bulk vào mảng images của Variant SKU: ${payload.targetId}`,
@@ -165,15 +165,10 @@ export class ProductListener {
           );
         }
       } else if (safeType === 'VARIANT') {
-        // handle: Dùng $pull để xóa chính xác URL ra khỏi mảng images của Variant
+        // Sử dụng toán tử $ cực kỳ an toàn thay cho arrayFilters
         const result = await this.productModel.updateOne(
           { 'variants.sku': payload.targetId },
-          {
-            $pull: { 'variants.$[elem].images': payload.url },
-          },
-          {
-            arrayFilters: [{ 'elem.sku': payload.targetId }],
-          },
+          { $pull: { 'variants.$.images': payload.url } },
         );
 
         if (result.modifiedCount > 0) {
@@ -185,6 +180,78 @@ export class ProductListener {
     } catch (error: unknown) {
       this.logger.error(
         `[EVENT ERROR] Lỗi xử lý dọn dẹp ảnh khi Media bị xóa (Target: ${payload.targetId})`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+  }
+
+  // 5. LẮNG NGHE ĐỔI TRẠNG THÁI ẢNH (Đồng bộ với mảng Images của Client)
+  // Lắng nghe sự kiện thay đổi trạng thái hiển thị của phương tiện
+  @OnEvent('media.status.changed', { async: true })
+  async handleMediaStatusChanged(payload: {
+    targetId: string;
+    type: string;
+    url: string;
+    status: string;
+  }) {
+    try {
+      const safeType = payload.type.toUpperCase();
+      const isPublished = payload.status === 'Published';
+
+      if (safeType === 'PRODUCT') {
+        const product = await this.productModel.findById(payload.targetId);
+        if (!product) return;
+
+        let isModified = false;
+
+        if (isPublished) {
+          // Đẩy url vào mảng images nếu chưa tồn tại
+          if (!product.images) product.images = [];
+          if (!product.images.includes(payload.url)) {
+            product.images.push(payload.url);
+            isModified = true;
+          }
+        } else {
+          // Rút url ra khỏi mảng images
+          if (product.images && product.images.includes(payload.url)) {
+            product.images = product.images.filter(
+              (img) => img !== payload.url,
+            );
+            isModified = true;
+          }
+          // Xóa luôn thumbnail nếu url bị ẩn trùng với ảnh đại diện hiện tại
+          if (product.thumbnail === payload.url) {
+            product.thumbnail = '';
+            isModified = true;
+          }
+        }
+
+        if (isModified) {
+          await product.save();
+          this.logger.log(
+            `[EVENT SUCCESS] Đã đồng bộ ẩn/hiện url ảnh cho Product ID: ${payload.targetId}`,
+          );
+        }
+      } else if (safeType === 'VARIANT') {
+        // Tương tự, dùng toán tử $ cho việc đồng bộ trạng thái
+        const updateQuery = isPublished
+          ? { $addToSet: { 'variants.$.images': payload.url } }
+          : { $pull: { 'variants.$.images': payload.url } };
+
+        const result = await this.productModel.updateOne(
+          { 'variants.sku': payload.targetId },
+          updateQuery,
+        );
+
+        if (result.modifiedCount > 0) {
+          this.logger.log(
+            `[EVENT SUCCESS] Đã đồng bộ ẩn/hiện URL ảnh cho Variant SKU: ${payload.targetId}`,
+          );
+        }
+      }
+    } catch (error: unknown) {
+      this.logger.error(
+        `[EVENT ERROR] Lỗi đồng bộ trạng thái ảnh (Target: ${payload.targetId})`,
         error instanceof Error ? error.stack : String(error),
       );
     }

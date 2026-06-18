@@ -22,6 +22,7 @@ import {
   Coupon,
   CouponSchema,
 } from 'src/modules/marketing/promotions/schemas/coupon.schema';
+import { UploadModule } from 'src/modules/system/upload/upload.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import {
     UsersModule,
     AuditLogsModule,
     NotificationsModule,
+    UploadModule,
   ],
   controllers: [ReviewsController, AdminReviewsController],
   providers: [ReviewsService, ReviewEventListener, AdminReviewsService],

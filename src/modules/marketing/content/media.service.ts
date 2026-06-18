@@ -6,15 +6,15 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, FilterQuery, Types } from 'mongoose';
-import * as fs from 'fs';
 import * as path from 'path';
-import { Media, MediaType } from './schemas/media-record.schema';
+import { Media, MediaStatus, MediaType } from './schemas/media-record.schema';
 import {
   MediaMetadataDto,
   QueryMediaInterface,
   UpdateMediaInfoDto,
 } from './dto/media-record.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { UploadService } from 'src/modules/system/upload/upload.service';
 
 export interface UploadResponseInterface {
   id: string;
@@ -30,7 +30,24 @@ export class MediaService {
   constructor(
     @InjectModel(Media.name) private mediaModel: Model<Media>,
     private eventEmitter: EventEmitter2,
+    private readonly uploadService: UploadService,
   ) {}
+
+  private async deletePhysicalFile(fileUrl: string) {
+    if (!fileUrl) return;
+    try {
+      // Gọi service xóa file trên Cloud
+      await this.uploadService.deleteFile(fileUrl);
+      this.logger.log(
+        `[CLOUD FILE] Đã xóa thành công khỏi Cloudinary: ${fileUrl}`,
+      );
+    } catch (error: unknown) {
+      this.logger.error(
+        `[CLOUD FILE] Lỗi khi xóa file trên Cloud: ${fileUrl}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+  }
 
   // Xử lý lưu mảng file và metadata
   async uploadBulkMedia(
@@ -42,20 +59,13 @@ export class MediaService {
       throw new BadRequestException('Số lượng file và metadata không khớp.');
     }
 
-    const uploadDir = path.join(process.cwd(), 'uploads/media');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
     const savedRecords: Media[] = [];
-    // Map kiểm tra xem targetId đã có ảnh primary nào trong DB chưa
     const targetCheckMap = new Map<string, boolean>();
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const meta = metadataArray[i];
 
-      // LOGIC: Tự động set Primary cho ảnh đầu tiên nếu chưa có
       let isPrimaryFlag = false;
       const targetKey = `${meta.type}_${meta.targetId}`;
 
@@ -68,19 +78,16 @@ export class MediaService {
         if (!existingPrimary) {
           isPrimaryFlag = true;
         }
-        targetCheckMap.set(targetKey, true); // Đánh dấu là đã xử lý kiểm tra
+        targetCheckMap.set(targetKey, true);
       }
 
-      const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-      const ext = path.extname(file.originalname);
-      const safePhysicalName = `media-${uniqueSuffix}${ext}`;
-      const physicalPath = path.join(uploadDir, safePhysicalName);
-      const relativeUrl = `/uploads/media/${safePhysicalName}`;
+      const safePhysicalName = `media-${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
 
-      fs.writeFileSync(physicalPath, file.buffer);
+      // THAY ĐỔI: Đẩy file thẳng lên Cloudinary
+      const uploadResult = await this.uploadService.uploadFile(file, 'media');
 
       const newMedia = new this.mediaModel({
-        url: relativeUrl,
+        url: uploadResult.secure_url, // Lấy link HTTPS từ Cloudinary
         fileName: safePhysicalName,
         originalName: String(file.originalname),
         type: String(meta.type),
@@ -90,31 +97,31 @@ export class MediaService {
         size: Number(file.size),
         mimetype: String(file.mimetype),
         created_by: new Types.ObjectId(userId),
-        isPrimary: isPrimaryFlag, // Đã fix: Không set cứng false nữa
+        isPrimary: isPrimaryFlag,
       });
 
       const saved = await newMedia.save();
       savedRecords.push(saved);
 
-      // Bắn event ngay lập tức nếu ảnh này được chọn làm Primary tự động
       if (isPrimaryFlag) {
         if (meta.type === MediaType.PRODUCT) {
           this.eventEmitter.emit('product.thumbnail.updated', {
             productId: meta.targetId,
-            thumbnailUrl: relativeUrl,
+            thumbnailUrl: uploadResult.secure_url,
           });
         } else if (meta.type === MediaType.VARIANT) {
-          // Quy ước: targetId của Variant khi upload lên là SKU của nó
           this.eventEmitter.emit('variant.thumbnail.updated', {
             variantSku: meta.targetId,
-            thumbnailUrl: relativeUrl,
+            thumbnailUrl: uploadResult.secure_url,
           });
         }
       }
     }
+    const publishedRecords = savedRecords.filter(
+      (r) => r.status === MediaStatus.PUBLISHED,
+    );
 
-    // LOGIC: Gom nhóm và bắn Event upload hàng loạt để cập nhật mảng images/gallery
-    const groupedByTarget = savedRecords.reduce(
+    const groupedByTarget = publishedRecords.reduce(
       (acc, curr) => {
         const key = `${curr.type}_${curr.targetId}`;
         if (!acc[key]) {
@@ -186,6 +193,8 @@ export class MediaService {
     const media = await this.mediaModel.findById(id);
     if (!media) throw new NotFoundException('Không tìm thấy phương tiện.');
 
+    const oldStatus = media.status;
+
     // FIX LỖI ESLINT: Gán tường minh thay vì dùng Object.keys() sinh ra dynamic type (any)
     if (dto.type !== undefined) media.type = dto.type;
     if (dto.targetId !== undefined) media.targetId = dto.targetId;
@@ -193,7 +202,19 @@ export class MediaService {
     if (dto.status !== undefined) media.status = dto.status;
     if (dto.isPrimary !== undefined) media.isPrimary = dto.isPrimary;
 
-    return media.save();
+    const savedMedia = await media.save();
+
+    // Bắn sự kiện đồng bộ nếu trạng thái thay đổi để product.listener xử lý
+    if (dto.status !== undefined && oldStatus !== dto.status) {
+      this.eventEmitter.emit('media.status.changed', {
+        targetId: media.targetId,
+        type: media.type,
+        url: media.url,
+        status: dto.status,
+      });
+    }
+
+    return savedMedia;
   }
 
   // AC3: Đặt làm ảnh đại diện
@@ -245,21 +266,15 @@ export class MediaService {
       );
     }
 
-    const uploadDir = path.join(process.cwd(), 'uploads/media');
-    const uniqueSuffix = `${Date.now()}-cropped`;
-    const safePhysicalName = `media-${uniqueSuffix}.jpg`;
-    const physicalPath = path.join(uploadDir, safePhysicalName);
-    const relativeUrl = `/uploads/media/${safePhysicalName}`;
+    // Tải file crop mới lên Cloudinary
+    const uploadResult = await this.uploadService.uploadFile(file, 'media');
 
-    // Lưu file crop mới
-    fs.writeFileSync(physicalPath, file.buffer);
-
-    // Xóa file cũ khỏi ổ cứng
-    this.deletePhysicalFile(media.url);
+    // Xóa file cũ khỏi Cloudinary
+    await this.deletePhysicalFile(media.url);
 
     // Cập nhật DB
-    media.url = relativeUrl;
-    media.fileName = safePhysicalName;
+    media.url = uploadResult.secure_url;
+    media.fileName = `media-${Date.now()}-cropped.jpg`;
     media.size = file.size;
     await media.save();
 
@@ -271,7 +286,6 @@ export class MediaService {
     };
   }
 
-  // Thay thế file (Replace)
   async replaceMedia(
     id: string,
     file: Express.Multer.File,
@@ -279,18 +293,14 @@ export class MediaService {
     const media = await this.mediaModel.findById(id);
     if (!media) throw new NotFoundException('Không tìm thấy phương tiện.');
 
-    const uploadDir = path.join(process.cwd(), 'uploads/media');
-    const ext = path.extname(file.originalname);
-    const uniqueSuffix = `${Date.now()}-replaced`;
-    const safePhysicalName = `media-${uniqueSuffix}${ext}`;
-    const physicalPath = path.join(uploadDir, safePhysicalName);
-    const relativeUrl = `/uploads/media/${safePhysicalName}`;
+    // Tải file mới lên Cloudinary
+    const uploadResult = await this.uploadService.uploadFile(file, 'media');
 
-    fs.writeFileSync(physicalPath, file.buffer);
-    this.deletePhysicalFile(media.url);
+    // Xóa file cũ trên Cloudinary
+    await this.deletePhysicalFile(media.url);
 
-    media.url = relativeUrl;
-    media.fileName = safePhysicalName;
+    media.url = uploadResult.secure_url;
+    media.fileName = `media-${Date.now()}-replaced${path.extname(file.originalname)}`;
     media.originalName = file.originalname;
     media.size = file.size;
     media.mimetype = file.mimetype;
@@ -315,7 +325,7 @@ export class MediaService {
     const type = media.type;
 
     // Xóa file vật lý khỏi ổ cứng
-    this.deletePhysicalFile(media.url);
+    await this.deletePhysicalFile(media.url);
 
     // Xóa khỏi Database hoàn toàn
     await this.mediaModel.findByIdAndDelete(id);
@@ -330,6 +340,20 @@ export class MediaService {
     return { message: 'Đã xóa hoàn toàn phương tiện khỏi hệ thống và bộ nhớ.' };
   }
 
+  async deleteMedia(id: string) {
+    // 2. Tìm bản ghi media cũ trong DB để lấy URL ảnh
+    const mediaRecord = await this.mediaModel.findById(id);
+    if (!mediaRecord) {
+      throw new NotFoundException('Không tìm thấy bản ghi media');
+    }
+
+    // 3. Tiến hành xóa file vật lý trên Cloudinary trước
+    await this.uploadService.deleteFile(mediaRecord.url);
+
+    // 4. Sau đó mới tiến hành xóa bản ghi dưới MongoDB
+    return this.mediaModel.findByIdAndDelete(id);
+  }
+
   // Xóa toàn bộ phương tiện liên kết với một đối tượng khi đối tượng đó bị xóa
   async deleteMediaByTarget(targetId: string, type: string): Promise<void> {
     const medias = await this.mediaModel.find({
@@ -338,7 +362,7 @@ export class MediaService {
     });
 
     for (const media of medias) {
-      this.deletePhysicalFile(media.url);
+      await this.deletePhysicalFile(media.url);
     }
 
     await this.mediaModel.deleteMany({
@@ -349,23 +373,6 @@ export class MediaService {
     this.logger.log(
       `Đã dọn dẹp toàn bộ phương tiện của ${type} có ID: ${targetId}`,
     );
-  }
-
-  private deletePhysicalFile(relativePath: string) {
-    if (!relativePath) return;
-    try {
-      const absolutePath = path.join(process.cwd(), relativePath);
-      if (fs.existsSync(absolutePath)) {
-        fs.unlinkSync(absolutePath);
-        this.logger.log(`[FILE] Deleted physically: ${absolutePath}`);
-      }
-    } catch (error: unknown) {
-      // FIX LỖI ESLINT BẰNG unknown THAY VÌ implicit any
-      this.logger.error(
-        `[FILE] Error deleting physical file: ${relativePath}`,
-        error instanceof Error ? error.stack : String(error),
-      );
-    }
   }
 
   // Tự động ẩn toàn bộ ảnh của một đối tượng khi đối tượng đó bị ẩn/xóa mềm

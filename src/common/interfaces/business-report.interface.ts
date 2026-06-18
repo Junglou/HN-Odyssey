@@ -69,6 +69,7 @@ export interface IConversionReport {
   byDevice: { desktopCR: number; mobileCR: number }; // AC4
   trend: ITimelineTrend[]; // AC5: Xu hướng biến động
   byCustomerType: { newCustomerCR: number; returningCustomerCR: number }; // AC7
+  conversionGrowth: number;
 }
 
 //  US3: TỶ LỆ THOÁT & BỎ DỞ
@@ -94,6 +95,8 @@ export interface IBounceAndAbandonmentReport {
     byDevice: { desktopRate: number; mobileRate: number }; // AC5
     bySource: { source: string; rate: number }[]; // AC7
   };
+  visitsGrowth: number;
+  bounceGrowth: number;
 }
 
 //  US4: GIỎ HÀNG BỊ BỎ QUÊN
@@ -131,6 +134,7 @@ export interface IRetentionReport {
   vipList: IVipCustomer[]; // AC4
   churnRiskList: IVipCustomer[]; // AC6
   cohortHeatmap: Record<string, Record<string, number>>; // AC7
+  retentionGrowth: number;
 }
 
 //  BỔ SUNG CHO US4

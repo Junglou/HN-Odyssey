@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { CACHE_MANAGER } from '@nestjs/cache-manager'; // [FIX 1]: Import CACHE_MANAGER từ đúng package
-import type { Cache } from 'cache-manager'; // [FIX 2]: Thêm 'type' vào import
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
@@ -11,7 +11,7 @@ import {
 import { TrackEventDto, MergeSessionDto } from './dto/track-event.dto';
 import { Cart } from 'src/modules/sales/cart/schemas/cart.schema';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import {
   Order,
   OrderDocument,
@@ -49,6 +49,7 @@ import {
   IAlgoliaInsightEvent,
   IAlgoliaInsightPayload,
 } from 'src/common/interfaces/algolia.interface';
+import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
 
 export interface UserExportInfo {
   fullName?: string;
@@ -191,8 +192,37 @@ export class TrackingService {
     }
   }
 
+  @OnEvent(NOTIFY_EVENTS.ORDER_CREATED)
+  async handleOrderCreatedTracking(order: Order) {
+    try {
+      // 1. Tự động lưu 1 record PURCHASE vào bảng tracking của bạn để BI Dashboard vẽ Phễu
+      await this.behaviorModel.create({
+        session_id: order.session_id || 'SYSTEM_GUEST',
+        user_id: order.user_id,
+        action: BehaviorAction.PURCHASE, // Ghi nhận Purchase!
+        device: DeviceType.DESKTOP, // Mặc định hoặc lấy từ order nếu có
+        path: '/checkout/success',
+        source: 'System_Auto_Log',
+        metadata: {
+          order_code: order.order_code,
+          total_amount: order.total_amount,
+        },
+      });
+      this.logger.log(
+        `Auto-logged PURCHASE event for order: ${order.order_code}`,
+      );
+
+      // 2. Gọi hàm bắn sang Google Analytics có sẵn của bạn
+      await this.sendPurchaseEventToGA4(order, order.session_id);
+    } catch (error) {
+      this.logger.error(
+        `Lỗi khi tự động log sự kiện Purchase: ${(error as Error).message}`,
+      );
+    }
+  }
+
   // US5 - AC4: Gửi sự kiện mua hàng sang GA4 với thông tin thật
-  async sendPurchaseEventToGA4(order: Order, clientId: string) {
+  async sendPurchaseEventToGA4(order: Order, clientId?: string) {
     const measurementId = this.configService.get<string>('GA_MEASUREMENT_ID');
     const apiSecret = this.configService.get<string>('GA_API_SECRET');
 
@@ -323,6 +353,8 @@ export class TrackingService {
       reports.push({
         campaign_id: String(campaign._id),
         campaign_name: campaign.name,
+        status: campaign.status || 'Active',
+        budget: campaign.budget || 0,
         utm: {
           utm_campaign: campaign.utm_campaign,
           utm_source: campaign.utm_source,
