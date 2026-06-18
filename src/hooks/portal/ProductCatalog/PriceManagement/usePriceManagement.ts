@@ -209,11 +209,17 @@ export function usePriceManagement() {
       });
     },
     toggleSelectAll: (isSelectAll: boolean) => {
-      if (isSelectAll) {
-        setSelectedIds(new Set(filteredRecords.map((r) => r.id)));
-      } else {
-        setSelectedIds(new Set());
-      }
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (isSelectAll) {
+          // Chỉ Select All các item đang hiển thị ở trang hiện tại
+          currentRecords.forEach((r) => next.add(r.id));
+        } else {
+          // Chỉ bỏ chọn các item ở trang hiện tại
+          currentRecords.forEach((r) => next.delete(r.id));
+        }
+        return next;
+      });
     },
     changePage: (page: number) => setPagination((p) => ({ ...p, page })),
     changeLimit: (limit: number) => setPagination({ page: 1, limit }),

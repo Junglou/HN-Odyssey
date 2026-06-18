@@ -80,9 +80,10 @@ export default function PriceManagement({
   const limitRef = useRef<HTMLDivElement>(null);
   useClickOutside(limitRef, () => setIsLimitDropdownOpen(false));
 
-  const isAllSelected = data.length > 0 && selectedIds.size === data.length;
+  const isAllSelected =
+    data.length > 0 && data.every((item) => selectedIds.has(item.id));
   const isPartiallySelected =
-    selectedIds.size > 0 && selectedIds.size < data.length;
+    data.some((item) => selectedIds.has(item.id)) && !isAllSelected;
 
   const renderStatusBadge = (status: PriceStatus) => {
     switch (status) {

@@ -136,16 +136,9 @@ export function useProductManagement() {
           p.status.slice(1).toLowerCase()) as ProductStatus)
       : "Draft";
 
-    let displayPrice =
+    const displayPrice =
       p.sale_price && p.sale_price > 0 ? p.sale_price : p.price;
-    if (p.has_variants && p.variants && p.variants.length > 0) {
-      displayPrice = p.variants.reduce((sum, v) => {
-        const vPrice =
-          v.sale_price && v.sale_price > 0 ? v.sale_price : v.price;
-        return sum + vPrice;
-      }, 0);
-    }
-    const currencyFormat = p.currency || "VND";
+    const currencyFormat = p.currency || "USD";
 
     return {
       id: p._id,

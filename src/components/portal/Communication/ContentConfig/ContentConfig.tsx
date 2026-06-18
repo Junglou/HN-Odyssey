@@ -431,7 +431,7 @@ export default function ContentConfig({
                         (currentSection.backgroundUrl || "").startsWith("#") ||
                         (currentSection.backgroundUrl || "").startsWith("rgb")
                           ? currentSection.backgroundUrl
-                          : `url(${currentSection.backgroundUrl}) center/cover no-repeat`,
+                          : `url("${currentSection.backgroundUrl}") center/cover no-repeat`,
                     }}
                   >
                     {currentSection.elements.length === 0 && !isPreviewMode && (

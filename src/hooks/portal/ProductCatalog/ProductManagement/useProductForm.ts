@@ -117,18 +117,32 @@ const generatePricingVariants = (
     }));
   }
 
+  // THÊM HÀM LÀM SẠCH SKU Ở ĐÂY
+  const sanitizeSkuPart = (str: string) => {
+    return str
+      .toUpperCase()
+      .replace(/\s+/g, "-") // Biến khoảng trắng thành dấu gạch ngang
+      .replace(/[^A-Z0-9_-]/g, "") // Loại bỏ mọi ký tự không phải chữ, số, gạch ngang, gạch dưới (VD: xóa dấu %)
+      .replace(/-+/g, "-") // Rút gọn nhiều dấu gạch ngang liên tiếp thành 1 dấu
+      .replace(/^-|-$/g, ""); // Xóa dấu gạch ngang ở đầu hoặc cuối chuỗi nếu có
+  };
+
   return variantConfigs.map((config, index) => {
     const existing = currentPricing.find((p) => p.variantName === config.name);
     if (existing) return existing;
 
+    // ÁP DỤNG HÀM LÀM SẠCH VÀO SUFFIX
     const suffix =
       config.combination.length > 0
-        ? `-${config.combination.join("-").toUpperCase()}`
+        ? `-${config.combination.map(sanitizeSkuPart).join("-")}`
         : "";
+
+    // Dọn dẹp lại một lần cuối để tránh trường hợp baseSku có kết thúc bằng gạch ngang nối với suffix
+    const finalSku = `${baseSku || "NEW"}${suffix}`.replace(/-+/g, "-");
 
     return {
       id: `p-${Date.now()}-${index}`,
-      sku: `${baseSku || "NEW"}${suffix}`,
+      sku: finalSku,
       variantName: config.name,
       price: 0,
       status: "draft",

@@ -107,14 +107,16 @@ const renderContentElement = (
       );
     case "button":
       return (
-        <button
+        <a
           key={el.id}
+          href={el.link || "#"} // Kích hoạt thuộc tính URL hành động từ Database
           className="dynamic-btn-hover"
           style={{
             ...baseStyle,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            textDecoration: "none", // Đảm bảo chữ không bị gạch chân mặc định của thẻ <a>
           }}
           dangerouslySetInnerHTML={{ __html: finalCleanHtml }}
         />
