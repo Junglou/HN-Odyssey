@@ -26,7 +26,9 @@
   display: flex;
   flex: 1;
   min-height: 250px;
+  max-height: 400px; /* <-- ĐIỂM CHỐT: Ép biểu đồ không bao giờ cao quá 400px */
   position: relative;
+  width: 100%;
 }
 
 /* y axis */
@@ -46,12 +48,30 @@
 .smt-chart-content {
   flex: 1;
   display: flex;
-  justify-content: space-around;
+  justify-content: flex-start; /* Để các cột chạy từ trái sang phải, không bị ép dồn vào giữa */
+  gap: 32px; /* Khoảng cách giữa các ngày */
   align-items: flex-end;
   position: relative;
   border-bottom: 1px solid #e5e7eb;
   padding-bottom: 1px;
+
+  /* BẬT THANH CUỘN NGANG */
+  overflow-x: auto;
+  padding-right: 24px;
 }
+
+.smt-chart-content::-webkit-scrollbar {
+  height: 6px;
+}
+
+.smt-chart-content::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+.smt-chart-content::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
 .smt-grid-line {
   position: absolute;
   left: 0;

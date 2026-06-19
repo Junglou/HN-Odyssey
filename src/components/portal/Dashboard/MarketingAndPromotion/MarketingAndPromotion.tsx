@@ -26,6 +26,12 @@ interface MarketingAndPromotionProps {
   onStartDateChange: (_date: string) => void;
   onEndDateChange: (_date: string) => void;
   onApply: () => void;
+  campaignPage: number;
+  totalCampaignPages: number;
+  onCampaignPageChange: (page: number) => void;
+  couponPage: number;
+  totalCouponPages: number;
+  onCouponPageChange: (page: number) => void;
 }
 
 export default function MarketingAndPromotion({
@@ -42,6 +48,12 @@ export default function MarketingAndPromotion({
   onStartDateChange,
   onEndDateChange,
   onApply,
+  campaignPage,
+  totalCampaignPages,
+  onCampaignPageChange,
+  couponPage,
+  totalCouponPages,
+  onCouponPageChange,
 }: MarketingAndPromotionProps) {
   const filterOptions = ["Today", "This Week", "This Month", "Custom Range"];
 
@@ -109,9 +121,20 @@ export default function MarketingAndPromotion({
 
       <div className={`mp-content-wrapper ${isLoading ? "mp-is-loading" : ""}`}>
         <AdCampaignOverview metrics={adMetrics} />
-        <TopCampaignsTable campaigns={campaigns} />
+        {/* Nối dây Props phân trang vào các Table */}
+        <TopCampaignsTable
+          campaigns={campaigns}
+          currentPage={campaignPage}
+          totalPages={totalCampaignPages}
+          onPageChange={onCampaignPageChange}
+        />
         <CouponEffectiveness metrics={couponMetrics} />
-        <TopCouponsTable coupons={coupons} />
+        <TopCouponsTable
+          coupons={coupons}
+          currentPage={couponPage}
+          totalPages={totalCouponPages}
+          onPageChange={onCouponPageChange}
+        />
       </div>
     </div>
   );

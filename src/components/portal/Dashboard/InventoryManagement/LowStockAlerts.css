@@ -24,9 +24,14 @@
 
 /* list */
 .lsa-list {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  padding: 4px;
+  padding: 4px 8px 4px 4px; /* Thêm padding bên phải để thanh cuộn không đè lên text */
+  max-height: 400px; /* <-- ĐIỂM CHỐT: Giới hạn chiều cao của danh sách */
+  overflow-y: auto; /* <-- ĐIỂM CHỐT: Tự động hiện thanh cuộn khi danh sách quá dài */
 }
+
 .lsa-list::-webkit-scrollbar {
   width: 6px;
 }

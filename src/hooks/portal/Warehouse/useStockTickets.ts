@@ -3,7 +3,6 @@ import { toast } from "react-toastify";
 import axiosClient from "../../../api/axiosClient";
 
 // 1. FE TYPES
-
 export type TicketType = "import" | "export";
 export type TicketStatus = "PROCESSING" | "COMPLETED" | "CANCELLED";
 
@@ -31,7 +30,6 @@ export interface StockTicketRow {
 }
 
 // 2. BE RESPONSE INTERFACES
-
 interface BackendActor {
   email?: string;
 }
@@ -68,7 +66,6 @@ interface ErrorResponse {
 }
 
 // 3. MAIN HOOK
-
 export function useStockTickets() {
   // states
   const [data, setData] = useState<StockTicketRow[]>([]);
@@ -79,9 +76,12 @@ export function useStockTickets() {
     total: 0,
     totalPages: 1,
   });
+
+  // [CẬP NHẬT]: Thêm initialSku vào state để chứa mã được truyền sang
   const [createDrawer, setCreateDrawer] = useState<{
     isOpen: boolean;
     defaultType: TicketType;
+    initialSku?: string;
   }>({ isOpen: false, defaultType: "import" });
 
   const [loading, setLoading] = useState(false);
@@ -97,21 +97,17 @@ export function useStockTickets() {
       });
 
       if (filters.search) queryParams.append("search", filters.search);
-      // BE sẽ tự handle type = 'import' | 'export' | 'all' trong hàm getAllHistory
       if (filters.type !== "all") {
         queryParams.append("action_type", filters.type.toUpperCase());
       }
 
-      // Gọi API Get All History đã tạo ở BE
       const response = await axiosClient.get(
         `/inventory/transactions/history/all?${queryParams.toString()}&_t=${Date.now()}`,
       );
 
       const resultData: BackendTransaction[] = response.data.data;
-      // Tùy BaseResponse trả về (meta hoặc pagination)
       const meta = response.data.meta || response.data.pagination;
 
-      // Map BE schema sang FE row
       const mappedData: StockTicketRow[] = resultData.map(
         (item: BackendTransaction) => ({
           id: item._id,
@@ -173,11 +169,16 @@ export function useStockTickets() {
     refreshData: () => {
       setRefetchTrigger((prev) => prev + 1);
     },
-    openCreateDrawer: (type: TicketType) => {
-      setCreateDrawer({ isOpen: true, defaultType: type });
+    // [CẬP NHẬT]: Nhận thêm initialSku
+    openCreateDrawer: (type: TicketType, initialSku?: string) => {
+      setCreateDrawer({ isOpen: true, defaultType: type, initialSku });
     },
     closeCreateDrawer: () => {
-      setCreateDrawer((prev) => ({ ...prev, isOpen: false }));
+      setCreateDrawer((prev) => ({
+        ...prev,
+        isOpen: false,
+        initialSku: undefined,
+      }));
     },
     submitTicket: async (
       payload: Omit<
@@ -189,7 +190,6 @@ export function useStockTickets() {
         let endpoint = "";
         let requestBody = {};
 
-        // Phân tách payload gửi BE dựa trên Type
         if (payload.type === "import") {
           endpoint = "/inventory/transactions/import";
           requestBody = {
@@ -219,7 +219,6 @@ export function useStockTickets() {
         }
 
         await axiosClient.post(endpoint, requestBody);
-
         toast.success("Tạo phiếu nháp thành công!");
         setRefetchTrigger((prev) => prev + 1);
         setPagination((prev) => ({ ...prev, page: 1 }));
@@ -253,7 +252,6 @@ export function useStockTickets() {
         toast.error(err.message || "Lỗi hủy phiếu!");
       }
     },
-
     exportPdf: async (
       ticketId: string,
       type: TicketType,
@@ -261,8 +259,6 @@ export function useStockTickets() {
     ) => {
       try {
         toast.info("Đang xử lý xuất file PDF, vui lòng đợi...");
-
-        // Cập nhật endpoint tự động chọn API tương ứng với type
         const endpoint =
           type === "import"
             ? `/inventory/transactions/import/history/pdf/${ticketId}`
@@ -271,26 +267,21 @@ export function useStockTickets() {
         const response = await axiosClient.get(endpoint, {
           responseType: "blob",
         });
-
         const blob = new Blob([response.data], { type: "application/pdf" });
         const url = window.URL.createObjectURL(blob);
-
         const link = document.createElement("a");
         link.href = url;
 
-        // Cập nhật tên file tải về
         const fileName =
           type === "import"
             ? `PhieuNhap_${ticketCode}.pdf`
             : `PhieuXuat_${ticketCode}.pdf`;
-
         link.setAttribute("download", fileName);
         document.body.appendChild(link);
         link.click();
 
         link.parentNode?.removeChild(link);
         window.URL.revokeObjectURL(url);
-
         toast.success("Xuất file PDF thành công!");
       } catch (error: unknown) {
         console.error(error);

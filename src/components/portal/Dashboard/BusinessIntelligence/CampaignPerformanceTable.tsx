@@ -1,7 +1,6 @@
 import { useState } from "react";
 import "./CampaignPerformanceTable.css";
 
-// interface chuẩn gốc
 export interface CampaignData {
   id: string;
   name: string;
@@ -19,18 +18,16 @@ interface CampaignPerformanceTableProps {
 export default function CampaignPerformanceTable({
   data,
 }: CampaignPerformanceTableProps) {
-  // state phân trang
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  if (!data || data.length === 0) return null;
+  // Giữ an toàn cho biến data nhưng không ẩn component khi mảng rỗng
+  const safeData = data || [];
 
-  // logic tính toán phân trang
-  const totalPages = Math.ceil(data.length / itemsPerPage);
+  const totalPages = Math.ceil(safeData.length / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentData = data.slice(startIndex, startIndex + itemsPerPage);
+  const currentData = safeData.slice(startIndex, startIndex + itemsPerPage);
 
-  // render bảng
   return (
     <div className="cpt-wrapper">
       <div className="cpt-title">Campaign Performance Table</div>
@@ -48,32 +45,48 @@ export default function CampaignPerformanceTable({
               </tr>
             </thead>
             <tbody>
-              {currentData.map((row) => (
-                <tr key={row.id} className="cpt-tr">
-                  <td className="cpt-td" style={{ color: "#1e293b" }}>
-                    {row.name}
-                  </td>
-                  <td className="cpt-td">{row.budget}</td>
-                  <td className="cpt-td">{row.spend}</td>
-                  <td className="cpt-td">{row.revenue}</td>
-                  <td className="cpt-td">
-                    <span
-                      className={`cpt-roi-badge ${
-                        row.roi.startsWith("+")
-                          ? "cpt-roi-positive"
-                          : "cpt-roi-negative"
-                      }`}
-                    >
-                      {row.roi}
-                    </span>
+              {safeData.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="cpt-td"
+                    style={{
+                      textAlign: "center",
+                      padding: "30px",
+                      color: "#64748b",
+                    }}
+                  >
+                    Không có chiến dịch quảng cáo nào phát sinh dữ liệu trong
+                    thời gian này
                   </td>
                 </tr>
-              ))}
+              ) : (
+                currentData.map((row) => (
+                  <tr key={row.id} className="cpt-tr">
+                    <td className="cpt-td" style={{ color: "#1e293b" }}>
+                      {row.name}
+                    </td>
+                    <td className="cpt-td">{row.budget}</td>
+                    <td className="cpt-td">{row.spend}</td>
+                    <td className="cpt-td">{row.revenue}</td>
+                    <td className="cpt-td">
+                      <span
+                        className={`cpt-roi-badge ${
+                          row.roi.startsWith("+")
+                            ? "cpt-roi-positive"
+                            : "cpt-roi-negative"
+                        }`}
+                      >
+                        {row.roi}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
-        {/* ui phân trang */}
         <div className="cpt-pagination-container">
           <button
             className="cpt-page-nav-btn"
@@ -97,7 +110,7 @@ export default function CampaignPerformanceTable({
 
           <button
             className="cpt-page-nav-btn"
-            disabled={currentPage === totalPages}
+            disabled={currentPage === totalPages || safeData.length === 0}
             onClick={() => setCurrentPage((prev) => prev + 1)}
           >
             Next

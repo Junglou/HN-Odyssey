@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom"; // <-- Thêm thư viện đọc URL
 import StockManagement from "../../../components/portal/Warehouse/StockManagement";
 import QuickAdjustModal from "../../../components/portal/Warehouse/StockOverviewTab/QuickAdjustModal";
 import CreateTicketDrawer from "../../../components/portal/Warehouse/StockTicketsTab/CreateTicketDrawer";
@@ -15,6 +16,32 @@ export default function StockManagementPage() {
   const requestsHook = useRequestTab();
   const overviewHook = useStockOverview();
   const ticketsHook = useStockTickets();
+
+  // [CẬP NHẬT QUAN TRỌNG]: Logic đón thông điệp từ Dashboard
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const sku = searchParams.get("sku");
+    const action = searchParams.get("action");
+
+    if (sku && action) {
+      // 1. Tự động nhảy sang tab "Ticket History"
+      setActiveTab("tickets");
+
+      // 2. Mở Drawer Tạo phiếu Nhập/Xuất và bơm SKU vào
+      if (action === "PO") {
+        ticketsHook.actions.openCreateDrawer("import", sku);
+      } else if (action === "TRANSFER") {
+        ticketsHook.actions.openCreateDrawer("export", sku);
+      }
+
+      // 3. Xoá param trên URL để nếu người dùng F5 thì không bị tự động mở lại
+      searchParams.delete("sku");
+      searchParams.delete("action");
+      setSearchParams(searchParams, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Chỉ chạy 1 lần khi component mount
 
   return (
     <div className="sm-page-container">
@@ -41,6 +68,7 @@ export default function StockManagementPage() {
       <CreateTicketDrawer
         isOpen={ticketsHook.createDrawer.isOpen}
         type={ticketsHook.createDrawer.defaultType}
+        initialSku={ticketsHook.createDrawer.initialSku} // <-- Truyền SKU vào Drawer
         onClose={ticketsHook.actions.closeCreateDrawer}
         onSubmit={ticketsHook.actions.submitTicket}
       />

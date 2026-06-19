@@ -17,6 +17,12 @@ export default function MarketingAndPromotionPage() {
     setStartDate,
     setEndDate,
     handleApply,
+    campaignPage,
+    totalCampaignPages,
+    setCampaignPage,
+    couponPage,
+    totalCouponPages,
+    setCouponPage,
   } = useMarketingAndPromotion();
 
   return (
@@ -35,6 +41,12 @@ export default function MarketingAndPromotionPage() {
         onStartDateChange={setStartDate}
         onEndDateChange={setEndDate}
         onApply={handleApply}
+        campaignPage={campaignPage}
+        totalCampaignPages={totalCampaignPages}
+        onCampaignPageChange={setCampaignPage}
+        couponPage={couponPage}
+        totalCouponPages={totalCouponPages}
+        onCouponPageChange={setCouponPage}
       />
     </div>
   );

@@ -16,18 +16,21 @@ import {
   ArrowLeftIcon,
 } from "../../../../assets/icons/StockManagementIcons";
 
-// Khai báo kiểu dữ liệu trả về từ API để tránh dùng any
-interface BackendVariant {
+// Khai báo kiểu dữ liệu cho API Inventory Stock
+interface StockVariant {
   sku: string;
-  stock?: number;
+  available_stock?: number;
+  total_stock?: number;
 }
 
-interface BackendProduct {
+interface StockItem {
   sku: string;
-  name: string;
-  stock?: number;
-  has_variants: boolean;
-  variants?: BackendVariant[];
+  name?: string;
+  product_name?: string;
+  has_variants?: boolean;
+  variants?: StockVariant[];
+  available_quantity?: number;
+  total_quantity?: number;
 }
 
 interface PreviewItem {
@@ -47,15 +50,10 @@ interface PreviewResponse {
 }
 
 interface ErrorResponse {
-  response?: {
-    data?: {
-      message?: string;
-    };
-  };
+  response?: { data?: { message?: string } };
   message?: string;
 }
 
-// Hằng số tĩnh cho Lý do xuất (vẫn giữ vì đây là logic cố định của FE/BE)
 const EXPORT_REASON_OPTIONS = [
   { value: "XUAT_HUY", label: "Xuất hủy hàng hỏng" },
   { value: "XUAT_TRA_NCC", label: "Xuất trả Nhà cung cấp" },
@@ -76,10 +74,10 @@ interface CreateTicketDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   type: TicketType;
+  initialSku?: string;
   onSubmit: (payload: NewTicketPayload) => void;
 }
 
-// internal type for ui
 interface UITicketItem extends TicketItem {
   uiId: string;
 }
@@ -140,7 +138,9 @@ function CustomDrawerDropdown({
       </div>
 
       <div
-        className={`ctd-dropdown-options ${isOpen ? "open" : hasOpened ? "closed" : ""}`}
+        className={`ctd-dropdown-options ${
+          isOpen ? "open" : hasOpened ? "closed" : ""
+        }`}
       >
         {showSearch && (
           <div className="ctd-dropdown-search">
@@ -159,7 +159,9 @@ function CustomDrawerDropdown({
           filteredOptions.map((opt) => (
             <div
               key={opt.value}
-              className={`ctd-dropdown-option ${value === opt.value ? "selected" : ""}`}
+              className={`ctd-dropdown-option ${
+                value === opt.value ? "selected" : ""
+              }`}
               onClick={() => {
                 onChange(opt.value);
                 setIsOpen(false);
@@ -191,9 +193,9 @@ export default function CreateTicketDrawer(props: CreateTicketDrawerProps) {
 function CreateTicketDrawerContent({
   onClose,
   type,
+  initialSku,
   onSubmit,
 }: CreateTicketDrawerProps) {
-  // general states
   const [currentType, setCurrentType] = useState<TicketType>(type);
   const [warehouse, setWarehouse] = useState("");
   const [ticketNote, setTicketNote] = useState("");
@@ -201,108 +203,116 @@ function CreateTicketDrawerContent({
 
   const [supplier, setSupplier] = useState("");
   const [exportReason, setExportReason] = useState("");
-  const [warehouseOptions, setWarehouseOptions] = useState<
-    { value: string; label: string }[]
-  >([]);
+  const warehouseOptions = [
+    { value: "all", label: "Tất cả các kho (All Warehouses)" },
+    { value: "WH-HCM-01", label: "Kho Tổng - TP.Hồ Chí Minh" },
+    { value: "WH-HN-01", label: "Kho Trung Chuyển - Hà Nội" },
+    { value: "WH-DN-01", label: "Kho Bán Lẻ - Đà Nẵng" },
+  ];
 
-  useEffect(() => {
-    const mockWarehouses = [
-      { value: "WH-HCM-01", label: "Kho Tổng - TP.Hồ Chí Minh" },
-      { value: "WH-HN-01", label: "Kho Trung Chuyển - Hà Nội" },
-      { value: "WH-DN-01", label: "Kho Bán Lẻ - Đà Nẵng" },
-    ];
-
-    // Gán thẳng data giả vào state
-    setWarehouseOptions(mockWarehouses);
-  }, []);
-
-  // form states (manual entry)
-  const [formSku, setFormSku] = useState("");
+  const [formSku, setFormSku] = useState(initialSku || "");
   const [formName, setFormName] = useState("");
   const [formQuantity, setFormQuantity] = useState<number | "">("");
   const [formReason, setFormReason] = useState("");
   const [availableQty, setAvailableQty] = useState<number | null>(null);
 
-  // refs
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   const currentTotalQty = items.reduce((sum, item) => sum + item.quantity, 0);
-
   const alreadyAddedQty = items
     .filter((item) => item.sku === formSku)
     .reduce((sum, item) => sum + item.quantity, 0);
 
-  // Hàm check SKU đơn lẻ
-  const handleCheckSku = async () => {
-    const inputSku = formSku.trim();
+  // Tách hàm Check SKU và bổ sung Bắt lỗi mềm
+  const performCheckSku = async (inputSku: string) => {
     if (!inputSku) return;
+    const cleanSku = inputSku.trim().toUpperCase();
 
     try {
-      // API search có thể trả về nhiều kết quả khớp một phần (tên, slug, tags...)
-      const res = await axiosClient.get("/products", {
-        params: { search: inputSku },
+      // Gọi thẳng API Kho thay vì API Products
+      const res = await axiosClient.get("/inventory/stock", {
+        params: { search: cleanSku },
       });
 
-      const productsList: BackendProduct[] = res.data?.data || res.data || [];
+      // Bóc tách mảng an toàn và cấp Type chặt chẽ
+      const rawData = res.data?.data?.data || res.data?.data || [];
+      const stockList: StockItem[] = Array.isArray(rawData) ? rawData : [];
 
-      // 1. TÌM CHÍNH XÁC SẢN PHẨM CÓ MÃ SKU KHỚP 100%
-      // (Khớp SKU cha HOẶC khớp SKU của một trong các biến thể)
-      const exactProduct = productsList.find(
+      const exactProduct = stockList.find(
         (p) =>
-          p.sku === inputSku ||
-          (p.has_variants && p.variants?.some((v) => v.sku === inputSku)),
+          p.sku?.toUpperCase() === cleanSku ||
+          (p.has_variants &&
+            p.variants?.some(
+              (v: StockVariant) => v.sku?.toUpperCase() === cleanSku,
+            )),
       );
 
-      // Nếu không có sản phẩm nào khớp chính xác mã SKU đã nhập
+      // Nếu hoàn toàn không có trong kho
       if (!exactProduct) {
-        throw new Error("SKU_NOT_FOUND");
+        setFormName(`Sản phẩm: ${cleanSku}`);
+        setAvailableQty(0);
+        toast.warning(
+          `Không tìm thấy mã này trong kho. Hệ thống dùng mã làm tên tạm thời!`,
+        );
+        return;
       }
 
-      setFormName(exactProduct.name);
-
-      // 2. NẾU LÀ SẢN PHẨM CÓ BIẾN THỂ
       if (exactProduct.has_variants && exactProduct.variants) {
-        // Trường hợp user nhập đúng SKU của sản phẩm cha (đòi hỏi phải nhập SKU của biến thể)
-        if (exactProduct.sku === inputSku) {
+        if (exactProduct.sku?.toUpperCase() === cleanSku) {
           toast.warning(
-            "Sản phẩm này có nhiều phân loại. Vui lòng nhập mã SKU của Biến thể (Size/Màu cụ thể), không nhập SKU Sản phẩm gốc!",
+            "Đây là mã gốc. Hãy nhập chính xác mã SKU của phân loại (Size/Màu)!",
           );
-          setAvailableQty(null);
-          setFormName("");
+          setFormName(
+            `Sản phẩm gốc: ${exactProduct.name || exactProduct.product_name}`,
+          );
+          setAvailableQty(0);
           return;
         }
 
-        // Lấy đúng biến thể khớp SKU
-        const variant = exactProduct.variants.find((v) => v.sku === inputSku);
+        const variant = exactProduct.variants.find(
+          (v: StockVariant) => v.sku?.toUpperCase() === cleanSku,
+        );
+
         if (variant) {
-          setAvailableQty(Number(variant.stock) || 0);
+          setFormName(exactProduct.name || exactProduct.product_name || "");
+          setAvailableQty(
+            Number(variant.available_stock ?? variant.total_stock ?? 0),
+          );
         } else {
-          throw new Error("SKU_NOT_FOUND");
+          setFormName(`Sản phẩm: ${cleanSku}`);
+          setAvailableQty(0);
         }
-      }
-      // 3. NẾU LÀ SẢN PHẨM ĐƠN GIẢN (KHÔNG CÓ BIẾN THỂ)
-      else {
-        if (exactProduct.sku !== inputSku) {
-          throw new Error("SKU_NOT_FOUND");
-        }
-        setAvailableQty(Number(exactProduct.stock) || 0);
+      } else {
+        // Trường hợp sản phẩm không có biến thể
+        setFormName(exactProduct.name || exactProduct.product_name || "");
+        setAvailableQty(
+          Number(
+            exactProduct.available_quantity ?? exactProduct.total_quantity ?? 0,
+          ),
+        );
       }
     } catch {
-      toast.error(
-        "Mã SKU không tồn tại! Vui lòng yêu cầu bộ phận Sản phẩm tạo mã này trước.",
+      setFormName(`Sản phẩm: ${cleanSku}`);
+      setAvailableQty(0);
+      toast.warning(
+        "Lỗi kết nối. Hệ thống tự động dùng mã SKU làm tên tạm thời.",
       );
-      setFormName("");
-      setAvailableQty(null);
     }
   };
 
-  // validation
+  const handleCheckSku = () => performCheckSku(formSku);
+
+  useEffect(() => {
+    if (initialSku) {
+      setFormSku(initialSku);
+      performCheckSku(initialSku);
+    }
+  }, [initialSku]);
+
   const isOverQty =
     currentType === "export" &&
     availableQty !== null &&
     Number(formQuantity) + alreadyAddedQty > availableQty;
 
-  // [FIX]: Bổ sung điều kiện !formName để nút Add bị mờ nếu chưa Check thành công
   const isAddDisabled =
     !formSku ||
     !formName ||
@@ -316,7 +326,6 @@ function CreateTicketDrawerContent({
     (currentType === "import" && !supplier.trim()) ||
     (currentType === "export" && !exportReason);
 
-  // handlers
   const handleAddToList = () => {
     if (isAddDisabled) return;
     const newItem: UITicketItem = {
@@ -344,24 +353,20 @@ function CreateTicketDrawerContent({
     if (!file) return;
 
     try {
-      // 1. Tạo form data chứa file
       const formData = new FormData();
       formData.append("file", file);
 
-      // 2. Xác định endpoint dựa trên loại phiếu đang thao tác
       const endpoint =
         currentType === "import"
           ? "/inventory/transactions/import/excel/preview"
           : "/inventory/transactions/export/excel/preview";
 
-      // 3. Bắn file lên Backend để chạy validation nội bộ (tồn kho, SKU hợp lệ...)
       const res = await axiosClient.post(endpoint, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
       });
 
-      // NestJS BaseResponse thường bọc dữ liệu trong res.data.data
       const responseData: PreviewResponse = res.data?.data || res.data;
       const previewItems: PreviewItem[] = responseData.data || [];
 
@@ -370,13 +375,11 @@ function CreateTicketDrawerContent({
         return;
       }
 
-      // 4. Phân loại item hợp lệ và không hợp lệ
       const validItems = previewItems.filter((item) => item.status === "VALID");
       const invalidItems = previewItems.filter(
         (item) => item.status === "INVALID",
       );
 
-      // 5. Cảnh báo cho người dùng nếu có dòng lỗi
       if (invalidItems.length > 0) {
         const errorDetails = invalidItems
           .map((i) => `Dòng ${i.row} (SKU: ${i.sku}): ${i.errors.join(", ")}`)
@@ -386,12 +389,11 @@ function CreateTicketDrawerContent({
         );
       }
 
-      // 6. Map các item hợp lệ vào mảng của form
       if (validItems.length > 0) {
         const newItems: UITicketItem[] = validItems.map((item) => ({
           uiId: Date.now().toString() + "-" + item.row,
           sku: item.sku,
-          productName: "Sản phẩm từ Excel", // Backend preview không trả về tên, dùng placeholder
+          productName: "Sản phẩm từ Excel",
           quantity: item.quantity,
           reason: item.note || "Excel Import",
         }));
@@ -407,20 +409,17 @@ function CreateTicketDrawerContent({
         "Lỗi khi tải file lên hệ thống!";
       toast.error(errorMessage);
     } finally {
-      // Reset input để có thể up lại cùng 1 file nếu cần
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
   const handleDownloadTemplate = async () => {
     try {
-      // Xác định endpoint dựa trên loại phiếu import hay export
       const endpoint =
         currentType === "import"
           ? "/inventory/transactions/import/excel/template"
           : "/inventory/transactions/export/excel/template";
 
-      // Yêu cầu kiểu dữ liệu trả về là blob để xử lý file nhị phân
       const response = await axiosClient.get(endpoint, {
         responseType: "blob",
       });
@@ -429,7 +428,6 @@ function CreateTicketDrawerContent({
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
 
-      // Tạo url tạm thời và kích hoạt sự kiện tải file xuống trình duyệt
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -443,7 +441,6 @@ function CreateTicketDrawerContent({
       document.body.appendChild(link);
       link.click();
 
-      // Dọn dẹp thẻ a và url sau khi hoàn tất tải file
       link.parentNode?.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error: unknown) {
@@ -476,11 +473,9 @@ function CreateTicketDrawerContent({
     onClose();
   };
 
-  // render
   return (
     <div className="ctd-overlay">
       <div className="ctd-drawer">
-        {/* header */}
         <div className="ctd-header">
           <button className="ctd-back-btn" onClick={onClose} title="Go back">
             <ArrowLeftIcon />
@@ -488,9 +483,7 @@ function CreateTicketDrawerContent({
           <h2>Create Ticket</h2>
         </div>
 
-        {/* body */}
         <div className="ctd-body">
-          {/* info section */}
           <div className="ctd-info-stack">
             <div className="ctd-form-group">
               <label className="ctd-label">Type</label>
@@ -500,7 +493,7 @@ function CreateTicketDrawerContent({
                   { value: "import", label: "Import" },
                   { value: "export", label: "Export" },
                 ]}
-                onChange={(val) => {
+                onChange={(val: string) => {
                   const newType = val as TicketType;
                   if (newType !== currentType) {
                     setCurrentType(newType);
@@ -534,7 +527,7 @@ function CreateTicketDrawerContent({
                 <CustomDrawerDropdown
                   value={exportReason}
                   options={EXPORT_REASON_OPTIONS}
-                  onChange={(val) => setExportReason(val)}
+                  onChange={(val: string) => setExportReason(val)}
                   placeholder="Select export reason..."
                 />
               </div>
@@ -545,7 +538,7 @@ function CreateTicketDrawerContent({
               <CustomDrawerDropdown
                 value={warehouse}
                 options={warehouseOptions}
-                onChange={(val) => setWarehouse(val)}
+                onChange={(val: string) => setWarehouse(val)}
                 placeholder="Select warehouse..."
               />
             </div>
@@ -559,7 +552,6 @@ function CreateTicketDrawerContent({
             </div>
           </div>
 
-          {/* entry section */}
           <div className="ctd-section ctd-entry-section">
             <div className="ctd-entry-header">
               <h3>Manual Entry</h3>
@@ -578,7 +570,6 @@ function CreateTicketDrawerContent({
                 >
                   Download Template
                 </button>
-
                 <button
                   className="ctd-btn-outline"
                   onClick={() => fileInputRef.current?.click()}
@@ -605,13 +596,11 @@ function CreateTicketDrawerContent({
                     value={formSku}
                     onChange={(e) => {
                       setFormSku(e.target.value);
-                      // [FIX]: Bắt buộc reset name khi đổi SKU để ép user phải Check lại
                       setFormName("");
                       setAvailableQty(null);
                     }}
                     placeholder="Enter SKU..."
                   />
-                  {/* [FIX]: Bỏ check currentType, luôn hiện nút Check cho cả Import và Export */}
                   <button
                     type="button"
                     className="ctd-btn-outline"
@@ -629,13 +618,12 @@ function CreateTicketDrawerContent({
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="Click Check to get name..."
-                  readOnly // [FIX]: Luôn ReadOnly, chỉ hệ thống tự điền khi Check thành công
+                  readOnly
                 />
               </div>
               <div className="ctd-form-group">
                 <label className="ctd-label ctd-label-flex">
                   <span>Qty *</span>
-                  {/* [FIX]: Luôn hiện tồn kho hiện tại cho cả Nhập và Xuất để làm thông tin tham khảo */}
                   {availableQty !== null && (
                     <span className="ctd-avail-text">
                       (Avail: {availableQty})
@@ -671,7 +659,6 @@ function CreateTicketDrawerContent({
             )}
           </div>
 
-          {/* table section */}
           <div className="ctd-section">
             <h3>Product List ({items.length})</h3>
             <div className="ctd-table-wrapper">
@@ -720,7 +707,6 @@ function CreateTicketDrawerContent({
           </div>
         </div>
 
-        {/* footer */}
         <div className="ctd-footer">
           <button className="ctd-btn-cancel" onClick={onClose}>
             Cancel

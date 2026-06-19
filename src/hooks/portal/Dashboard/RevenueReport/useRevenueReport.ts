@@ -1,4 +1,5 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
+import axiosClient from "../../../../api/axiosClient";
 
 export interface RevenueMetric {
   value: string;
@@ -19,86 +20,273 @@ export interface TopProduct {
   revenue: string;
 }
 
+interface ChartDataPoint {
+  label: string;
+  revenue: number;
+  orders: number;
+}
+
+interface OverviewResponse {
+  net_revenue: number;
+  total_orders: number;
+  total_items: number;
+  prev_net_revenue: number;
+  prev_total_orders: number;
+  revenue_growth_percent: number;
+  orders_growth_percent: number;
+  items_growth_percent: number;
+  chart_data: ChartDataPoint[];
+}
+
+interface TopProductVariant {
+  sku: string;
+  variant_name?: string;
+  quantity: number;
+  revenue: number;
+  contribution_percent: number;
+}
+
+interface TopProductResponse {
+  product_id: string;
+  name: string;
+  image: string;
+  total_quantity: number;
+  total_revenue: number;
+  growth_percent: number;
+  variants: TopProductVariant[];
+}
+
+interface BaseResponse<T> {
+  success: boolean;
+  message: string;
+  data: T;
+}
+
+const formatDate = (date: Date): string => {
+  const d = String(date.getDate()).padStart(2, "0");
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const y = date.getFullYear();
+  return `${y}-${m}-${d}`;
+};
+
 export function useRevenueReport() {
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+
   const [activeFilter, setActiveFilter] = useState<string>("This Month");
-  const [startDate, setStartDate] = useState<string>("2024-05-01");
-  const [endDate, setEndDate] = useState<string>("2024-05-31");
+  const [startDate, setStartDate] = useState<string>(formatDate(firstDay));
+  const [endDate, setEndDate] = useState<string>(formatDate(today));
+
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [dateError, setDateError] = useState<string | null>(null);
+  const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
 
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 5;
 
-  // thêm state quản lý trạng thái sắp xếp cột
   const [sortKey, setSortKey] = useState<keyof TopProduct | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  const [metrics] = useState<Record<string, RevenueMetric>>({
-    totalRevenue: { value: "$250,500.00", trend: "+15%", isUp: true },
-    totalOrders: { value: "1,850", trend: "+8%", isUp: true },
-    itemsSold: { value: "4,200", trend: "+10%", isUp: true },
-    avgOrderValue: { value: "$135.40", trend: "+1%", isUp: true },
+  const [metrics, setMetrics] = useState<Record<string, RevenueMetric>>({
+    totalRevenue: { value: "$0.00", trend: "0%", isUp: true },
+    totalOrders: { value: "0", trend: "0%", isUp: true },
+    itemsSold: { value: "0", trend: "0%", isUp: true },
+    avgOrderValue: { value: "$0.00", trend: "0%", isUp: true },
   });
 
-  const [trendData, setTrendData] = useState<TrendDataPoint[]>([
-    { date: "May 1", revenue: 10000 },
-    { date: "May 5", revenue: 25000 },
-    { date: "May 10", revenue: 80000 },
-    { date: "May 15", revenue: 85000 },
-    { date: "May 17", revenue: 90245 },
-    { date: "May 19", revenue: 80000 },
-    { date: "May 21", revenue: 150000 },
-    { date: "May 24", revenue: 190000 },
-    { date: "May 28", revenue: 100000 },
-    { date: "May 30", revenue: 160000 },
-  ]);
+  const [trendData, setTrendData] = useState<TrendDataPoint[]>([]);
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
 
-  const [topProducts] = useState<TopProduct[]>([
-    {
-      rank: 1,
-      name: "Grey Jacket",
-      sku: "GJ-COT-001",
-      qty: 500,
-      revenue: "$12,500.00",
-    },
-    {
-      rank: 2,
-      name: "Slim-Fit Jeans",
-      sku: "JN-SLM-002",
-      qty: 350,
-      revenue: "$24,500.00",
-    },
-    {
-      rank: 3,
-      name: "Black Jacket",
-      sku: "BJ-COT-003",
-      qty: 200,
-      revenue: "$30,000.00",
-    },
-    {
-      rank: 4,
-      name: "Survival Knife",
-      sku: "SUR-KNF-004",
-      qty: 150,
-      revenue: "$45,000.00",
-    },
-    {
-      rank: 5,
-      name: "Leather Belt",
-      sku: "LB-LTH-005",
-      qty: 120,
-      revenue: "$5,000.00",
-    },
-    {
-      rank: 6,
-      name: "Cotton T-Shirt",
-      sku: "CT-T-006",
-      qty: 100,
-      revenue: "$2,000.00",
-    },
-  ]);
+  const getApiFilter = (uiFilter: string): string => {
+    switch (uiFilter) {
+      case "Today":
+        return "TODAY";
+      case "This Week":
+        return "THIS_WEEK";
+      case "This Month":
+        return "THIS_MONTH";
+      case "Custom Range":
+        return "CUSTOM";
+      default:
+        return "THIS_MONTH";
+    }
+  };
 
-  // logic sắp xếp toàn bộ dữ liệu trước khi phân trang
+  const validateDates = (start: string, end: string): boolean => {
+    if (!start || !end) {
+      setDateError("Vui lòng chọn đầy đủ ngày bắt đầu và kết thúc");
+      return false;
+    }
+    const startObj = new Date(start);
+    const endObj = new Date(end);
+    const todayObj = new Date();
+
+    if (startObj > endObj) {
+      setDateError("Ngày bắt đầu không được lớn hơn ngày kết thúc");
+      return false;
+    }
+    if (endObj > todayObj) {
+      setDateError("Không thể xem báo cáo cho ngày ở tương lai");
+      return false;
+    }
+    setDateError(null);
+    return true;
+  };
+
+  const fetchReportData = useCallback(
+    async (filterName: string, start: string, end: string) => {
+      if (!validateDates(start, end)) return;
+      setIsLoading(true);
+      setCurrentPage(1);
+
+      try {
+        const filterParam = getApiFilter(filterName);
+
+        const params: Record<string, string> = {
+          time_filter: filterParam,
+          start_date: start,
+          end_date: end,
+        };
+
+        const [overviewRes, topProductsRes] = await Promise.all([
+          axiosClient.get<BaseResponse<OverviewResponse>>(
+            "/reports/dashboard/overview",
+            { params },
+          ),
+          axiosClient.get<BaseResponse<TopProductResponse[]>>(
+            "/reports/dashboard/top-products",
+            {
+              params: { ...params, sort_by: "REVENUE", sort_order: "DESC" },
+            },
+          ),
+        ]);
+
+        const overview =
+          overviewRes.data?.data || ({} as Partial<OverviewResponse>);
+        const products = topProductsRes.data?.data || [];
+
+        const formatCurrency = (val: number) =>
+          new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: "USD",
+          }).format(val);
+        const formatNumber = (val: number) =>
+          new Intl.NumberFormat("en-US").format(val);
+
+        const netRev = overview.net_revenue || 0;
+        const totOrd = overview.total_orders || 0;
+        const totItems = overview.total_items || 0;
+        const prevNetRev = overview.prev_net_revenue || 0;
+        const prevTotOrd = overview.prev_total_orders || 0;
+
+        const revGrowth = overview.revenue_growth_percent || 0;
+        const ordGrowth = overview.orders_growth_percent || 0;
+        const itemsGrowth = overview.items_growth_percent || 0;
+
+        const aov = totOrd > 0 ? netRev / totOrd : 0;
+        const prevAov = prevTotOrd > 0 ? prevNetRev / prevTotOrd : 0;
+        let aovGrowth = 0;
+        if (prevAov > 0) aovGrowth = ((aov - prevAov) / prevAov) * 100;
+        else if (aov > 0) aovGrowth = 100;
+
+        setMetrics({
+          totalRevenue: {
+            value: formatCurrency(netRev),
+            trend: `${revGrowth > 0 ? "+" : ""}${revGrowth.toFixed(1)}%`,
+            isUp: revGrowth >= 0,
+          },
+          totalOrders: {
+            value: formatNumber(totOrd),
+            trend: `${ordGrowth > 0 ? "+" : ""}${ordGrowth.toFixed(1)}%`,
+            isUp: ordGrowth >= 0,
+          },
+          itemsSold: {
+            value: formatNumber(totItems),
+            trend: `${itemsGrowth > 0 ? "+" : ""}${itemsGrowth.toFixed(1)}%`,
+            isUp: itemsGrowth >= 0,
+          },
+          avgOrderValue: {
+            value: formatCurrency(aov),
+            trend: `${aovGrowth > 0 ? "+" : ""}${aovGrowth.toFixed(1)}%`,
+            isUp: aovGrowth >= 0,
+          },
+        });
+
+        if (overview.chart_data) {
+          setTrendData(
+            overview.chart_data.map((c) => ({
+              date: c.label,
+              revenue: c.revenue,
+            })),
+          );
+        }
+
+        const formattedProducts: TopProduct[] = products.map((p, index) => ({
+          rank: index + 1,
+          name: p.name,
+          sku: p.variants && p.variants.length > 0 ? p.variants[0].sku : "N/A",
+          qty: p.total_quantity,
+          revenue: formatCurrency(p.total_revenue),
+        }));
+
+        setTopProducts(formattedProducts);
+      } catch (error) {
+        console.error("Lỗi khi fetch báo cáo doanh thu:", error);
+        setDateError("Có lỗi xảy ra khi tải dữ liệu từ máy chủ");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (isInitialLoad && startDate && endDate) {
+      fetchReportData(activeFilter, startDate, endDate);
+      setIsInitialLoad(false);
+    }
+  }, [isInitialLoad, startDate, endDate, activeFilter, fetchReportData]);
+
+  const handleFilterChange = (filter: string) => {
+    setActiveFilter(filter);
+
+    const todayDate = new Date();
+    let newStart = startDate;
+    let newEnd = endDate;
+
+    if (filter === "Today") {
+      newStart = formatDate(todayDate);
+      newEnd = formatDate(todayDate);
+    } else if (filter === "This Week") {
+      const day = todayDate.getDay();
+      const diff = todayDate.getDate() - day + (day === 0 ? -6 : 1);
+      const firstDayOfWeek = new Date(todayDate.setDate(diff));
+      newStart = formatDate(firstDayOfWeek);
+      newEnd = formatDate(new Date());
+    } else if (filter === "This Month") {
+      const firstDayOfMonth = new Date(
+        todayDate.getFullYear(),
+        todayDate.getMonth(),
+        1,
+      );
+      newStart = formatDate(firstDayOfMonth);
+      newEnd = formatDate(new Date());
+    }
+
+    setStartDate(newStart);
+    setEndDate(newEnd);
+
+    if (filter !== "Custom Range") {
+      fetchReportData(filter, newStart, newEnd);
+    }
+  };
+
+  const handleApply = useCallback(() => {
+    if (activeFilter === "Custom Range") {
+      fetchReportData(activeFilter, startDate, endDate);
+    }
+  }, [activeFilter, startDate, endDate, fetchReportData]);
+
   const sortedProducts = useMemo(() => {
     if (!sortKey) return topProducts;
 
@@ -106,91 +294,25 @@ export function useRevenueReport() {
       const aValue = a[sortKey];
       const bValue = b[sortKey];
 
-      // xử lý riêng cho cột doanh thu vì nó chứa ký tự $ và dấu phẩy
       if (sortKey === "revenue") {
         const numA = parseFloat(String(aValue).replace(/[^0-9.-]+/g, ""));
         const numB = parseFloat(String(bValue).replace(/[^0-9.-]+/g, ""));
         return sortDirection === "asc" ? numA - numB : numB - numA;
       }
 
-      // sắp xếp chữ hoặc số thông thường
       if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
       if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
       return 0;
     });
   }, [topProducts, sortKey, sortDirection]);
 
-  // cắt mảng đã sắp xếp để lấy dữ liệu trang hiện tại
   const paginatedProducts = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return sortedProducts.slice(startIndex, startIndex + itemsPerPage);
   }, [sortedProducts, currentPage]);
 
-  const totalPages = Math.ceil(topProducts.length / itemsPerPage);
+  const totalPages = Math.ceil(topProducts.length / itemsPerPage) || 1;
 
-  const formatDate = (date: Date) => {
-    const d = String(date.getDate()).padStart(2, "0");
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const y = date.getFullYear();
-    return `${y}-${m}-${d}`;
-  };
-
-  const validateDates = (start: string, end: string) => {
-    if (!start || !end) {
-      setDateError("vui lòng chọn đầy đủ ngày bắt đầu và kết thúc");
-      return false;
-    }
-    const startObj = new Date(start);
-    const endObj = new Date(end);
-    const todayObj = new Date();
-    if (startObj > endObj) {
-      setDateError("ngày bắt đầu không được lớn hơn ngày kết thúc");
-      return false;
-    }
-    if (endObj > todayObj) {
-      setDateError("không thể xem báo cáo cho ngày ở tương lai");
-      return false;
-    }
-    setDateError(null);
-    return true;
-  };
-
-  const handleFilterChange = (filter: string) => {
-    setActiveFilter(filter);
-    setCurrentPage(1);
-    const today = new Date();
-    if (filter === "Today") {
-      setStartDate(formatDate(today));
-      setEndDate(formatDate(today));
-    } else if (filter === "This Week") {
-      const firstDay = new Date(
-        today.setDate(today.getDate() - today.getDay() + 1),
-      );
-      setStartDate(formatDate(firstDay));
-      setEndDate(formatDate(new Date()));
-    } else if (filter === "This Month") {
-      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-      setStartDate(formatDate(firstDay));
-      setEndDate(formatDate(new Date()));
-    }
-  };
-
-  const handleApply = useCallback(() => {
-    if (!validateDates(startDate, endDate)) return;
-    setIsLoading(true);
-    setCurrentPage(1);
-    setTimeout(() => {
-      setTrendData((prev) =>
-        prev.map((item) => ({
-          ...item,
-          revenue: item.revenue * (Math.random() * 0.4 + 0.8),
-        })),
-      );
-      setIsLoading(false);
-    }, 1000);
-  }, [startDate, endDate]);
-
-  // hàm bắt sự kiện click vào tiêu đề cột
   const handleSort = (key: keyof TopProduct) => {
     if (sortKey === key) {
       setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));

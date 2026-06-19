@@ -19,6 +19,9 @@ export default function InventoryManagementPage() {
     handleEndDateChange,
     handleApply,
     handleWarehouseChange,
+    handleExportExcel,
+    handleExportPdf,
+    handleAlertAction, // <-- 1. Bóc tách hàm xử lý điều hướng từ hook
   } = useInventoryManagement();
 
   return (
@@ -39,6 +42,9 @@ export default function InventoryManagementPage() {
         onEndDateChange={handleEndDateChange}
         onApply={handleApply}
         onWarehouseChange={handleWarehouseChange}
+        onExportExcel={handleExportExcel}
+        onExportPdf={handleExportPdf}
+        onAlertAction={handleAlertAction} // <-- 2. Truyền hàm xuống component con
       />
     </div>
   );

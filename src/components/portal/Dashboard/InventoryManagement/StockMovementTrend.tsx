@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import "./StockMovementTrend.css";
 import type { StockTrendData } from "../../../../hooks/portal/Dashboard/InventoryManagement/useInventoryManagement";
 
@@ -7,28 +6,33 @@ interface StockMovementTrendProps {
 }
 
 export default function StockMovementTrend({ data }: StockMovementTrendProps) {
-  const [displayCount, setDisplayCount] = useState(12);
+  // Báo rỗng nếu API không có dữ liệu giao dịch
+  if (!data || data.length === 0) {
+    return (
+      <div className="smt-wrapper">
+        <div className="smt-header">
+          <h2 className="smt-title">Stock Movement Trend</h2>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            height: "100%",
+            minHeight: 200,
+            color: "#64748b",
+          }}
+        >
+          Không có dữ liệu giao dịch trong khoảng thời gian này
+        </div>
+      </div>
+    );
+  }
 
-  // resize listener
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 640)
-        setDisplayCount(5); // mobile
-      else if (window.innerWidth < 1024)
-        setDisplayCount(7); // tablet
-      else setDisplayCount(12); // desktop
-    };
+  // Tính giá trị trục Y lớn nhất từ TOÀN BỘ dữ liệu API
+  const maxTotal = Math.max(...data.map((d) => d.inward + d.outward));
+  const safeMax = maxTotal > 0 ? maxTotal : 1;
 
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  if (!data || data.length === 0) return null;
-
-  // slice data
-  const visibleData = data.slice(-displayCount);
-  const maxTotal = Math.max(...visibleData.map((d) => d.inward + d.outward));
   const yAxisValues = [
     maxTotal,
     Math.round(maxTotal * 0.75),
@@ -39,12 +43,10 @@ export default function StockMovementTrend({ data }: StockMovementTrendProps) {
 
   return (
     <div className="smt-wrapper">
-      {/* header */}
       <div className="smt-header">
         <h2 className="smt-title">Stock Movement Trend</h2>
       </div>
 
-      {/* chart container */}
       <div className="smt-chart-container">
         {/* y axis */}
         <div className="smt-y-axis">
@@ -64,9 +66,8 @@ export default function StockMovementTrend({ data }: StockMovementTrendProps) {
             />
           ))}
 
-          {/* bars */}
-          {visibleData.map((item, index) => {
-            const safeMax = maxTotal > 0 ? maxTotal : 1;
+          {/* Lặp qua TOÀN BỘ DATA để vẽ cột */}
+          {data.map((item, index) => {
             const inwardHeight = (item.inward / safeMax) * 100;
             const outwardHeight = (item.outward / safeMax) * 100;
 
@@ -81,12 +82,10 @@ export default function StockMovementTrend({ data }: StockMovementTrendProps) {
                   </div>
                 </div>
 
-                {/* bottom bar */}
                 <div
                   className="smt-outward"
                   style={{ height: `${outwardHeight}%` }}
                 />
-                {/* top bar */}
                 <div
                   className="smt-inward"
                   style={{ height: `${inwardHeight}%` }}

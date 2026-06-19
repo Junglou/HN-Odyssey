@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import axiosClient from "../../../../api/axiosClient";
 
 export interface InventoryKPI {
   title: string;
@@ -34,188 +36,215 @@ export interface StockMovementRow {
   status: "Safe" | "Low Stock" | "Out of Stock" | "Overstock";
 }
 
-export function useInventoryManagement() {
-  const today = new Date().toISOString().split("T")[0];
+// Định nghĩa các type cục bộ
+type XntResponseItem = {
+  sku: string;
+  product_name: string;
+  beginning_stock: number;
+  in_period: number;
+  out_period: number;
+  adjustments: number;
+  ending_stock: number;
+  status: StockMovementRow["status"];
+};
 
-  // state bộ lọc
-  const [activeFilter, setActiveFilter] = useState("Last 30 Days");
-  const [startDate, setStartDate] = useState(today);
+type TrendResponseItem = {
+  date: string;
+  inward: number;
+  outward: number;
+};
+
+type StockResponseItem = {
+  _id?: string;
+  sku: string;
+  name?: string;
+  product_name?: string;
+  stock: number;
+  min_stock: number;
+  max_stock: number;
+};
+
+// Hàm xử lý Múi giờ (Tránh lỗi lấy ngày UTC bị lùi 1 ngày so với giờ Việt Nam)
+const getLocalISODate = (date: Date) => {
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+    .toISOString()
+    .split("T")[0];
+};
+
+export function useInventoryManagement() {
+  const navigate = useNavigate();
+  const today = getLocalISODate(new Date());
+
+  // State bộ lọc
+  const [activeFilter, setActiveFilter] = useState("This Month");
+  const [startDate, setStartDate] = useState(() => {
+    const start = new Date();
+    start.setDate(1); // Mặc định đầu tháng
+    return getLocalISODate(start);
+  });
   const [endDate, setEndDate] = useState(today);
   const [dateError, setDateError] = useState<string | null>(null);
 
-  // state kho hàng (MỚI THÊM)
-  const [selectedWarehouse, setSelectedWarehouse] = useState("All Warehouses");
+  // [ĐIỂM SỬA 1]: Đổi giá trị mặc định thành "all" để đồng bộ với Dropdown
+  const [selectedWarehouse, setSelectedWarehouse] = useState("all");
 
-  // state dữ liệu
+  // State dữ liệu
   const [isLoading, setIsLoading] = useState(true);
   const [kpis, setKpis] = useState<InventoryKPI[]>([]);
   const [trendData, setTrendData] = useState<StockTrendData[]>([]);
   const [alerts, setAlerts] = useState<InventoryAlert[]>([]);
   const [tableData, setTableData] = useState<StockMovementRow[]>([]);
+  const [triggerCount, setTriggerCount] = useState(0);
 
-  // fetch data (giả lập)
   const fetchDashboardData = useCallback(async () => {
     setIsLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      const queryParams = new URLSearchParams();
+      if (startDate) queryParams.append("start_date", startDate);
+      if (endDate) queryParams.append("end_date", endDate);
 
-      setKpis([
-        {
-          title: "Total Stock Value",
-          value: "$1.2M",
-          subtext: "+5.2% vs last month",
-          iconType: "dollar",
-        },
+      // [ĐIỂM SỬA 2]: Mở cờ gọi API lọc Kho, gửi param nếu chọn kho cụ thể
+      if (selectedWarehouse !== "all") {
+        queryParams.append("warehouse", selectedWarehouse);
+      }
+
+      const queryString = queryParams.toString();
+
+      const [xntRes, trendRes, stockRes] = await Promise.allSettled([
+        axiosClient.get(`/reports/inventory/xnt?${queryString}&limit=50`),
+        axiosClient.get(`/reports/inventory/trend?${queryString}`),
+        axiosClient.get(`/inventory/stock?limit=100`),
+      ]);
+
+      // 1. Dữ liệu Bảng (XNT)
+      let tableRows: StockMovementRow[] = [];
+      let totalItems = 0;
+      let lowStockCount = 0;
+
+      if (xntRes.status === "fulfilled" && xntRes.value.data?.success) {
+        const rawXnt = xntRes.value.data.data;
+        const xntData = Array.isArray(rawXnt) ? rawXnt : rawXnt?.data || [];
+
+        tableRows = xntData.map((item: XntResponseItem) => ({
+          id: item.sku,
+          sku: item.sku,
+          name: item.product_name,
+          openingQty: item.beginning_stock,
+          inward: item.in_period,
+          outward: item.out_period,
+          adjustments: item.adjustments,
+          closingQty: item.ending_stock,
+          status: item.status,
+        }));
+
+        totalItems = tableRows.reduce((sum, item) => sum + item.closingQty, 0);
+        lowStockCount = tableRows.filter((item) =>
+          ["Low Stock", "Out of Stock"].includes(item.status),
+        ).length;
+      }
+
+      // 2. Dữ liệu Biểu đồ (Trend)
+      let trends: StockTrendData[] = [];
+      if (trendRes.status === "fulfilled" && trendRes.value.data?.success) {
+        const rawTrend = trendRes.value.data.data;
+        const trendDataArray = Array.isArray(rawTrend)
+          ? rawTrend
+          : rawTrend?.data || [];
+
+        trends = trendDataArray.map((item: TrendResponseItem) => ({
+          date: item.date,
+          inward: item.inward,
+          outward: item.outward,
+        }));
+      }
+
+      // 3. Dữ liệu Cảnh báo (Low Stock)
+      let alertList: InventoryAlert[] = [];
+      if (stockRes.status === "fulfilled" && stockRes.value.data?.success) {
+        const rawStock = stockRes.value.data.data;
+        const stocks = Array.isArray(rawStock)
+          ? rawStock
+          : rawStock?.data || [];
+
+        if (Array.isArray(stocks)) {
+          alertList = stocks
+            .filter(
+              (s: StockResponseItem) =>
+                s.stock <= s.min_stock ||
+                s.stock >= s.max_stock ||
+                s.stock === 0,
+            )
+            .map((s: StockResponseItem) => ({
+              id: s._id || s.sku,
+              sku: s.sku,
+              name: s.name || s.product_name || "Unknown Product",
+              currentStock: s.stock || 0,
+              minThreshold: s.min_stock || 10,
+              maxThreshold: s.max_stock || 100,
+            }));
+        }
+      }
+
+      // Fallback lấy cảnh báo từ bảng XNT nếu API stock không trả về kịp
+      if (alertList.length === 0 && tableRows.length > 0) {
+        alertList = tableRows
+          .filter((item) => item.status !== "Safe")
+          .map((item) => ({
+            id: item.sku,
+            sku: item.sku,
+            name: item.name,
+            currentStock: item.closingQty,
+            minThreshold: 10,
+            maxThreshold: 100,
+          }));
+      }
+
+      // 4. KPIs
+      const kpisData: InventoryKPI[] = [
         {
           title: "Total Items in Stock",
-          value: "45,231",
-          subtext: "Across all warehouses",
+          value: totalItems.toLocaleString(),
+          subtext: "Across selected time",
           iconType: "box",
         },
         {
           title: "Low Stock Items",
-          value: "12",
+          value: lowStockCount.toString(),
           subtext: "Requires immediate attention",
           iconType: "truck",
         },
         {
-          title: "Inventory Turnover",
-          value: "4.2",
-          subtext: "Target: 5.0",
+          title: "Inward Transactions",
+          value: trends
+            .reduce((acc, curr) => acc + curr.inward, 0)
+            .toLocaleString(),
+          subtext: "Total imported items",
           iconType: "refresh",
         },
-      ]);
+        {
+          title: "Outward Transactions",
+          value: trends
+            .reduce((acc, curr) => acc + curr.outward, 0)
+            .toLocaleString(),
+          subtext: "Total exported items",
+          iconType: "dollar",
+        },
+      ];
 
-      setTrendData([
-        { date: "Sep 25", inward: 100, outward: 70 },
-        { date: "Sep 26", inward: 120, outward: 85 },
-        { date: "Sep 27", inward: 90, outward: 110 },
-        { date: "Sep 28", inward: 180, outward: 130 },
-        { date: "Sep 29", inward: 110, outward: 90 },
-        { date: "Sep 30", inward: 130, outward: 100 },
-        { date: "Oct 01", inward: 120, outward: 80 },
-        { date: "Oct 02", inward: 150, outward: 90 },
-        { date: "Oct 03", inward: 80, outward: 110 },
-        { date: "Oct 04", inward: 200, outward: 150 },
-        { date: "Oct 05", inward: 90, outward: 130 },
-        { date: "Oct 06", inward: 110, outward: 95 },
-        { date: "Oct 07", inward: 140, outward: 120 },
-        { date: "Oct 08", inward: 160, outward: 140 },
-      ]);
-
-      setAlerts([
-        {
-          id: "1",
-          sku: "SKU-TS-001",
-          name: "Premium Cotton T-Shirt",
-          currentStock: 5,
-          minThreshold: 20,
-          maxThreshold: 100,
-        },
-        {
-          id: "2",
-          sku: "SKU-HD-002",
-          name: "Winter Hoodie Basic",
-          currentStock: 0,
-          minThreshold: 15,
-          maxThreshold: 80,
-        },
-        {
-          id: "3",
-          sku: "SKU-CP-003",
-          name: "Denim Baseball Cap",
-          currentStock: 150,
-          minThreshold: 10,
-          maxThreshold: 100,
-        },
-        {
-          id: "4",
-          sku: "SKU-SH-004",
-          name: "Running Shoes X1",
-          currentStock: 12,
-          minThreshold: 15,
-          maxThreshold: 50,
-        },
-      ]);
-
-      setTableData([
-        {
-          id: "1",
-          sku: "SKU-TS-001",
-          name: "Premium Cotton T-Shirt",
-          openingQty: 100,
-          inward: 50,
-          outward: 145,
-          adjustments: 0,
-          closingQty: 5,
-          status: "Low Stock",
-        },
-        {
-          id: "2",
-          sku: "SKU-HD-002",
-          name: "Winter Hoodie Basic",
-          openingQty: 50,
-          inward: 0,
-          outward: 50,
-          adjustments: 0,
-          closingQty: 0,
-          status: "Out of Stock",
-        },
-        {
-          id: "3",
-          sku: "SKU-CP-003",
-          name: "Denim Baseball Cap",
-          openingQty: 80,
-          inward: 100,
-          outward: 30,
-          adjustments: 0,
-          closingQty: 150,
-          status: "Overstock",
-        },
-        {
-          id: "4",
-          sku: "SKU-SH-004",
-          name: "Running Shoes X1",
-          openingQty: 60,
-          inward: 20,
-          outward: 68,
-          adjustments: 0,
-          closingQty: 12,
-          status: "Low Stock",
-        },
-        {
-          id: "5",
-          sku: "SKU-JK-005",
-          name: "Leather Jacket Pro",
-          openingQty: 30,
-          inward: 10,
-          outward: 5,
-          adjustments: +2,
-          closingQty: 37,
-          status: "Safe",
-        },
-        {
-          id: "6",
-          sku: "SKU-SO-006",
-          name: "Cotton Socks Pack",
-          openingQty: 200,
-          inward: 100,
-          outward: 50,
-          adjustments: -5,
-          closingQty: 245,
-          status: "Safe",
-        },
-      ]);
+      setTableData(tableRows);
+      setTrendData(trends);
+      setAlerts(alertList);
+      setKpis(kpisData);
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Error fetching inventory data:", error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [startDate, endDate, selectedWarehouse]); // Đã bổ sung selectedWarehouse vào dependencies
 
   useEffect(() => {
     fetchDashboardData();
-  }, [fetchDashboardData]);
+  }, [fetchDashboardData, triggerCount]);
 
   const validateDates = (start: string, end: string) => {
     if (!start || !end) {
@@ -233,10 +262,27 @@ export function useInventoryManagement() {
   const handleFilterChange = (filter: string) => {
     setActiveFilter(filter);
     setDateError(null);
+
     if (filter !== "Custom Range") {
-      setStartDate(today);
-      setEndDate(today);
-      fetchDashboardData();
+      const end = new Date();
+      const start = new Date();
+
+      if (filter === "Today") {
+        // start và end đều là today
+      } else if (filter === "This Week") {
+        start.setDate(
+          end.getDate() - end.getDay() + (end.getDay() === 0 ? -6 : 1),
+        );
+      } else if (filter === "This Month") {
+        start.setDate(1);
+      } else if (filter === "Last 30 Days") {
+        start.setDate(end.getDate() - 30);
+      }
+
+      // Sử dụng getLocalISODate để ép chuẩn múi giờ khi set State
+      setStartDate(getLocalISODate(start));
+      setEndDate(getLocalISODate(end));
+      setTriggerCount((prev) => prev + 1);
     }
   };
 
@@ -253,13 +299,72 @@ export function useInventoryManagement() {
   const handleApply = () => {
     if (activeFilter === "Custom Range" && !validateDates(startDate, endDate))
       return;
-    fetchDashboardData();
+    setTriggerCount((prev) => prev + 1);
   };
 
-  // hàm đổi kho
   const handleWarehouseChange = (warehouse: string) => {
     setSelectedWarehouse(warehouse);
-    fetchDashboardData();
+    setTriggerCount((prev) => prev + 1); // Trigger lại API nếu đổi kho
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (startDate) queryParams.append("start_date", startDate);
+      if (endDate) queryParams.append("end_date", endDate);
+
+      const response = await axiosClient.get(
+        `/reports/inventory/xnt/export/excel?${queryParams.toString()}`,
+        { responseType: "blob" },
+      );
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      const dateStr = getLocalISODate(new Date()).replace(/-/g, "");
+      link.setAttribute("download", `BaoCaoXNT_${dateStr}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("Lỗi khi xuất báo cáo Excel.");
+      console.error(err);
+    }
+  };
+
+  // 2. THÊM HÀM MỚI: Xuất PDF
+  const handleExportPdf = async () => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (startDate) queryParams.append("start_date", startDate);
+      if (endDate) queryParams.append("end_date", endDate);
+
+      const response = await axiosClient.get(
+        `/reports/inventory/xnt/export/pdf?${queryParams.toString()}`,
+        { responseType: "blob" },
+      );
+
+      // Lưu ý type của Blob phải là application/pdf
+      const url = window.URL.createObjectURL(
+        new Blob([response.data], { type: "application/pdf" }),
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      const dateStr = getLocalISODate(new Date()).replace(/-/g, "");
+      link.setAttribute("download", `BaoCaoXNT_${dateStr}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("Lỗi khi xuất báo cáo PDF.");
+      console.error(err);
+    }
+  };
+
+  const handleAlertAction = (sku: string, type: "PO" | "TRANSFER") => {
+    navigate(`/portal/warehouse?sku=${sku}&action=${type}`);
   };
 
   return {
@@ -278,5 +383,8 @@ export function useInventoryManagement() {
     handleEndDateChange,
     handleApply,
     handleWarehouseChange,
+    handleExportExcel,
+    handleExportPdf,
+    handleAlertAction,
   };
 }

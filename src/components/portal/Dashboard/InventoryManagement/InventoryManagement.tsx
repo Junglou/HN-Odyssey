@@ -30,6 +30,7 @@ function CustomDropdown({
   const containerRef = useRef<HTMLDivElement>(null);
   const optionsRef = useRef<HTMLDivElement>(null);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+
   const handleToggle = () => {
     if (!disabled && !isOpen && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
@@ -43,6 +44,7 @@ function CustomDropdown({
     }
     if (!disabled) setIsOpen(!isOpen);
   };
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
@@ -106,6 +108,7 @@ function CustomDropdown({
     </div>
   );
 }
+
 interface InventoryManagementProps {
   activeFilter: string;
   startDate: string;
@@ -122,6 +125,9 @@ interface InventoryManagementProps {
   onEndDateChange: (date: string) => void;
   onApply: () => void;
   onWarehouseChange: (val: string) => void;
+  onExportExcel: () => void; // Thay bằng onExportExcel
+  onExportPdf: () => void; // Thêm onExportPdf
+  onAlertAction: (sku: string, type: "PO" | "TRANSFER") => void;
 }
 
 export default function InventoryManagement({
@@ -140,13 +146,17 @@ export default function InventoryManagement({
   onEndDateChange,
   onApply,
   onWarehouseChange,
+  onExportExcel,
+  onExportPdf,
+  onAlertAction,
 }: InventoryManagementProps) {
   const filterOptions = ["Today", "This Week", "This Month", "Custom Range"];
 
   const warehouseOptions = [
-    { label: "All Warehouses", value: "All Warehouses" },
-    { label: "Warehouse A", value: "Warehouse A" },
-    { label: "Warehouse B", value: "Warehouse B" },
+    { value: "all", label: "Tất cả các kho (All Warehouses)" },
+    { value: "WH-HCM-01", label: "Kho Tổng - TP.Hồ Chí Minh" },
+    { value: "WH-HN-01", label: "Kho Trung Chuyển - Hà Nội" },
+    { value: "WH-DN-01", label: "Kho Bán Lẻ - Đà Nẵng" },
   ];
 
   return (
@@ -154,22 +164,27 @@ export default function InventoryManagement({
       {/* header */}
       <div className="im-header-row">
         <h1 className="im-main-title">Inventory Management</h1>
-        <button
-          className="im-btn-export"
-          onClick={() => {
-            alert(
-              "Đang xuất báo cáo ra file Excel...\n(Tính năng này sẽ được kích hoạt khi nối API)",
-            );
-            console.log(
-              "Xuất báo cáo Kho - Thời gian:",
-              startDate,
-              "đến",
-              endDate,
-            );
-          }}
-        >
-          Export Report
-        </button>
+
+        {/* Bọc 2 nút trong 1 div flex để chúng đứng cạnh nhau */}
+        <div style={{ display: "flex", gap: "12px" }}>
+          <button
+            className="im-btn-export"
+            onClick={onExportExcel}
+            disabled={isLoading}
+            style={{ backgroundColor: "#10b981" }}
+          >
+            {isLoading ? "Loading..." : "Export Excel"}
+          </button>
+
+          <button
+            className="im-btn-export"
+            onClick={onExportPdf}
+            disabled={isLoading}
+            style={{ backgroundColor: "#ef4444" }}
+          >
+            {isLoading ? "Loading..." : "Export PDF"}
+          </button>
+        </div>
       </div>
 
       {/* filter */}
@@ -212,6 +227,7 @@ export default function InventoryManagement({
                 readOnly={activeFilter !== "Custom Range"}
               />
             </div>
+
             <div
               className={`im-date-wrapper ${dateError ? "im-has-error" : ""}`}
             >
@@ -241,7 +257,7 @@ export default function InventoryManagement({
         <div className="im-middle-wrapper">
           <div className="im-middle-grid">
             <StockMovementTrend data={trendData} />
-            <LowStockAlerts alerts={alerts} />
+            <LowStockAlerts alerts={alerts} onActionClick={onAlertAction} />
           </div>
         </div>
         <StockMovementTable data={tableData} />

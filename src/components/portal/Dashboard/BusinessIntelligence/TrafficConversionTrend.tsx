@@ -36,7 +36,8 @@ export default function TrafficConversionTrend({
     const chartHeight = dimensions.height - padding.top - padding.bottom;
 
     const rawMaxS = Math.max(...data.map((d) => d.sessions));
-    const niceMaxS = Math.ceil(rawMaxS / 40000) * 40000 || 40000;
+    // Đảm bảo chia hết cho 4 (để 4 vạch grid ra số chẵn), mức tối thiểu là 4
+    const niceMaxS = Math.max(4, Math.ceil(rawMaxS / 4) * 4);
     const rawMaxC = Math.max(...data.map((d) => d.conversion));
     const niceMaxC = Math.ceil(rawMaxC / 4) * 4 || 4;
 
@@ -183,7 +184,12 @@ export default function TrafficConversionTrend({
                       textAnchor="end"
                       className="trend-axis-text"
                     >
-                      {(((t / 4) * chartConfig.niceMaxS) / 1000).toFixed(0)}K
+                      {(() => {
+                        const val = (t / 4) * chartConfig.niceMaxS;
+                        return val >= 1000
+                          ? `${(val / 1000).toFixed(1)}K`
+                          : val.toFixed(0);
+                      })()}
                     </text>
                     <text
                       x={dimensions.width - chartConfig.padding.right + 15}

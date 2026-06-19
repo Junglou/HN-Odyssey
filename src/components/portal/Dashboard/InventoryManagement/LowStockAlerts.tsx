@@ -4,9 +4,13 @@ import type { InventoryAlert } from "../../../../hooks/portal/Dashboard/Inventor
 
 interface LowStockAlertsProps {
   alerts: InventoryAlert[];
+  onActionClick?: (sku: string, type: "PO" | "TRANSFER") => void; // <-- Định nghĩa thêm prop
 }
 
-export default function LowStockAlerts({ alerts }: LowStockAlertsProps) {
+export default function LowStockAlerts({
+  alerts,
+  onActionClick,
+}: LowStockAlertsProps) {
   if (!alerts || alerts.length === 0) return null;
 
   return (
@@ -67,7 +71,13 @@ export default function LowStockAlerts({ alerts }: LowStockAlertsProps) {
                   {item.maxThreshold})
                 </div>
 
-                <button className="lsa-action-btn">
+                <button
+                  className="lsa-action-btn"
+                  onClick={() =>
+                    onActionClick &&
+                    onActionClick(item.sku, !isOver ? "PO" : "TRANSFER")
+                  } // <-- Gắn sự kiện click
+                >
                   {!isOver ? "+ Tạo PO" : "Điều chuyển"}
                 </button>
               </div>
