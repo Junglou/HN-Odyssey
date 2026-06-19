@@ -12,8 +12,11 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Request } from 'express';
 import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
 
+// Mở rộng interface để hỗ trợ các định dạng payload khác nhau
 interface RequestUser {
   userId?: string;
+  _id?: string | { toString: () => string };
+  sub?: string;
   roles?: string[];
 }
 
@@ -34,10 +37,20 @@ export class UebaMonitorInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const url = request.url;
     const method = request.method;
-    const user = request.user;
 
-    // Nếu chưa đăng nhập thì gán là anonymous
-    const userId = user?.userId || 'anonymous';
+    // Lấy thông tin user dựa trên interface đã định nghĩa thay vì dùng any
+    const user = request.user;
+    let userId = 'anonymous';
+
+    if (user) {
+      if (user.userId) {
+        userId = user.userId;
+      } else if (user._id) {
+        userId = user._id.toString();
+      } else if (user.sub) {
+        userId = user.sub;
+      }
+    }
 
     const forwardedFor = request.headers['x-forwarded-for'];
     const ip =
@@ -60,8 +73,7 @@ export class UebaMonitorInterceptor implements NestInterceptor {
     try {
       const currentMin = new Date().getMinutes();
 
-      // [AC11] KIỂM TRA TẦN SUẤT REQUEST LỆCH CHUẨN (UEBA)
-
+      // Kiểm tra tần suất request lệch chuẩn ueba
       const rateKey = `ueba:rate:${userId}:${currentMin}`;
       const reqCount = await this.redis.incr(rateKey);
 
@@ -70,7 +82,7 @@ export class UebaMonitorInterceptor implements NestInterceptor {
         await this.redis.expire(rateKey, 60);
       }
 
-      // Ngưỡng cảnh báo: 200 request / 1 phút
+      // Ngưỡng cảnh báo: 200 request mỗi phút
       if (reqCount === 200) {
         this.eventEmitter.emit(NOTIFY_EVENTS.SECURITY_ALERT, {
           severity: 'HIGH',
@@ -80,15 +92,16 @@ export class UebaMonitorInterceptor implements NestInterceptor {
         });
       }
 
-      // [AC12] PHÁT HIỆN TRUY CẬP DỮ LIỆU NHẠY CẢM / TẢI FILE LỚN
-
+      // Phát hiện truy cập dữ liệu nhạy cảm hoặc tải file lớn
+      // Thu hẹp phạm vi các endpoint nhạy cảm để tránh báo cáo sai từ dashboard
       const sensitivePatterns = [
         '/export',
         '/download',
-        '/reports',
-        '/portal/users',
-        '/portal/revenue',
+        '/reports/export',
+        '/portal/users/export-data',
+        '/portal/revenue/download-csv',
       ];
+
       const isSensitive = sensitivePatterns.some((pattern) =>
         url.includes(pattern),
       );
@@ -101,7 +114,7 @@ export class UebaMonitorInterceptor implements NestInterceptor {
           await this.redis.expire(sensitiveKey, 60);
         }
 
-        // Ngưỡng cảnh báo truy cập dữ liệu nhạy cảm: 5 lần / 1 phút
+        // Ngưỡng cảnh báo truy cập dữ liệu nhạy cảm: 5 lần mỗi phút
         if (sensitiveCount === 5) {
           this.eventEmitter.emit(NOTIFY_EVENTS.SECURITY_ALERT, {
             severity: 'CRITICAL',

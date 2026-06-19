@@ -24,12 +24,33 @@ import {
 import {
   StockAlertItem,
   RawAggregatedProduct,
-  ChartDataPoint,
   OverviewMetrics,
   TopCategory,
   TopProduct,
   VariantContribution,
+  SystemStageStat,
 } from 'src/common/interfaces/dashboard.interface';
+import { Conversation } from 'twilio/lib/twiml/VoiceResponse';
+import {
+  WarrantyClaim,
+  WarrantyClaimDocument,
+} from 'src/modules/support/warranty/schemas/warranty-claim.schema';
+import {
+  SystemMetric,
+  SystemMetricDocument,
+} from 'src/modules/system/monitoring/schemas/system-metric.schema';
+import {
+  IntegrationLog,
+  IntegrationLogDocument,
+} from 'src/modules/system/monitoring/schemas/integration-log.schema';
+import {
+  ConversationDocument,
+  ConversationStatus,
+} from 'src/modules/support/chat/schemas/conversation.schema';
+import {
+  StockTransaction,
+  StockTransactionDocument,
+} from 'src/modules/inventory/transactions/schemas/stock-transaction.schema';
 
 interface RawAggregationResult {
   total_revenue: number;
@@ -90,6 +111,16 @@ export class DashboardService {
     @InjectModel(Order.name) private readonly orderModel: Model<OrderDocument>,
     @InjectModel(Category.name)
     private readonly categoryModel: Model<CategoryDocument>,
+    @InjectModel(Conversation.name)
+    private readonly conversationModel: Model<ConversationDocument>,
+    @InjectModel(WarrantyClaim.name)
+    private readonly warrantyClaimModel: Model<WarrantyClaimDocument>,
+    @InjectModel(SystemMetric.name)
+    private readonly systemMetricModel: Model<SystemMetricDocument>,
+    @InjectModel(IntegrationLog.name)
+    private readonly integrationLogModel: Model<IntegrationLogDocument>,
+    @InjectModel(StockTransaction.name)
+    private readonly stockTransactionModel: Model<StockTransactionDocument>,
   ) {}
 
   // WIDGET CẢNH BÁO TỒN KHO
@@ -290,37 +321,55 @@ export class DashboardService {
       $nin: ['CANCELLED', 'RETURNED', 'DELIVERY_FAILED', 'REFUNDED'],
     };
 
-    const [currentStats, prevStats, chartRaw] = await Promise.all([
-      this.orderModel.aggregate<RawAggregationResult>([
-        {
-          $match: {
-            createdAt: { $gte: start, $lte: end },
-            status: validStatuses,
+    // Thực thi toàn bộ truy vấn song song để tối ưu hiệu suất đọc
+    const [
+      currentStats,
+      prevStats,
+      chartRaw,
+      pipelineStats,
+      returnStats,
+      recentTickets,
+      openTicketsCount,
+      metricsCount,
+      integrationErrors,
+      inventoryBatches, // Biến hứng dữ liệu thứ 10
+    ] = await Promise.all([
+      this.orderModel.aggregate<RawAggregationResult & { total_items: number }>(
+        [
+          {
+            $match: {
+              createdAt: { $gte: start, $lte: end },
+              status: validStatuses,
+            },
           },
-        },
-        {
-          $group: {
-            _id: null,
-            total_revenue: { $sum: '$total_amount' },
-            total_orders: { $sum: 1 },
+          {
+            $group: {
+              _id: null,
+              total_revenue: { $sum: '$total_amount' },
+              total_orders: { $sum: 1 },
+              total_items: { $sum: { $sum: '$items.quantity' } },
+            },
           },
-        },
-      ]),
-      this.orderModel.aggregate<RawAggregationResult>([
-        {
-          $match: {
-            createdAt: { $gte: prevStart, $lte: prevEnd },
-            status: validStatuses,
+        ],
+      ),
+      this.orderModel.aggregate<RawAggregationResult & { total_items: number }>(
+        [
+          {
+            $match: {
+              createdAt: { $gte: prevStart, $lte: prevEnd },
+              status: validStatuses,
+            },
           },
-        },
-        {
-          $group: {
-            _id: null,
-            total_revenue: { $sum: '$total_amount' },
-            total_orders: { $sum: 1 },
+          {
+            $group: {
+              _id: null,
+              total_revenue: { $sum: '$total_amount' },
+              total_orders: { $sum: 1 },
+              total_items: { $sum: { $sum: '$items.quantity' } },
+            },
           },
-        },
-      ]),
+        ],
+      ),
       this.orderModel.aggregate<ChartRawData>([
         {
           $match: {
@@ -337,20 +386,105 @@ export class DashboardService {
         },
         { $sort: { _id: 1 } },
       ]),
+      this.orderModel.aggregate<{ _id: string; count: number }>([
+        { $match: { createdAt: { $gte: start, $lte: end } } },
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ]),
+      // Lấy các yêu cầu bảo hành gần nhất để làm return_stats
+      this.warrantyClaimModel
+        .find({ createdAt: { $gte: start, $lte: end } })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .select('claim_code status')
+        .lean<Array<{ claim_code: string; status: string }>>(),
+      // Lấy lịch sử vé chat hỗ trợ
+      this.conversationModel
+        .find({ createdAt: { $gte: start, $lte: end } })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .select('_id status')
+        .lean<Array<{ _id: Types.ObjectId; status: string }>>(),
+      this.conversationModel.countDocuments({
+        status: ConversationStatus.OPEN,
+        createdAt: { $gte: start, $lte: end },
+      }),
+      // Kiểm tra sức khỏe hệ thống dựa vào lỗi 5xx
+      this.systemMetricModel.countDocuments({
+        createdAt: { $gte: start, $lte: end },
+        status_code: { $gte: 500 },
+      }),
+      // Kiểm tra sức khỏe hệ thống đối tác thứ 3
+      this.integrationLogModel.countDocuments({
+        createdAt: { $gte: start, $lte: end },
+        is_error: true,
+      }),
+      // [BỔ SUNG THỨ 10]: Lấy danh sách lô hàng chuẩn bị xuất (Ready for Pick/Pack Batches)
+      this.stockTransactionModel
+        .find({ action_type: 'EXPORT', status: 'PROCESSING' })
+        .sort({ created_at: -1 })
+        .limit(4)
+        .select('transaction_code')
+        .lean<Array<{ transaction_code: string }>>(),
     ]);
 
-    const current = currentStats[0] || { total_revenue: 0, total_orders: 0 };
-    const prev = prevStats[0] || { total_revenue: 0, total_orders: 0 };
+    const current = currentStats[0] || {
+      total_revenue: 0,
+      total_orders: 0,
+      total_items: 0,
+    };
+    const prev = prevStats[0] || {
+      total_revenue: 0,
+      total_orders: 0,
+      total_items: 0,
+    };
 
-    const chart_data: ChartDataPoint[] = chartRaw.map((item) => ({
+    const chart_data = chartRaw.map((item) => ({
       label: String(item._id),
       revenue: Number(item.revenue),
       orders: Number(item.orders),
     }));
 
+    // Gắn logic hệ thống thực tế vào widget Live Activity
+    const system_activities: SystemStageStat[] = [
+      {
+        id: 'stage-1',
+        type: 'server',
+        title: 'Server Info',
+        desc: metricsCount > 5 ? 'High Server Errors' : 'API Gateway Connected',
+        status: metricsCount > 5 ? 'offline' : 'active',
+      },
+      {
+        id: 'stage-2',
+        type: 'order',
+        title: 'Order',
+        desc:
+          integrationErrors > 5
+            ? 'Integration Issues'
+            : 'Order Processing Online',
+        status: integrationErrors > 5 ? 'offline' : 'active',
+      },
+      {
+        id: 'stage-3',
+        type: 'announcement',
+        title: 'Announcement',
+        desc: 'System Optimal',
+        status: 'active',
+      },
+      {
+        id: 'stage-4',
+        type: 'alert',
+        title: 'Alert',
+        desc: 'Security Monitoring Active',
+        status: 'active',
+      },
+    ];
+
     return {
       net_revenue: current.total_revenue,
       total_orders: current.total_orders,
+      total_items: current.total_items,
+      prev_net_revenue: prev.total_revenue,
+      prev_total_orders: prev.total_orders,
       revenue_growth_percent: this.calculateGrowth(
         current.total_revenue,
         prev.total_revenue,
@@ -359,7 +493,24 @@ export class DashboardService {
         current.total_orders,
         prev.total_orders,
       ),
+      items_growth_percent: this.calculateGrowth(
+        current.total_items,
+        prev.total_items,
+      ),
       chart_data: chart_data || [],
+      pipeline_stats: pipelineStats || [],
+      return_stats: returnStats.map((r) => ({
+        claim_code: r.claim_code,
+        status: r.status,
+      })),
+      recent_tickets: recentTickets.map((t) => ({
+        id: String(t._id).substring(0, 8),
+        status: t.status,
+      })),
+      open_tickets_count: openTicketsCount,
+      system_activities,
+      // [BỔ SUNG ĐẦU RA]: Map mảng object thành mảng string các mã transaction
+      inventory_batches: inventoryBatches.map((b) => b.transaction_code),
     };
   }
 
@@ -729,7 +880,7 @@ export class DashboardService {
     }));
   }
 
-  // LẤY INVENTORY KPIs - CẬP NHẬT: Xóa tham số _filter để sửa lỗi ESLint
+  // LẤY INVENTORY KPIs
   async getInventoryKPIs(): Promise<InventoryKPI[]> {
     const products = await this.productModel
       .find({ is_deleted: false, status: 'ACTIVE' })
@@ -739,6 +890,7 @@ export class DashboardService {
     let totalValue = 0;
     let totalItems = 0;
     let lowStockCount = 0;
+    let totalSkus = 0; // Thêm biến đếm tổng số lượng SKU
 
     for (const product of products) {
       const productObj = product as unknown as { base_price?: number };
@@ -746,6 +898,7 @@ export class DashboardService {
 
       if (product.has_variants && Array.isArray(product.variants)) {
         for (const variant of product.variants) {
+          totalSkus++; // Tăng đếm cho mỗi biến thể (1 SKU)
           const vStock = Number(variant.stock) || 0;
           const vObj = variant as unknown as { price?: number };
           const variantPrice = vObj.price || basePrice;
@@ -757,6 +910,7 @@ export class DashboardService {
           if (vStock <= vMin) lowStockCount++;
         }
       } else {
+        totalSkus++; // Tăng đếm cho sản phẩm không có biến thể (1 SKU)
         const pStock = Number(product.stock) || 0;
         totalItems += pStock;
         totalValue += pStock * basePrice;
@@ -792,6 +946,13 @@ export class DashboardService {
         value: turnoverRatio.toFixed(1),
         subtext: 'Target: 5.0',
         iconType: 'refresh',
+      },
+      // Object ngầm cung cấp dữ liệu tổng SKU cho Frontend tính toán tỷ lệ phần trăm
+      {
+        title: 'Total SKUs',
+        value: totalSkus.toString(),
+        subtext: '',
+        iconType: 'box',
       },
     ];
   }

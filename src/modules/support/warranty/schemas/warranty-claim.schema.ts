@@ -71,4 +71,6 @@ export class WarrantyClaim extends Document {
   @Prop({ type: [SchemaFactory.createForClass(ClaimTimeline)], default: [] })
   timeline: ClaimTimeline[]; // Timeline 4 bước chuẩn AC6
 }
+// Thêm dòng này
+export type WarrantyClaimDocument = WarrantyClaim & Document;
 export const WarrantyClaimSchema = SchemaFactory.createForClass(WarrantyClaim);

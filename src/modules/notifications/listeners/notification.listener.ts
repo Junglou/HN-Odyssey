@@ -141,29 +141,31 @@ export class NotificationListener {
       this.configService.get<string>('MAIL_ADMIN_RECEIVER') ||
       'admin@hn-odyssey.com';
 
-    // 1. Gửi Email cảnh báo
+    // Gửi email cảnh báo
     await this.emailService.sendRaw(
       adminEmail,
       `[BẢO MẬT] Cảnh báo mức độ ${data.severity}`,
       `Chi tiết: ${data.message}\n- IP: ${data.ip || 'N/A'}\n- User ID: ${data.user_id || 'N/A'}`,
     );
 
-    // 2. Xử lý logic khóa tài khoản cho mức CRITICAL (Đã gỡ SMS)
-    if (data.severity === 'CRITICAL' && data.user_id) {
+    // Xác định xem tài khoản có thỏa mãn điều kiện bị khóa hay không
+    const isAccountLocked = data.severity === 'CRITICAL' && data.user_id;
+
+    // Xử lý logic khóa tài khoản cho mức critical
+    if (isAccountLocked && data.user_id) {
       await this.usersService.updateStatus(data.user_id, {
         is_active: false,
         lock_reason: `Security Alert: ${data.message}`,
       });
     }
 
-    // 3. Gửi Duy Nhất một thông báo hệ thống (Socket + DB)
+    // Gửi duy nhất một thông báo hệ thống (Socket + DB)
     await this.notificationsService.createAndSend({
       recipient_role: 'SUPER_ADMIN',
       warehouse_id: undefined, // Admin nhận diện rộng, không phân kho
-      title:
-        data.severity === 'CRITICAL'
-          ? 'Tài khoản đã bị tạm khóa'
-          : 'Cảnh báo bảo mật',
+      title: isAccountLocked
+        ? 'Tài khoản đã bị tạm khóa'
+        : 'Cảnh báo bảo mật: Mức độ nghiêm trọng',
       message: data.message,
       type: NotificationType.SECURITY,
       priority:
@@ -174,7 +176,6 @@ export class NotificationListener {
         severity: data.severity,
         user_id: data.user_id,
         ip: data.ip,
-        // Cập nhật target_url đúng với định tuyến frontend
         target_url: '/portal/system',
       },
     });
@@ -247,13 +248,12 @@ export class NotificationListener {
       metadata: {
         error_code: data.error_code,
         stack: data.stack_trace,
-        // Bổ sung target_url cho lỗi hệ thống
         target_url: '/portal/system',
       },
     });
   }
 
-  // XỬ LÝ SỰ KIỆN TỪ MODULE LOYALTY (US2 - AC17)
+  // Xử lý sự kiện từ module loyalty (US2 - AC17)
   @OnEvent('loyalty.points_earned')
   async handlePointsEarned(data: {
     userId: string;
@@ -261,13 +261,12 @@ export class NotificationListener {
     pointsAmount: number;
   }) {
     await this.notificationsService.createAndSend({
-      recipient_role: 'CUSTOMER', // Bắn đích danh cho role Khách Hàng
+      recipient_role: 'CUSTOMER',
       recipient_id: data.userId,
       title: 'Nhận điểm thưởng thành công!',
       message: `Bạn vừa được cộng thêm ${data.pointsAmount} điểm từ đơn hàng ${data.orderId}.`,
-      type: NotificationType.LOYALTY, // Dùng đúng Type chuẩn xác
-      priority: NotificationPriority.LOW, // Sự kiện bình thường
-      // Cập nhật target_url đúng với định tuyến frontend
+      type: NotificationType.LOYALTY,
+      priority: NotificationPriority.LOW,
       metadata: { target_url: '/profile/loyalty', order_id: data.orderId },
     });
   }
@@ -286,8 +285,7 @@ export class NotificationListener {
       title: `Chúc mừng bạn đã lên hạng ${data.tierName}!`,
       message: `Bạn đã nhận được 1 Voucher giảm ${data.rewardValue}${symbol}. Kiểm tra Kho Voucher ngay nhé!`,
       type: NotificationType.LOYALTY,
-      priority: NotificationPriority.HIGH, // Ưu tiên cao để đẩy nổi bật
-      // Cập nhật target_url đúng với định tuyến frontend
+      priority: NotificationPriority.HIGH,
       metadata: { target_url: '/profile/coupon' },
     });
   }
@@ -307,7 +305,6 @@ export class NotificationListener {
       message: `Bạn đã sử dụng ${data.pointsUsed} điểm để đổi ${itemName}.`,
       type: NotificationType.LOYALTY,
       priority: NotificationPriority.MEDIUM,
-      // Cập nhật target_url đúng với định tuyến frontend
       metadata: { target_url: '/profile/loyalty' },
     });
   }
@@ -331,7 +328,6 @@ export class NotificationListener {
       message: message,
       type: NotificationType.LOYALTY,
       priority: NotificationPriority.HIGH,
-      // Cập nhật target_url đúng với định tuyến frontend
       metadata: { target_url: '/profile/coupon', event: 'birthday' },
     });
   }
@@ -345,7 +341,6 @@ export class NotificationListener {
       message: `Sản phẩm ${data.product_name} đã được định giá ${data.final_value}đ. Mã vận đơn ngược: ${data.rma_order_code}. Shipper sẽ sớm liên hệ bạn!`,
       type: NotificationType.ORDER,
       priority: NotificationPriority.HIGH,
-      // Cập nhật target_url đúng với định tuyến frontend
       metadata: { target_url: '/profile/orders' },
     });
   }
@@ -364,7 +359,6 @@ export class NotificationListener {
       message: msg,
       type: NotificationType.ORDER,
       priority: NotificationPriority.HIGH,
-      // Cập nhật target_url đúng với định tuyến frontend
       metadata: { target_url: '/profile/orders' },
     });
   }
@@ -378,7 +372,6 @@ export class NotificationListener {
       message: `Hệ thống đã tiếp nhận yêu cầu thu mua sản phẩm ${data.product_name}. Định giá sơ bộ: ${data.estimated_value.toLocaleString()}đ.`,
       type: NotificationType.ORDER,
       priority: NotificationPriority.MEDIUM,
-      // Cập nhật target_url đúng với định tuyến frontend
       metadata: { target_url: '/profile/orders' },
     });
   }
@@ -392,7 +385,6 @@ export class NotificationListener {
       message: `Sản phẩm của bạn có sai lệch tình trạng sau khi kiểm định tại kho. Đề xuất giá mới: ${data.proposed_price.toLocaleString()}đ. Vui lòng kiểm tra và xác nhận!`,
       type: NotificationType.ORDER,
       priority: NotificationPriority.HIGH,
-      // Cập nhật target_url đúng với định tuyến frontend
       metadata: { target_url: '/profile/orders' },
     });
   }
@@ -406,7 +398,6 @@ export class NotificationListener {
       message: `Tuyệt vời! Sản phẩm của bạn khớp hoàn toàn với mô tả. Đã chốt giá thu mua: ${data.final_value.toLocaleString()}đ.`,
       type: NotificationType.ORDER,
       priority: NotificationPriority.HIGH,
-      // Cập nhật target_url đúng với định tuyến frontend
       metadata: { target_url: '/profile/orders' },
     });
   }
@@ -417,18 +408,17 @@ export class NotificationListener {
       `[Support] Bắt đầu xử lý thông báo cho Ticket mới từ: ${data.email}`,
     );
 
-    // 1. Bắn thông báo In-app (Qua Socket/DB) cho nhân viên CSKH hoặc Admin
+    // Bắn thông báo in-app cho nhân viên cskh
     await this.notificationsService.createAndSend({
       recipient_role: 'SUPPORT_STAFF',
       title: 'Có yêu cầu hỗ trợ mới (Offline Ticket)',
       message: `Khách hàng (${data.email}) vừa gửi lời nhắn: "${data.content.substring(0, 50)}..."`,
       type: NotificationType.SYSTEM,
       priority: NotificationPriority.HIGH,
-      // Cập nhật target_url đúng với định tuyến frontend
       metadata: { target_url: '/portal/live-chat' },
     });
 
-    // 2. (Tùy chọn) Gửi Email thông báo cho Trưởng bộ phận CSKH / Email dùng chung
+    // Gửi email thông báo cho trưởng bộ phận
     const supportEmail =
       this.configService.get<string>('MAIL_SUPPORT_RECEIVER') ||
       'support@hn-odyssey.com';

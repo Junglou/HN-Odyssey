@@ -26,12 +26,14 @@ import {
   TrackingFilterDto,
 } from './dto/marketing-tracking.dto';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { TrackingSeederService } from './tracking-seeder.service';
 
 @Controller('tracking')
 export class TrackingController {
   constructor(
     private readonly trackingService: TrackingService,
     private readonly configService: ConfigService,
+    private readonly trackingSeederService: TrackingSeederService,
   ) {}
 
   // AC1, AC2, AC3: Nhận tín hiệu Tracking từ FE
@@ -179,5 +181,11 @@ export class TrackingController {
       'Lấy danh sách đơn hàng dùng mã thành công',
       data,
     );
+  }
+
+  @Public()
+  @Post('seed-marketing-data')
+  async seedMarketingData() {
+    return await this.trackingSeederService.seedMarketingData();
   }
 }

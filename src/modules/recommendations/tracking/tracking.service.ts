@@ -321,6 +321,7 @@ export class TrackingService {
       }>([
         {
           $match: {
+            ...dateMatch,
             session_id: { $in: sessionIds },
             status: { $nin: this.EXCLUDED_STATUSES },
           },
@@ -430,6 +431,7 @@ export class TrackingService {
 
       reports.push({
         coupon_code: coupon.code,
+        description: coupon.description,
         usage_count: totalAttempts,
         success_count: successCount,
         conversion_rate: Number(cr.toFixed(2)),
@@ -486,9 +488,13 @@ export class TrackingService {
       { $match: { status: { $nin: this.EXCLUDED_STATUSES }, ...dateMatch } },
       {
         $group: {
-          // Nhóm theo user_id nếu có (Member), ngược lại nhóm theo session_id (Guest)
-          _id: { $ifNull: ['$user_id', '$session_id'] },
-          // Đánh dấu true nếu là Member, false nếu là Guest
+          // Nhóm theo user_id nếu là thành viên, ưu tiên email cho khách vãng lai, cuối cùng mới dùng session_id
+          _id: {
+            $ifNull: [
+              '$user_id',
+              { $ifNull: ['$shipping_info.email', '$session_id'] },
+            ],
+          },
           is_member: {
             $first: { $cond: [{ $ifNull: ['$user_id', false] }, true, false] },
           },

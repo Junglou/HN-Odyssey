@@ -58,6 +58,7 @@ export interface ISourceConversionAgg {
 export interface ITimelineTrend {
   label: string;
   rate: number;
+  sessions?: number;
 }
 
 export interface IConversionReport {

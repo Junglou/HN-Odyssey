@@ -24,6 +24,7 @@ export interface ICampaignReport {
 
 export interface ICouponReport {
   coupon_code: string;
+  description?: string; // Bổ sung trường description
   usage_count: number; // Tổng số lượt nhập
   success_count: number; // Đã thanh toán và không hoàn/hủy
   conversion_rate: number;

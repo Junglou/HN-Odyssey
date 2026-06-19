@@ -28,6 +28,7 @@ import {
 import { LoyaltyFraudListener } from './listeners/loyalty-fraud.listener';
 import { NotificationsModule } from 'src/modules/notifications/notifications.module';
 import { UsersModule } from 'src/modules/users/users.module';
+import { TrackingSeederService } from './tracking-seeder.service';
 
 @Module({
   imports: [
@@ -44,7 +45,7 @@ import { UsersModule } from 'src/modules/users/users.module';
     NotificationsModule,
   ],
   controllers: [TrackingController],
-  providers: [TrackingService, LoyaltyFraudListener],
+  providers: [TrackingService, LoyaltyFraudListener, TrackingSeederService],
   exports: [TrackingService],
 })
 export class TrackingModule {}

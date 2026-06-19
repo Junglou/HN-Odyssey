@@ -46,5 +46,5 @@ export class Conversation extends Document {
   @Prop()
   closed_at?: Date; // Thời điểm kết thúc phiên chat
 }
-
+export type ConversationDocument = Conversation & Document;
 export const ConversationSchema = SchemaFactory.createForClass(Conversation);

@@ -35,12 +35,45 @@ export interface ChartDataPoint {
   orders: number;
 }
 
+export interface PipelineStat {
+  _id: string;
+  count: number;
+}
+
+export interface ReturnOrderStat {
+  claim_code: string;
+  status: string;
+}
+
+export interface RecentTicketStat {
+  id: string;
+  status: string;
+}
+
+export interface SystemStageStat {
+  id: string;
+  type: string;
+  title: string;
+  desc: string;
+  status: 'active' | 'offline';
+}
+
 export interface OverviewMetrics {
   net_revenue: number;
   total_orders: number;
+  total_items: number;
+  prev_net_revenue: number;
+  prev_total_orders: number;
   revenue_growth_percent: number;
   orders_growth_percent: number;
+  items_growth_percent: number;
   chart_data: ChartDataPoint[];
+  pipeline_stats: PipelineStat[];
+  return_stats: ReturnOrderStat[];
+  recent_tickets: RecentTicketStat[];
+  open_tickets_count: number;
+  system_activities: SystemStageStat[];
+  inventory_batches: string[];
 }
 
 export interface VariantContribution {
