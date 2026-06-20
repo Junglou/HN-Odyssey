@@ -54,6 +54,16 @@ export class RejectTradeInDto {
   reason: string;
 }
 
+export class ApproveTradeInDto {
+  @IsNumber()
+  @IsNotEmpty()
+  estimateValue: number;
+
+  @IsString()
+  @IsNotEmpty()
+  note: string;
+}
+
 // Ứng với FinalizeValueModal
 export class FinalizeTradeInDto {
   @IsNumber()

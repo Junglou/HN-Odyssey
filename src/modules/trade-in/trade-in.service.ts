@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, Model, Types } from 'mongoose';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { BaseResponse } from 'src/common/dtos/base-response.dto';
 import { OrderDocument } from '../sales/orders/schemas/order.schema';
 import { ProductDocument } from '../products/catalog/schemas/product.schema';
@@ -33,6 +33,7 @@ import {
 } from '../marketing/promotions/schemas/coupon.schema';
 import { TRADE_IN_CONFIG } from 'src/common/constants/trade-in.constant';
 import {
+  ApproveTradeInDto,
   CancelTradeInDto,
   CreateTradeInRequestDto,
   FinalizeTradeInDto,
@@ -130,23 +131,31 @@ export class TradeInService {
     customerId: string,
     dto: CreateTradeInRequestDto,
   ): Promise<BaseResponse<TradeInRequest>> {
-    const requestCode = `TRD${Date.now()}`;
+    // Ràng buộc: 1 tài khoản chỉ được 1 đơn Trade-in đang xử lý
+    const existingActive = await this.tradeInModel.findOne({
+      customer_id: new Types.ObjectId(customerId),
+      status: {
+        $nin: [
+          TradeInStatus.COMPLETED,
+          TradeInStatus.REJECTED,
+          TradeInStatus.CANCELLED,
+        ],
+      },
+    });
 
-    // HÀM MỚI: Random có kiểm soát dành cho Demo (Từ 50$ đến 400$)
-    const minPrice = 50;
-    const maxPrice = 400;
-    const step = 10;
-    const steps = Math.floor((maxPrice - minPrice) / step);
-    const mockEstimatedValue =
-      minPrice + Math.floor(Math.random() * steps) * step;
+    if (existingActive) {
+      throw new BadRequestException(
+        'Tài khoản của bạn đang có một yêu cầu Trade-in đang xử lý. Vui lòng hoàn tất yêu cầu hiện tại trước khi tạo mới.',
+      );
+    }
+
+    const requestCode = `TRD${Date.now()}`;
 
     const newRequest = await this.tradeInModel.create({
       ...dto,
       request_code: requestCode,
       customer_id: new Types.ObjectId(customerId),
-
-      estimated_value: mockEstimatedValue,
-
+      estimated_value: 0,
       status: TradeInStatus.PENDING,
       timeline: [
         {
@@ -164,12 +173,14 @@ export class TradeInService {
   async approveTradeIn(
     adminId: string,
     requestId: string,
+    dto: ApproveTradeInDto,
   ): Promise<BaseResponse<any>> {
     const request = await this.tradeInModel.findById(requestId);
     if (!request || request.status !== TradeInStatus.PENDING) {
       throw new BadRequestException('Đơn không hợp lệ để Approve');
     }
 
+    request.estimated_value = dto.estimateValue;
     request.status = TradeInStatus.APPROVED;
     request.timeline.push({
       status: TradeInStatus.APPROVED,
@@ -277,30 +288,22 @@ export class TradeInService {
     let ghnResult: GhnShippingResponse;
 
     try {
-      // Thực hiện ép kiểu an toàn về interface đã định nghĩa
       ghnResult = (await this.ghnService.createShippingOrder(
         orderData,
       )) as GhnShippingResponse;
     } catch (error: unknown) {
-      // Hứng đúng HttpException từ GhnService ném qua
       if (error instanceof HttpException) {
         throw new BadRequestException(`Tạo vận đơn thất bại. ${error.message}`);
       }
-
-      // Fallback cho các lỗi rớt mạng, sập server (nếu có)
       this.logger.error(
         'Lỗi khi gọi GHN API:',
         error instanceof Error ? error.stack : error,
       );
-
-      // BỔ SUNG DÒNG NÀY ĐỂ NGẮT LUỒNG VÀ FIX LỖI TS2454
       throw new BadRequestException(
         'Tạo vận đơn thất bại. Lỗi không xác định từ hệ thống.',
       );
     }
 
-    // Khi có throw ở trên, TypeScript sẽ hiểu: Nếu code chạy được tới đây
-    // thì chắc chắn khối try đã thành công và ghnResult đã có data.
     request.rma_order_code = ghnResult.waybillCode;
     request.status = TradeInStatus.SHIPPING;
     request.timeline.push({
@@ -311,6 +314,39 @@ export class TradeInService {
     });
 
     await request.save();
+
+    // Đồng bộ dữ liệu sang kho (Tạo đơn ảo đẩy về Request Queue để nhân viên kho thao tác duyệt)
+    await this.orderModel.create({
+      order_code: request.request_code,
+      user_id: null,
+      status: 'TRADE_IN_REVIEW',
+      total_amount: 0,
+      payment: { method: 'TRADE-IN', status: 'PENDING' },
+      shipping_info: {
+        name: request.full_name,
+        phone: request.phone_number,
+        address: request.shipping_address
+          ? request.shipping_address.street_address
+          : 'Khách vãng lai',
+        district_code: request.shipping_address
+          ? request.shipping_address.district_id.toString()
+          : '0',
+        ward_code: request.shipping_address
+          ? request.shipping_address.ward_code
+          : '0',
+        city_code: '0',
+      },
+      items: [
+        {
+          product_id: null,
+          sku: 'TRADE-IN',
+          product_name: request.product_name || 'Thiết bị Trade-in thu hồi',
+          price: request.estimated_value,
+          quantity: 1,
+        },
+      ],
+    });
+
     this.notifyStatusUpdate(request.request_code, request.status);
 
     return new BaseResponse(
@@ -370,27 +406,32 @@ export class TradeInService {
       );
     }
 
+    if (
+      dto.method === PayoutMethod.PERCENTAGE_VOUCHER &&
+      dto.finalValue > 100
+    ) {
+      throw new BadRequestException(
+        'Mức phần trăm quy đổi ưu đãi không được vượt quá 100%',
+      );
+    }
+
     request.status = TradeInStatus.COMPLETED;
     request.final_value = dto.finalValue;
     request.payout_method = dto.method;
 
     const now = new Date();
 
-    // Luồng cấp phát điểm thưởng
+    // 1. Luồng cấp phát điểm thưởng
     if (dto.method === PayoutMethod.REWARD_POINTS) {
-      request.payout_details = {
-        points_earned: dto.finalValue,
-      };
-
+      request.payout_details = { points_earned: dto.finalValue };
       await this.customerModel.updateOne(
         { _id: request.customer_id },
         { $inc: { 'loyalty.point': dto.finalValue } },
       );
     }
-    // Luồng cấp phát mã giảm giá
-    else if (dto.method === PayoutMethod.VOUCHER) {
+    // 2. Luồng cấp phát Voucher Fix Amount
+    else if (dto.method === PayoutMethod.FIXED_AMOUNT) {
       const voucherCode = `${TRADE_IN_CONFIG.VOUCHER_PREFIX}${Date.now()}`;
-
       const expiryDate = new Date(
         now.getTime() +
           TRADE_IN_CONFIG.VOUCHER_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
@@ -398,7 +439,7 @@ export class TradeInService {
 
       await this.couponModel.create({
         code: voucherCode,
-        description: `Store Credit từ đơn Trade-in ${request.request_code}`,
+        description: `Voucher Fixed Amount từ đơn Trade-in ${request.request_code}`,
         discount_type: DiscountType.FIXED_AMOUNT,
         discount_value: dto.finalValue,
         min_order_value: 0,
@@ -423,38 +464,24 @@ export class TradeInService {
         expiry_date: expiryDate.toISOString(),
       };
     }
-    // Luồng cấp phát ưu đãi dịch vụ
-    else if (dto.method === PayoutMethod.SERVICE_PROMOTION) {
-      const promotionCode = `${TRADE_IN_CONFIG.PROMOTION_PREFIX}${Date.now()}`;
+    // 3. Luồng cấp phát Percentage Voucher
+    else if (dto.method === PayoutMethod.PERCENTAGE_VOUCHER) {
+      if (dto.finalValue > 100 || dto.finalValue < 1) {
+        throw new BadRequestException(
+          'Giá trị Percentage Voucher chỉ được phép nằm trong khoảng từ 1% đến 100%',
+        );
+      }
 
+      const promotionCode = `${TRADE_IN_CONFIG.PROMOTION_PREFIX}${Date.now()}`;
       const expiryDate = new Date(
         now.getTime() +
           TRADE_IN_CONFIG.PROMOTION_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
       );
 
-      const serviceCategories = await this.categoryModel
-        .find({
-          slug: { $in: TRADE_IN_CONFIG.SERVICE_CATEGORY_SLUGS },
-        })
-        .select('_id')
-        .lean()
-        .exec();
-
-      const serviceCategoryIds: string[] = serviceCategories.map((cat) =>
-        cat._id.toString(),
-      );
-
-      // ngăn chặn việc cấp phát mã dịch vụ rỗng nếu truy vấn danh mục thất bại
-      if (serviceCategoryIds.length === 0) {
-        throw new BadRequestException(
-          'Không tìm thấy danh mục dịch vụ phù hợp trong hệ thống để tạo ưu đãi, quá trình bị từ chối.',
-        );
-      }
-
       await this.couponModel.create({
         code: promotionCode,
-        description: `Service Promotion từ đơn Trade-in ${request.request_code}`,
-        discount_type: 'PERCENTAGE',
+        description: `Percentage Voucher từ đơn Trade-in ${request.request_code}`,
+        discount_type: 'PERCENTAGE', // Tương đương DiscountType.PERCENTAGE
         discount_value: dto.finalValue,
         max_discount_amount: null,
         min_order_value: 0,
@@ -463,12 +490,12 @@ export class TradeInService {
         usage_limit: 1,
         usage_count: 0,
         user_usage_limit: 1,
-        status: 'ACTIVE',
+        status: 'ACTIVE', // Tương đương CouponStatus.ACTIVE
         is_stackable: false,
         owner_id: request.customer_id,
         applicable_scope: {
-          isAllProducts: false,
-          categories: serviceCategoryIds,
+          isAllProducts: true, // Áp dụng toàn sàn, không còn gò bó vào danh mục bảo dưỡng
+          categories: [],
           tags: [],
           products: [],
         },
@@ -488,7 +515,6 @@ export class TradeInService {
     });
 
     await request.save();
-
     this.notifyStatusUpdate(request.request_code, request.status);
 
     this.eventEmitter.emit('trade_in.completed', {
@@ -820,9 +846,11 @@ export class TradeInService {
       if (item.status === TradeInStatus.COMPLETED) {
         if (item.payout_method === PayoutMethod.REWARD_POINTS) {
           finalValueDisplay = `${item.final_value || 0} Điểm`;
-        } else if (item.payout_method === PayoutMethod.SERVICE_PROMOTION) {
+        } else if (item.payout_method === PayoutMethod.PERCENTAGE_VOUCHER) {
+          // Đã sửa tại đây
           finalValueDisplay = `Giảm ${item.final_value || 0}%`;
-        } else if (item.payout_method === PayoutMethod.VOUCHER) {
+        } else if (item.payout_method === PayoutMethod.FIXED_AMOUNT) {
+          // Đã sửa tại đây
           finalValueDisplay = `$${(item.final_value || 0).toFixed(2)}`;
         } else {
           finalValueDisplay = `${item.final_value || 0}`;
@@ -1006,5 +1034,43 @@ export class TradeInService {
       'Cập nhật nhận hàng thành công (Sandbox)',
       request,
     );
+  }
+
+  // Khối lắng nghe phản hồi ngược lại từ Module Kho
+  @OnEvent('trade_in.warehouse_received', { async: true })
+  async handleWarehouseReceived(requestCode: string) {
+    const request = await this.tradeInModel.findOne({
+      request_code: requestCode,
+    });
+    if (request && request.status === TradeInStatus.SHIPPING) {
+      request.status = TradeInStatus.RECEIVED;
+      request.timeline.push({
+        status: TradeInStatus.RECEIVED,
+        note: 'Hệ thống ghi nhận: Kho đã duyệt (Approve) nhận thiết bị Trade-in.',
+        timestamp: new Date(),
+      });
+      await request.save();
+      this.notifyStatusUpdate(request.request_code, request.status);
+    }
+  }
+
+  @OnEvent('trade_in.warehouse_rejected', { async: true })
+  async handleWarehouseRejected(payload: {
+    requestCode: string;
+    reason: string;
+  }) {
+    const request = await this.tradeInModel.findOne({
+      request_code: payload.requestCode,
+    });
+    if (request && request.status === TradeInStatus.SHIPPING) {
+      request.status = TradeInStatus.REJECTED;
+      request.timeline.push({
+        status: TradeInStatus.REJECTED,
+        note: `Hệ thống ghi nhận: Kho từ chối (Reject) thiết bị. Lý do: ${payload.reason}`,
+        timestamp: new Date(),
+      });
+      await request.save();
+      this.notifyStatusUpdate(request.request_code, request.status);
+    }
   }
 }

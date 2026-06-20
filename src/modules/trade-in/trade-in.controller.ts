@@ -20,6 +20,7 @@ import { RequirePermissions } from 'src/common/decorators/permissions.decorator'
 import { Resource, Action } from 'src/common/enums/resource.enum';
 import type { RequestWithUser } from 'src/common/interfaces/request-with-user.interface';
 import {
+  ApproveTradeInDto,
   CancelTradeInDto,
   CreateTradeInRequestDto,
   FinalizeTradeInDto,
@@ -77,8 +78,12 @@ export class TradeInController {
   @Patch('admin/request/:id/approve')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @RequirePermissions(Resource.TRADE_IN, Action.UPDATE)
-  async approveTradeIn(@Req() req: RequestWithUser, @Param('id') id: string) {
-    return this.tradeInService.approveTradeIn(req.user._id, id);
+  async approveTradeIn(
+    @Req() req: RequestWithUser,
+    @Param('id') id: string,
+    @Body() dto: ApproveTradeInDto,
+  ) {
+    return this.tradeInService.approveTradeIn(req.user._id, id, dto);
   }
 
   @Patch('admin/request/:id/reject')

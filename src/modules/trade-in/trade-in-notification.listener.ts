@@ -42,15 +42,12 @@ export class TradeInNotificationListener {
       requestCode,
     } = payload;
 
-    // --- LUỒNG 1: STORE CREDIT / VOUCHER ---
-    if (
-      payoutMethod === 'Store Credit / Voucher' &&
-      payoutDetails?.voucher_code
-    ) {
+    // Xử lý luồng gửi email cho phần thưởng là mã giảm giá cố định
+    if (payoutMethod === 'Fixed Amount' && payoutDetails?.voucher_code) {
       const voucherCode = payoutDetails.voucher_code;
-      const subject = `[H&N Odyssey] Hoàn tất Trade-in - Mã Voucher của bạn`;
+      const subject = `[H&N Odyssey] Hoàn tất Trade-in - Mã Giảm Giá Cố Định của bạn`;
 
-      const emailContent = TradeInEmailTemplates.buildVoucherTemplate(
+      const emailContent = TradeInEmailTemplates.buildFixedAmountTemplate(
         fullName,
         requestCode,
         finalValue,
@@ -59,11 +56,11 @@ export class TradeInNotificationListener {
 
       await this.emailService.sendRaw(email, subject, emailContent);
       this.logger.log(
-        `Đã gửi Email chứa mã Voucher ${voucherCode} cho khách hàng.`,
+        `Đã gửi Email chứa mã Voucher Fixed Amount ${voucherCode} cho khách hàng.`,
       );
     }
 
-    // --- LUỒNG 2: REWARD POINTS (ĐIỂM THƯỞNG) ---
+    // Xử lý luồng gửi email thông báo cộng điểm thưởng
     else if (payoutMethod === 'Reward Points') {
       const subject = `[H&N Odyssey] Hoàn tất Trade-in - Tài khoản được cộng điểm`;
 
@@ -79,15 +76,15 @@ export class TradeInNotificationListener {
       );
     }
 
-    // --- LUỒNG 3: SERVICE PROMOTION (ƯU ĐÃI DỊCH VỤ) ---
+    // Xử lý luồng gửi email cho phần thưởng là mã giảm giá theo phần trăm
     else if (
-      payoutMethod === 'Service Promotion' &&
+      payoutMethod === 'Percentage Voucher' &&
       payoutDetails?.voucher_code
     ) {
       const promoCode = payoutDetails.voucher_code;
-      const subject = `[H&N Odyssey] Hoàn tất Trade-in - Ưu đãi dịch vụ của bạn`;
+      const subject = `[H&N Odyssey] Hoàn tất Trade-in - Voucher Giảm Giá Phần Trăm của bạn`;
 
-      const emailContent = TradeInEmailTemplates.buildServicePromoTemplate(
+      const emailContent = TradeInEmailTemplates.buildPercentageVoucherTemplate(
         fullName,
         requestCode,
         finalValue,
@@ -96,16 +93,16 @@ export class TradeInNotificationListener {
 
       await this.emailService.sendRaw(email, subject, emailContent);
       this.logger.log(
-        `Đã gửi Email chứa mã Khuyến mãi dịch vụ ${promoCode} cho khách.`,
+        `Đã gửi Email chứa mã Percentage Voucher ${promoCode} cho khách.`,
       );
     }
   }
 
-  // --- LUỒNG 4: THÔNG BÁO TỪ CHỐI (REJECT) ---
+  // Xử lý luồng gửi email thông báo khi yêu cầu Trade-in bị từ chối
   @OnEvent('trade_in.rejected', { async: true })
   async handleTradeInRejectedEvent(payload: TradeInRejectedPayload) {
     this.logger.log(
-      `Đang chuẩn bị gửi thông báo TỪ CHỐI Trade-in cho ${payload.email}`,
+      `Đang chuẩn bị gửi thông báo từ chối Trade-in cho ${payload.email}`,
     );
 
     const subject = `[H&N Odyssey] Cập nhật trạng thái yêu cầu Trade-in #${payload.requestCode}`;
@@ -123,11 +120,7 @@ export class TradeInNotificationListener {
   }
 }
 
-/**
- * ============================================================================
- * TẦNG QUẢN LÝ GIAO DIỆN EMAIL (UI TEMPLATES)
- * ============================================================================
- */
+// Lớp chứa các hàm hỗ trợ render giao diện HTML cho email thông báo
 class TradeInEmailTemplates {
   private static getHeader(): string {
     return `
@@ -180,7 +173,7 @@ class TradeInEmailTemplates {
     `;
   }
 
-  public static buildVoucherTemplate(
+  public static buildFixedAmountTemplate(
     fullName: string,
     requestCode: string,
     value: number,
@@ -190,10 +183,10 @@ class TradeInEmailTemplates {
       ${this.getHeader()}
       <h2 style="margin: 0 0 16px 0; color: #0f172a; font-size: 20px; font-weight: 700;">Xin chào ${fullName},</h2>
       <p style="margin: 0 0 20px 0; font-size: 15px; color: #475569; line-height: 1.6;">
-        Yêu cầu Trade-in <strong style="color: #0f172a;">#${requestCode}</strong> của bạn đã được hoàn tất quá trình kiểm định chất lượng nghiêm ngặt thành công.
+        Yêu cầu Trade-in <strong style="color: #0f172a;">#${requestCode}</strong> của bạn đã được hoàn tất thủ tục kiểm định thành công.
       </p>
       <p style="margin: 0 0 24px 0; font-size: 15px; color: #475569;">
-        Trị giá thu đổi được chốt chính thức là: <span style="color: #2563eb; font-size: 20px; font-weight: 700;">$${value}</span>
+        Trị giá mã giảm giá cố định được chốt là: <span style="color: #2563eb; font-size: 20px; font-weight: 700;">$${value}</span>
       </p>
       
       <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; margin-bottom: 24px;">
@@ -206,14 +199,14 @@ class TradeInEmailTemplates {
       </table>
       
       <p style="margin: 0 0 28px 0; font-size: 13px; color: #64748b; line-height: 1.5;">
-        * Mã voucher này được sử dụng trực tiếp tại phân đoạn điền mã ưu đãi thuộc trang thanh toán cho các đơn hàng tiếp theo trên hệ thống trực tuyến.
+        * Mã giảm giá này được sử dụng trực tiếp tại trang thanh toán cho các đơn hàng tiếp theo trên hệ thống.
       </p>
       
       <table role="presentation" style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
         <tr>
           <td align="center">
             <a href="https://hnodyssey.vn/shop" target="_blank" style="display: inline-block; background-color: #10b981; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; padding: 12px 32px; border-radius: 6px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2);">
-              Sử Dụng Khảo Sát Đồ Mới Ngay
+              Mua Sắm Ngay
             </a>
           </td>
         </tr>
@@ -260,7 +253,7 @@ class TradeInEmailTemplates {
     `;
   }
 
-  public static buildServicePromoTemplate(
+  public static buildPercentageVoucherTemplate(
     fullName: string,
     requestCode: string,
     value: number,
@@ -270,30 +263,30 @@ class TradeInEmailTemplates {
       ${this.getHeader()}
       <h2 style="margin: 0 0 16px 0; color: #0f172a; font-size: 20px; font-weight: 700;">Xin chào ${fullName},</h2>
       <p style="margin: 0 0 20px 0; font-size: 15px; color: #475569; line-height: 1.6;">
-        Yêu cầu Trade-in <strong style="color: #0f172a;">#${requestCode}</strong> của bạn đã được quy đổi thành giá trị Ưu đãi dịch vụ theo mong muốn.
+        Yêu cầu Trade-in <strong style="color: #0f172a;">#${requestCode}</strong> của bạn đã được quy đổi thành Percentage Voucher (Voucher phần trăm) thành công.
       </p>
       <p style="margin: 0 0 24px 0; font-size: 15px; color: #475569;">
-        Trị giá gói ưu đãi đặc biệt: <span style="color: #dc2626; font-size: 20px; font-weight: 700;">Giảm giá ${value}%</span>
+        Mức ưu đãi giảm giá: <span style="color: #dc2626; font-size: 20px; font-weight: 700;">Giảm ${value}%</span>
       </p>
       
       <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #fff5f5; border: 1px dashed #fca5a5; border-radius: 8px; margin-bottom: 24px;">
         <tr>
           <td style="padding: 24px; text-align: center;">
-            <p style="margin: 0 0 6px 0; color: #991b1b; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;">MÃ DỊCH VỤ CỦA BẠN</p>
+            <p style="margin: 0 0 6px 0; color: #991b1b; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;">MÃ GIẢM GIÁ CỦA BẠN</p>
             <p style="margin: 0; font-size: 26px; font-weight: 800; color: #b91c1c; letter-spacing: 3px; font-family: 'Courier New', Courier, monospace;">${promoCode}</p>
           </td>
         </tr>
       </table>
       
       <p style="margin: 0 0 28px 0; font-size: 13px; color: #64748b; line-height: 1.5;">
-        * Khuyến nghị đặc biệt: Mã ưu đãi áp dụng duy nhất cho các hóa đơn liên quan đến hạng mục <strong>Dịch vụ Bảo dưỡng, Vệ sinh sâu hoặc Sửa chữa tối ưu hóa</strong> các trang bị cắm trại/dã ngoại chuyên sâu thuộc chuỗi trung tâm H&N Odyssey.
+        * Mã giảm giá phần trăm áp dụng cho toàn bộ các sản phẩm trên hệ thống H&N Odyssey. Vui lòng nhập mã tại trang thanh toán.
       </p>
       
       <table role="presentation" style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
         <tr>
           <td align="center">
-            <a href="https://hnodyssey.vn/services/booking" target="_blank" style="display: inline-block; background-color: #dc2626; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; padding: 12px 32px; border-radius: 6px; box-shadow: 0 4px 6px rgba(220, 38, 38, 0.2);">
-              Đặt Lịch Bảo Dưỡng Ngay
+            <a href="https://hnodyssey.vn/shop" target="_blank" style="display: inline-block; background-color: #dc2626; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; padding: 12px 32px; border-radius: 6px; box-shadow: 0 4px 6px rgba(220, 38, 38, 0.2);">
+              Sử Dụng Khuyến Mãi Ngay
             </a>
           </td>
         </tr>
@@ -302,9 +295,7 @@ class TradeInEmailTemplates {
     `;
   }
 
-  /**
-   * Template hoàn chỉnh cho luồng thông báo TỪ CHỐI yêu cầu Trade-in
-   */
+  // Khởi tạo template email cho luồng thông báo từ chối yêu cầu Trade-in
   public static buildRejectTemplate(
     fullName: string,
     requestCode: string,

@@ -9,9 +9,9 @@ export enum TradeInStatus {
 }
 
 export enum PayoutMethod {
-  VOUCHER = 'Store Credit / Voucher',
+  PERCENTAGE_VOUCHER = 'Percentage Voucher',
   REWARD_POINTS = 'Reward Points',
-  SERVICE_PROMOTION = 'Service Promotion',
+  FIXED_AMOUNT = 'Fixed Amount',
 }
 
 export enum EvaluationMethod {

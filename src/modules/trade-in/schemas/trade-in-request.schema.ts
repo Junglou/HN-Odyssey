@@ -99,7 +99,8 @@ export class TradeInRequest {
   @Prop()
   rma_order_code?: string;
 
-  @Prop({ enum: PayoutMethod, default: PayoutMethod.VOUCHER })
+  // Cập nhật giá trị default bằng Enum mới đang có trong hệ thống
+  @Prop({ enum: PayoutMethod, default: PayoutMethod.PERCENTAGE_VOUCHER })
   payout_method: PayoutMethod;
 
   @Prop({ type: Object })

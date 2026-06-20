@@ -141,7 +141,10 @@ export class OrdersService {
     }
 
     // GIAI ĐOẠN 2: MATCH VÀ PHIÊN DỊCH STATUS (FE -> BE)
-    const matchStage: FilterQuery<Order> = { status: { $ne: 'TEMPORARY' } };
+    const matchStage: FilterQuery<Order> = {
+      status: { $ne: 'TEMPORARY' },
+      'payment.method': { $ne: 'TRADE-IN' },
+    };
 
     if (status && status !== 'all') {
       const upperStatus = status.toUpperCase();
@@ -2268,6 +2271,16 @@ export class OrdersService {
       return;
     }
 
+    if (
+      order.payment?.method === 'TRADE-IN' ||
+      order.status === 'TRADE_IN_REVIEW'
+    ) {
+      this.logger.log(
+        `Webhook: Bỏ qua tự động cập nhật GHN cho đơn Trade-in ảo ${waybillCode}`,
+      );
+      return;
+    }
+
     // Fix lỗi no-unsafe-enum-comparison bằng cách ép về string khi so sánh
     if (String(order.status) === String(status)) return;
 
@@ -2305,7 +2318,10 @@ export class OrdersService {
 
   // HÀM DÀNH RIÊNG CHO CHATBOT TRA CỨU
   async findForChatbot(orderCode?: string, phone?: string) {
-    const query: FilterQuery<OrderDocument> = { status: { $ne: 'TEMPORARY' } };
+    const query: FilterQuery<OrderDocument> = {
+      status: { $ne: 'TEMPORARY' },
+      'payment.method': { $ne: 'TRADE-IN' },
+    };
 
     if (orderCode) {
       // Tìm bằng Regex cực kỳ chính xác và không quan tâm hoa thường

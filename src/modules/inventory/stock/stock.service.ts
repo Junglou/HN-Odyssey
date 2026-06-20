@@ -509,6 +509,42 @@ export class StockService {
         if (order.status === 'CANCELLED')
           throw new Error('Đơn hàng đã bị hủy (AC4)');
 
+        const isTradeIn = order.status === 'TRADE_IN_REVIEW';
+        if (isTradeIn) {
+          // Chỉ duyệt chuyển trạng thái xác nhận kho đã nhận hàng (Approve Request Queue), không can thiệp số lượng kho
+          order.status = 'COMPLETED';
+          order.timeline.push({
+            status: order.status,
+            timestamp: new Date(),
+            actor: validActorIdStr,
+            note: 'Nhân viên kho đã xác nhận nhận thiết bị Trade-in thành công. Chờ thẩm định thủ công.',
+          });
+          await order.save();
+
+          // Bắn tín hiệu sang bên Module Trade-In
+          this.eventEmitter.emit(
+            'trade_in.warehouse_received',
+            order.order_code,
+          );
+
+          await this.auditLogsService.log({
+            action: 'ACCEPT_TRADE_IN_IMPORT',
+            collection_name: Resource.TRANSFERS,
+            actor_id: validActorIdStr,
+            target_id: order._id.toString(),
+            department: Department.WAREHOUSE,
+            detail: {
+              order_code: String(order.order_code),
+              message: `Duyệt nhận hàng Trade-in thành công.`,
+            },
+            ip,
+            user_agent: userAgent,
+          });
+
+          results.success++;
+          continue; // Bỏ qua toàn bộ luồng xử lý Transaction và Stock bên dưới để kho xử lý bằng ticket thủ công sau
+        }
+
         // Phân loại luồng xử lý dựa trên trạng thái đơn hàng
         const isExport = ['PENDING', 'CONFIRMED'].includes(order.status);
         const isImport = ['RETURNED', 'TRADE_IN_REVIEW'].includes(order.status);
@@ -726,18 +762,43 @@ export class StockService {
     if (product.has_variants) {
       queryFilter['variants.sku'] = sku;
       queryFilter['$or'] = [
-        // Sửa lại logic: Tổng kho trừ đi số đang hold phải >= quantity mới cho mua
         {
           $expr: {
             $gte: [
-              { $subtract: ['$variants.stock', '$variants.stock_on_hold'] },
+              {
+                $let: {
+                  vars: {
+                    // Lọc mảng variants để lấy đúng object có sku trùng khớp
+                    matchedVariant: {
+                      $arrayElemAt: [
+                        {
+                          $filter: {
+                            input: '$variants',
+                            as: 'v',
+                            cond: { $eq: ['$$v.sku', sku] },
+                          },
+                        },
+                        0,
+                      ],
+                    },
+                  },
+                  in: {
+                    // Thực hiện phép trừ trên object đã lọc
+                    $subtract: [
+                      { $ifNull: ['$$matchedVariant.stock', 0] },
+                      { $ifNull: ['$$matchedVariant.stock_on_hold', 0] },
+                    ],
+                  },
+                },
+              },
               quantity,
             ],
           },
         },
         { allow_backorder: true },
       ];
-      // [FIX QUAN TRỌNG]: Chỉ giữ hàng, KHÔNG TRỪ STOCK TỔNG
+
+      // Chỉ giữ hàng, KHÔNG TRỪ STOCK TỔNG
       update = {
         $inc: {
           'variants.$.stock_on_hold': quantity,
@@ -747,12 +808,22 @@ export class StockService {
       queryFilter['$or'] = [
         {
           $expr: {
-            $gte: [{ $subtract: ['$stock', '$stock_on_hold'] }, quantity],
+            $gte: [
+              {
+                // Thêm $ifNull để tránh lỗi khi stock_on_hold bị null/undefined
+                $subtract: [
+                  { $ifNull: ['$stock', 0] },
+                  { $ifNull: ['$stock_on_hold', 0] },
+                ],
+              },
+              quantity,
+            ],
           },
         },
         { allow_backorder: true },
       ];
-      // [FIX QUAN TRỌNG]: Chỉ giữ hàng, KHÔNG TRỪ STOCK TỔNG
+
+      // Chỉ giữ hàng, KHÔNG TRỪ STOCK TỔNG
       update = {
         $inc: {
           stock_on_hold: quantity,
@@ -1000,6 +1071,25 @@ export class StockService {
       : SYSTEM_CONSTANTS.SYSTEM_ACTOR_ID;
 
     if (!order) throw new BadRequestException('Đơn hàng không tồn tại');
+
+    const isTradeIn = order.status === 'TRADE_IN_REVIEW';
+    if (isTradeIn) {
+      order.status = 'CANCELLED';
+      order.timeline.push({
+        status: 'CANCELLED',
+        timestamp: new Date(),
+        actor: validActorIdStr,
+        note: `Kho từ chối nhận thiết bị Trade-in. Lý do: ${reason}`,
+      });
+      await order.save();
+
+      this.eventEmitter.emit('trade_in.warehouse_rejected', {
+        requestCode: order.order_code,
+        reason: reason,
+      });
+
+      return { success: true, message: 'Đã từ chối đơn Trade-in' };
+    }
 
     order.status = 'ON_HOLD';
     order.timeline.push({
