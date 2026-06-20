@@ -11,6 +11,46 @@ import { mapCustomerOrderDetailFromApi } from "../../utils/mapCustomerOrder";
 import tokenStorage from "../../utils/tokenStorage";
 import type { RecommendProduct } from "./useRecommendProduct";
 
+interface TradeInHistoryDetail {
+  _id: string;
+  request_code: string;
+  product_name?: string;
+  status: string;
+  final_value?: number;
+  estimated_value?: number;
+  media_urls?: string[];
+  createdAt: string;
+  updatedAt?: string;
+  category_id?: { _id: string };
+  payout_method?: string;
+  payout_details?: { voucher_code?: string };
+  full_name?: string;
+  phone_number?: string;
+  shipping_address?: { street_address?: string; city?: string };
+  rma_order_code?: string;
+  timeline?: { status: string; timestamp: string; note?: string }[];
+}
+
+const mapTradeInToOrderStatus = (tradeInStatus: string): string => {
+  switch (tradeInStatus) {
+    case "Pending":
+      return "PENDING";
+    case "Approved":
+      return "CONFIRMED";
+    case "Shipping":
+      return "SHIPPING";
+    case "Received":
+      return "PROCESSING";
+    case "Completed":
+      return "COMPLETED";
+    case "Rejected":
+    case "Cancelled":
+      return "CANCELLED";
+    default:
+      return "PENDING";
+  }
+};
+
 const getErrorMessage = (error: unknown, fallback: string): string => {
   if (axios.isAxiosError(error)) {
     return (
@@ -54,16 +94,94 @@ async function loadCustomerOrderDetail(
     return null;
   }
 
-  const res = await axiosClient.get<CustomerOrderDetailResponse>(
-    `/users/customers/orders/${encodeURIComponent(id)}`,
-  );
+  try {
+    const res = await axiosClient.get<CustomerOrderDetailResponse>(
+      `/users/customers/orders/${encodeURIComponent(id)}`,
+    );
 
-  const raw = extractOrderDetailFromResponse(res.data);
-  if (!raw) {
-    return null;
+    const raw = extractOrderDetailFromResponse(res.data);
+    if (raw) {
+      // BỨC TƯỜNG LỬA BẢO VỆ TRANG CHI TIẾT: Ném lỗi ép rẽ nhánh nếu dính Đơn Ảo
+      if (
+        raw.payment?.method === "TRADE-IN" ||
+        raw.order_code.startsWith("TRD")
+      ) {
+        throw new Error("SHADOW_ORDER_DETECTED");
+      }
+      return mapCustomerOrderDetailFromApi(raw);
+    }
+  } catch (error: unknown) {
+    // Nếu API Đơn hàng thông thường trả 404 hoặc bị tường lửa chặn thì tiếp tục kiểm tra Trade-in
+    const axiosErr = error as {
+      response?: { status?: number };
+      message?: string;
+    };
+    if (
+      axiosErr?.response?.status !== 404 &&
+      axiosErr?.response?.status !== 400 &&
+      axiosErr?.message !== "SHADOW_ORDER_DETECTED"
+    ) {
+      console.warn("Lỗi fetch đơn thông thường:", error);
+    }
   }
 
-  return mapCustomerOrderDetailFromApi(raw);
+  // Fallback: Tìm đơn ở nhánh Lịch sử Trade-in (Đã gỡ bỏ try/catch rỗng để fix lỗi Eslint no-useless-catch)
+  const res = await axiosClient.get<{ data: TradeInHistoryDetail }>(
+    `/trade-in/history/${encodeURIComponent(id)}`,
+  );
+
+  const tradeIn = res.data?.data || res.data;
+  if (tradeIn && tradeIn.request_code) {
+    const fakeDetail: CustomerOrderDetail = {
+      _id: tradeIn._id,
+      order_code: `[Trade-In] ${tradeIn.request_code}`,
+      isGuest: false,
+      items: [
+        {
+          // FIX LỖI ALGOLIA: Để chuỗi rỗng thay vì nhét category_id vào, các Hook AI sẽ tự động bỏ qua không gọi API nữa
+          product_id: "",
+          sku: "TRADE-IN",
+          product_name: tradeIn.product_name || "Thiết bị Trade-in",
+          price: tradeIn.final_value || tradeIn.estimated_value || 0,
+          quantity: 1,
+          image: tradeIn.media_urls?.[0] || "",
+        },
+      ],
+      payment: {
+        method: tradeIn.payout_method || "Thu cũ đổi mới",
+        status: tradeIn.status === "Completed" ? "PAID" : "PENDING",
+      },
+      total_amount: tradeIn.final_value || tradeIn.estimated_value || 0,
+      status: mapTradeInToOrderStatus(tradeIn.status),
+      discount_amount: 0,
+      voucher_code: tradeIn.payout_details?.voucher_code || "",
+      shipping_info: {
+        name: tradeIn.full_name || "",
+        phone: tradeIn.phone_number || "",
+        address: tradeIn.shipping_address
+          ? `${tradeIn.shipping_address.street_address}, ${tradeIn.shipping_address.city}`
+          : "Giao dịch tại cửa hàng",
+        district_code: "",
+        ward_code: "",
+        city_code: "",
+      },
+      waybill_code: tradeIn.rma_order_code || "",
+      actual_shipping_fee: 0,
+      timeline: (tradeIn.timeline || []).map((tl) => ({
+        status: mapTradeInToOrderStatus(tl.status),
+        timestamp: tl.timestamp,
+        actor: "Hệ thống",
+        note: tl.note,
+      })),
+      print_count: 0,
+      points_used: 0,
+      createdAt: tradeIn.createdAt,
+      updatedAt: tradeIn.updatedAt || tradeIn.createdAt,
+    };
+    return mapCustomerOrderDetailFromApi(fakeDetail);
+  }
+
+  return null;
 }
 
 export function useOrderDetail(orderId: string) {
@@ -133,9 +251,7 @@ export function useOrderDetail(orderId: string) {
   };
 }
 
-// ============================================
-// CÁC HOOK GỌI AI MODEL TRONG CHI TIẾT ĐƠN HÀNG
-// ============================================
+// CÁC HOOK GỌI AI MODEL TRONG CHI TIẾT ĐƠN HÀNG (Giữ nguyên)
 
 export function useOrderFBT(productId?: string) {
   const [fbtProducts, setFbtProducts] = useState<RecommendProduct[]>([]);

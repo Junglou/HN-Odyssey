@@ -15,12 +15,8 @@ interface FinalizeValueModalProps {
   ) => void;
 }
 
-// options
-const PAYOUT_METHODS = [
-  "Store Credit / Voucher",
-  "Reward Points",
-  "Service Promotion",
-];
+// options cập nhật theo Enum hệ thống
+const PAYOUT_METHODS = ["Percentage Voucher", "Reward Points", "Fixed Amount"];
 
 // component
 export default function FinalizeValueModal({
@@ -30,8 +26,8 @@ export default function FinalizeValueModal({
   onConfirm,
 }: FinalizeValueModalProps) {
   // states
+  const [method, setMethod] = useState("");
   const [finalValue, setFinalValue] = useState<number | "">("");
-  const [method, setMethod] = useState(PAYOUT_METHODS[0]);
   const [note, setNote] = useState("");
 
   const [prevIsOpen, setPrevIsOpen] = useState(false);
@@ -43,8 +39,8 @@ export default function FinalizeValueModal({
   if (isOpen !== prevIsOpen) {
     setPrevIsOpen(isOpen);
     if (isOpen) {
+      setMethod("");
       setFinalValue("");
-      setMethod(PAYOUT_METHODS[0]);
       setNote("");
       setIsDropdownOpen(false);
       setHasDropdownOpened(false);
@@ -69,9 +65,28 @@ export default function FinalizeValueModal({
 
   if (!isOpen || !tradeInId) return null;
 
-  // Validation: Giá trị phải > 0 và bắt buộc có ghi chú thẩm định (BR5)
+  // Validation: bắt buộc chọn Method, Value > 0, nếu Percentage Value <= 100
   const isFormValid =
-    finalValue !== "" && Number(finalValue) > 0 && note.trim() !== "";
+    method !== "" &&
+    finalValue !== "" &&
+    Number(finalValue) > 0 &&
+    (method !== "Percentage Voucher" || Number(finalValue) <= 100) &&
+    note.trim() !== "";
+
+  // logic: Đổi nhãn động theo phương thức thanh toán
+  const getValueLabel = () => {
+    if (method === "Percentage Voucher") return "Discount Percentage (%)";
+    if (method === "Reward Points") return "Reward Points Amount";
+    if (method === "Fixed Amount") return "Fixed Voucher Amount ($)";
+    return "Final Assessed Value";
+  };
+
+  const getValuePlaceholder = () => {
+    if (method === "Percentage Voucher") return "Ex: 10, 20 (Max 100)...";
+    if (method === "Reward Points") return "Ex: 500, 1000...";
+    if (method === "Fixed Amount") return "Ex: 50, 100...";
+    return "Enter final value...";
+  };
 
   return (
     <div className="fvm-overlay">
@@ -81,25 +96,11 @@ export default function FinalizeValueModal({
         </div>
 
         <div className="fvm-body">
-          {/* Final Assessed Value */}
+          {/* Payout Method (Hiển thị đầu tiên) */}
           <div>
             <label className="fvm-label">
-              Final Assessed Value ($) <span className="fvm-required">*</span>
+              Payout Method <span className="fvm-required">*</span>
             </label>
-            <input
-              type="number"
-              className="fvm-input"
-              placeholder="Enter final value after inspection..."
-              value={finalValue}
-              onChange={(e) => setFinalValue(Number(e.target.value) || "")}
-              autoFocus
-              min="0"
-            />
-          </div>
-
-          {/* Payout Method */}
-          <div>
-            <label className="fvm-label">Payout Method</label>
             <div className="fvm-custom-dropdown" ref={dropdownRef}>
               <div
                 className={`fvm-dropdown-trigger ${isDropdownOpen ? "active" : ""}`}
@@ -108,7 +109,9 @@ export default function FinalizeValueModal({
                   if (!hasDropdownOpened) setHasDropdownOpened(true);
                 }}
               >
-                <span>{method}</span>
+                <span style={{ color: method ? "#111827" : "#6b7280" }}>
+                  {method || "Select Payout Method..."}
+                </span>
                 <div
                   className={`fvm-dropdown-arrow ${isDropdownOpen ? "open" : ""}`}
                 >
@@ -125,6 +128,7 @@ export default function FinalizeValueModal({
                     className={`fvm-dropdown-option ${method === m ? "selected" : ""}`}
                     onClick={() => {
                       setMethod(m);
+                      setFinalValue(""); // Khởi tạo lại Input tránh lưu đè sai logic max value
                       setIsDropdownOpen(false);
                     }}
                   >
@@ -134,6 +138,32 @@ export default function FinalizeValueModal({
               </div>
             </div>
           </div>
+
+          {/* Final Assessed Value - Bị ẩn cho đến khi chọn Payout Method */}
+          {method && (
+            <div style={{ animation: "fadeIn 0.2s ease-out" }}>
+              <label className="fvm-label">
+                {getValueLabel()} <span className="fvm-required">*</span>
+              </label>
+              <input
+                type="number"
+                className="fvm-input"
+                placeholder={getValuePlaceholder()}
+                value={finalValue}
+                onChange={(e) => {
+                  let val = Number(e.target.value);
+                  // Giới hạn trực tiếp tại ô input nếu chọn quy đổi %
+                  if (method === "Percentage Voucher" && val > 100) {
+                    val = 100;
+                  }
+                  setFinalValue(val || "");
+                }}
+                autoFocus
+                min="0"
+                max={method === "Percentage Voucher" ? "100" : undefined}
+              />
+            </div>
+          )}
 
           {/* Inspection Note */}
           <div>

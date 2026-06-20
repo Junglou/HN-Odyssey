@@ -276,11 +276,11 @@ export function useTradeInManagement() {
     switch (feMethod) {
       case "Reward Points":
         return "Reward Points";
-      case "Service Promotion":
-        return "Service Promotion";
-      case "Store Credit / Voucher":
+      case "Fixed Amount":
+        return "Fixed Amount";
+      case "Percentage Voucher":
       default:
-        return "Store Credit / Voucher";
+        return "Percentage Voucher";
     }
   };
 

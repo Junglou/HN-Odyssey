@@ -22,6 +22,17 @@ export type OrderStatusFE =
   | "Delivered"
   | "Canceled";
 
+interface TradeInHistoryItem {
+  _id: string;
+  request_code: string;
+  product_name?: string;
+  status: string;
+  final_value?: number;
+  estimated_value?: number;
+  media_urls?: string[];
+  createdAt: string;
+}
+
 const mapStatusFilterToApi = (
   status: OrderStatusFE,
 ): CustomerOrderListStatusFilter => {
@@ -33,6 +44,47 @@ const mapStatusFilterToApi = (
     Canceled: "CANCELED",
   };
   return map[status];
+};
+
+const mapTradeInToOrderStatus = (tradeInStatus: string): string => {
+  switch (tradeInStatus) {
+    case "Pending":
+      return "PENDING";
+    case "Approved":
+      return "CONFIRMED";
+    case "Shipping":
+      return "SHIPPING";
+    case "Received":
+      return "PROCESSING";
+    case "Completed":
+      return "COMPLETED";
+    case "Rejected":
+    case "Cancelled":
+      return "CANCELLED";
+    default:
+      return "PENDING";
+  }
+};
+
+const doesTradeInMatchFilter = (
+  tradeInStatus: string,
+  filter: OrderStatusFE | "All",
+) => {
+  if (filter === "All") return true;
+  switch (filter) {
+    case "Pending":
+      return tradeInStatus === "Pending";
+    case "Processing":
+      return tradeInStatus === "Approved" || tradeInStatus === "Received";
+    case "Delivering":
+      return tradeInStatus === "Shipping";
+    case "Delivered":
+      return tradeInStatus === "Completed";
+    case "Canceled":
+      return tradeInStatus === "Rejected" || tradeInStatus === "Cancelled";
+    default:
+      return true;
+  }
 };
 
 const getErrorMessage = (error: unknown, fallback: string): string => {
@@ -67,8 +119,8 @@ async function loadCustomerOrders(
   }
 
   const params: CustomerOrdersListQuery = {
-    page,
-    limit,
+    page: 1,
+    limit: 1000,
   };
 
   if (search.trim()) {
@@ -79,30 +131,87 @@ async function loadCustomerOrders(
     params.status = mapStatusFilterToApi(statusFilter);
   }
 
-  const res = await axiosClient.get<CustomerOrdersListResponse>(
-    "/users/customers/orders",
-    { params },
-  );
+  const [ordersRes, tradeInsRes] = await Promise.all([
+    axiosClient
+      .get<CustomerOrdersListResponse>("/users/customers/orders", { params })
+      .catch(() => null),
+    axiosClient
+      .get<{ data: TradeInHistoryItem[] }>("/trade-in/history")
+      .catch(() => null),
+  ]);
 
-  const payload = res.data ?? {
+  const payload = ordersRes?.data ?? {
     data: [],
     meta: { total: 0, page: 1, limit, total_pages: 0 },
   };
-  const mapped = (payload.data ?? []).map(mapCustomerOrderFromApi);
-  const totalCount = payload.meta?.total ?? 0;
-  const maxPage = totalCount > 0 ? Math.ceil(totalCount / limit) : 1;
+
+  // BỨC TƯỜNG LỬA: Lọc ngay từ dữ liệu thô (raw data) của API trước khi map
+  // Đơn thô (CustomerOrderListItem) có trường order_code. Ta sẽ loại bỏ các đơn ảo bắt đầu bằng "TRD"
+  const rawOrders = payload.data ?? [];
+  const validRawOrders = rawOrders.filter(
+    (raw) => raw.order_code && !raw.order_code.startsWith("TRD"),
+  );
+
+  let standardOrders = validRawOrders.map(mapCustomerOrderFromApi);
+
+  let tradeIns = tradeInsRes?.data?.data || [];
+
+  if (Array.isArray(tradeIns) && tradeIns.length > 0) {
+    if (search.trim()) {
+      const kw = search.trim().toLowerCase();
+      tradeIns = tradeIns.filter(
+        (t) =>
+          (t.request_code && t.request_code.toLowerCase().includes(kw)) ||
+          (t.product_name && t.product_name.toLowerCase().includes(kw)),
+      );
+    }
+
+    if (statusFilter !== "All") {
+      tradeIns = tradeIns.filter((t) =>
+        doesTradeInMatchFilter(t.status, statusFilter),
+      );
+    }
+
+    // Map dữ liệu Trade-in thật về form Đơn hàng thông thường
+    const mappedTradeIns = tradeIns.map((t) => {
+      return mapCustomerOrderFromApi({
+        _id: t._id,
+        order_code: `[Trade-In] ${t.request_code}`,
+        createdAt: t.createdAt,
+        total_amount: t.final_value || t.estimated_value || 0,
+        status: mapTradeInToOrderStatus(t.status),
+        summary: {
+          image: t.media_urls?.[0] || "",
+          name: t.product_name || "Thiết bị Trade-in",
+          remaining_count: 0,
+        },
+      });
+    });
+
+    standardOrders = [...standardOrders, ...mappedTradeIns];
+  }
+
+  // Sort gộp (Mới nhất lên đầu)
+  standardOrders.sort(
+    (a, b) =>
+      new Date(b.createdAt || 0).getTime() -
+      new Date(a.createdAt || 0).getTime(),
+  );
+
+  const totalFiltered = standardOrders.length;
+  const maxPage = totalFiltered > 0 ? Math.ceil(totalFiltered / limit) : 1;
+  const safePage = clampPaginationPage(page, maxPage);
+
+  const startIndex = (safePage - 1) * limit;
+  const paginatedOrders = standardOrders.slice(startIndex, startIndex + limit);
 
   return {
-    orders: mapped,
-    totalFiltered: totalCount,
-    safePage: clampPaginationPage(page, maxPage),
+    orders: paginatedOrders,
+    totalFiltered,
+    safePage,
   };
 }
 
-/**
- * Loads the logged-in customer's orders via
- * `GET /users/customers/orders` (scoped by JWT + CUSTOMER role on backend).
- */
 export function useOrderManagement() {
   const [orders, setOrders] = useState<UserOrder[]>([]);
   const [loading, setLoading] = useState(false);
