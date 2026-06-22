@@ -423,21 +423,15 @@
   margin-top: clamp(4px, 0.8vw, 12px);
 }
 
-/* phần phản hồi của admin (Đã đồng bộ thiết kế Minimalist) */
+/* dinh dang khung phan hoi chung */
 .pdp-review-reply {
-  margin-top: clamp(12px, 1.5vw, 16px);
-  padding: clamp(12px, 1.5vw, 16px);
-  background-color: rgba(
-    0,
-    0,
-    0,
-    0.03
-  ); /* Nền xám cực nhạt để tách biệt nhẹ nhàng */
-  border: 1px solid rgba(0, 0, 0, 0.1); /* Viền mỏng đồng bộ với thẻ card bên ngoài */
+  margin-top: clamp(10px, 1.2vw, 14px);
+  padding: clamp(10px, 1.2vw, 14px);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
-  gap: clamp(6px, 0.8vw, 10px);
+  gap: 8px;
+  border-left: 3px solid transparent;
 }
 
 .pdp-review-reply-header {
@@ -456,7 +450,7 @@
 
 .pdp-review-reply-date {
   font-size: clamp(12px, 0.9vw, 14px);
-  color: rgba(0, 0, 0, 0.4); /* Đồng bộ màu text phụ của hệ thống */
+  color: rgba(0, 0, 0, 0.4);
 }
 
 .pdp-review-reply-content {
@@ -464,4 +458,282 @@
   font-size: clamp(13px, 1vw, 15px);
   color: #111827;
   line-height: 1.5;
+}
+
+/* dinh dang phan hoi tu khach hang */
+.pdp-review-reply--customer {
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.pdp-review-reply--customer .pdp-review-reply-name {
+  color: #4b5563;
+  font-weight: 500;
+}
+
+/* dinh dang phan hoi tu quan tri vien */
+.pdp-review-reply--admin {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-left-color: #000000;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.pdp-review-reply--admin .pdp-review-reply-name {
+  color: #000000;
+  font-weight: 700;
+}
+
+.pdp-review-reply--admin .pdp-review-reply-content {
+  font-weight: 500;
+  color: #000000;
+}
+
+/* thao tac nut bam phan hoi cua khach hang */
+.pdp-reply-action-btn {
+  background: none;
+  border: none;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 10px;
+}
+
+.pdp-reply-action-btn:hover {
+  color: #000;
+  text-decoration: underline;
+}
+
+/* khung nhap lieu phan hoi */
+.pdp-reply-input-box {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid #e5e7eb;
+  padding: 10px;
+  border-radius: 8px;
+  background: #ffffff;
+  position: relative; /* Dung de neo bang Emoji Picker */
+}
+
+.pdp-reply-input-box textarea {
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.pdp-reply-input-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: 8px;
+  gap: 8px;
+}
+
+.pdp-reply-action-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.pdp-reply-action-right {
+  display: flex;
+  gap: 8px;
+}
+
+/* khu vuc tai anh va video */
+.pdp-form-media-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.pdp-upload-btn {
+  align-self: flex-start;
+  padding: 6px 14px;
+  background: #f3f4f6;
+  border: 1px dashed #9ca3af;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.pdp-upload-btn:hover {
+  background: #e5e7eb;
+  border-color: #6b7280;
+}
+
+.pdp-upload-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pdp-media-preview-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pdp-media-preview-item {
+  width: 60px;
+  height: 60px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #d1d5db;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.pdp-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Custom Buttons Emoji & Image */
+.pdp-icon-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.pdp-icon-action-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.pdp-icon-action-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pdp-action-buttons-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+/* Emoji Picker Wrapper */
+.pdp-emoji-picker-wrapper {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 0;
+  z-index: 50;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  background: #fff;
+}
+
+/* FIX XUNG DOT CSS CHO EMOJI PICKER */
+.pdp-emoji-picker-wrapper .EmojiPickerReact svg {
+  display: block;
+  vertical-align: baseline;
+}
+
+.pdp-emoji-picker-wrapper .EmojiPickerReact button {
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  border-radius: 0;
+  min-width: auto;
+  min-height: auto;
+  line-height: normal;
+}
+
+.pdp-emoji-picker-wrapper .EmojiPickerReact .epr-icn-clear-search {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pdp-emoji-picker-wrapper .EmojiPickerReact button:focus,
+.pdp-emoji-picker-wrapper .EmojiPickerReact button:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.pdp-emoji-picker-wrapper .EmojiPickerReact button:hover {
+  border-color: transparent;
+}
+
+/* --- TÍNH NĂNG PHÓNG TO ẢNH (MODAL ZOOM) --- */
+.pdp-preview-img-clickable {
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  /* FIX: Tối ưu hiệu ứng hover, chạy trên luồng GPU riêng */
+  will-change: opacity;
+}
+
+.pdp-preview-img-clickable:hover {
+  opacity: 0.8;
+}
+
+.pdp-media-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.85); /* Nền đen mờ 85% */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 99999; /* Đảm bảo nằm đè lên mọi thứ (kể cả Header) */
+}
+
+.pdp-media-modal-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.pdp-media-modal-content img,
+.pdp-media-modal-content video {
+  max-width: 100%;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+.pdp-media-modal-close {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  background: none;
+  border: none;
+  color: #ffffff;
+  font-size: 32px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s;
+  padding: 0;
+}
+
+.pdp-media-modal-close:hover {
+  color: #9ca3af;
 }

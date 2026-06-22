@@ -356,6 +356,7 @@ export function useShoppingCart() {
 
       toast.success(res.data.message || "Thao tác thành công!");
       await fetchCartAndRecommendations();
+      window.dispatchEvent(new Event("wishlist_updated"));
     } catch (error: unknown) {
       const err = error as ApiError;
       toast.error(err?.message || "Lỗi khi cập nhật wishlist");

@@ -25,12 +25,14 @@ interface INormalizedError {
 
 // 2. HÀM TIỆN ÍCH TẠO SESSION CHO GUEST (Người dùng chưa đăng nhập)
 const getGuestSessionId = (): string => {
-  let sessionId = localStorage.getItem("guest_session_id");
+  // Đổi từ "guest_session_id" thành "guestSessionId"
+  let sessionId = localStorage.getItem("guestSessionId");
   if (!sessionId) {
     // Tạo ID ngẫu nhiên kết hợp timestamp
     sessionId =
       Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
-    localStorage.setItem("guest_session_id", sessionId);
+    // Đổi từ "guest_session_id" thành "guestSessionId"
+    localStorage.setItem("guestSessionId", sessionId);
   }
   return sessionId;
 };

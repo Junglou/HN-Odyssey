@@ -89,7 +89,7 @@ export default function CheckoutForm({
       {/* Tính năng chọn Address Book (Nếu đã đăng nhập & có địa chỉ) */}
       {isLogged && savedAddresses.length > 0 && (
         <div
-          className="checkout-input-group"
+          className={`checkout-input-group ${openDropdown === "addressBook" ? "dropdown-active" : ""}`}
           style={{ marginBottom: "0.5rem" }}
           onClick={() => handleToggleDropdown("addressBook")}
         >
@@ -205,7 +205,7 @@ export default function CheckoutForm({
           {/* row 4: Tỉnh/Thành phố & Quận/Huyện */}
           <div className="checkout-form-row">
             <div
-              className="checkout-input-group"
+              className={`checkout-input-group ${openDropdown === "province" ? "dropdown-active" : ""}`}
               onClick={() => handleToggleDropdown("province")}
             >
               <input
@@ -240,7 +240,7 @@ export default function CheckoutForm({
             </div>
 
             <div
-              className="checkout-input-group"
+              className={`checkout-input-group ${openDropdown === "district" ? "dropdown-active" : ""}`}
               onClick={() => handleToggleDropdown("district")}
             >
               <input
@@ -283,7 +283,7 @@ export default function CheckoutForm({
           {/* row 5: Phường/Xã & Country */}
           <div className="checkout-form-row">
             <div
-              className="checkout-input-group"
+              className={`checkout-input-group ${openDropdown === "ward" ? "dropdown-active" : ""}`}
               onClick={() => handleToggleDropdown("ward")}
             >
               <input
@@ -323,7 +323,7 @@ export default function CheckoutForm({
             </div>
 
             <div
-              className="checkout-input-group"
+              className={`checkout-input-group ${openDropdown === "country" ? "dropdown-active" : ""}`}
               onClick={() => handleToggleDropdown("country")}
             >
               <input

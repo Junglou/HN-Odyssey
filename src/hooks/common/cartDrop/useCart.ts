@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import axiosClient from "../../../api/axiosClient";
+import tokenStorage from "../../../utils/tokenStorage";
 
-// 1. FRONTEND UI TYPES
-
+// định nghĩa kiểu dữ liệu cho frontend
 export interface CartItem {
   id: string;
   name: string;
@@ -14,8 +14,7 @@ export interface CartItem {
   image: string;
 }
 
-// 2. BACKEND RESPONSE TYPES
-
+// định nghĩa kiểu dữ liệu trả về từ backend
 interface ValidatedCartItem {
   productId: string;
   variantId?: string;
@@ -55,38 +54,35 @@ interface ApiError {
   data?: unknown;
 }
 
-// 3. UTILITIES
-
-const GUEST_SESSION_KEY = "guestSessionId";
-
+// tiện ích lấy session cho khách vãng lai
 export const getGuestSessionId = (): string => {
-  let sessionId = localStorage.getItem(GUEST_SESSION_KEY);
+  let sessionId = localStorage.getItem("guestSessionId");
   if (!sessionId) {
-    sessionId = Math.random().toString(36).substring(2, 15);
-    localStorage.setItem(GUEST_SESSION_KEY, sessionId);
+    sessionId = `guest_${Math.random().toString(36).substring(2, 15)}`;
+    localStorage.setItem("guestSessionId", sessionId);
   }
   return sessionId;
 };
 
-// 4. MAIN HOOK
-
+// hook chính quản lý giỏ hàng
 export function useCart() {
   const navigate = useNavigate();
 
-  // States
   const [items, setItems] = useState<CartItem[]>([]);
   const [summarySubtotal, setSummarySubtotal] = useState<number>(0);
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
-  // --- API CALLS & DATA MAPPING ---
+  // xử lý gọi api và ánh xạ dữ liệu
   const fetchCart = useCallback(async () => {
     try {
-      const guestSessionId = getGuestSessionId();
-      const res = await axiosClient.get<CartResponse>(
-        `/cart?guestSessionId=${guestSessionId}`,
-      );
+      const isLogged = !!tokenStorage.getToken();
+      const guestSessionId = isLogged ? undefined : getGuestSessionId();
+
+      const res = await axiosClient.get<CartResponse>("/cart", {
+        params: { guestSessionId },
+      });
 
       const mappedItems: CartItem[] = res.data.items.map((item) => {
         let descriptionText = `SKU: ${item.sku}`;
@@ -130,10 +126,9 @@ export function useCart() {
     }
   }, []);
 
-  // --- ACTIONS: UI Controls ---
+  // các hàm điều khiển giao diện
   const toggleCart = () => {
     setIsOpen((prev) => {
-      // Nếu đang đóng và chuẩn bị mở -> Cập nhật data ngay lập tức
       if (!prev) {
         fetchCart();
       }
@@ -153,23 +148,33 @@ export function useCart() {
     setIsDeleteModalOpen(false);
   };
 
-  // Đồng bộ giỏ hàng
+  // đồng bộ giỏ hàng khi có thay đổi
   useEffect(() => {
-    //eslint-disable-next-line react-hooks/exhaustive-deps
-    fetchCart(); // Kéo data lần đầu khi load app
+    let isMounted = true;
 
-    // Lắng nghe sự kiện để đồng bộ giỏ hàng giữa các Component
+    const loadInitialData = async () => {
+      if (isMounted) {
+        await fetchCart();
+      }
+    };
+
+    void loadInitialData();
+
     const handleCartUpdate = () => {
-      fetchCart();
+      if (isMounted) {
+        void fetchCart();
+      }
     };
 
     window.addEventListener("cart_updated", handleCartUpdate);
+
     return () => {
+      isMounted = false;
       window.removeEventListener("cart_updated", handleCartUpdate);
     };
   }, [fetchCart]);
 
-  // --- ACTIONS: Cart Operations ---
+  // các thao tác cập nhật dữ liệu giỏ hàng
   const increaseQuantity = async (id: string) => {
     const currentItem = items.find((i) => i.id === id);
     if (!currentItem) return;
@@ -184,7 +189,6 @@ export function useCart() {
         quantity: currentItem.quantity + 1,
         guestSessionId,
       });
-      // Phát sự kiện để báo cho các giỏ hàng khác cùng update
       window.dispatchEvent(new Event("cart_updated"));
     } catch (err) {
       const error = err as ApiError;
@@ -253,7 +257,6 @@ export function useCart() {
   const subtotal = useMemo(() => {
     return summarySubtotal.toFixed(2);
   }, [summarySubtotal]);
-
 
   return {
     isOpen,

@@ -3,26 +3,22 @@ import "./UpdateStatusModal.css";
 import type { OrderStatus } from "../../../../hooks/portal/OrderManagement/OrderManagement/useOrderManagement";
 import { ChevronDownSmallIcon } from "../../../../assets/icons/OrderManagementIcons";
 
-// props
 interface UpdateStatusModalProps {
   isOpen: boolean;
   orderId: string | null;
   currentStatus: OrderStatus | null;
   onClose: () => void;
-  onConfirm: (orderId: string, newStatus: OrderStatus, reason: string) => void;
+  // Đổi thành Promise để có thể await state loading
+  onConfirm: (
+    orderId: string,
+    newStatus: OrderStatus,
+    reason: string,
+  ) => Promise<void>;
 }
 
-// options
-const STATUS_LIST: OrderStatus[] = [
-  "Confirmed",
-  "Packaging",
-  "Shipping",
-  "Delivered",
-  "Cancelled",
-  "Refunded",
-];
+// CHỈ HIỂN THỊ 3 TRẠNG THÁI THEO ĐÚNG YÊU CẦU
+const STATUS_LIST: OrderStatus[] = ["Delivered", "Cancelled", "Refunded"];
 
-// component
 export default function UpdateStatusModal({
   isOpen,
   orderId,
@@ -30,27 +26,29 @@ export default function UpdateStatusModal({
   onClose,
   onConfirm,
 }: UpdateStatusModalProps) {
-  // states
   const [selectedStatus, setSelectedStatus] =
-    useState<OrderStatus>("Confirmed");
+    useState<OrderStatus>("Delivered");
   const [reason, setReason] = useState("");
   const [prevStatus, setPrevStatus] = useState<OrderStatus | null>(null);
 
-  // dropdown states
+  // State chống spam click
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [hasDropdownOpened, setHasDropdownOpened] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // logic: sync currentStatus
   if (currentStatus !== prevStatus) {
     setPrevStatus(currentStatus);
+    // Nếu status cũ không nằm trong 3 cái trên, mặc định chọn Delivered
     setSelectedStatus(
-      currentStatus === "Pending" ? "Confirmed" : currentStatus || "Confirmed",
+      STATUS_LIST.includes(currentStatus as OrderStatus)
+        ? (currentStatus as OrderStatus)
+        : "Delivered",
     );
     setReason("");
   }
 
-  // close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -66,6 +64,17 @@ export default function UpdateStatusModal({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
+  // Handle Confirm Click
+  const handleConfirmClick = async () => {
+    if (!orderId || isProcessing) return;
+    setIsProcessing(true);
+    try {
+      await onConfirm(orderId, selectedStatus, reason);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   if (!isOpen || !orderId) return null;
 
   return (
@@ -78,12 +87,11 @@ export default function UpdateStatusModal({
         <div className="usm-body">
           <div>
             <label className="usm-label">Select New Status</label>
-
-            {/* Custom Dropdown */}
             <div className="usm-custom-dropdown" ref={dropdownRef}>
               <div
                 className={`usm-dropdown-trigger ${isDropdownOpen ? "active" : ""}`}
                 onClick={() => {
+                  if (isProcessing) return;
                   setIsDropdownOpen(!isDropdownOpen);
                   if (!hasDropdownOpened) setHasDropdownOpened(true);
                 }}
@@ -121,21 +129,26 @@ export default function UpdateStatusModal({
               placeholder="Enter reason for update (Required)..."
               value={reason}
               onChange={(e) => setReason(e.target.value)}
+              disabled={isProcessing}
               autoFocus
             />
           </div>
         </div>
 
         <div className="usm-footer">
-          <button className="usm-btn-cancel" onClick={onClose}>
+          <button
+            className="usm-btn-cancel"
+            onClick={onClose}
+            disabled={isProcessing}
+          >
             Cancel
           </button>
           <button
             className="usm-btn-confirm"
-            disabled={!reason.trim()}
-            onClick={() => onConfirm(orderId, selectedStatus, reason)}
+            disabled={!reason.trim() || isProcessing}
+            onClick={handleConfirmClick}
           >
-            Confirm
+            {isProcessing ? "Processing..." : "Confirm"}
           </button>
         </div>
       </div>

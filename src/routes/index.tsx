@@ -68,31 +68,39 @@ import BlogDetailPage from "../pages/blogNews/BlogDetailPage";
 
 import StaticPageView from "../pages/staticPage/StaticPageView";
 
+import AuthGuard from "../guards/AuthGuard";
+import GuestGuard from "../guards/GuestGuard";
+
 export const router = createBrowserRouter([
   // route auth
   {
-    path: "/login",
-    element: <LoginPage />,
-  },
-  {
-    path: "/register",
-    element: <RegisterPage />,
-  },
-  {
-    path: "/verify-otp",
-    element: <VerifyOtpPage />,
-  },
-  {
-    path: "/reset-password",
-    element: <ResetPasswordPage />,
-  },
-  {
-    path: "/account-recovery",
-    element: <AccountRecoveryPage />,
-  },
-  {
-    path: "/account-reco-verified",
-    element: <AccountRecoVerifiedPage />,
+    element: <GuestGuard />,
+    children: [
+      {
+        path: "/login",
+        element: <LoginPage />,
+      },
+      {
+        path: "/register",
+        element: <RegisterPage />,
+      },
+      {
+        path: "/verify-otp",
+        element: <VerifyOtpPage />,
+      },
+      {
+        path: "/reset-password",
+        element: <ResetPasswordPage />,
+      },
+      {
+        path: "/account-recovery",
+        element: <AccountRecoveryPage />,
+      },
+      {
+        path: "/account-reco-verified",
+        element: <AccountRecoVerifiedPage />,
+      },
+    ],
   },
 
   // route bảo vệ dùng main layout
@@ -150,40 +158,45 @@ export const router = createBrowserRouter([
       },
       // todo: cum route profile nay can duoc boc bang auth guard de kiem tra token khi chay thuc te, hien tai de day de tien hanh thu nghiem
       {
-        path: "/profile",
-        element: <MyProfilePage />,
-      },
-      {
-        path: "/profile/address-management",
-        element: <AddressMangementPage />,
-      },
-      {
-        path: "/profile/orders",
-        element: <MyOrderMangementPage />,
-      },
-      {
-        path: "/profile/orders/detail/:id",
-        element: <OrderDetailPage />,
-      },
-      {
-        path: "/profile/history",
-        element: <PurchaseHistoryPage />,
-      },
-      {
-        path: "/profile/wishlist",
-        element: <MyWishlistPage />,
-      },
-      {
-        path: "/profile/recent",
-        element: <RecentViewPage />,
-      },
-      {
-        path: "/profile/coupon",
-        element: <MyCouponPage />,
-      },
-      {
-        path: "/profile/loyalty",
-        element: <LoyaltyPage />,
+        element: <AuthGuard />,
+        children: [
+          {
+            path: "/profile",
+            element: <MyProfilePage />,
+          },
+          {
+            path: "/profile/address-management",
+            element: <AddressMangementPage />,
+          },
+          {
+            path: "/profile/orders",
+            element: <MyOrderMangementPage />,
+          },
+          {
+            path: "/profile/orders/detail/:id",
+            element: <OrderDetailPage />,
+          },
+          {
+            path: "/profile/history",
+            element: <PurchaseHistoryPage />,
+          },
+          {
+            path: "/profile/wishlist",
+            element: <MyWishlistPage />,
+          },
+          {
+            path: "/profile/recent",
+            element: <RecentViewPage />,
+          },
+          {
+            path: "/profile/coupon",
+            element: <MyCouponPage />,
+          },
+          {
+            path: "/profile/loyalty",
+            element: <LoyaltyPage />,
+          },
+        ],
       },
     ],
   },
@@ -197,7 +210,11 @@ export const router = createBrowserRouter([
   // route bảo vệ dùng portal layout cho admin
   {
     path: "/portal",
-    element: <PortalLayout />,
+    element: (
+      <AuthGuard excludedRoles={["CUSTOMER"]}>
+        <PortalLayout />
+      </AuthGuard>
+    ),
     children: [
       {
         path: "users",

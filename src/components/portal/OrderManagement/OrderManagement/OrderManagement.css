@@ -551,3 +551,20 @@
   animation: om-spin 0.5s linear infinite;
   display: flex;
 }
+
+/* THÊM MỚI: Bọc Status & Countdown để chống lệch layout */
+.om-status-col {
+  position: relative; /* Biến thẻ td thành mỏ neo */
+}
+
+.om-refund-countdown {
+  position: absolute;
+  bottom: 2px; /* Neo sát đáy ô td, tận dụng phần đệm (padding) rỗng */
+  left: 50%;
+  transform: translateX(-50%);
+  color: #d32f2f;
+  font-size: 0.72rem; /* Kích thước nhỏ gọn để không lấn vào badge */
+  font-weight: 500;
+  white-space: nowrap;
+  line-height: 1;
+}

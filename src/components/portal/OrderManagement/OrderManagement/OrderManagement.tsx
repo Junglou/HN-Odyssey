@@ -181,6 +181,16 @@ export default function OrderManagement({
   const [prevData, setPrevData] = useState<OrderRow[]>(data);
   const [prevSearch, setPrevSearch] = useState(filters.search);
 
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+
+  // Cập nhật thời gian mỗi 60 giây để trigger check 24h & render lại countdown
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
   // logic
   if (data !== prevData) {
     setPrevData(data);
@@ -387,11 +397,45 @@ export default function OrderManagement({
                 </tr>
               ) : (
                 data.map((order) => {
-                  const isTerminal = [
-                    "Delivered",
-                    "Cancelled",
-                    "Refunded",
-                  ].includes(order.orderStatus);
+                  // 1. Logic kiểm tra thời gian 24h cho trạng thái Delivered & Đếm ngược
+                  let isPast24hDelivered = false;
+                  let remainingTimeText = "";
+
+                  if (order.orderStatus === "Delivered") {
+                    // Tìm mốc thời gian lúc đơn hàng được chuyển sang Delivered
+                    const deliveredEvent = order.timeline.find(
+                      (t) => t.status === "Delivered",
+                    );
+
+                    if (deliveredEvent && deliveredEvent.date) {
+                      const deliveredTime = new Date(
+                        deliveredEvent.date,
+                      ).getTime();
+
+                      const diffMs = currentTime - deliveredTime;
+                      const diffInHours = diffMs / (1000 * 60 * 60);
+
+                      isPast24hDelivered = diffInHours > 24;
+
+                      // Tính toán format text đếm ngược nếu chưa hết hạn
+                      if (!isPast24hDelivered) {
+                        const remainingMs = 24 * 60 * 60 * 1000 - diffMs;
+                        const hours = Math.floor(
+                          remainingMs / (1000 * 60 * 60),
+                        );
+                        const minutes = Math.floor(
+                          (remainingMs % (1000 * 60 * 60)) / (1000 * 60),
+                        );
+                        remainingTimeText = `Refund ends: ${hours}h ${minutes}m`;
+                      }
+                    }
+                  }
+
+                  // 2. Cập nhật lại isTerminal (Thêm điều kiện hết hạn 24h)
+                  const isTerminal =
+                    ["Cancelled", "Refunded"].includes(order.orderStatus) ||
+                    isPast24hDelivered;
+
                   const canUpdate =
                     order.orderStatus !== "Pending" && !isTerminal;
 
@@ -415,7 +459,7 @@ export default function OrderManagement({
                       <td>{order.customerName}</td>
                       <td>{order.createdBy}</td>
                       <td className="om-text-blue-bold">
-                        ${order.totalAmount.toLocaleString()}
+                        ${order.totalAmount.toFixed(2)}
                       </td>
                       <td className="om-text-center">
                         <span
@@ -424,12 +468,18 @@ export default function OrderManagement({
                           {order.paymentStatus}
                         </span>
                       </td>
-                      <td className="om-text-center">
+                      <td className="om-text-center om-status-col">
                         <span
                           className={`om-badge om-badge-status-${order.orderStatus}`}
                         >
                           {order.orderStatus}
                         </span>
+                        {/* Dòng text được thả rông tự do nhờ absolute */}
+                        {remainingTimeText && (
+                          <span className="om-refund-countdown">
+                            {remainingTimeText}
+                          </span>
+                        )}
                       </td>
                       <td>
                         <div className="om-row-actions">

@@ -24,7 +24,7 @@ interface ScopeOption {
   name: string;
 }
 
-// Bổ sung Interface để giải quyết triệt để lỗi ESLint "Unexpected any"
+// Add Interface to completely resolve ESLint "Unexpected any" error
 interface BEProduct {
   _id: string;
   name: string;
@@ -41,7 +41,7 @@ interface BETag {
   name: string;
 }
 
-// Hàm đệ quy làm phẳng cây Danh mục từ BE
+// Recursive function to flatten the Category tree from BE
 const flattenCategories = (
   nodes: BECategory[],
   parentPath = "",
@@ -49,7 +49,7 @@ const flattenCategories = (
   let result: ScopeOption[] = [];
   for (const node of nodes) {
     const currentPath = parentPath ? `${parentPath} > ${node.name}` : node.name;
-    // Chú ý: Backend mongoose trả về _id
+    // Note: Backend mongoose returns _id
     result.push({ id: node._id, name: currentPath });
     if (node.children && node.children.length > 0) {
       result = result.concat(flattenCategories(node.children, currentPath));
@@ -58,10 +58,10 @@ const flattenCategories = (
   return result;
 };
 
-// Component MultiSelectDropdown đã được cấu trúc lại để lưu ID nhưng hiển thị Name
+// MultiSelectDropdown component restructured to store ID but display Name
 function MultiSelectDropdown({
   options,
-  selectedValues, // Chứa mảng ID
+  selectedValues, // Contains array of IDs
   onChange,
   placeholder,
   disabled,
@@ -91,7 +91,7 @@ function MultiSelectDropdown({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Ẩn đi những lựa chọn đã có ID trong danh sách selectedValues
+  // Hide options that already have their ID in the selectedValues list
   const filteredOptions = options.filter(
     (opt) =>
       opt.name.toLowerCase().includes(search.toLowerCase()) &&
@@ -117,10 +117,10 @@ function MultiSelectDropdown({
             className="promo-form-input promo-select-search"
             placeholder={
               isLoading
-                ? "Đang tải dữ liệu..."
+                ? "Loading data..."
                 : selectedValues.length === 0
                   ? placeholder
-                  : "Tìm kiếm để thêm..."
+                  : "Search to add..."
             }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -142,19 +142,19 @@ function MultiSelectDropdown({
                   </div>
                 ))
               ) : (
-                <div className="promo-select-empty">Không tìm thấy kết quả</div>
+                <div className="promo-select-empty">No results found</div>
               )}
             </div>
           )}
         </div>
       )}
 
-      {/* Đã xóa style inline, sử dụng className has-items thay thế */}
+      {/* Removed inline style, using has-items className instead */}
       <div
         className={`promo-selected-chips ${selectedValues.length > 0 ? "has-items" : ""}`}
       >
         {selectedValues.map((idVal) => {
-          // Ánh xạ ID ngược lại thành Name để hiển thị cho UI đẹp
+          // Map ID back to Name for better UI display
           const matchedOpt = options.find((o) => o.id === idVal);
           const displayName = matchedOpt ? matchedOpt.name : idVal;
 
@@ -212,7 +212,7 @@ export default function PromotionModal(props: PromotionModalProps) {
   );
 }
 
-// Modal Content chính
+// Main Modal Content
 function PromotionModalContent({
   mode,
   initialData,
@@ -227,7 +227,7 @@ function PromotionModalContent({
   const [tags, setTags] = useState<ScopeOption[]>([]);
   const [isLoadingScopes, setIsLoadingScopes] = useState(false);
 
-  // Fetch dữ liệu thật từ DB cho Dropdown
+  // Fetch real data from DB for Dropdown
   useEffect(() => {
     if (mode === "add" || mode === "edit") {
       const fetchScopeData = async () => {
@@ -239,7 +239,7 @@ function PromotionModalContent({
             axiosClient.get("/tags?limit=1000"),
           ]);
 
-          // Ép kiểu chuẩn để loại bỏ lỗi ESLint
+          // Standard type casting to remove ESLint errors
           const fetchedProducts: BEProduct[] =
             prodRes.data?.data?.data || prodRes.data?.data || [];
           const fetchedCategories: BECategory[] =
@@ -252,8 +252,8 @@ function PromotionModalContent({
           setCategories(flattenCategories(fetchedCategories));
           setTags(fetchedTags.map((t) => ({ id: t._id, name: t.name })));
         } catch (error) {
-          console.error("Lỗi khi tải dữ liệu Scope:", error);
-          toast.error("Lỗi khi tải danh sách Sản phẩm / Danh mục.");
+          console.error("Error loading Scope data:", error);
+          toast.error("Error loading Product / Category list.");
         } finally {
           setIsLoadingScopes(false);
         }
@@ -303,9 +303,9 @@ function PromotionModalContent({
   );
 
   const getTitle = () => {
-    if (mode === "add") return "Tạo Khuyến mãi";
-    if (mode === "edit") return "Chỉnh sửa Khuyến mãi";
-    if (mode === "view") return "Chi tiết Khuyến mãi";
+    if (mode === "add") return "Create Promotion";
+    if (mode === "edit") return "Edit Promotion";
+    if (mode === "view") return "Promotion Details";
     return "";
   };
 
@@ -316,7 +316,7 @@ function PromotionModalContent({
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Xác định options nào sẽ được truyền vào Dropdown dựa trên loại Scope đang chọn
+  // Determine which options to pass into the Dropdown based on the selected Scope type
   const currentScopeOptions =
     formData.applicableScopeType === "Product"
       ? products
@@ -343,13 +343,13 @@ function PromotionModalContent({
         <div className="promo-modal-body">
           <div className="promo-form-group">
             <label className="promo-form-label">
-              Tên chương trình{" "}
+              Promotion Name{" "}
               {!isViewMode && <span className="promo-required">*</span>}
             </label>
             <input
               type="text"
               className="promo-form-input"
-              placeholder="Nhập tên chương trình"
+              placeholder="Enter promotion name"
               disabled={isViewMode}
               value={formData.name}
               onChange={(e) => handleChange("name", e.target.value)}
@@ -357,7 +357,7 @@ function PromotionModalContent({
           </div>
 
           <div className="promo-form-group">
-            <label className="promo-form-label">Loại khuyến mãi</label>
+            <label className="promo-form-label">Promotion Type</label>
             <div className="promo-radio-group">
               <label className="promo-radio-label">
                 <input
@@ -384,14 +384,14 @@ function PromotionModalContent({
 
           <div className="promo-form-group">
             <label className="promo-form-label">
-              Mức giảm{" "}
+              Discount Value{" "}
               {!isViewMode && <span className="promo-required">*</span>}
             </label>
             <div className="promo-value-input-group">
               <input
                 type="text"
                 className="promo-form-input promo-value-number"
-                placeholder="Giá trị giảm..."
+                placeholder="Discount value..."
                 disabled={isViewMode}
                 value={formData.discountValueNum}
                 onChange={(e) => {
@@ -417,7 +417,7 @@ function PromotionModalContent({
           </div>
 
           <div className="promo-form-group">
-            <label className="promo-form-label">Phạm vi áp dụng</label>
+            <label className="promo-form-label">Applicable Scope</label>
             <div className="promo-scope-tabs">
               {(["Product", "Category", "Tag"] as const).map((tab) => (
                 <button
@@ -442,7 +442,7 @@ function PromotionModalContent({
               options={currentScopeOptions}
               selectedValues={formData.applicableScopeValues}
               onChange={(vals) => handleChange("applicableScopeValues", vals)}
-              placeholder={`Tìm kiếm ${formData.applicableScopeType}...`}
+              placeholder={`Search ${formData.applicableScopeType}...`}
               disabled={isViewMode}
               isLoading={isLoadingScopes}
             />
@@ -451,7 +451,7 @@ function PromotionModalContent({
           <div className="promo-date-picker-row">
             <div className="promo-date-picker-col">
               <label className="promo-form-label">
-                Ngày bắt đầu{" "}
+                Start Date{" "}
                 {!isViewMode && <span className="promo-required">*</span>}
               </label>
               <input
@@ -465,7 +465,7 @@ function PromotionModalContent({
             </div>
             <div className="promo-date-picker-col">
               <label className="promo-form-label">
-                Ngày kết thúc{" "}
+                End Date{" "}
                 {!isViewMode && <span className="promo-required">*</span>}
               </label>
               <input
@@ -480,7 +480,7 @@ function PromotionModalContent({
           </div>
 
           <div className="promo-form-group">
-            <label className="promo-form-label">Trạng thái</label>
+            <label className="promo-form-label">Status</label>
             <div className="promo-radio-group">
               <label className="promo-radio-label">
                 <input
@@ -490,7 +490,7 @@ function PromotionModalContent({
                   onChange={() => handleChange("status", "Draft")}
                   disabled={isViewMode}
                 />
-                Bản nháp (Draft)
+                Draft
               </label>
               <label className="promo-radio-label">
                 <input
@@ -500,7 +500,7 @@ function PromotionModalContent({
                   onChange={() => handleChange("status", "Active")}
                   disabled={isViewMode}
                 />
-                Công bố (Active/Scheduled)
+                Published (Active/Scheduled)
               </label>
             </div>
           </div>
@@ -509,7 +509,7 @@ function PromotionModalContent({
             <label className="promo-form-label">Description</label>
             <textarea
               className="promo-form-textarea"
-              placeholder="Nhập mô tả..."
+              placeholder="Enter description..."
               rows={4}
               disabled={isViewMode}
               value={formData.description}

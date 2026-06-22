@@ -86,7 +86,6 @@ interface ScopeOption {
   name: string;
 }
 
-// Khai báo Interface chuẩn cho Error của Axios từ Backend trả về
 interface APIErrorResponse {
   response?: {
     data?: {
@@ -95,7 +94,6 @@ interface APIErrorResponse {
   };
 }
 
-// ĐÃ FIX LỖI "ANY" TẠI ĐÂY BẰNG CÁCH DÙNG APIErrorResponse
 const extractErrorMessage = (error: unknown, defaultMsg: string): string => {
   try {
     const err = error as APIErrorResponse;
@@ -445,8 +443,19 @@ export function usePromotionManagement() {
       return toast.error("Giá trị không hợp lệ.");
     if (data.discountType === "%" && Number(data.discountValueNum) > 100)
       return toast.error("Phần trăm không được vượt 100%.");
-    if (data.applicableScopeValues.length === 0)
-      return toast.error("Vui lòng chọn phạm vi áp dụng.");
+
+    // ==========================================
+    // BẢN FIX CUỐI CÙNG Ở ĐÂY:
+    // Nếu trạng thái muốn lưu KHÔNG PHẢI là Draft và Inactive,
+    // thì bắt buộc phải có Sản phẩm/Danh mục. Còn lại thì cho lưu rỗng thoải mái!
+    // ==========================================
+    if (
+      data.status !== "Draft" &&
+      data.status !== "Inactive" &&
+      data.applicableScopeValues.length === 0
+    ) {
+      return toast.error("Vui lòng chọn phạm vi áp dụng để Công bố.");
+    }
 
     const sDate = new Date(data.startDate);
     sDate.setHours(0, 0, 0, 0);

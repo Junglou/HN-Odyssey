@@ -87,16 +87,20 @@ export function useTradeInForm() {
         const catData: CategoryNode[] = catRes.data?.data || catRes.data || [];
         const flatList: { id: string; name: string }[] = [];
 
-        const flatten = (nodes: CategoryNode[], depth = 0) => {
+        // SỬA ĐỔI: Dùng định dạng "Parent > Child"
+        const flatten = (nodes: CategoryNode[], parentPath = "") => {
           nodes.forEach((node) => {
-            const prefix =
-              depth > 0 ? "\u00A0\u00A0\u00A0\u00A0".repeat(depth) : "";
-            flatList.push({ id: node._id, name: `${prefix}${node.name}` });
+            const currentPath = parentPath
+              ? `${parentPath} > ${node.name}`
+              : node.name;
+            flatList.push({ id: node._id, name: currentPath });
+
             if (node.children && node.children.length > 0) {
-              flatten(node.children, depth + 1);
+              flatten(node.children, currentPath);
             }
           });
         };
+
         flatten(catData);
         setCategories(flatList);
 

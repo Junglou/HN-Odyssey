@@ -148,7 +148,7 @@ const mapFeToBeStatus = (feStatus: string): string => {
   if (feStatus === "Shipping") return "SHIPPING";
   if (feStatus === "Delivered") return "DELIVERED";
   if (feStatus === "Cancelled") return "CANCELLED";
-  if (feStatus === "Refunded") return "REFUNDED";
+  if (feStatus === "Refunded") return "RETURNED";
   if (feStatus === "READY_TO_SHIP") return "READY_TO_SHIP";
   return "PENDING";
 };
@@ -226,13 +226,24 @@ export function useOrderManagement() {
           order.shipping_info?.email || order.guest_info?.email || "N/A";
         const address = order.shipping_info?.address || "Nhận tại cửa hàng";
 
-        // Xử lý toán học cho Subtotal (Tổng giá trị item trước giảm giá và ship)
-        const shipFee = order.actual_shipping_fee || order.shipping_fee || 0;
-        const totalAmount = order.total_amount;
-        const subtotal = totalAmount + (order.discount_amount || 0) - shipFee;
+        // TÍNH TOÁN LẠI CHUẨN USD
+        // 1. Quy đổi tiền ship
+        const shipFeeVnd = order.actual_shipping_fee || order.shipping_fee || 0;
+        const shipFeeUsd = shipFeeVnd / 25400;
+
+        // 2. Giá Item đã là USD sẵn -> KHÔNG ĐƯỢC CHIA NỮA
+        const subtotalUsd = order.items.reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0,
+        );
+
+        // 3. Discount cũng đã là USD -> KHÔNG ĐƯỢC CHIA NỮA
+        const discountUsd = order.discount_amount || 0;
+
+        // 4. Cộng lại ra Total Amount chuẩn xác: Giá USD + Ship USD
+        const totalAmountUsd = subtotalUsd - discountUsd + shipFeeUsd;
 
         // Xác định người tạo đơn dựa vào actor của sự kiện khởi tạo (nằm ở vị trí đầu tiên trong mảng timeline)
-        // Backend đang trả về 'Member' đối với thành viên, 'Guest' đối với khách vãng lai
         const firstEventActor = order.timeline?.[0]?.actor;
         const creatorRole =
           firstEventActor === "Guest" ||
@@ -249,9 +260,9 @@ export function useOrderManagement() {
           email: email,
           shippingAddress: address,
           orderDate: order.createdAt,
-          subtotal: subtotal > 0 ? subtotal : totalAmount, // Ngừa số âm
-          shipFee: shipFee,
-          totalAmount: totalAmount,
+          subtotal: subtotalUsd, // Gán chuẩn số USD
+          shipFee: shipFeeUsd, // Gán chuẩn số USD
+          totalAmount: totalAmountUsd, // Gán chuẩn số USD
           paymentStatus: mapPaymentStatus(order.payment?.status),
           orderStatus: mapBeToFeStatus(order.status),
           createdBy: creatorRole,
@@ -298,6 +309,9 @@ export function useOrderManagement() {
     fetchOrders();
   }, [fetchOrders]);
 
+  // State khóa hành động để chống Click Spam
+  const [isProcessingAction, setIsProcessingAction] = useState<boolean>(false);
+
   const actions = {
     changeFilter: (key: keyof typeof filters, val: string) => {
       setFilters((prev) => ({ ...prev, [key]: val }));
@@ -334,13 +348,16 @@ export function useOrderManagement() {
       orderId: string,
       newStatus: OrderStatus,
       reason: string,
-    ) => {
+    ): Promise<void> => {
+      if (isProcessingAction) return;
+      setIsProcessingAction(true);
       try {
-        const beStatus = mapFeToBeStatus(newStatus); // Dịch trước khi gửi
+        const beStatus = mapFeToBeStatus(newStatus);
         await axiosClient.patch(`/orders/${orderId}/status-advanced`, {
           status: beStatus,
           reason: reason,
-          is_override: false,
+          // [QUAN TRỌNG]: Bật true để bypass Rule lùi/chuyển trạng thái của State Machine BE
+          is_override: true,
         });
 
         toast.success(
@@ -355,20 +372,23 @@ export function useOrderManagement() {
           (error as { response?: { data?: { message?: string } } }).response
             ?.data?.message || "Lỗi cập nhật trạng thái!";
         toast.error(errMsg);
+      } finally {
+        setIsProcessingAction(false);
       }
     },
 
     // Đổi type của nextStatus thành string để hỗ trợ truyền "READY_TO_SHIP"
     advanceOrderStatus: async (orderId: string, nextStatus: string) => {
+      if (isProcessingAction) return;
+      setIsProcessingAction(true);
       try {
-        const beStatus = mapFeToBeStatus(nextStatus); // Dịch trước khi gửi
+        const beStatus = mapFeToBeStatus(nextStatus);
         await axiosClient.patch(`/orders/${orderId}/status-advanced`, {
           status: beStatus,
           note: `Staff auto advanced to ${beStatus}`,
         });
 
         if (nextStatus === "READY_TO_SHIP") {
-          // Do BE tạo đơn GHN chạy ngầm (async event), cần dặn nhân viên đợi
           toast.info(
             "Đã gửi yêu cầu tạo đơn sang ĐVVC thành công! Vui lòng đợi vài giây và bấm 'Refresh' để thấy mã vận đơn.",
           );
@@ -383,6 +403,8 @@ export function useOrderManagement() {
           (error as { response?: { data?: { message?: string } } }).response
             ?.data?.message || "Không thể chuyển tiếp trạng thái.";
         toast.error(errMsg);
+      } finally {
+        setIsProcessingAction(false);
       }
     },
 

@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import "./ReviewAndRatingDrawer.css";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 import {
@@ -59,7 +60,6 @@ export default function ReviewAndRatingDrawer(
     }
   }, [props.isOpen, shouldRender]);
 
-  // Render an toàn để giữ animation đóng
   if (!shouldRender || (!props.review && !isClosing)) return null;
 
   return (
@@ -95,10 +95,15 @@ function DrawerContent({
   );
   const [isBlockSubmitted, setIsBlockSubmitted] = useState(review.isUserBanned);
 
-  // State cho Custom Dropdown
   const [isReasonOpen, setIsReasonOpen] = useState(false);
   const [hasReasonOpened, setHasReasonOpened] = useState(false);
   const reasonRef = useRef<HTMLDivElement>(null);
+
+  // STATE MODAL ZOOM ẢNH DÀNH CHO ADMIN
+  const [expandedMedia, setExpandedMedia] = useState<{
+    url: string;
+    type: "IMAGE" | "VIDEO";
+  } | null>(null);
 
   useClickOutside(reasonRef, () => setIsReasonOpen(false));
 
@@ -200,9 +205,177 @@ function DrawerContent({
             <span className="rarm-customer-name">{review.customerName}</span>
             {renderStars(review.rating)}
             <p className="rarm-review-content">{review.reviewContent}</p>
+
+            {/* HIỂN THỊ ẢNH CỦA ĐÁNH GIÁ GỐC */}
+            {review.media && review.media.length > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  gap: "8px",
+                  flexWrap: "wrap",
+                  marginTop: "12px",
+                  marginBottom: "12px",
+                }}
+              >
+                {review.media.map((m, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      width: "60px",
+                      height: "60px",
+                      borderRadius: "6px",
+                      overflow: "hidden",
+                      border: "1px solid #d1d5db",
+                      cursor: "pointer",
+                    }}
+                    onClick={() =>
+                      setExpandedMedia({ url: m.url, type: m.type })
+                    }
+                  >
+                    {m.type === "VIDEO" ? (
+                      <video
+                        src={m.url}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                        muted
+                      />
+                    ) : (
+                      <img
+                        src={m.url}
+                        alt="review-media"
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
             <p className="rarm-submitted-date">
               Submitted: {review.submittedDate}
             </p>
+
+            {/* HIỂN THỊ BÌNH LUẬN TRẢ LỜI */}
+            {review.customerReplies && review.customerReplies.length > 0 && (
+              <div
+                style={{
+                  marginTop: "16px",
+                  borderTop: "1px solid #e5e7eb",
+                  paddingTop: "12px",
+                }}
+              >
+                <h4
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    color: "#111827",
+                    margin: "0 0 12px 0",
+                  }}
+                >
+                  Customer Replies ({review.customerReplies.length})
+                </h4>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                    maxHeight: "250px",
+                    overflowY: "auto",
+                  }}
+                >
+                  {review.customerReplies.map((reply, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        background: "#f9fafb",
+                        padding: "10px",
+                        borderRadius: "6px",
+                        border: "1px solid #f3f4f6",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          color: "#6b7280",
+                          display: "block",
+                          marginBottom: "4px",
+                        }}
+                      >
+                        {reply.date}
+                      </span>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: "13px",
+                          color: "#374151",
+                          lineHeight: "1.4",
+                        }}
+                      >
+                        {reply.content}
+                      </p>
+
+                      {/* HIỂN THỊ ẢNH CỦA REPLY NẾU CÓ */}
+                      {reply.media && reply.media.length > 0 && (
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "6px",
+                            flexWrap: "wrap",
+                            marginTop: "8px",
+                          }}
+                        >
+                          {reply.media.map((m, idx) => (
+                            <div
+                              key={idx}
+                              style={{
+                                width: "45px",
+                                height: "45px",
+                                borderRadius: "4px",
+                                overflow: "hidden",
+                                border: "1px solid #d1d5db",
+                                cursor: "pointer",
+                              }}
+                              onClick={() =>
+                                setExpandedMedia({ url: m.url, type: m.type })
+                              }
+                            >
+                              {m.type === "VIDEO" ? (
+                                <video
+                                  src={m.url}
+                                  style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                  }}
+                                  muted
+                                />
+                              ) : (
+                                <img
+                                  src={m.url}
+                                  alt="reply-media"
+                                  style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                  }}
+                                />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {mode === "edit" && (
@@ -243,7 +416,6 @@ function DrawerContent({
 
               {/* Form Block */}
               <div className="rarm-form-block">
-                {/* Custom Dropdown Reason */}
                 <div className="rarm-drawer-dropdown" ref={reasonRef}>
                   <div
                     className={`rarm-drawer-dropdown-trigger ${isReasonOpen ? "active" : ""}`}
@@ -297,7 +469,6 @@ function DrawerContent({
                   </div>
                 </div>
 
-                {/* Textarea Detail Reason */}
                 {tempBlockReason === "Other" && (
                   <textarea
                     className="rarm-textarea rarm-reason-input"
@@ -311,7 +482,6 @@ function DrawerContent({
                   />
                 )}
 
-                {/* Submit Button */}
                 <div
                   className={`rarm-btn-right-wrapper ${
                     tempBlockReason === "Other" ? "no-mt" : ""
@@ -350,6 +520,33 @@ function DrawerContent({
           </div>
         </div>
       </div>
+
+      {/* PORTAL MODAL ZOOM CHO ADMIN */}
+      {expandedMedia &&
+        createPortal(
+          <div
+            className="rarm-media-modal-overlay"
+            onClick={() => setExpandedMedia(null)}
+          >
+            <div
+              className="rarm-media-modal-content"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                className="rarm-media-modal-close"
+                onClick={() => setExpandedMedia(null)}
+              >
+                &times;
+              </button>
+              {expandedMedia.type === "VIDEO" ? (
+                <video src={expandedMedia.url} controls autoPlay />
+              ) : (
+                <img src={expandedMedia.url} alt="Zoomed view" />
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

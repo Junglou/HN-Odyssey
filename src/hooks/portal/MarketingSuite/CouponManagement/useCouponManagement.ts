@@ -71,6 +71,30 @@ interface BePaginatedResponse {
   };
 }
 
+interface APIErrorResponse {
+  response?: {
+    data?: {
+      message?: string | string[];
+    };
+  };
+}
+
+const extractErrorMessage = (error: unknown, defaultMsg: string): string => {
+  try {
+    const err = error as APIErrorResponse;
+    const beMessage = err?.response?.data?.message;
+    if (Array.isArray(beMessage) && beMessage.length > 0) {
+      return beMessage[0];
+    }
+    if (typeof beMessage === "string") {
+      return beMessage;
+    }
+    return defaultMsg;
+  } catch {
+    return defaultMsg;
+  }
+};
+
 export function useCouponManagement() {
   const [records, setRecords] = useState<CouponRecord[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -146,8 +170,10 @@ export function useCouponManagement() {
         totalPages: res.data.data.meta.totalPages,
         totalFiltered: res.data.data.meta.totalItems,
       }));
-    } catch {
-      toast.error("Lỗi khi tải danh sách mã giảm giá");
+    } catch (error: unknown) {
+      toast.error(
+        extractErrorMessage(error, "Lỗi khi tải danh sách mã giảm giá"),
+      );
     } finally {
       setIsLoading(false);
     }
@@ -244,16 +270,22 @@ export function useCouponManagement() {
           );
           toast.success("Xóa mã giảm giá thành công!");
         } else {
-          await axiosClient.post("/promotions/bulk/delete", {
+          const res = await axiosClient.post("/promotions/bulk/delete", {
             couponIds: Array.from(selectedIds),
           });
-          toast.success("Xóa hàng loạt thành công!");
+
+          const msg = res.data?.message || "Xóa hàng loạt thành công!";
+          if (msg.includes("chặn xóa") || msg.includes("bỏ qua")) {
+            toast.warning(msg);
+          } else {
+            toast.success(msg);
+          }
         }
         setSelectedIds(new Set());
         actions.closeModal();
         fetchCoupons();
-      } catch {
-        toast.error("Có lỗi xảy ra khi xóa");
+      } catch (error: unknown) {
+        toast.error(extractErrorMessage(error, "Có lỗi xảy ra khi xóa"));
       }
     },
   };
@@ -300,11 +332,7 @@ export function useCouponManagement() {
       actions.closeModal();
       fetchCoupons();
     } catch (error: unknown) {
-      if (error instanceof Error) {
-        toast.error(error.message || "Có lỗi xảy ra khi lưu dữ liệu");
-      } else {
-        toast.error("Có lỗi xảy ra khi lưu dữ liệu");
-      }
+      toast.error(extractErrorMessage(error, "Có lỗi xảy ra khi lưu dữ liệu"));
     } finally {
       setModalConfig((prev) => ({ ...prev, isSubmitting: false }));
     }
@@ -321,8 +349,8 @@ export function useCouponManagement() {
         toast.success("Kích hoạt hàng loạt thành công!");
         setSelectedIds(new Set());
         fetchCoupons();
-      } catch {
-        toast.error("Có lỗi xảy ra");
+      } catch (error: unknown) {
+        toast.error(extractErrorMessage(error, "Có lỗi xảy ra khi kích hoạt"));
       }
     },
     bulkDeactivate: async () => {
@@ -330,13 +358,15 @@ export function useCouponManagement() {
       try {
         await axiosClient.patch("/promotions/bulk/status", {
           couponIds: Array.from(selectedIds),
-          action: "DEACTIVATE", // Gọi lệnh DEACTIVATE lên BE
+          action: "DEACTIVATE",
         });
         toast.success("Vô hiệu hóa hàng loạt thành công!");
         setSelectedIds(new Set());
         fetchCoupons();
-      } catch {
-        toast.error("Có lỗi xảy ra");
+      } catch (error: unknown) {
+        toast.error(
+          extractErrorMessage(error, "Có lỗi xảy ra khi vô hiệu hóa"),
+        );
       }
     },
     bulkDelete: () => actions.openDeleteModal(),

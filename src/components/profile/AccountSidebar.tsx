@@ -10,6 +10,7 @@ import {
   CrownIcon,
   LogoutIcon,
 } from "../../assets/icons/ProfileIcons";
+import authService from "../../services/auth.service";
 
 const menuItems = [
   { label: "My Profile", path: "/profile", icon: <UserIcon /> },
@@ -34,9 +35,14 @@ const AccountSidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     console.log("Logging out...");
-    navigate("/login");
+
+    // 1. Gọi authService để dọn dẹp API và LocalStorage
+    await authService.logout();
+
+    // 2. Ép trình duyệt tải lại trang để xóa sạch bộ nhớ tạm (Ghost State của React)
+    window.location.href = "/login";
   };
 
   return (

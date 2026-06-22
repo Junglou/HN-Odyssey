@@ -385,3 +385,53 @@
     transform: translateX(0);
   }
 }
+
+/* --- TÍNH NĂNG PHÓNG TO ẢNH (MODAL ZOOM ADMIN) --- */
+.rarm-media-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 99999;
+}
+
+.rarm-media-modal-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.rarm-media-modal-content img,
+.rarm-media-modal-content video {
+  max-width: 100%;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+.rarm-media-modal-close {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  background: none;
+  border: none;
+  color: #ffffff;
+  font-size: 32px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s;
+  padding: 0;
+}
+
+.rarm-media-modal-close:hover {
+  color: #9ca3af;
+}

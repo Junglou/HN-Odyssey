@@ -38,6 +38,7 @@ interface ProductResponse {
 interface CategoryItem {
   _id: string;
   name: string;
+  children?: CategoryItem[];
 }
 
 interface TagItem {
@@ -68,6 +69,21 @@ const DISCOUNT_OPTIONS = [
   { label: "Percentage - %", value: "PERCENTAGE" },
   { label: "Fixed Amount - $", value: "FIXED_AMOUNT" },
 ];
+
+const flattenCategories = (
+  nodes: CategoryItem[],
+  parentPath = "",
+): OptionData[] => {
+  let result: OptionData[] = [];
+  for (const node of nodes) {
+    const currentPath = parentPath ? `${parentPath} > ${node.name}` : node.name;
+    result.push({ id: node._id, name: currentPath });
+    if (node.children && node.children.length > 0) {
+      result = result.concat(flattenCategories(node.children, currentPath));
+    }
+  }
+  return result;
+};
 
 function CustomSelect({
   value,
@@ -135,7 +151,7 @@ function CustomSelect({
 
 function MultiSelectDropdown({
   options,
-  selectedValues,
+  selectedValues, // Chứa mảng ID
   onChange,
   placeholder,
   disabled,
@@ -175,25 +191,24 @@ function MultiSelectDropdown({
     }
   };
 
-  // Nếu dùng server-side search (onSearchChange), ta bỏ qua việc filter chuỗi local, chỉ bỏ đi các item đã chọn.
-  // Nếu local, ta filter theo string bao gồm.
+  // Lọc option dựa trên ID thay vì Name
   const filteredOptions = onSearchChange
-    ? options.filter((opt) => !selectedValues.includes(opt.name))
+    ? options.filter((opt) => !selectedValues.includes(opt.id))
     : options.filter(
         (opt) =>
           opt.name.toLowerCase().includes(search.toLowerCase()) &&
-          !selectedValues.includes(opt.name),
+          !selectedValues.includes(opt.id),
       );
 
-  const handleSelect = (name: string) => {
-    onChange([...selectedValues, name]);
+  const handleSelect = (id: string) => {
+    onChange([...selectedValues, id]);
     setSearch("");
     if (onSearchChange) onSearchChange("");
     setIsOpen(false);
   };
 
-  const handleRemove = (name: string) => {
-    onChange(selectedValues.filter((v) => v !== name));
+  const handleRemove = (id: string) => {
+    onChange(selectedValues.filter((v) => v !== id));
   };
 
   return (
@@ -221,7 +236,7 @@ function MultiSelectDropdown({
                   <div
                     key={opt.id}
                     className="coupon-select-option"
-                    onClick={() => handleSelect(opt.name)}
+                    onClick={() => handleSelect(opt.id)} // Chọn ID
                   >
                     {opt.name}
                   </div>
@@ -238,20 +253,26 @@ function MultiSelectDropdown({
         className="coupon-selected-chips"
         style={{ marginTop: selectedValues.length > 0 ? "12px" : "0" }}
       >
-        {selectedValues.map((val) => (
-          <div key={val} className="coupon-chip-item">
-            {val}
-            {!disabled && (
-              <button
-                type="button"
-                className="coupon-chip-remove-btn"
-                onClick={() => handleRemove(val)}
-              >
-                <CloseIcon />
-              </button>
-            )}
-          </div>
-        ))}
+        {selectedValues.map((idVal) => {
+          // Map ID ngược lại thành Name để hiển thị cho User
+          const matchedOpt = options.find((o) => o.id === idVal);
+          const displayName = matchedOpt ? matchedOpt.name : idVal;
+
+          return (
+            <div key={idVal} className="coupon-chip-item">
+              {displayName}
+              {!disabled && (
+                <button
+                  type="button"
+                  className="coupon-chip-remove-btn"
+                  onClick={() => handleRemove(idVal)} // Gỡ ID
+                >
+                  <CloseIcon />
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -315,9 +336,8 @@ function ModalContent({
         ]);
 
         if (catRes.data) {
-          setCategoriesData(
-            catRes.data.map((c) => ({ id: c._id, name: c.name })),
-          );
+          // SỬA ĐỔI: Gọi hàm flatten
+          setCategoriesData(flattenCategories(catRes.data));
         }
         if (tagRes.data) {
           setTagsData(tagRes.data.map((t) => ({ id: t._id, name: t.name })));

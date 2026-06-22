@@ -2,8 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
 
-// 1. FIX LỖI erasableSyntaxOnly: DÙNG CONST OBJECT THAY VÌ ENUM
-
 export const ReviewStatusEnum = {
   NEW: "NEW",
   APPROVED: "APPROVED",
@@ -26,11 +24,16 @@ export const BulkReviewActionEnum = {
   DELETE: "DELETE",
 } as const;
 
-// 2. TYPES / INTERFACES CHUẨN XÁC
-
 export type ReviewStatus = "Replied" | "New" | "Hidden";
 export type DrawerMode = "view" | "edit" | null;
 
+export interface ReviewMedia {
+  url: string;
+  type: "IMAGE" | "VIDEO";
+  thumbnail?: string;
+}
+
+// Bổ sung mảng chứa reply của khách vào Record
 export interface ReviewRecord {
   id: string;
   productName: string;
@@ -47,6 +50,8 @@ export interface ReviewRecord {
   blockNote?: string;
   isPinned?: boolean;
   pinnedAt?: number;
+  media?: ReviewMedia[];
+  customerReplies: { content: string; date: string; media?: ReviewMedia[] }[];
 }
 
 interface ProductData {
@@ -68,6 +73,7 @@ interface BeReviewReply {
   replied_at: string;
 }
 
+// Bổ sung type từ Backend trả về
 interface BeReviewItem {
   _id: string;
   product_id: ProductData | string;
@@ -79,6 +85,12 @@ interface BeReviewItem {
   reply?: BeReviewReply;
   is_pinned: boolean;
   pinned_at?: string;
+  media?: ReviewMedia[]; // Đánh giá gốc
+  customer_replies?: {
+    content: string;
+    createdAt: string;
+    media?: ReviewMedia[];
+  }[]; // Reply của khách
 }
 
 interface FetchResponse {
@@ -89,8 +101,6 @@ interface FetchResponse {
     limit: number;
   };
 }
-
-// 3. MAPPER: CHUYỂN ĐỔI DỮ LIỆU TỪ BE -> FE
 
 const mapBeToFe = (item: BeReviewItem): ReviewRecord => {
   const product = typeof item.product_id === "object" ? item.product_id : null;
@@ -104,11 +114,18 @@ const mapBeToFe = (item: BeReviewItem): ReviewRecord => {
     .filter(Boolean)
     .join(" ");
 
+  // THÊM ĐOẠN MAP DỮ LIỆU REPLY NÀY
+  const mappedCustomerReplies = (item.customer_replies || []).map((cr) => ({
+    content: cr.content,
+    date: new Date(cr.createdAt).toLocaleString("vi-VN"),
+    media: cr.media || [],
+  }));
+
   return {
     id: item._id,
     productName: product?.name || "Unknown Product",
     customerId: user?._id || "Unknown ID",
-    customerName: fullName || "Anonymous", // Hiển thị tên thật
+    customerName: fullName || "Anonymous",
     rating: item.rating,
     reviewContent: item.content,
     price: product?.price || product?.base_price || 0,
@@ -118,10 +135,10 @@ const mapBeToFe = (item: BeReviewItem): ReviewRecord => {
     officialResponse: item.reply?.content,
     isPinned: item.is_pinned,
     pinnedAt: item.pinned_at ? new Date(item.pinned_at).getTime() : undefined,
+    media: item.media || [],
+    customerReplies: mappedCustomerReplies, // Gắn vào bản ghi FE
   };
 };
-
-// 4. MAIN HOOK
 
 export function useReviewAndRatingManagement() {
   const [records, setRecords] = useState<ReviewRecord[]>([]);
@@ -149,8 +166,6 @@ export function useReviewAndRatingManagement() {
     editingRecord: ReviewRecord | null;
   }>({ isOpen: false, mode: null, editingRecord: null });
 
-  // API: FETCH REVIEWS
-
   const fetchReviews = useCallback(async () => {
     try {
       const params: Record<string, string | number> = { page, limit };
@@ -174,7 +189,7 @@ export function useReviewAndRatingManagement() {
       setRecords(responseData.items.map(mapBeToFe));
       setTotalRecords(responseData.meta.total);
     } catch (error) {
-      console.error(error); // FIX: log error ra để hết báo lỗi no-unused-vars
+      console.error(error);
       toast.error("Lỗi khi tải danh sách đánh giá.");
     }
   }, [page, limit, search, statusFilter, ratingFilter]);
@@ -185,8 +200,6 @@ export function useReviewAndRatingManagement() {
     }, 300);
     return () => clearTimeout(timeout);
   }, [fetchReviews]);
-
-  // HANDLERS (FIX: XÓA USEMEMO ĐỂ CHIỀU LÒNG REACT COMPILER)
 
   const totalPages = Math.ceil(totalRecords / limit);
   const startIndex = (page - 1) * limit;
@@ -260,7 +273,7 @@ export function useReviewAndRatingManagement() {
         actions.closeModal();
         fetchReviews();
       } catch (error) {
-        console.error(error); // FIX: xử lý biến error
+        console.error(error);
         toast.error("Có lỗi xảy ra khi xóa đánh giá.");
       }
     },
@@ -277,7 +290,7 @@ export function useReviewAndRatingManagement() {
         );
         fetchReviews();
       } catch (error) {
-        console.error(error); // FIX: xử lý biến error
+        console.error(error);
         toast.error("Có lỗi xảy ra, không thể thay đổi trạng thái.");
       }
     },
@@ -296,7 +309,6 @@ export function useReviewAndRatingManagement() {
       if (!targetReview) return;
 
       try {
-        // 1. Gửi phản hồi hoặc Khóa tài khoản
         if (
           updates.officialResponse !== targetReview.officialResponse ||
           updates.isUserBanned !== targetReview.isUserBanned
@@ -327,22 +339,19 @@ export function useReviewAndRatingManagement() {
           }
         }
 
-        // 2. Chuyển đổi trạng thái ghim nếu có thay đổi
         if (updates.isPinned !== targetReview.isPinned) {
           await axiosClient.patch(`/admin/reviews/${reviewId}/toggle-pin`);
         }
 
         toast.success("Thay đổi đã được lưu thành công!");
         actions.closeDrawer();
-        fetchReviews(); // Re-fetch data mới nhất từ server
+        fetchReviews();
       } catch (error) {
-        console.error(error); // FIX: xử lý biến error
+        console.error(error);
         toast.error("Có lỗi xảy ra khi lưu thay đổi.");
       }
     },
   };
-
-  // BULK ACTIONS (FIX: XÓA USEMEMO NHƯ TRÊN)
 
   const bulkActions = {
     bulkHide: async () => {
@@ -356,7 +365,7 @@ export function useReviewAndRatingManagement() {
         setSelectedIds(new Set());
         fetchReviews();
       } catch (error) {
-        console.error(error); // FIX: xử lý biến error
+        console.error(error);
         toast.error("Lỗi thao tác hàng loạt (Ẩn).");
       }
     },
@@ -371,7 +380,7 @@ export function useReviewAndRatingManagement() {
         setSelectedIds(new Set());
         fetchReviews();
       } catch (error) {
-        console.error(error); // FIX: xử lý biến error
+        console.error(error);
         toast.error("Lỗi thao tác hàng loạt (Hiển thị).");
       }
     },

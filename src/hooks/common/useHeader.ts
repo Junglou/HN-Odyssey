@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import tokenStorage from "../../utils/tokenStorage";
+import axiosClient from "../../api/axiosClient";
 
 export function useHeader() {
   const navigate = useNavigate();
@@ -10,13 +12,58 @@ export function useHeader() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // mock data states
-  const [isAuthenticated] = useState(true);
-  const [hasWishlistItems] = useState(true);
+  // real data states
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [hasWishlistItems, setHasWishlistItems] = useState<boolean>(false);
 
   // refs
   const lastScrollY = useRef(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // effect: Kéo dữ liệu Wishlist và check Auth
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchWishlistStatus = async () => {
+      const token = tokenStorage.getToken();
+
+      if (isMounted) {
+        setIsAuthenticated(!!token);
+      }
+
+      if (!token) {
+        if (isMounted) setHasWishlistItems(false);
+        return;
+      }
+
+      try {
+        const res = await axiosClient.get("/users/wishlist");
+        if (isMounted) {
+          // Lấy mảng dữ liệu trả về (tương thích cả 2 chuẩn res.data.data hoặc res.data)
+          const items = res.data?.data || res.data || [];
+          setHasWishlistItems(Array.isArray(items) && items.length > 0);
+        }
+      } catch (error) {
+        console.error("Lỗi khi kiểm tra wishlist:", error);
+      }
+    };
+
+    void fetchWishlistStatus();
+
+    // Lắng nghe sự kiện cập nhật wishlist từ các Component khác
+    const handleWishlistUpdate = () => {
+      if (isMounted) {
+        void fetchWishlistStatus();
+      }
+    };
+
+    window.addEventListener("wishlist_updated", handleWishlistUpdate);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener("wishlist_updated", handleWishlistUpdate);
+    };
+  }, []);
 
   // effect scroll ẩn hiện header
   useEffect(() => {
@@ -101,7 +148,11 @@ export function useHeader() {
   };
 
   const handleWishlistClick = () => {
-    navigate("/profile/wishlist");
+    if (isAuthenticated) {
+      navigate("/profile/wishlist");
+    } else {
+      navigate("/login");
+    }
   };
 
   return {

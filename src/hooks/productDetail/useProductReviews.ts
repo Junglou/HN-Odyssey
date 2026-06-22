@@ -2,10 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
 import tokenStorage from "../../utils/tokenStorage";
-import { toast } from "react-toastify"; // Đảm bảo bạn đã cài và setup react-toastify trong project
+import { toast } from "react-toastify";
 
-// --- Types ---
-interface ReviewUser {
+export interface ReviewUser {
   _id: string;
   first_Name?: string;
   last_Name?: string;
@@ -13,12 +12,26 @@ interface ReviewUser {
   avatar: string | null;
 }
 
-interface ReviewReply {
+export interface ReviewReply {
   content: string;
   replied_at: string;
 }
 
-interface ReviewData {
+export interface ReviewMedia {
+  url: string;
+  type: "IMAGE" | "VIDEO";
+  thumbnail?: string;
+}
+
+export interface CustomerReplyBE {
+  _id: string;
+  user_id: string | ReviewUser;
+  content: string;
+  createdAt: string;
+  media: ReviewMedia[];
+}
+
+export interface ReviewData {
   _id: string;
   product_id: string;
   user_id: string | ReviewUser;
@@ -33,6 +46,9 @@ interface ReviewData {
   user?: ReviewUser;
   is_verified_purchase?: boolean;
   reply?: ReviewReply;
+  customer_replies?: CustomerReplyBE[];
+  reply_users?: ReviewUser[];
+  media: ReviewMedia[];
 }
 
 interface ReviewResponse {
@@ -40,17 +56,26 @@ interface ReviewResponse {
   meta: { total: number; page: number; limit: number; totalPages: number };
 }
 
-interface UIReview {
+export interface UICustomerReply {
+  id: string;
+  author: string;
+  date: string;
+  content: string;
+  media: ReviewMedia[];
+}
+
+export interface UIReview {
   id: string;
   author: string;
   isVerified: boolean;
   date: string;
   rating: number;
   content: string;
-  reply?: { content: string; date: string };
+  media: ReviewMedia[];
+  adminReply?: { content: string; date: string };
+  customerReplies: UICustomerReply[];
 }
 
-// --- Config data ---
 const MOCK_FILTERS = [
   "All",
   "5 Stars",
@@ -69,13 +94,13 @@ const SORT_OPTIONS = [
 export function useProductReviews() {
   const { slug: productId } = useParams<{ slug: string }>();
 
-  // States bộ lọc & phân trang
+  const [reviewStats, setReviewStats] = useState({ average: 0, total: 0 });
+
   const [activeFilter, setActiveFilter] = useState<string>("All");
   const [sortBy, setSortBy] = useState<string>("Most recent");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(0);
 
-  // States form đánh giá
   const [_isWritingReview, _setIsWritingReview] = useState<boolean>(false);
   const [userFeedback, setUserFeedback] = useState<
     Record<string, "like" | "dislike">
@@ -84,41 +109,55 @@ export function useProductReviews() {
   const [newRating, setNewRating] = useState<number>(0);
   const [reviewText, setReviewText] = useState<string>("");
 
-  // States kiểm tra điều kiện đánh giá (Lấy từ BE)
+  const [reviewMedia, setReviewMedia] = useState<ReviewMedia[]>([]);
+  const [isUploadingMedia, setIsUploadingMedia] = useState<boolean>(false);
+
   const [eligibility, setEligibility] = useState<{
     isEligible: boolean;
     orderId?: string;
     variantSku?: string;
   }>({ isEligible: false });
 
-  // 1. Hàm kiểm tra quyền đánh giá (Chỉ chạy khi có token)
+  // THÊM: Quản lý Reply Media
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState<string>("");
+  const [replyMedia, setReplyMedia] = useState<ReviewMedia[]>([]);
+  const [isUploadingReplyMedia, setIsUploadingReplyMedia] =
+    useState<boolean>(false);
+
   const checkReviewEligibility = useCallback(async () => {
     if (!productId || !tokenStorage.getToken()) return;
-
     try {
       const response = await axiosClient.get(
         `/reviews/eligibility/${productId}`,
       );
       setEligibility(response.data);
     } catch (error) {
-      console.error("Lỗi kiểm tra quyền đánh giá:", error);
+      console.error(error);
     }
   }, [productId]);
 
-  // 2. Hàm Fetch danh sách đánh giá
+  const fetchReviewStats = useCallback(async () => {
+    if (!productId) return;
+    try {
+      const response = await axiosClient.get(`/reviews/stats/${productId}`);
+      setReviewStats({
+        average: response.data.stats.average || 0,
+        total: response.data.stats.total || 0,
+      });
+    } catch (error) {
+      console.error("Loi khi lay thong ke review:", error);
+    }
+  }, [productId]);
+
   const fetchReviews = useCallback(async () => {
     if (!productId) return;
-
     let backendSort = "newest";
     if (sortBy === "Highest Rating") backendSort = "highest_rating";
     if (sortBy === "Lowest Rating") backendSort = "lowest_rating";
 
     let starFilter: number | undefined = undefined;
-    if (activeFilter === "5 Stars") starFilter = 5;
-    if (activeFilter === "4 Stars") starFilter = 4;
-    if (activeFilter === "3 Stars") starFilter = 3;
-    if (activeFilter === "2 Stars") starFilter = 2; // Đã bổ sung logic cho 2 Stars
-    if (activeFilter === "1 Stars") starFilter = 1; // Đã bổ sung logic cho 1 Stars
+    if (activeFilter !== "All") starFilter = parseInt(activeFilter.charAt(0));
 
     try {
       const response = await axiosClient.get<ReviewResponse>(
@@ -137,11 +176,10 @@ export function useProductReviews() {
       const mappedReviews: UIReview[] = data.map((review) => {
         const dateObj = new Date(review.createdAt);
 
-        // xử lý format dữ liệu reply nếu admin đã phản hồi
-        let replyData;
+        let adminReplyData;
         if (review.reply) {
           const replyDate = new Date(review.reply.replied_at);
-          replyData = {
+          adminReplyData = {
             content: review.reply.content,
             date: replyDate.toLocaleDateString("en-US", {
               month: "short",
@@ -150,6 +188,28 @@ export function useProductReviews() {
             }),
           };
         }
+
+        const mappedCustomerReplies: UICustomerReply[] = (
+          review.customer_replies || []
+        ).map((cr) => {
+          const rUser = review.reply_users?.find(
+            (u) => u._id === cr.user_id?.toString() || u._id === cr.user_id,
+          );
+          const rFullName = rUser
+            ? `${rUser.first_Name} ${rUser.last_Name}`
+            : "Customer";
+          return {
+            id: cr._id,
+            author: rFullName,
+            date: new Date(cr.createdAt).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            }),
+            content: cr.content,
+            media: cr.media || [], // Ánh xạ media trả về từ BE
+          };
+        });
 
         return {
           id: review._id,
@@ -162,27 +222,34 @@ export function useProductReviews() {
           }),
           rating: review.rating,
           content: review.content,
-          reply: replyData, // gán dữ liệu đã xử lý vào danh sách trả về
+          media: review.media || [],
+          adminReply: adminReplyData,
+          customerReplies: mappedCustomerReplies,
         };
       });
 
       setReviewsList(mappedReviews);
       setTotalPages(meta.totalPages);
     } catch (error) {
-      console.error("Lỗi khi tải danh sách đánh giá:", error);
+      console.error(error);
     }
   }, [productId, activeFilter, sortBy, currentPage]);
 
   useEffect(() => {
-    //eslint-disable-next-line react-hooks/exhaustive-deps
-    fetchReviews();
-  }, [fetchReviews]);
+    const initFetch = async () => {
+      await fetchReviewStats();
+      await fetchReviews();
+    };
+    initFetch();
+  }, [fetchReviews, fetchReviewStats]);
 
   useEffect(() => {
-    checkReviewEligibility();
+    const initCheck = async () => {
+      await checkReviewEligibility();
+    };
+    initCheck();
   }, [checkReviewEligibility]);
 
-  // --- Handlers ---
   const handleFilterChange = (filter: string) => {
     setActiveFilter(filter);
     setCurrentPage(1);
@@ -195,43 +262,117 @@ export function useProductReviews() {
 
   const handleFeedback = async (reviewId: string, type: "like" | "dislike") => {
     setUserFeedback((prev) => {
-      if (prev[reviewId] === type) {
-        const newState = { ...prev };
-        delete newState[reviewId];
-        return newState;
-      }
-      return { ...prev, [reviewId]: type };
+      const newState = { ...prev };
+      if (prev[reviewId] === type) delete newState[reviewId];
+      else newState[reviewId] = type;
+      return newState;
     });
-
     if (type === "like") {
       try {
         await axiosClient.post(`/reviews/${reviewId}/vote`);
       } catch (error) {
-        console.error("Lỗi khi vote đánh giá:", error);
+        console.error(error);
       }
+    }
+  };
+
+  const handleUploadMedia = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    if (reviewMedia.length + files.length > 5) {
+      toast.warning("Chỉ được tải lên tối đa 5 hình ảnh/video.");
+      return;
+    }
+
+    setIsUploadingMedia(true);
+    try {
+      const formData = new FormData();
+      Array.from(files).forEach((file) => formData.append("files", file));
+
+      const response = await axiosClient.post<{ data: ReviewMedia[] }>(
+        "/reviews/upload-media",
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } },
+      );
+
+      setReviewMedia((prev) => [...prev, ...response.data.data]);
+    } catch (error: unknown) {
+      console.error(error);
+      toast.error("Tải tệp lên thất bại. Vui lòng thử lại.");
+    } finally {
+      setIsUploadingMedia(false);
+      event.target.value = "";
+    }
+  };
+
+  // THÊM: Logic Upload cho Form Reply
+  const handleUploadReplyMedia = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    if (replyMedia.length + files.length > 5) {
+      toast.warning("Chỉ được tải lên tối đa 5 hình ảnh/video.");
+      return;
+    }
+
+    setIsUploadingReplyMedia(true);
+    try {
+      const formData = new FormData();
+      Array.from(files).forEach((file) => formData.append("files", file));
+
+      const response = await axiosClient.post<{ data: ReviewMedia[] }>(
+        "/reviews/upload-media",
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } },
+      );
+
+      setReplyMedia((prev) => [...prev, ...response.data.data]);
+    } catch (error: unknown) {
+      console.error(error);
+      toast.error("Tải tệp lên thất bại. Vui lòng thử lại.");
+    } finally {
+      setIsUploadingReplyMedia(false);
+      event.target.value = "";
     }
   };
 
   const handleCancelReview = () => {
     setNewRating(0);
     setReviewText("");
+    setReviewMedia([]);
     _setIsWritingReview(false);
   };
 
-  /**
-   * KỸ THUẬT GHI ĐÈ BẢO VỆ UI:
-   * Không cho mở form nếu chưa đăng nhập hoặc không đủ điều kiện (chưa mua/đã review hết).
-   */
+  // THÊM: Logic mở đóng Reply để clear dữ liệu rác
+  const handleOpenReply = (reviewId: string) => {
+    if (replyingTo === reviewId) {
+      handleCloseReply();
+    } else {
+      setReplyingTo(reviewId);
+      setReplyText("");
+      setReplyMedia([]);
+    }
+  };
+
+  const handleCloseReply = () => {
+    setReplyingTo(null);
+    setReplyText("");
+    setReplyMedia([]);
+  };
+
   const setIsWritingReview = (val: boolean) => {
     if (val) {
       if (!tokenStorage.getToken()) {
-        toast.warning("Vui lòng đăng nhập để viết đánh giá.");
+        toast.warning("Vui lòng đăng nhập.");
         return;
       }
       if (!eligibility.isEligible) {
-        toast.warning(
-          "Bạn cần mua và nhận sản phẩm này thành công trước khi đánh giá. Nếu đã mua, có thể bạn đã đánh giá sản phẩm này rồi.",
-        );
+        toast.warning("Bạn cần mua sản phẩm này trước.");
         return;
       }
     }
@@ -239,9 +380,13 @@ export function useProductReviews() {
   };
 
   const handleSubmitReview = async () => {
-    if (newRating === 0 || !reviewText.trim() || !productId) return;
-    if (!eligibility.orderId || !eligibility.variantSku) return;
-
+    if (
+      newRating === 0 ||
+      (!reviewText.trim() && reviewMedia.length === 0) ||
+      !productId ||
+      !eligibility.orderId
+    )
+      return;
     try {
       await axiosClient.post("/reviews", {
         productId,
@@ -249,23 +394,41 @@ export function useProductReviews() {
         variantSku: eligibility.variantSku,
         rating: newRating,
         content: reviewText,
+        media: reviewMedia,
       });
-
       handleCancelReview();
+      fetchReviewStats();
       fetchReviews();
-      checkReviewEligibility(); // Check lại để xem còn order nào khác hợp lệ không
+      checkReviewEligibility();
       toast.success("Gửi đánh giá thành công!");
     } catch (error: unknown) {
-      // Đổi thành unknown để tránh lỗi ESLint any
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Đã xảy ra lỗi khi gửi đánh giá.";
-      toast.error(errorMessage);
+      toast.error(error instanceof Error ? error.message : "Đã xảy ra lỗi.");
+    }
+  };
+
+  const handleSubmitCustomerReply = async (reviewId: string) => {
+    if (!tokenStorage.getToken()) {
+      toast.warning("Vui lòng đăng nhập.");
+      return;
+    }
+    // Cho phép gửi nếu có text HOẶC có hình ảnh
+    if (!replyText.trim() && replyMedia.length === 0) return;
+
+    try {
+      await axiosClient.post(`/reviews/${reviewId}/reply`, {
+        content: replyText,
+        media: replyMedia, // Đính kèm mảng hình ảnh Reply
+      });
+      handleCloseReply();
+      fetchReviews();
+      toast.success("Đã phản hồi bình luận.");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Đã xảy ra lỗi.");
     }
   };
 
   return {
+    reviewStats,
     filters: MOCK_FILTERS,
     sortOptions: SORT_OPTIONS,
     reviews: reviewsList,
@@ -277,6 +440,18 @@ export function useProductReviews() {
     userFeedback,
     newRating,
     reviewText,
+    reviewMedia,
+    isUploadingMedia,
+    replyingTo,
+    replyText,
+    replyMedia,
+    isUploadingReplyMedia,
+    setReplyText,
+    handleOpenReply,
+    handleCloseReply,
+    handleUploadMedia,
+    handleUploadReplyMedia,
+    handleSubmitCustomerReply,
     handleFilterChange,
     handleSortChange,
     handlePageChange: setCurrentPage,

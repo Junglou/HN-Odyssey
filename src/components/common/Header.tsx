@@ -63,6 +63,12 @@ export default function Header() {
   const searchWrapperRef = useRef<HTMLDivElement>(null);
   const isModalOpenRef = useRef(isDeleteModalOpen);
 
+  // tính tổng số lượng sản phẩm thực tế trong giỏ hàng
+  const totalCartQuantity = cartItems.reduce(
+    (total, item) => total + item.quantity,
+    0,
+  );
+
   // cập nhật ref theo state modal xóa để tránh lỗi click outside
   useEffect(() => {
     isModalOpenRef.current = isDeleteModalOpen;
@@ -145,8 +151,9 @@ export default function Header() {
           <div className="header-action-wrapper" ref={cartWrapperRef}>
             <div className="cart-trigger-box" onClick={toggleCart}>
               <CartIcon className="action-icon" />
-              {cartItems.length > 0 && (
-                <span className="action-badge">{cartItems.length}</span>
+              {/* hiển thị tổng số lượng thay vì độ dài mảng */}
+              {totalCartQuantity > 0 && (
+                <span className="action-badge">{totalCartQuantity}</span>
               )}
             </div>
 
@@ -184,7 +191,6 @@ export default function Header() {
                 placeholder="Search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                // đã gỡ onBlur để popup không bị ẩn mất trước khi user kịp click vào item
                 onKeyDown={handleSearchKeyDown}
               />
 
