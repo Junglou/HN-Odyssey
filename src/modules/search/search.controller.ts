@@ -37,6 +37,7 @@ export class SearchController {
     };
   }
 
+  @Public()
   @Get('suggestions')
   @Throttle({ default: { limit: 10, ttl: 1000 } })
   async getSuggestions(

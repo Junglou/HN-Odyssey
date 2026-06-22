@@ -26,6 +26,7 @@ import type { RequestWithUser } from 'src/common/interfaces/request-with-user.in
 import type { QueryFlashSaleDto } from './flash-sales.service';
 import type { QueryCouponDto } from './coupons.service';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { Public } from 'src/common/decorators/public.decorator';
 
 @Controller('promotions')
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
@@ -77,6 +78,7 @@ export class PromotionsController {
   }
 
   // API Public cho Frontend trang chủ
+  @Public()
   @Get('public/flash-sales/active')
   async getActiveFlashSaleForClient() {
     const data = await this.flashSalesService.getActiveFlashSales();
@@ -115,6 +117,7 @@ export class PromotionsController {
     return new BaseResponse(true, 'Lấy danh sách mã giảm giá thành công', data);
   }
 
+  @Public()
   @Get('public/coupons/active')
   async getActiveCouponsForClient() {
     const data = await this.couponsService.findActiveCoupons();
@@ -129,6 +132,7 @@ export class PromotionsController {
   }
 
   // API Public cho Frontend Checkout (Không cần phân quyền Admin)
+  @Public()
   @Post('coupons/apply')
   async applyCoupon(
     @Body('code') code: string,

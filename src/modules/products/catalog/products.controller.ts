@@ -282,6 +282,7 @@ export class ProductsController {
   }
 
   @Get(':slug')
+  @Public()
   async getDetail(@Param('slug') slug: string, @Res() res: Response) {
     try {
       const product = await this.productsService.findBySlug(slug);

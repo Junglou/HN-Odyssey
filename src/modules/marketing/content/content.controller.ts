@@ -38,6 +38,7 @@ import { BannerStatus } from './schemas/banner.schema';
 import { PostStatus } from './schemas/blog-post.schema';
 import { UpdatePageConfigDto } from './dto/page-config.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Public } from 'src/common/decorators/public.decorator';
 
 interface RequestWithUser extends Request {
   user: {
@@ -73,6 +74,7 @@ export class ContentController {
     return new BaseResponse(true, 'Lấy danh sách bài viết thành công', data);
   }
 
+  @Public()
   @Get('public/posts')
   async getPublicPosts(@Query() query: QueryPostDto) {
     const data = await this.contentService.findAllPosts(query);
@@ -134,6 +136,7 @@ export class ContentController {
   }
 
   // AC7 (US.125) & Mở rộng (US.126): API Xem trước (Preview Mode) cho Frontend
+  @Public()
   @Get('public/preview/:slug')
   async previewContent(@Param('slug') slug: string) {
     // API này không dùng Guard để Frontend có thể fetch xem trước,
@@ -191,6 +194,7 @@ export class ContentController {
     return new BaseResponse(true, 'Tạo cấu hình Menu thành công', data);
   }
 
+  @Public()
   @Get('public/menus')
   async getPublicMenus(@Query('position') position: string) {
     const data = await this.contentService.getPublicMenus(position);
@@ -198,12 +202,14 @@ export class ContentController {
   }
 
   // API PUBLIC FRONTEND KHÁCH HÀNG (Đọc bài viết/trang)
+  @Public()
   @Get('public/posts/:slug')
   async getPublicPost(@Param('slug') slug: string) {
     const data = await this.contentService.getPublicPostBySlug(slug);
     return new BaseResponse(true, 'Thành công', data);
   }
 
+  @Public()
   @Get('public/pages/:slug')
   async getPublicPage(@Param('slug') slug: string) {
     const data = await this.contentService.getPublicPageBySlug(slug);
@@ -272,7 +278,7 @@ export class ContentController {
   }
 
   // API PUBLIC CHO FRONTEND (BANNERS)
-
+  @Public()
   @Get('banners/public/active')
   async getActiveBanners(
     @Query('position') position: string,
@@ -285,6 +291,7 @@ export class ContentController {
     return new BaseResponse(true, 'Thành công', data);
   }
 
+  @Public()
   @Post('banners/public/:id/click')
   async trackBannerClick(@Param('id') id: string) {
     await this.contentService.trackClick(id);
@@ -340,6 +347,7 @@ export class ContentController {
   }
 
   // Lấy cấu hình trang (Admin hoặc Public đều có thể gọi)
+  @Public()
   @Get('page-configs/:pageId')
   async getPageConfig(@Param('pageId') pageId: string) {
     const data = await this.contentService.getPageConfig(pageId);

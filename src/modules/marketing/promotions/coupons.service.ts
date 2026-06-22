@@ -194,7 +194,7 @@ export class CouponsService {
 
     if (cartTotal < coupon.min_order_value) {
       throw new BadRequestException(
-        `Đơn hàng tối thiểu để áp dụng mã này là ${coupon.min_order_value}đ.`,
+        `Đơn hàng tối thiểu để áp dụng mã này là $${coupon.min_order_value}.`,
       );
     }
 

@@ -353,6 +353,7 @@ export class AuthService {
           email: user.email,
           full_name: user.last_Name + ' ' + user.first_Name,
           roles: user.roles,
+          status: user.status,
         },
       };
     }
@@ -588,6 +589,7 @@ export class AuthService {
         full_name: user.fullName,
         roles: user.roles,
         avatar: user.avatar,
+        status: user.status,
       },
     };
   }

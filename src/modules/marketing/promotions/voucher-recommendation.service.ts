@@ -166,9 +166,9 @@ export class VoucherRecommendationService {
           // AC2: Logic Upsell (Chỉ gợi ý nếu thiếu dưới 30% giá trị giỏ)
           if (
             missingAmount <= cartContext.total_value * 0.3 ||
-            missingAmount <= 100000
+            missingAmount <= 5
           ) {
-            message = `Mua thêm ${missingAmount.toLocaleString('vi-VN')}đ để được giảm ${coupon.discount_value.toLocaleString('vi-VN')}${coupon.discount_type === DiscountType.PERCENTAGE ? '%' : 'đ'}`;
+            message = `Mua thêm $${missingAmount.toLocaleString('en-US')} để được giảm ${coupon.discount_type === DiscountType.PERCENTAGE ? coupon.discount_value.toLocaleString('en-US') + '%' : '$' + coupon.discount_value.toLocaleString('en-US')}`;
           } else {
             continue; // Bỏ qua không hiển thị nếu khoảng cách quá xa
           }
