@@ -16,7 +16,10 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ReviewsService } from './reviews.service';
-import { CreateReviewDto } from './dto/create-review.dto';
+import {
+  CreateCustomerReplyDto,
+  CreateReviewDto,
+} from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { ReportReviewDto } from './dto/report-review.dto';
 import { ReviewQueryDto } from './dto/review-query.dto';
@@ -60,11 +63,9 @@ export class ReviewsController {
   async create(
     @CurrentUser() user: ICurrentUser,
     @Body() dto: CreateReviewDto,
-    @Ip() ip: string,
-    @UserAgent() userAgent: string,
   ) {
     const userId = this.getUserId(user);
-    return this.reviewsService.create(userId, dto, ip, userAgent);
+    return this.reviewsService.create(userId, dto);
   }
 
   @Patch(':id')
@@ -182,5 +183,15 @@ export class ReviewsController {
   ) {
     const userId = this.getUserId(user);
     return this.reviewsService.checkEligibility(userId, productId);
+  }
+
+  @Post(':id/reply')
+  async replyToReview(
+    @Param('id') reviewId: string,
+    @CurrentUser() user: ICurrentUser,
+    @Body() dto: CreateCustomerReplyDto,
+  ) {
+    const userId = this.getUserId(user);
+    return this.reviewsService.replyToReview(userId, reviewId, dto);
   }
 }

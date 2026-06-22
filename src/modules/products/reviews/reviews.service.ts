@@ -26,6 +26,29 @@ import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant
 import { ReviewQueryDto } from './dto/review-query.dto';
 import { ReviewStatus } from 'src/common/enums/review.enum';
 import { User, UserDocument } from 'src/modules/users/schemas/user.schema';
+import {
+  Customer,
+  CustomerDocument,
+} from 'src/modules/users/customers/schemas/customer.schema';
+
+// Khai báo Interface cho DTO Reply để fix triệt để lỗi "any" của ESLint
+export interface ICustomerReplyDto {
+  content: string;
+  media?: Array<{
+    url: string;
+    type: 'IMAGE' | 'VIDEO';
+    thumbnail?: string;
+  }>;
+}
+
+export interface ICustomerReplyResult {
+  _id: Types.ObjectId;
+  user_id: Types.ObjectId | AggregatedUser;
+  content: string;
+  media: Record<string, unknown>[];
+  createdAt: Date;
+  user?: AggregatedUser;
+}
 
 // 1. Interface Query Params
 export interface ReviewQueryParam {
@@ -102,6 +125,7 @@ export class ReviewsService {
     private reviewReportModel: Model<ReviewReportDocument>,
     private readonly eventEmitter: EventEmitter2,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Customer.name) private customerModel: Model<CustomerDocument>, // Đã sửa lỗi typo "customermodel"
   ) {}
 
   // Hàm tự động nhận diện và chuyển đổi Slug thành ObjectId chuẩn
@@ -120,12 +144,7 @@ export class ReviewsService {
     return product._id.toString();
   }
 
-  async create(
-    userId: string,
-    dto: CreateReviewDto,
-    ip: string,
-    userAgent: string,
-  ) {
+  async create(userId: string, dto: CreateReviewDto) {
     const user = (await this.userModel
       .findById(userId)
       .select('review_access')
@@ -133,7 +152,7 @@ export class ReviewsService {
 
     if (user && user.review_access === 'RESTRICTED') {
       throw new ForbiddenException(
-        'Tài khoản của bạn đã bị hạn chế quyền đánh giá do vi phạm tiêu chuẩn cộng đồng.',
+        'Tài khoản của bạn đã bị hạn chế quyền đánh giá.',
       );
     }
     const order = await this.orderModel
@@ -146,12 +165,11 @@ export class ReviewsService {
 
     if (!order) {
       throw new ForbiddenException(
-        'Bạn chưa mua sản phẩm này hoặc đơn hàng chưa hoàn tất giao dịch.',
+        'Bạn chưa mua sản phẩm này hoặc đơn hàng chưa hoàn tất.',
       );
     }
 
     const actualProductId = await this.resolveProductId(dto.productId);
-
     const itemExists = order.items.find(
       (item) =>
         item.product_id.toString() === actualProductId &&
@@ -163,26 +181,9 @@ export class ReviewsService {
       );
     }
 
-    const existingReview = await this.reviewModel
-      .findOne({
-        order_id: new Types.ObjectId(dto.orderId),
-        product_id: new Types.ObjectId(actualProductId),
-        variant_sku: dto.variantSku,
-      })
-      .lean();
-
-    if (existingReview) {
-      throw new BadRequestException(
-        'Bạn đã đánh giá sản phẩm này trong đơn hàng hiện tại rồi.',
-      );
-    }
-
     let safeContent = '';
     if (dto.content) {
-      // 1. Chống XSS
       safeContent = sanitizeReviewContent(dto.content);
-
-      // 2. Auto-Moderation (AC7): Thay thế từ cấm bằng *** thay vì báo lỗi
       const profanityCheck = filterProfanity(safeContent);
       if (!profanityCheck.isClean && profanityCheck.filteredText) {
         safeContent = profanityCheck.filteredText;
@@ -208,17 +209,6 @@ export class ReviewsService {
       reviewId: review._id.toString(),
       productId: dto.productId,
       orderId: dto.orderId,
-    });
-
-    await this.auditLogsService.log({
-      action: 'CREATE_REVIEW',
-      collection_name: 'reviews',
-      department: Department.SUPPORT,
-      actor_id: userId,
-      target_id: review._id.toString(),
-      detail: { rating: dto.rating },
-      ip,
-      user_agent: userAgent,
     });
 
     return { message: 'Gửi đánh giá thành công', data: review };
@@ -429,6 +419,17 @@ export class ReviewsService {
         {
           $facet: {
             data: [
+              {
+                $lookup: {
+                  from: 'users',
+                  localField: 'customer_replies.user_id',
+                  foreignField: '_id',
+                  as: 'reply_users',
+                  pipeline: [
+                    { $project: { first_Name: 1, last_Name: 1, avatar: 1 } },
+                  ],
+                },
+              },
               { $skip: skip },
               { $limit: limitNumber },
               {
@@ -491,36 +492,89 @@ export class ReviewsService {
     const review = await this.reviewModel.findById(reviewId);
     if (!review) throw new NotFoundException('Đánh giá không tồn tại');
 
-    const existingReport = await this.reviewReportModel.findOne({
-      review_id: new Types.ObjectId(reviewId),
-      reporter_id: new Types.ObjectId(userId),
-    });
-
-    if (existingReport) {
-      throw new BadRequestException('Bạn đã báo cáo đánh giá này rồi.');
-    }
-
-    const report = await this.reviewReportModel.create({
+    // Tạo record report (Lưu vết)
+    await this.reviewReportModel.create({
       review_id: new Types.ObjectId(reviewId),
       reporter_id: new Types.ObjectId(userId),
       reason: dto.reason,
     });
 
+    // AUTO ACTION: Xóa comment
+    await this.reviewModel.deleteOne({ _id: reviewId });
+    await this.updateProductRating(review.product_id.toString());
+
+    // AUTO ACTION: Tắt quyền review của tác giả comment
+    await this.customerModel.updateOne(
+      { _id: review.user_id },
+      {
+        $set: {
+          review_access: 'RESTRICTED',
+          status_reason: `Hệ thống tự động khóa do vi phạm (Report bởi User ${userId})`,
+        },
+      },
+    );
+
     await this.auditLogsService.log({
-      action: 'REPORT_REVIEW',
-      collection_name: 'review_reports',
+      action: 'AUTO_RESOLVE_REPORT',
+      collection_name: 'reviews',
       department: Department.SUPPORT,
       actor_id: userId,
-      target_id: report._id.toString(),
-      detail: {
-        review_id: reviewId,
-        reason: dto.reason,
-      },
+      target_id: reviewId,
+      detail: { message: 'Xóa tự động và chặn người dùng', reason: dto.reason },
       ip: ip || 'Unknown',
       user_agent: userAgent || 'Unknown',
     });
 
-    return { message: 'Cảm ơn bạn đã báo cáo. Chúng tôi sẽ xem xét sớm nhất.' };
+    return {
+      message: 'Đã xử lý báo cáo vi phạm thành công. Bình luận đã được gỡ bỏ.',
+    };
+  }
+
+  // 4. THÊM HÀM XỬ LÝ CUSTOMER REPLY
+  async replyToReview(
+    userId: string,
+    reviewId: string,
+    dto: ICustomerReplyDto, // Đã fix từ any sang Interface
+  ) {
+    const user = (await this.userModel
+      .findById(userId)
+      .select('review_access')
+      .lean()) as { review_access?: string } | null;
+    if (user && user.review_access === 'RESTRICTED') {
+      throw new ForbiddenException('Tài khoản của bạn đã bị hạn chế.');
+    }
+
+    const review = await this.reviewModel.findById(reviewId);
+    if (!review) throw new NotFoundException('Đánh giá không tồn tại');
+
+    let safeContent = sanitizeReviewContent(dto.content);
+    const profanityCheck = filterProfanity(safeContent);
+    if (!profanityCheck.isClean && profanityCheck.filteredText) {
+      safeContent = profanityCheck.filteredText;
+    }
+
+    // Mapping an toàn, loại bỏ triệt để lỗi "unsafe-assignment"
+    const mappedMedia = dto.media
+      ? dto.media.map((m) => ({
+          url: m.url,
+          type: m.type,
+          thumbnail: m.thumbnail,
+        }))
+      : [];
+
+    const newReply = {
+      user_id: new Types.ObjectId(userId),
+      content: safeContent,
+      media: mappedMedia,
+      createdAt: new Date(),
+    };
+
+    await this.reviewModel.updateOne(
+      { _id: reviewId },
+      { $push: { customer_replies: newReply } },
+    );
+
+    return { message: 'Phản hồi thành công', data: newReply };
   }
 
   async voteHelpful(reviewId: string, userId: string) {
@@ -609,21 +663,15 @@ export class ReviewsService {
   }
 
   async checkEligibility(userId: string, productId: string) {
-    console.log('--- DEBUG REVIEW ELIGIBILITY ---');
-    console.log('1. User ID gọi API:', userId);
-    // 1. Chuyển đổi Slug thành ObjectId chuẩn
     const actualProductId = await this.resolveProductId(productId);
 
-    // 2. Tìm tất cả đơn hàng đã hoàn thành của user
     const eligibleOrders = await this.orderModel
       .find({
         user_id: new Types.ObjectId(userId),
         status: { $in: ['COMPLETED', 'DELIVERED'] },
-        'items.product_id': new Types.ObjectId(actualProductId), // Sử dụng ID đã convert
+        'items.product_id': new Types.ObjectId(actualProductId),
       })
       .lean();
-
-    console.log('3. Số đơn hàng khớp điều kiện:', eligibleOrders.length);
 
     if (!eligibleOrders || eligibleOrders.length === 0) {
       return {
@@ -632,37 +680,16 @@ export class ReviewsService {
       };
     }
 
-    // 3. Tìm xem trong các đơn hàng hợp lệ đó, có item nào chưa được review không
-    for (const order of eligibleOrders) {
-      const itemsMatchingProduct = order.items.filter(
-        (item) => item.product_id.toString() === actualProductId, // Sử dụng ID đã convert
-      );
+    // Lấy order gần nhất hợp lệ để gắn ID
+    const latestOrder = eligibleOrders[0];
+    const item = latestOrder.items.find(
+      (i) => i.product_id.toString() === actualProductId,
+    );
 
-      for (const item of itemsMatchingProduct) {
-        // Kiểm tra xem item này trong đơn hàng này đã có review chưa
-        const existingReview = await this.reviewModel
-          .findOne({
-            order_id: order._id,
-            product_id: new Types.ObjectId(actualProductId), // Sử dụng ID đã convert
-            variant_sku: item.sku,
-          })
-          .lean();
-
-        // Nếu chưa có review -> Trả về ngay orderId và sku để FE dùng
-        if (!existingReview) {
-          return {
-            isEligible: true,
-            orderId: order._id.toString(),
-            variantSku: item.sku,
-          };
-        }
-      }
-    }
-
-    // Nếu tất cả các lần mua đều đã được đánh giá hết
     return {
-      isEligible: false,
-      message: 'Bạn đã đánh giá tất cả các sản phẩm đã mua',
+      isEligible: true,
+      orderId: latestOrder._id.toString(),
+      variantSku: item?.sku || '',
     };
   }
 }

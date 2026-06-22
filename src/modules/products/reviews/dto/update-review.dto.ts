@@ -7,10 +7,10 @@ import {
   Max,
   Min,
   ValidateNested,
-  Length,
   ArrayMaxSize,
   IsEnum,
   IsNotEmpty,
+  MaxLength,
 } from 'class-validator';
 
 class ReviewMediaUpdateDto {
@@ -36,7 +36,9 @@ export class UpdateReviewDto {
 
   @IsString()
   @IsOptional()
-  @Length(10, 1000, { message: 'Nội dung đánh giá phải từ 10 đến 1000 ký tự' })
+  @MaxLength(1000, {
+    message: 'Nội dung đánh giá không được vượt quá 1000 ký tự',
+  })
   content?: string;
 
   @IsArray()

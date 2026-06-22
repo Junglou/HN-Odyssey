@@ -31,7 +31,7 @@ import {
   CartItem,
   InvoiceOrder,
   MongooseOrderDoc,
-  OrderData,
+  type OrderData,
   OrderItem,
   OrderStatus,
   PrintTemplateData,
@@ -43,7 +43,7 @@ import { ShippingConfig } from 'src/modules/shipping/schemas/shipping-config.sch
 import { ShippingService } from 'src/modules/shipping/shipping.service';
 import { PaymentService } from '../payment/payment.service';
 import { GhnService } from 'src/modules/shipping/providers/ghn.service';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { GhtkService } from 'src/modules/shipping/providers/ghtk.service';
 import { OrderStateMachine } from './flow/order-state-machine.service';
 import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
@@ -1901,15 +1901,12 @@ export class OrdersService {
       order.status = finalStatusToSave;
       if (dto.note) order.internal_note = dto.note;
 
-      // Tự động cập nhật mọi đơn hàng thành PAID khi giao thành công
       if (
         (finalStatusToSave === OrderStatus.DELIVERED ||
           finalStatusToSave === OrderStatus.COMPLETED) &&
         order.payment.status === 'PENDING'
       ) {
         order.payment.status = 'PAID';
-
-        // Ghi chú thêm vào timeline để biết là do hệ thống tự chuyển đổi
         if (!order.timeline) order.timeline = [];
         order.timeline.push({
           status: finalStatusToSave,
@@ -1917,8 +1914,6 @@ export class OrdersService {
           actor: 'SYSTEM_FIREFIGHTING',
           note: `Tự động ghi nhận thanh toán thành công (PAID) khi đơn hàng chuyển sang ${finalStatusToSave}.`,
         });
-
-        (order as unknown as OrderDocument).markModified('payment');
       }
 
       this.stateMachine.addTimeline(
@@ -1928,7 +1923,29 @@ export class OrdersService {
         dto.reason || dto.note,
       );
 
-      await order.save({ session });
+      // [TỐI ƯU BE]: Dùng updateOne thay vì order.save() để tránh VersionError của Mongoose
+      const updatePayload = {
+        $set: {
+          status: finalStatusToSave,
+          'payment.status': order.payment.status,
+          timeline: order.timeline,
+          cancel_reason: order.cancel_reason,
+          internal_note: order.internal_note,
+          waybill_code: order.waybill_code,
+          actual_shipping_fee: order.actual_shipping_fee,
+        } as Record<string, unknown>,
+      };
+
+      // Xóa các key undefined để updateOne không bị lỗi null exception
+      Object.keys(updatePayload.$set).forEach((key) => {
+        if (updatePayload.$set[key] === undefined) {
+          delete updatePayload.$set[key];
+        }
+      });
+
+      await this.orderModel.updateOne({ _id: order._id }, updatePayload, {
+        session,
+      });
       await session.commitTransaction();
 
       orderDoc = order.toObject() as unknown as OrderData;
@@ -1975,6 +1992,10 @@ export class OrdersService {
     // Hủy vận đơn trên hệ thống ĐVVC
     if (status === OrderStatus.CANCELLED && orderDoc.waybill_code) {
       this.eventEmitter.emit('order.cancelled_shipping', orderDoc);
+    }
+
+    if (status === OrderStatus.RETURNED) {
+      this.eventEmitter.emit('order.refund_shipping_needed', orderDoc);
     }
 
     // Đổi điều kiện kích hoạt cộng điểm thành DELIVERED
@@ -2273,10 +2294,11 @@ export class OrdersService {
 
     if (
       order.payment?.method === 'TRADE-IN' ||
-      order.status === 'TRADE_IN_REVIEW'
+      order.status === 'TRADE_IN_REVIEW' ||
+      order.status === 'RETURNED'
     ) {
       this.logger.log(
-        `Webhook: Bỏ qua tự động cập nhật GHN cho đơn Trade-in ảo ${waybillCode}`,
+        `Webhook: Bỏ qua tự động cập nhật GHN cho đơn thu hồi/trade-in ${waybillCode}`,
       );
       return;
     }
@@ -2384,5 +2406,11 @@ export class OrdersService {
 
     // 5. Trả file về cho FE
     res.send(pdfBuffer);
+  }
+
+  @OnEvent('warehouse.refund_approved', { async: true })
+  handleWarehouseRefundApproved(orderDoc: OrderData) {
+    // Gọi lại hàm xử lý Event nội bộ
+    this.handleOrderEvents(OrderStatus.REFUND_PENDING, orderDoc);
   }
 }

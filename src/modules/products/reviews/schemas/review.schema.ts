@@ -2,7 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { ReviewStatus } from 'src/common/enums/review.enum';
 
-// Sub-schema cho Media (AC4 - Customer)
+// Sub-schema cho Media
 @Schema({ _id: false })
 export class ReviewMedia {
   @Prop({ required: true })
@@ -15,6 +15,20 @@ export class ReviewMedia {
   thumbnail?: string;
 }
 const ReviewMediaSchema = SchemaFactory.createForClass(ReviewMedia);
+
+// THÊM MỚI: Sub-schema cho Customer Reply
+@Schema({ _id: true, timestamps: true })
+export class CustomerReply {
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  user_id: Types.ObjectId;
+
+  @Prop({ required: true })
+  content: string;
+
+  @Prop({ type: [ReviewMediaSchema], default: [] })
+  media: ReviewMedia[];
+}
+const CustomerReplySchema = SchemaFactory.createForClass(CustomerReply);
 
 export type ReviewDocument = Review & Document;
 
@@ -41,7 +55,6 @@ export class Review extends Document {
   @Prop({ type: [ReviewMediaSchema], default: [] })
   media: ReviewMedia[];
 
-  // Storefront Features
   @Prop({ default: false })
   is_anonymous: boolean;
 
@@ -63,7 +76,7 @@ export class Review extends Document {
   @Prop({ type: [String], default: [] })
   liked_by_users: string[];
 
-  // Admin & Moderation Features
+  // Admin Reply (Giữ nguyên)
   @Prop({
     type: {
       content: String,
@@ -73,6 +86,10 @@ export class Review extends Document {
     default: null,
   })
   reply?: { content: string; staff_id: Types.ObjectId; replied_at: Date };
+
+  // THÊM MỚI: Mảng chứa reply của khách hàng
+  @Prop({ type: [CustomerReplySchema], default: [] })
+  customer_replies: CustomerReply[];
 
   @Prop({
     required: true,
@@ -94,7 +111,6 @@ export class Review extends Document {
 
 export const ReviewSchema = SchemaFactory.createForClass(Review);
 
-// Indexes tối ưu hóa
 ReviewSchema.index({
   product_id: 1,
   status: 1,
@@ -102,7 +118,8 @@ ReviewSchema.index({
   pinned_at: -1,
   createdAt: -1,
 });
-ReviewSchema.index(
-  { order_id: 1, product_id: 1, variant_sku: 1 },
-  { unique: true },
-);
+// BỎ INDEX UNIQUE NÀY ĐỂ CHO PHÉP REVIEW NHIỀU LẦN
+// ReviewSchema.index(
+//   { order_id: 1, product_id: 1, variant_sku: 1 },
+//   { unique: true },
+// );

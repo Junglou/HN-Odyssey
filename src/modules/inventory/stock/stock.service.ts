@@ -662,17 +662,21 @@ export class StockService {
         }
 
         // Cập nhật trạng thái đơn hàng (Order Status)
-        // Nếu là hàng trả về thì đổi thành COMPLETED để đánh dấu kho đã hoàn tất khâu nhận
-        order.status = isExport ? 'PROCESSING' : 'COMPLETED';
+        order.status = isExport ? 'PROCESSING' : 'REFUND_PENDING';
+
         order.timeline.push({
           status: order.status,
           timestamp: new Date(),
           actor: validActorIdStr,
           note: isExport
             ? 'Đã tiếp nhận đơn hàng xuất'
-            : 'Kho đã nhận được hàng và nhập lại thành công',
+            : 'Kho đã nhận được hàng và nhập lại thành công. Chờ hoàn tiền.',
         });
         await order.save();
+
+        if (!isExport) {
+          this.eventEmitter.emit('warehouse.refund_approved', order.toObject());
+        }
 
         // Ghi Audit Log
         await this.auditLogsService.log({
@@ -1091,15 +1095,21 @@ export class StockService {
       return { success: true, message: 'Đã từ chối đơn Trade-in' };
     }
 
-    order.status = 'ON_HOLD';
+    const isReturnOrder = order.status === 'RETURNED';
+    order.status = isReturnOrder ? 'CANCELLED' : 'ON_HOLD';
+
     order.timeline.push({
-      status: 'ON_HOLD',
+      status: order.status,
       timestamp: new Date(),
       actor: validActorIdStr,
       note: `Gửi phản hồi / Tạm giữ: ${reason}`,
     });
 
     await order.save();
+
+    if (isReturnOrder) {
+      this.eventEmitter.emit('order.cancelled_shipping', order.toObject());
+    }
 
     await this.auditLogsService.log({
       action: 'REPORT_ORDER_ISSUE',
@@ -1138,7 +1148,14 @@ export class StockService {
       allowedStatuses = ['PENDING', 'CONFIRMED', 'TRADE_IN_REVIEW', 'RETURNED'];
     } else if (status === RequestFilterStatus.ACCEPTED) {
       // Đã duyệt (Thành công)
-      allowedStatuses = ['PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+      allowedStatuses = [
+        'PROCESSING',
+        'SHIPPED',
+        'DELIVERED',
+        'COMPLETED',
+        'REFUND_PENDING',
+        'REFUNDED',
+      ];
     } else if (status === RequestFilterStatus.REJECTED) {
       // Bị từ chối / Tạm giữ
       allowedStatuses = ['ON_HOLD', 'CANCELLED'];
@@ -1160,14 +1177,24 @@ export class StockService {
 
     // 2. LỌC TIẾP THEO LOẠI (TYPE: IMPORT / EXPORT)
     if (type === RequestFilterType.IMPORT) {
-      // Chỉ giữ lại các status thuộc luồng nhập kho
-      allowedStatuses = allowedStatuses.filter((s) =>
-        ['TRADE_IN_REVIEW', 'RETURNED'].includes(s),
+      allowedStatuses = allowedStatuses.filter(
+        (s) =>
+          [
+            'TRADE_IN_REVIEW',
+            'RETURNED',
+            'REFUND_PENDING',
+            'REFUNDED',
+          ].includes(s), // Thêm 2 trạng thái này
       );
     } else if (type === RequestFilterType.EXPORT) {
-      // Loại bỏ các status thuộc luồng nhập kho
       allowedStatuses = allowedStatuses.filter(
-        (s) => !['TRADE_IN_REVIEW', 'RETURNED'].includes(s),
+        (s) =>
+          ![
+            'TRADE_IN_REVIEW',
+            'RETURNED',
+            'REFUND_PENDING',
+            'REFUNDED',
+          ].includes(s), // Thêm 2 trạng thái này
       );
     }
 
@@ -1200,9 +1227,13 @@ export class StockService {
       let mappedSource: 'Sales' | 'Purchasing' = 'Sales'; // Mặc định là Bán hàng
 
       // Phân loại Import / Export và Nguồn (Source)
-      if (['RETURNED', 'TRADE_IN_REVIEW'].includes(order.status)) {
+      if (
+        ['RETURNED', 'TRADE_IN_REVIEW', 'REFUND_PENDING', 'REFUNDED'].includes(
+          order.status,
+        )
+      ) {
         mappedType = 'import';
-        mappedSource = 'Purchasing'; // <-- ĐÃ SỬA: Đơn hoàn/thu cũ sẽ tính là Thu mua (Purchasing)
+        mappedSource = 'Purchasing';
       }
 
       // Phân loại Status cho giao diện

@@ -3,7 +3,6 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
-  IsMongoId,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -13,6 +12,7 @@ import {
   ValidateNested,
   Length,
   ArrayMaxSize,
+  MaxLength,
 } from 'class-validator';
 
 class ReviewMediaDto {
@@ -51,7 +51,9 @@ export class CreateReviewDto {
   // AC3: Content từ 10 đến 1000 ký tự
   @IsString()
   @IsOptional()
-  @Length(10, 1000, { message: 'Nội dung đánh giá phải từ 10 đến 1000 ký tự' })
+  @MaxLength(1000, {
+    message: 'Nội dung đánh giá không được vượt quá 1000 ký tự',
+  })
   content?: string;
 
   // AC4: Tối đa 5 ảnh
@@ -66,4 +68,19 @@ export class CreateReviewDto {
   @IsBoolean()
   @IsOptional()
   is_anonymous?: boolean;
+}
+
+// Thêm class này vào cuối file create-review.dto.ts
+export class CreateCustomerReplyDto {
+  @IsString()
+  @IsNotEmpty({ message: 'Nội dung phản hồi không được để trống' })
+  @Length(1, 1000)
+  content: string;
+
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => ReviewMediaDto)
+  @ArrayMaxSize(5)
+  media?: ReviewMediaDto[];
 }

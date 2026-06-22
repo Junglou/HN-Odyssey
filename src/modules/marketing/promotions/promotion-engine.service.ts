@@ -1,79 +1,78 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Combo, ComboType, ComboStatus } from './schemas/combo.schema';
 import { CreateComboDto } from './dto/create-combo.dto';
 import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
 import { Department } from 'src/common/enums/department.enum';
 import { ApplicableScope } from './schemas/flash-sale.schema';
+import { Order } from 'src/modules/sales/orders/schemas/order.schema';
 
-// 1. Định nghĩa Interface cho Item trong giỏ hàng (Để tránh dùng any)
 export interface CartItemInput {
   productId: string;
   quantity: number;
   unitPrice: number;
   discountedPrice?: number;
   appliedCombo?: string;
-  [key: string]: any; // Cho phép các trường khác nếu có
+  [key: string]: any;
 }
+
+const ONGOING_ORDER_STATUSES = [
+  'PENDING',
+  'CONFIRMED',
+  'PROCESSING',
+  'READY_TO_SHIP',
+  'SHIPPING',
+  'ON_HOLD',
+  'TRADE_IN_REVIEW',
+  'REFUND_PENDING',
+  'REFUND_NEEDED',
+];
 
 @Injectable()
 export class PromotionEngineService {
   constructor(
     @InjectModel(Combo.name) private comboModel: Model<Combo>,
     private readonly auditLogsService: AuditLogsService,
+    @InjectModel('Order') private orderModel: Model<Order>,
   ) {}
 
-  // 2. Cập nhật kiểu CartItemInput[] và xử lý logic Scope an toàn
   async applyCombos(
     cartItems: CartItemInput[],
   ): Promise<{ items: CartItemInput[]; totalDiscount: number }> {
-    // Lấy tất cả Combo/Discount đang có trạng thái ACTIVE
     const now = new Date();
     const activeCombos = await this.comboModel.find({
       status: ComboStatus.ACTIVE,
       start_date: { $lte: now },
       end_date: { $gte: now },
     });
-
     let totalDiscount = 0;
-
-    // 3. Clone items an toàn và ép kiểu rõ ràng
     const processedItems = JSON.parse(
       JSON.stringify(cartItems),
     ) as CartItemInput[];
 
-    // Logic tìm Combo
     for (const combo of activeCombos) {
       if (
         combo.type === ComboType.BUY_X_GET_Y ||
         combo.type === ComboType.DIRECT_DISCOUNT
       ) {
-        // 4. Lấy danh sách giá trị áp dụng
         const comboScopeValues = combo.applicable_scope_values;
-
-        // Tìm các item trong giỏ khớp với sản phẩm trong Combo
         const matchedItems = processedItems.filter((item) => {
-          // [ĐÃ FIX LỖI 1]: Ép kiểu an toàn sang enum trước khi so sánh
           if (
             (combo.applicable_scope_type as unknown as ApplicableScope) ===
             ApplicableScope.PRODUCT
           ) {
             return comboScopeValues.includes(item.productId.toString());
           }
-          // Nếu sau này có logic so sánh Category/Tag thì thêm vào đây
           return false;
         });
 
-        // Tính tổng số lượng các món khớp
         const totalQty = matchedItems.reduce(
           (sum, item) => sum + item.quantity,
           0,
         );
 
-        // Nếu đủ điều kiện số lượng tối thiểu
         if (totalQty >= combo.min_quantity) {
-          // Tính tiền giảm
           for (const item of matchedItems) {
             let discountAmount = 0;
             if (combo.is_percent) {
@@ -83,38 +82,29 @@ export class PromotionEngineService {
             } else {
               discountAmount = combo.discount_value;
             }
-
-            // Cập nhật lại giá của item để hiển thị
             item.discountedPrice = item.unitPrice - discountAmount;
             item.appliedCombo = combo.name;
-
-            // Cộng tổng tiền giảm cho cả giỏ
             totalDiscount += discountAmount * item.quantity;
           }
         }
       }
     }
-
     return { items: processedItems, totalDiscount };
   }
 
   async createCombo(dto: CreateComboDto, userId?: string) {
-    if (new Date(dto.start_date) >= new Date(dto.end_date)) {
+    if (new Date(dto.start_date) >= new Date(dto.end_date))
       throw new BadRequestException('Ngày bắt đầu phải nhỏ hơn ngày kết thúc');
-    }
-
     const newCombo = new this.comboModel({
       ...dto,
       status: dto.status || ComboStatus.PENDING,
     });
-
     const savedCombo = await newCombo.save();
 
     await this.auditLogsService.log({
       action: 'CREATE_PROMOTION_COMBO',
       collection_name: 'combos',
       actor_id: userId,
-      // [ĐÃ FIX LỖI 2]: Dùng phương thức .toString() của Mongoose ObjectID thay vì ép kiểu as string
       target_id: savedCombo._id.toString(),
       department: Department.MARKETING,
       detail: {
@@ -124,7 +114,6 @@ export class PromotionEngineService {
       },
       is_success: true,
     });
-
     return savedCombo;
   }
 
@@ -135,18 +124,110 @@ export class PromotionEngineService {
   async updateCombo(id: string, dto: Partial<CreateComboDto>) {
     const combo = await this.comboModel.findById(id);
     if (!combo) throw new BadRequestException('Không tìm thấy Combo/Discount');
+
+    const isCoreFieldChanged =
+      (dto.name !== undefined && dto.name !== combo.name) ||
+      (dto.type !== undefined && dto.type !== combo.type) ||
+      (dto.discount_value !== undefined &&
+        Number(dto.discount_value) !== Number(combo.discount_value)) ||
+      (dto.is_percent !== undefined && dto.is_percent !== combo.is_percent) ||
+      (dto.min_quantity !== undefined &&
+        Number(dto.min_quantity) !== Number(combo.min_quantity));
+
+    const currentScopeCount = combo.applicable_scope_values?.length || 0;
+    const newScopeCount = dto.applicable_scope_values
+      ? dto.applicable_scope_values.length
+      : currentScopeCount;
+    const isTryingToClearScope =
+      dto.applicable_scope_values && dto.applicable_scope_values.length === 0;
+    const isScopeChanged =
+      dto.applicable_scope_values &&
+      JSON.stringify(dto.applicable_scope_values) !==
+        JSON.stringify(combo.applicable_scope_values);
+
+    // ĐÃ FIX: Thêm || isScopeChanged
+    if (isCoreFieldChanged || isScopeChanged) {
+      const targetStatus = dto.status || combo.status;
+
+      if (
+        targetStatus !== ComboStatus.INACTIVE &&
+        targetStatus !== ComboStatus.DRAFT
+      ) {
+        throw new BadRequestException(
+          'Vui lòng chuyển chương trình sang trạng thái Inactive (Deactive) hoặc Bản nháp (Draft) trước khi chỉnh sửa thông tin.',
+        );
+      }
+
+      if (
+        currentScopeCount > 0 &&
+        isCoreFieldChanged &&
+        !isTryingToClearScope
+      ) {
+        throw new BadRequestException(
+          'Chương trình đang áp dụng cho sản phẩm. Vui lòng gỡ tất cả sản phẩm khỏi danh sách trước khi sửa thông tin khác.',
+        );
+      }
+
+      if (currentScopeCount > 0 || newScopeCount > 0) {
+        const checkValues =
+          (currentScopeCount > 0
+            ? combo.applicable_scope_values
+            : dto.applicable_scope_values) || [];
+
+        const objectIds = checkValues
+          .map((val) => {
+            try {
+              return new Types.ObjectId(val.toString());
+            } catch {
+              return null;
+            }
+          })
+          .filter((val) => val !== null);
+
+        const hasOngoingOrder = await this.orderModel.exists({
+          'items.product_id': { $in: objectIds },
+          status: { $in: ONGOING_ORDER_STATUSES },
+        });
+
+        if (hasOngoingOrder) {
+          throw new BadRequestException(
+            'Có đơn hàng đang mua sản phẩm thuộc chương trình này chưa hoàn tất. Vui lòng chờ hoàn thành đơn.',
+          );
+        }
+      }
+    }
+
     Object.assign(combo, dto);
     return combo.save();
   }
 
   async deleteCombo(id: string) {
-    const combo = await this.comboModel.findByIdAndDelete(id);
+    const combo = await this.comboModel.findById(id);
     if (!combo)
       throw new BadRequestException('Không tìm thấy Combo/Discount để xóa');
+
+    if (
+      combo.status !== ComboStatus.INACTIVE &&
+      combo.status !== ComboStatus.DRAFT
+    ) {
+      throw new BadRequestException(
+        'Vui lòng chuyển sang trạng thái Inactive (Deactive) trước khi xóa.',
+      );
+    }
+
+    if (
+      combo.applicable_scope_values &&
+      combo.applicable_scope_values.length > 0
+    ) {
+      throw new BadRequestException(
+        'Chương trình đang áp dụng cho sản phẩm. Vui lòng gỡ tất cả sản phẩm khỏi danh sách trước khi xóa.',
+      );
+    }
+
+    await this.comboModel.findByIdAndDelete(id);
     return { message: 'Đã xóa thành công' };
   }
 
-  // THÊM MỚI 2 HÀM BULK Ở CUỐI CLASS PromotionEngineService
   async bulkUpdateStatus(
     ids: string[],
     action: 'ACTIVATE' | 'DEACTIVATE',
@@ -154,6 +235,7 @@ export class PromotionEngineService {
   ) {
     const combos = await this.comboModel.find({ _id: { $in: ids } });
     const now = new Date();
+
     for (const combo of combos) {
       if (combo.status === ComboStatus.EXPIRED) continue;
       if (action === 'ACTIVATE') {
@@ -167,7 +249,6 @@ export class PromotionEngineService {
       await combo.save();
     }
 
-    // SỬ DỤNG userId ĐỂ GHI AUDIT LOG
     if (userId) {
       await this.auditLogsService.log({
         action: 'BULK_UPDATE_COMBO_STATUS',
@@ -179,38 +260,60 @@ export class PromotionEngineService {
         is_success: true,
       });
     }
-
     return { success: true };
   }
 
   async bulkDelete(ids: string[], userId?: string) {
     const combos = await this.comboModel.find({ _id: { $in: ids } });
-    const deletableIds = combos
-      .filter((c) => c.status !== ComboStatus.ACTIVE)
-      .map((c) => c._id);
+    const deletableIds: Types.ObjectId[] = [];
 
-    if (deletableIds.length > 0) {
-      await this.comboModel.deleteMany({ _id: { $in: deletableIds } });
+    for (const combo of combos) {
+      if (
+        combo.status !== ComboStatus.INACTIVE &&
+        combo.status !== ComboStatus.DRAFT
+      )
+        continue;
+      if (
+        combo.applicable_scope_values &&
+        combo.applicable_scope_values.length > 0
+      )
+        continue;
 
-      // SỬ DỤNG userId ĐỂ GHI AUDIT LOG
-      if (userId) {
-        await this.auditLogsService.log({
-          action: 'BULK_DELETE_COMBO',
-          collection_name: 'combos',
-          actor_id: userId,
-          target_id: 'BULK_ACTION',
-          department: Department.MARKETING,
-          detail: { deleted_ids: deletableIds },
-          is_success: true,
-        });
-      }
+      deletableIds.push(combo._id);
     }
 
-    if (deletableIds.length < ids.length) {
+    // 1. NẾU KHÔNG CÓ CÁI NÀO ĐỦ ĐIỀU KIỆN XÓA -> Quăng lỗi 400 đỏ
+    if (deletableIds.length === 0) {
       throw new BadRequestException(
-        'Đã xóa, nhưng một số chương trình đang diễn ra bị bỏ qua do hệ thống cấm xóa.',
+        'Không thể xóa. Tất cả chương trình được chọn đều đang Active hoặc chưa gỡ sản phẩm.',
       );
     }
-    return { success: true };
+
+    // 2. TIẾN HÀNH XÓA CÁC MÃ HỢP LỆ
+    await this.comboModel.deleteMany({ _id: { $in: deletableIds } });
+
+    if (userId) {
+      await this.auditLogsService.log({
+        action: 'BULK_DELETE_COMBO',
+        collection_name: 'combos',
+        actor_id: userId,
+        target_id: 'BULK_ACTION',
+        department: Department.MARKETING,
+        detail: { deleted_ids: deletableIds },
+        is_success: true,
+      });
+    }
+
+    // 3. NẾU XÓA ĐƯỢC MỘT PHẦN VÀ BỎ QUA MỘT PHẦN -> Trả về 200 OK kèm lời nhắc (Để FE hiện Toast Vàng)
+    if (deletableIds.length < ids.length) {
+      return {
+        success: true,
+        message:
+          'Đã xóa. Tuy nhiên một số chương trình bị chặn xóa do đang Active hoặc chưa gỡ hết sản phẩm.',
+      };
+    }
+
+    // NẾU XÓA SẠCH 100% -> Trả về 200 OK (FE hiện Toast Xanh)
+    return { success: true, message: 'Đã xóa hàng loạt thành công!' };
   }
 }

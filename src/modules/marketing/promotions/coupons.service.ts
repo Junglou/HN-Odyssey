@@ -19,6 +19,18 @@ export interface QueryCouponDto {
   search?: string;
 }
 
+const ONGOING_ORDER_STATUSES = [
+  'PENDING',
+  'CONFIRMED',
+  'PROCESSING',
+  'READY_TO_SHIP',
+  'SHIPPING',
+  'ON_HOLD',
+  'TRADE_IN_REVIEW',
+  'REFUND_PENDING',
+  'REFUND_NEEDED',
+];
+
 @Injectable()
 export class CouponsService {
   constructor(
@@ -27,7 +39,6 @@ export class CouponsService {
     @InjectModel('Order') private orderModel: Model<Order>,
   ) {}
 
-  // AC1, AC2, AC3, AC4: Tạo mã giảm giá mới
   async createCoupon(dto: CreateCouponDto, userId?: string) {
     const existingCoupon = await this.couponModel.findOne({
       code: dto.code.toUpperCase(),
@@ -46,7 +57,6 @@ export class CouponsService {
     const newCoupon = new this.couponModel({
       ...dto,
       code: dto.code.toUpperCase(),
-      // FIX TẠI ĐÂY: Ưu tiên lấy status do FE truyền lên
       status: dto.status || CouponStatus.DRAFT,
     });
 
@@ -65,40 +75,32 @@ export class CouponsService {
     return savedCoupon;
   }
 
-  // Lấy danh sách (Có phân trang và lọc) dành cho Admin
   async findAll(query: QueryCouponDto) {
     const page = Number(query.page || 1);
     const limit = Number(query.limit || 10);
     const skip = (page - 1) * limit;
-    const now = new Date(); // Lấy mốc thời gian hiện tại lúc gọi API
+    const now = new Date();
 
-    // Khởi tạo filter rỗng
     const filter: FilterQuery<Coupon> = {};
 
-    // XỬ LÝ LỌC TRẠNG THÁI THÔNG MINH
     if (query.status === CouponStatus.CANCELLED) {
       filter.status = CouponStatus.CANCELLED;
-      // Lọc Cancelled thì hiện cả mã đã xóa mềm
     } else {
-      filter.is_deleted = false; // Mặc định giấu mã đã xóa
+      filter.is_deleted = false;
 
       if (query.status === CouponStatus.ACTIVE) {
-        // ACTIVE thực sự = Trạng thái ACTIVE + Chưa hết hạn
         filter.status = CouponStatus.ACTIVE;
         filter.end_date = { $gte: now };
       } else if (query.status === CouponStatus.INACTIVE) {
-        // INACTIVE = Trạng thái INACTIVE HOẶC (Trạng thái ACTIVE nhưng đã quá hạn)
         filter.$or = [
           { status: CouponStatus.INACTIVE },
           { status: CouponStatus.ACTIVE, end_date: { $lt: now } },
         ];
       } else if (query.status) {
-        // Lọc Draft
         filter.status = query.status;
       }
     }
 
-    // Lọc theo từ khóa (Tìm chuỗi con, Regex)
     if (query.search && typeof query.search === 'string') {
       const searchRegex = new RegExp(query.search.trim(), 'i');
       filter.code = { $regex: searchRegex };
@@ -114,9 +116,7 @@ export class CouponsService {
       this.couponModel.countDocuments(filter),
     ]);
 
-    // COMPUTED DATA: Biến đổi dữ liệu trước khi trả về FE
     const formattedData = rawData.map((coupon) => {
-      // Nếu Database báo là ACTIVE nhưng thực tế đã hết hạn -> Trả về FE là INACTIVE
       if (
         coupon.status === CouponStatus.ACTIVE &&
         new Date(coupon.end_date) < now
@@ -138,7 +138,6 @@ export class CouponsService {
     };
   }
 
-  // API dành cho Frontend: Lấy danh sách các mã giảm giá đang có hiệu lực
   async findActiveCoupons() {
     const now = new Date();
     const activeCoupons = await this.couponModel
@@ -147,7 +146,6 @@ export class CouponsService {
         status: CouponStatus.ACTIVE,
         start_date: { $lte: now },
         end_date: { $gte: now },
-        // Chỉ lấy những mã mà số lần đã dùng vẫn còn nhỏ hơn giới hạn sử dụng
         $expr: { $lt: ['$usage_count', '$usage_limit'] },
       })
       .select(
@@ -159,7 +157,6 @@ export class CouponsService {
     return activeCoupons;
   }
 
-  // Lấy chi tiết 1 mã
   async findOne(id: string) {
     const coupon = await this.couponModel
       .findOne({ _id: id, is_deleted: false })
@@ -168,7 +165,6 @@ export class CouponsService {
     return coupon;
   }
 
-  // API Cực kỳ quan trọng: Áp dụng mã khi khách hàng Checkout
   async applyCoupon(code: string, cartTotal: number, userId: string) {
     const coupon = await this.couponModel.findOne({
       code: code.toUpperCase(),
@@ -231,27 +227,69 @@ export class CouponsService {
     };
   }
 
-  // AC6, AC7: Chỉnh sửa mã giảm giá
   async updateCoupon(id: string, dto: UpdateCouponDto, userId?: string) {
     const coupon = await this.couponModel.findById(id);
     if (!coupon || coupon.is_deleted) {
       throw new NotFoundException('Không tìm thấy mã giảm giá');
     }
 
-    if (coupon.status === CouponStatus.ACTIVE && coupon.usage_count > 0) {
-      const forbiddenFields = [
-        'discount_type',
-        'discount_value',
-        'min_order_value',
-        'usage_limit',
-      ];
-      const attemptToEditForbidden = forbiddenFields.some((field) =>
-        Object.keys(dto).includes(field),
-      );
+    const isCoreFieldChanged =
+      (dto.discount_type && dto.discount_type !== coupon.discount_type) ||
+      (dto.discount_value !== undefined &&
+        Number(dto.discount_value) !== Number(coupon.discount_value)) ||
+      (dto.min_order_value !== undefined &&
+        Number(dto.min_order_value) !== Number(coupon.min_order_value)) ||
+      (dto.usage_limit !== undefined &&
+        Number(dto.usage_limit) !== Number(coupon.usage_limit));
 
-      if (attemptToEditForbidden) {
+    const oldScope = coupon.applicable_scope;
+    const newScope = dto.applicable_scope;
+
+    const hasScopeCurrently =
+      !oldScope.isAllProducts &&
+      (oldScope.categories.length > 0 ||
+        oldScope.tags.length > 0 ||
+        oldScope.products.length > 0);
+
+    const isTryingToClearScope =
+      newScope &&
+      newScope.isAllProducts === true &&
+      newScope.categories.length === 0 &&
+      newScope.tags.length === 0 &&
+      newScope.products.length === 0;
+
+    const isScopeChanged =
+      newScope && JSON.stringify(newScope) !== JSON.stringify(oldScope);
+
+    // ĐÃ FIX: Thêm điều kiện isScopeChanged để bắt lỗi khi gỡ/thêm sản phẩm
+    if (isCoreFieldChanged || isScopeChanged) {
+      const targetStatus = dto.status || coupon.status;
+
+      if (
+        targetStatus !== CouponStatus.INACTIVE &&
+        targetStatus !== CouponStatus.DRAFT &&
+        targetStatus !== CouponStatus.CANCELLED
+      ) {
         throw new BadRequestException(
-          'Mã đang kích hoạt và đã có lượt sử dụng, chỉ được phép sửa Thời gian hiệu lực và Trạng thái.',
+          'Vui lòng chuyển mã giảm giá sang trạng thái Deactive (Inactive) hoặc Bản nháp (Draft) trước khi chỉnh sửa thông tin.',
+        );
+      }
+
+      if (hasScopeCurrently && isCoreFieldChanged && !isTryingToClearScope) {
+        throw new BadRequestException(
+          'Mã giảm giá đang được áp dụng cho sản phẩm. Phải gỡ khỏi tất cả sản phẩm (chọn All Products) trước khi được sửa các thông tin khác.',
+        );
+      }
+
+      // KIỂM TRA ĐƠN HÀNG BẤT KỂ LÀ SỬA TIỀN HAY GỠ SẢN PHẨM
+      const hasOngoingOrder = await this.orderModel.exists({
+        voucher_code: coupon.code,
+        status: { $in: ONGOING_ORDER_STATUSES },
+      });
+
+      if (hasOngoingOrder) {
+        throw new BadRequestException(
+          'Mã giảm giá này đang nằm trong đơn hàng chưa hoàn tất. Vui lòng chờ đơn hoàn thành hoặc hủy đơn mới được phép chỉnh sửa.',
         );
       }
     }
@@ -261,7 +299,6 @@ export class CouponsService {
       const end = dto.end_date || coupon.end_date.toISOString();
       this.validateDates(start, end);
     }
-
     if (dto.discount_type || dto.discount_value || dto.min_order_value) {
       const type = dto.discount_type || coupon.discount_type;
       const value = dto.discount_value ?? coupon.discount_value;
@@ -270,10 +307,7 @@ export class CouponsService {
     }
 
     Object.assign(coupon, dto);
-
-    if (!coupon.status) {
-      coupon.status = CouponStatus.DRAFT;
-    }
+    if (!coupon.status) coupon.status = CouponStatus.DRAFT;
 
     const updatedCoupon = await coupon.save();
 
@@ -283,18 +317,47 @@ export class CouponsService {
       actor_id: userId,
       target_id: updatedCoupon._id,
       department: Department.MARKETING,
-      detail: { updated_fields: Object.keys(dto) },
       is_success: true,
     });
 
     return updatedCoupon;
   }
 
-  // AC8: Vô hiệu hóa / Xóa mềm
   async softDeleteCoupon(id: string, userId?: string) {
     const coupon = await this.couponModel.findById(id);
-    if (!coupon || coupon.is_deleted) {
+    if (!coupon || coupon.is_deleted)
       throw new NotFoundException('Không tìm thấy mã giảm giá');
+
+    if (
+      coupon.status !== CouponStatus.INACTIVE &&
+      coupon.status !== CouponStatus.DRAFT &&
+      coupon.status !== CouponStatus.CANCELLED
+    ) {
+      throw new BadRequestException(
+        'Mã giảm giá phải ở trạng thái Deactive (Inactive) mới được phép xóa.',
+      );
+    }
+
+    const hasScope =
+      !coupon.applicable_scope.isAllProducts &&
+      (coupon.applicable_scope.categories.length > 0 ||
+        coupon.applicable_scope.tags.length > 0 ||
+        coupon.applicable_scope.products.length > 0);
+
+    if (hasScope) {
+      throw new BadRequestException(
+        'Mã giảm giá đang được gán cho sản phẩm/danh mục. Vui lòng sửa và gỡ khỏi tất cả sản phẩm trước khi xóa.',
+      );
+    }
+
+    const hasOngoingOrder = await this.orderModel.exists({
+      voucher_code: coupon.code,
+      status: { $in: ONGOING_ORDER_STATUSES },
+    });
+    if (hasOngoingOrder) {
+      throw new BadRequestException(
+        'Không thể xóa! Mã giảm giá đang được sử dụng trong đơn hàng chưa hoàn tất.',
+      );
     }
 
     coupon.is_deleted = true;
@@ -338,7 +401,6 @@ export class CouponsService {
     }
   }
 
-  // Bổ sung: Bulk update status
   async bulkUpdateStatus(
     ids: string[],
     action: 'ACTIVATE' | 'DEACTIVATE',
@@ -363,10 +425,42 @@ export class CouponsService {
     });
   }
 
-  // Bổ sung: Bulk delete
   async bulkDelete(ids: string[], userId?: string) {
+    const coupons = await this.couponModel.find({ _id: { $in: ids } });
+    const deletableIds: string[] = [];
+
+    for (const coupon of coupons) {
+      if (
+        coupon.status !== CouponStatus.INACTIVE &&
+        coupon.status !== CouponStatus.DRAFT &&
+        coupon.status !== CouponStatus.CANCELLED
+      )
+        continue;
+
+      const hasScope =
+        !coupon.applicable_scope.isAllProducts &&
+        (coupon.applicable_scope.categories.length > 0 ||
+          coupon.applicable_scope.tags.length > 0 ||
+          coupon.applicable_scope.products.length > 0);
+      if (hasScope) continue;
+
+      const hasOngoingOrder = await this.orderModel.exists({
+        voucher_code: coupon.code,
+        status: { $in: ONGOING_ORDER_STATUSES },
+      });
+      if (hasOngoingOrder) continue;
+
+      deletableIds.push(coupon._id as unknown as string);
+    }
+
+    if (deletableIds.length === 0) {
+      throw new BadRequestException(
+        'Không thể xóa. Tất cả mã giảm giá được chọn đều đang Active, đang áp dụng cho sản phẩm hoặc đang kẹt trong đơn hàng.',
+      );
+    }
+
     await this.couponModel.updateMany(
-      { _id: { $in: ids } },
+      { _id: { $in: deletableIds } },
       {
         $set: {
           is_deleted: true,
@@ -376,14 +470,27 @@ export class CouponsService {
       },
     );
 
-    await this.auditLogsService.log({
-      action: 'BULK_DELETE_COUPONS',
-      collection_name: 'coupons',
-      actor_id: userId,
-      target_id: 'BULK',
-      department: Department.MARKETING,
-      detail: { deleted_ids: ids },
-      is_success: true,
-    });
+    if (userId) {
+      await this.auditLogsService.log({
+        action: 'BULK_DELETE_COUPONS',
+        collection_name: 'coupons',
+        actor_id: userId,
+        target_id: 'BULK',
+        department: Department.MARKETING,
+        detail: { deleted_ids: deletableIds },
+        is_success: true,
+      });
+    }
+
+    // Trả về 200 để Frontend hiện Toast màu Vàng
+    if (deletableIds.length < ids.length) {
+      return {
+        success: true,
+        message:
+          'Đã xóa. Tuy nhiên một số mã giảm giá bị chặn xóa do đang Active hoặc chưa gỡ hết sản phẩm.',
+      };
+    }
+
+    return { success: true, message: 'Xóa hàng loạt thành công!' };
   }
 }
