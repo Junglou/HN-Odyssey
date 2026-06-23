@@ -1,0 +1,470 @@
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { FilterQuery, Model, Types } from 'mongoose';
+import { AnyBulkWriteOperation } from 'mongodb';
+import {
+  Category,
+  CategoryDocument,
+  Ancestor,
+} from './schemas/category.schema';
+import { CreateCategoryDto } from './dto/create-category.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
+import { UpdateCategoryOrderDto } from './dto/update-category-order.dto';
+import defaultSlugify from 'slugify';
+import sanitizeHtml from 'sanitize-html';
+import { Product, ProductDocument } from '../catalog/schemas/product.schema';
+import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
+import { Department } from 'src/common/enums/department.enum';
+import { CategoryTree } from 'src/common/interfaces/CategoryTree';
+
+export interface RawCategory {
+  _id: Types.ObjectId;
+  parent_id: Types.ObjectId | string | null;
+  name: string;
+  slug: string;
+  display_order?: number;
+  is_active: boolean;
+  image?: string;
+}
+
+@Injectable()
+export class CategoriesService {
+  constructor(
+    @InjectModel(Category.name) private categoryModel: Model<CategoryDocument>,
+    @InjectModel(Product.name) private productModel: Model<ProductDocument>,
+    private readonly auditLogsService: AuditLogsService,
+  ) {}
+
+  private createSlug(name: string): string {
+    return defaultSlugify(name, { lower: true, strict: true, locale: 'vi' });
+  }
+
+  private sanitizeContent(html: string): string {
+    if (!html) return '';
+    return sanitizeHtml(html, {
+      allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img']),
+      allowedAttributes: {
+        ...sanitizeHtml.defaults.allowedAttributes,
+        '*': ['style', 'class'],
+      },
+    });
+  }
+
+  private buildTree(
+    categories: RawCategory[],
+    parentId: string | null = null,
+    level = 0,
+  ): CategoryTree[] {
+    return categories
+      .filter((cat) => {
+        const pid = cat.parent_id ? cat.parent_id.toString() : null;
+        return pid === parentId;
+      })
+      .map((cat) => ({
+        _id: cat._id.toString(),
+        name: cat.name,
+        slug: cat.slug,
+        parentId: cat.parent_id ? cat.parent_id.toString() : null,
+        level: level,
+        order: cat.display_order ?? 0,
+        is_active: cat.is_active,
+        image: cat.image,
+        children: this.buildTree(categories, cat._id.toString(), level + 1),
+      }));
+  }
+
+  async findBySlug(slug: string) {
+    const category = await this.categoryModel
+      .findOne({ slug, is_active: true })
+      .lean();
+
+    if (!category) {
+      throw new NotFoundException(
+        `Không tìm thấy danh mục hoặc danh mục đã bị ẩn: ${slug}`,
+      );
+    }
+    return category;
+  }
+
+  async create(
+    createCategoryDto: CreateCategoryDto,
+    actorId: string,
+    ip: string,
+    userAgent: string,
+  ) {
+    const existingName = await this.categoryModel.findOne({
+      name: createCategoryDto.name,
+    });
+    if (existingName) throw new ConflictException('Tên danh mục đã tồn tại');
+
+    let slug = createCategoryDto.slug;
+    if (!slug) {
+      slug = this.createSlug(createCategoryDto.name);
+    }
+    const existingSlug = await this.categoryModel.findOne({ slug });
+    if (existingSlug)
+      throw new ConflictException('Đường dẫn (Slug) đã tồn tại');
+
+    let ancestors: Ancestor[] = [];
+    if (createCategoryDto.parent_id) {
+      const parent = await this.categoryModel.findById(
+        createCategoryDto.parent_id,
+      );
+      if (!parent) throw new NotFoundException('Danh mục cha không tồn tại');
+
+      ancestors = [
+        ...parent.ancestors,
+        {
+          _id: parent._id.toString(),
+          name: parent.name,
+          slug: parent.slug,
+        },
+      ];
+    }
+
+    const cleanDescription = this.sanitizeContent(
+      createCategoryDto.description || '',
+    );
+
+    const newCategory = new this.categoryModel({
+      ...createCategoryDto,
+      slug,
+      description: cleanDescription,
+      ancestors,
+    });
+
+    const savedCategory = await newCategory.save();
+
+    await this.auditLogsService.log({
+      action: 'CREATE_CATEGORY',
+      collection_name: 'categories',
+      actor_id: actorId,
+      target_id: savedCategory._id,
+      department: Department.WAREHOUSE,
+      detail: {
+        name: savedCategory.name,
+        slug: savedCategory.slug,
+        parent_id: savedCategory.parent_id,
+      },
+      ip,
+      user_agent: userAgent,
+    });
+
+    return {
+      message: 'Tạo danh mục mới thành công',
+      data: savedCategory,
+    };
+  }
+
+  async update(
+    id: string,
+    updateDto: UpdateCategoryDto,
+    actorId: string,
+    ip: string,
+    userAgent: string,
+  ) {
+    const category = await this.categoryModel.findById(id);
+    if (!category) throw new NotFoundException('Danh mục không tồn tại');
+
+    // KIỂM TRA RÀNG BUỘC: ĐANG ÁP DỤNG THÌ CẤM SỬA
+    const isUsed = await this.productModel.exists({
+      categories: new Types.ObjectId(id),
+      is_deleted: false,
+    });
+    if (isUsed) {
+      throw new BadRequestException(
+        `Danh mục '${category.name}' đang được áp dụng cho sản phẩm, KHÔNG ĐƯỢC PHÉP SỬA. Vui lòng gỡ danh mục khỏi các sản phẩm trước.`,
+      );
+    }
+
+    const oldData = category.toObject();
+    let nameChanged = false;
+
+    if (updateDto.name && updateDto.name !== category.name) {
+      const exists = await this.categoryModel.findOne({
+        name: updateDto.name,
+        _id: { $ne: id },
+      });
+      if (exists) throw new ConflictException('Tên danh mục mới bị trùng');
+      nameChanged = true;
+    }
+
+    if (updateDto.update_slug_from_name && updateDto.name) {
+      updateDto.slug = this.createSlug(updateDto.name);
+      const slugExists = await this.categoryModel.findOne({
+        slug: updateDto.slug,
+        _id: { $ne: id },
+      });
+      if (slugExists) throw new ConflictException('Slug mới bị trùng');
+    } else {
+      if (!updateDto.slug) delete updateDto.slug;
+    }
+
+    let parentChanged = false;
+    let newAncestors: Ancestor[] = [];
+
+    if (
+      updateDto.parent_id !== undefined &&
+      String(updateDto.parent_id) !== String(category.parent_id)
+    ) {
+      if (updateDto.parent_id === id) {
+        throw new BadRequestException(
+          'Không thể chọn chính mình làm danh mục cha',
+        );
+      }
+
+      if (updateDto.parent_id === null) {
+        newAncestors = [];
+        category.parent_id = null as unknown as Types.ObjectId;
+      } else {
+        const newParent = await this.categoryModel.findById(
+          updateDto.parent_id,
+        );
+        if (!newParent)
+          throw new NotFoundException('Danh mục cha mới không tồn tại');
+
+        const isLoop = newParent.ancestors.some(
+          (anc) => String(anc._id) === id,
+        );
+        if (isLoop) {
+          throw new BadRequestException(
+            'Không thể di chuyển vào danh mục con của chính nó (Lỗi vòng lặp)',
+          );
+        }
+
+        newAncestors = [
+          ...newParent.ancestors,
+          {
+            _id: newParent._id.toString(),
+            name: newParent.name,
+            slug: newParent.slug,
+          },
+        ];
+        category.parent_id = newParent._id;
+      }
+
+      category.ancestors = newAncestors;
+      parentChanged = true;
+    }
+
+    if (updateDto.description) {
+      updateDto.description = this.sanitizeContent(updateDto.description);
+    }
+
+    if (updateDto.is_active === false) {
+      await this.categoryModel.updateMany(
+        { 'ancestors._id': id },
+        { is_active: false },
+      );
+    }
+
+    Object.assign(category, updateDto);
+    const savedCategory = await category.save();
+
+    if (nameChanged || updateDto.slug) {
+      await this.categoryModel.updateMany(
+        { 'ancestors._id': id },
+        {
+          $set: {
+            'ancestors.$.name': savedCategory.name,
+            'ancestors.$.slug': savedCategory.slug,
+          },
+        },
+      );
+    }
+
+    if (parentChanged) {
+      const descendants = await this.categoryModel.find({
+        'ancestors._id': id,
+      });
+
+      if (descendants.length > 0) {
+        const bulkOps = descendants.map((child) => {
+          const index = child.ancestors.findIndex((a) => String(a._id) === id);
+          if (index === -1) return {};
+
+          const childNewAncestors = [
+            ...newAncestors,
+            {
+              _id: savedCategory._id.toString(),
+              name: savedCategory.name,
+              slug: savedCategory.slug,
+            },
+            ...child.ancestors.slice(index + 1),
+          ];
+
+          return {
+            updateOne: {
+              filter: { _id: child._id },
+              update: { $set: { ancestors: childNewAncestors } },
+            },
+          };
+        });
+
+        const validOps = bulkOps.filter(
+          (op) => op.updateOne,
+        ) as AnyBulkWriteOperation<CategoryDocument>[];
+
+        if (validOps.length > 0) {
+          await this.categoryModel.bulkWrite(validOps);
+        }
+      }
+    }
+
+    await this.auditLogsService.log({
+      action: 'UPDATE_CATEGORY',
+      collection_name: 'categories',
+      actor_id: actorId,
+      target_id: category._id,
+      department: Department.WAREHOUSE,
+      detail: {
+        name: category.name,
+        changes: {
+          old_name: oldData.name !== category.name ? oldData.name : undefined,
+          new_parent: updateDto.parent_id,
+        },
+      },
+      ip,
+      user_agent: userAgent,
+    });
+
+    return {
+      message: 'Cập nhật danh mục thành công',
+      data: savedCategory,
+    };
+  }
+
+  async remove(id: string, actorId: string, ip: string, userAgent: string) {
+    const category = await this.categoryModel.findById(id);
+    if (!category) throw new NotFoundException('Danh mục không tồn tại');
+
+    const hasChildren = await this.categoryModel.exists({ parent_id: id });
+    if (hasChildren) {
+      throw new BadRequestException(
+        'Không thể xóa: Danh mục này đang chứa danh mục con.',
+      );
+    }
+
+    // KIỂM TRA RÀNG BUỘC: ĐANG ÁP DỤNG THÌ CẤM XÓA
+    const isUsed = await this.productModel.exists({
+      categories: new Types.ObjectId(id),
+      is_deleted: false,
+    });
+    if (isUsed) {
+      throw new BadRequestException(
+        `Danh mục '${category.name}' đang được áp dụng cho sản phẩm, KHÔNG ĐƯỢC PHÉP XÓA. Vui lòng gỡ danh mục khỏi các sản phẩm trước.`,
+      );
+    }
+
+    await this.categoryModel.findByIdAndDelete(id);
+
+    await this.auditLogsService.log({
+      action: 'DELETE_CATEGORY',
+      collection_name: 'categories',
+      actor_id: actorId,
+      target_id: id,
+      department: Department.WAREHOUSE,
+      detail: {
+        name: category.name,
+        slug: category.slug,
+      },
+      ip,
+      user_agent: userAgent,
+    });
+
+    return {
+      message: 'Xóa danh mục thành công',
+    };
+  }
+
+  async getTree(includeHidden = false): Promise<CategoryTree[]> {
+    const filter: FilterQuery<CategoryDocument> = {};
+    if (!includeHidden) filter.is_active = true;
+
+    const categories = await this.categoryModel
+      .find(filter)
+      .sort({ display_order: 1, created_at: 1 })
+      .lean();
+
+    return this.buildTree(categories, null, 0);
+  }
+
+  async updateOrder(
+    updateOrderDto: UpdateCategoryOrderDto,
+    actorId: string,
+    ip: string,
+    userAgent: string,
+  ) {
+    const operations = updateOrderDto.items.map((item) => ({
+      updateOne: {
+        filter: { _id: new Types.ObjectId(item.id) },
+        update: { $set: { display_order: item.order } },
+      },
+    }));
+
+    if (operations.length > 0) {
+      await this.categoryModel.bulkWrite(
+        operations as AnyBulkWriteOperation<CategoryDocument>[],
+      );
+
+      await this.auditLogsService.log({
+        action: 'REORDER_CATEGORIES',
+        collection_name: 'categories',
+        actor_id: actorId,
+        target_id: null,
+        department: Department.WAREHOUSE,
+        detail: { count: operations.length },
+        ip,
+        user_agent: userAgent,
+      });
+    }
+
+    return {
+      message: 'Cập nhật thứ tự hiển thị thành công',
+    };
+  }
+
+  async search(keyword: string): Promise<any[]> {
+    const categories = await this.categoryModel
+      .find({
+        name: { $regex: keyword, $options: 'i' },
+      })
+      .select('name slug ancestors is_active')
+      .limit(20)
+      .lean();
+
+    return categories.map((cat) => {
+      const pathNames = [...cat.ancestors.map((a) => a.name), cat.name];
+      return {
+        _id: cat._id,
+        name: cat.name,
+        slug: cat.slug,
+        is_active: cat.is_active,
+        breadcrumb: pathNames.join(' > '),
+      };
+    });
+  }
+
+  async getAllChildCategories(
+    parentId: Types.ObjectId,
+  ): Promise<Types.ObjectId[]> {
+    const children = await this.categoryModel
+      .find({ parent_id: parentId })
+      .select('_id')
+      .lean();
+
+    let results = children.map((c) => c._id);
+
+    for (const child of children) {
+      const subChildren = await this.getAllChildCategories(child._id);
+      results = results.concat(subChildren);
+    }
+
+    return results;
+  }
+}

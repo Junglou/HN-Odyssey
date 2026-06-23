@@ -1,0 +1,36 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main # thay bằng tên nhánh thực tế của bạn nếu dùng nhánh khác (ví dụ: master)
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Execute deployment commands via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_KEY }}
+          port: 22
+          script: |
+            # di chuyển vào thư mục dự án
+            cd /var/www/odyssey/HN-Odyssey
+            
+            # lấy mã nguồn mới nhất
+            git pull origin main
+
+            # cập nhật và khởi động lại Backend
+            cd hn-odyssey-backend
+            npm install
+            npm run build
+            pm2 restart hn-odyssey-backend
+
+            # cập nhật và build lại Frontend
+            cd ../HN-Odyssey-Frontend
+            npm install
+            npm run build
