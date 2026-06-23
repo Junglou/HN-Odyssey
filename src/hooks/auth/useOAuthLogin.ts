@@ -8,23 +8,31 @@ export const useOAuthLogin = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Lấy thông số từ thanh địa chỉ URL
     const accessToken = searchParams.get("accessToken");
+    const refreshToken = searchParams.get("refreshToken");
+    const userParam = searchParams.get("user");
     const error = searchParams.get("error");
 
-    if (accessToken) {
-      // 1. Lưu token vào Storage để gọi các API khác sau này
+    if (accessToken && userParam) {
+      // 1. Lưu Access Token
       tokenStorage.setToken(accessToken);
 
-      // (Tùy chọn) Nếu hệ thống cần phân quyền dựa vào Roles ngay lập tức,
-      // có thể giải mã token ở đây hoặc gọi 1 API /auth/me để lấy profile user.
+      // 2. Lưu Refresh Token (Cực kỳ quan trọng để Interceptor hoạt động)
+      if (refreshToken) {
+        tokenStorage.setRefreshToken(refreshToken);
+      }
+
+      // 3. Giải mã URL và lưu User
+      try {
+        const decodedUser = JSON.parse(decodeURIComponent(userParam));
+        tokenStorage.setUser(decodedUser);
+      } catch (err) {
+        console.error("Lỗi parse thông tin user từ OAuth:", err);
+      }
 
       toast.success("Đăng nhập mạng xã hội thành công!");
-
-      // 2. Xóa URL chứa token và đẩy vào trang chủ
       navigate("/", { replace: true });
     } else if (error) {
-      // Nếu Backend báo lỗi (ví dụ user từ chối cấp quyền)
       toast.error(`Đăng nhập thất bại: ${decodeURIComponent(error)}`);
       navigate("/login", { replace: true });
     }
