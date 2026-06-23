@@ -1,0 +1,131 @@
+.box-container {
+  width: 100%;
+  height: fit-content;
+  min-width: 14rem;
+  border: solid lightgrey 0.1rem;
+  border-radius: 2rem;
+  box-shadow:
+    0 0 0 1px rgb(202, 200, 200),
+    8px 8px 4px rgba(17, 24, 39, 0.2);
+}
+
+.lbl-text {
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.lbl-coupon-text {
+  display: -webkit-box;
+  font-weight: bolder;
+  font-size: 1rem;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  line-clamp: 1;
+  box-orient: vertical;
+}
+
+.box-content {
+  width: 97%;
+  height: 100%;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.box-infor {
+  width: 100%;
+  height: fit-content;
+}
+
+.box-btn-container {
+  margin-top: 1.5rem;
+  width: fit-content;
+  height: fit-content;
+  display: flex;
+  align-items: center;
+}
+
+.coupon-thumbnail-container {
+  width: 100%;
+  height: fit-content;
+  display: flex;
+}
+
+.coupon-img-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  align-items: center;
+}
+
+.coupon-img-placeholder {
+  width: 120px;
+  height: 120px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.5rem;
+  font-weight: bold;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.coupon-img {
+  width: 150px;
+  height: fit-content;
+  border-radius: 12px;
+  background-color: #ddd;
+}
+
+.btn-container {
+  padding-top: 0.2rem;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+}
+
+.btn-container button {
+  width: 100%;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.btn-container button:hover {
+  border-color: #000;
+  color: #000;
+  background-color: #f9f9f9;
+}
+
+.coupon-detail-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.1rem;
+  height: fit-content;
+  width: 80%;
+  padding-left: 0.5rem;
+}
+
+.span-text {
+  display: -webkit-box;
+  width: 100%;
+  font-weight: 200;
+  font-size: 0.9rem;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  line-clamp: 1;
+  box-orient: vertical;
+}
+
+.title-container {
+  display: flex;
+  justify-content: space-between;
+}

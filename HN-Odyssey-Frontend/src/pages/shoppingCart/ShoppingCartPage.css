@@ -1,0 +1,38 @@
+/* wrapper */
+.shopping-cart-page-wrapper {
+  width: 100%;
+  padding: clamp(16px, 3vw, 48px) clamp(16px, 6vw, 120px);
+  box-sizing: border-box;
+  font-family: "Lexend", sans-serif;
+}
+
+/* layout */
+.shopping-cart-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 60fr) minmax(0, 40fr);
+  gap: clamp(24px, 4vw, 64px);
+  align-items: start;
+}
+
+/* col */
+.shopping-cart-right-col {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(32px, 4vw, 64px);
+}
+
+/* sticky */
+.sticky-summary-wrapper {
+  position: sticky;
+  top: 100px;
+}
+
+/* responsive */
+@media screen and (max-width: 1024px) {
+  .shopping-cart-grid {
+    grid-template-columns: 1fr;
+  }
+  .sticky-summary-wrapper {
+    position: static;
+  }
+}

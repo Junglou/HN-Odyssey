@@ -1,0 +1,112 @@
+/* section */
+.sc-features-section {
+  width: 100%;
+  padding: 80px 4%;
+  background-color: #ffffff;
+  display: flex;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+/* container */
+.sc-features-container {
+  width: 100%;
+  max-width: none;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 48px;
+  box-sizing: border-box;
+}
+
+.sc-features-title {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+  font-size: 30px;
+  color: #111827;
+  text-align: center;
+}
+
+/* grid */
+.sc-features-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  width: 100%;
+  max-width: none;
+}
+
+/* card */
+.sc-feature-card {
+  background-color: #f9fafb;
+  border-radius: 12px;
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.sc-feature-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+}
+
+/* icons variations */
+.sc-feature-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.sc-feature-icon.green {
+  background-color: #dcfce7;
+}
+.sc-feature-icon.blue {
+  background-color: #dbeafe;
+}
+.sc-feature-icon.purple {
+  background-color: #f3e8ff;
+}
+.sc-feature-icon.green-light {
+  background-color: #dcfce7;
+}
+
+/* typography */
+.sc-feature-card-title {
+  margin: 0 0 12px 0;
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  color: #111827;
+}
+
+.sc-feature-card-desc {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #4b5563;
+}
+
+/* responsive */
+@media screen and (max-width: 1024px) {
+  .sc-features-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media screen and (max-width: 640px) {
+  .sc-features-grid {
+    grid-template-columns: 1fr;
+  }
+}

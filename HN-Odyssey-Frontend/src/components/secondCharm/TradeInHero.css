@@ -1,0 +1,191 @@
+/* Bao bọc section hero */
+.trade-in-hero-section {
+  width: 100%;
+  padding: 110px 4%;
+  background: linear-gradient(0deg, #c9e3e8 0%, #c9e3e8 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+/* Container */
+.trade-in-hero-container {
+  width: 100%;
+  max-width: none;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 60px;
+  box-sizing: border-box;
+}
+
+/* Nửa trái - Text */
+.trade-in-hero-content {
+  flex: 1;
+  max-width: 823px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 24px;
+}
+
+.trade-in-hero-title {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+  font-size: 48px;
+  line-height: 1.25;
+  letter-spacing: -0.5px;
+  color: #000000;
+}
+
+.trade-in-hero-desc {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  font-size: 20px;
+  line-height: 1.4;
+  color: #000000;
+  max-width: 823px;
+}
+
+.trade-in-benefits-list {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 28px;
+  margin-top: 4px;
+}
+
+.benefit-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "Inter", sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: -0.5px;
+}
+
+/* Nửa phải - Stats box */
+.trade-in-stats-wrapper {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.trade-in-stats-box {
+  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  padding: 33px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 35px;
+  width: 400px;
+  box-sizing: border-box;
+}
+
+.stat-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.stat-number {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+  font-size: 48px;
+  color: #000000;
+  letter-spacing: -0.5px;
+}
+
+.stat-label {
+  margin: 4px 0 0 0;
+  font-family: "Inter", sans-serif;
+  font-size: 16px;
+  color: #000000;
+  letter-spacing: -0.5px;
+}
+
+.stat-row {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  justify-content: space-between;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.stat-sub-number {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+  font-size: 30px;
+  color: #000000;
+  letter-spacing: -0.5px;
+}
+
+.stat-sub-label {
+  margin: 4px 0 0 0;
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  color: #000000;
+  letter-spacing: -0.5px;
+}
+
+/* Responsive Breakpoints */
+@media screen and (max-width: 1200px) {
+  .trade-in-hero-title {
+    font-size: 40px;
+  }
+}
+
+@media screen and (max-width: 992px) {
+  .trade-in-hero-section {
+    padding: 60px 4%;
+  }
+  .trade-in-hero-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 40px;
+  }
+  .trade-in-stats-wrapper {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .trade-in-stats-box {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+@media screen and (max-width: 576px) {
+  .trade-in-hero-title {
+    font-size: 32px;
+  }
+  .trade-in-hero-desc {
+    font-size: 16px;
+  }
+  .trade-in-benefits-list {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .stat-number {
+    font-size: 40px;
+  }
+  .stat-sub-number {
+    font-size: 24px;
+  }
+}

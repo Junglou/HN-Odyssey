@@ -1,0 +1,223 @@
+/* wrapper */
+.blog-toolbar-wrapper {
+  width: 100%;
+  background: #ffffff;
+  padding: clamp(16px, 2vw, 24px) clamp(16px, 6vw, 120px);
+  box-sizing: border-box;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.blog-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+/* search box - pill shape */
+.blog-search-box {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 24px;
+  padding: 10px 16px;
+  gap: 10px;
+  min-width: 250px;
+  flex: 1 1 auto;
+  max-width: 350px;
+  transition: border-color 0.2s;
+}
+
+.blog-search-box:focus-within {
+  border-color: #000000;
+}
+
+.blog-search-icon {
+  color: #9ca3af;
+}
+
+.blog-search-box input {
+  border: none;
+  background: transparent;
+  outline: none;
+  width: 100%;
+  font-family: "Lexend Deca", sans-serif;
+  font-size: 14px;
+  color: #111827;
+}
+
+.blog-search-box input::placeholder {
+  color: #9ca3af;
+  font-weight: 400;
+}
+
+/* tabs */
+.blog-tabs {
+  display: flex;
+  align-items: center;
+  gap: clamp(16px, 2vw, 32px);
+  flex: 2 1 auto;
+  justify-content: center;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding-bottom: 4px;
+}
+
+.blog-tabs::-webkit-scrollbar {
+  height: 0px;
+}
+
+.blog-tab {
+  background: transparent;
+  border: none;
+  font-family: "Lexend Deca", sans-serif;
+  font-weight: 500;
+  font-size: clamp(14px, 1.2vw, 16px);
+  color: #6b7280;
+  cursor: pointer;
+  padding: 8px 0;
+  transition: color 0.2s;
+}
+
+.blog-tab:hover {
+  color: #111827;
+}
+
+.blog-tab.active {
+  color: #000000;
+  font-weight: 600;
+}
+
+/* custom dropdown - đồng bộ drawer */
+.blog-toolbar-custom-dropdown {
+  position: relative;
+  font-family: "Lexend Deca", sans-serif;
+  font-size: 14px;
+  user-select: none;
+  flex: 0 0 auto;
+}
+
+.blog-toolbar-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #fff;
+  color: #374151;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.blog-toolbar-dropdown-trigger.active,
+.blog-toolbar-dropdown-trigger:hover {
+  border-color: #000000;
+}
+
+.blog-toolbar-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+}
+
+.blog-toolbar-icon-wrapper svg {
+  transition: transform 0.2s ease;
+  width: 14px;
+  height: 14px;
+  color: #000000;
+}
+
+.blog-toolbar-icon-wrapper svg.open {
+  transform: rotate(180deg);
+}
+
+.blog-toolbar-dropdown-options {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: max-content;
+  min-width: 100%;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 1050;
+  overflow-y: auto;
+  max-height: 220px;
+  transform-origin: top right;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+}
+
+.blog-toolbar-dropdown-options.open {
+  pointer-events: auto;
+  animation: ban-slideFadeDown 0.2s ease-out forwards;
+}
+
+.blog-toolbar-dropdown-options.closed {
+  pointer-events: none;
+  animation: ban-slideFadeUp 0.2s ease-out forwards;
+}
+
+.blog-toolbar-dropdown-option {
+  padding: 10px 16px;
+  cursor: pointer;
+  color: #374151;
+  transition: all 0.2s ease;
+}
+
+.blog-toolbar-dropdown-option:hover {
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+.blog-toolbar-dropdown-option.active {
+  background-color: #f3f4f6;
+  color: #000000;
+  font-weight: 600;
+}
+
+/* animations */
+@keyframes ban-slideFadeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes ban-slideFadeUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+/* responsive */
+@media screen and (max-width: 768px) {
+  .blog-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .blog-search-box {
+    max-width: 100%;
+  }
+  .blog-tabs {
+    justify-content: flex-start;
+  }
+}

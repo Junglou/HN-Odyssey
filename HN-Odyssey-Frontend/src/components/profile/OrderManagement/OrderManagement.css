@@ -1,0 +1,449 @@
+/* --- MAIN CARD --- */
+.my-order-card {
+  background-color: #ffffff;
+  border-radius: 24px;
+
+  /* SHADOW GIỐNG SIDEBAR (Đã chốt) */
+  box-shadow:
+    0 0 0 1px rgb(202, 200, 200),
+    8px 8px 4px rgba(17, 24, 39, 0.2);
+
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  font-family: "Lexend Exa", sans-serif;
+  box-sizing: border-box;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.order-header {
+  padding: clamp(1.5rem, 2.5vw, 2.5rem) clamp(1.5rem, 3vw, 3rem)
+    clamp(0.75rem, 1.5vw, 1rem);
+  background: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: clamp(0.75rem, 1.2vw, 1rem);
+  position: relative;
+  z-index: 20;
+  overflow: visible;
+  border-radius: 24px 24px 0 0;
+}
+
+.order-title {
+  font-size: clamp(1.35rem, 2vw, 2.5rem);
+  font-weight: 700;
+  margin: 0;
+  color: #000;
+  line-height: 1.2;
+}
+
+/* Filter dropdown (checkout pattern) */
+.filter-container {
+  position: relative;
+  width: clamp(10rem, 11vw, 12rem);
+  min-width: 10rem;
+  cursor: pointer;
+}
+
+.filter-box {
+  width: 100%;
+  border: 1px solid #888;
+  border-radius: 50px;
+  padding: clamp(0.65rem, 0.9vw, 0.85rem) 2.75rem clamp(0.65rem, 0.9vw, 0.85rem)
+    1rem;
+  font-size: clamp(0.85rem, 1vw, 1.05rem);
+  font-family: "Lexend Exa", sans-serif;
+  color: #333;
+  background-color: #ffffff;
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.filter-box:focus {
+  border-color: #000;
+  border-width: 1.5px;
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.05);
+}
+
+.order-filter-select-icon {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #000;
+  pointer-events: none;
+  transition: transform 0.2s ease;
+}
+
+.order-filter-select-icon.open {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.order-filter-dropdown-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #888;
+  border-radius: 20px;
+  margin-top: 8px;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 8px 0;
+  animation: orderFilterSlideDownFade 0.2s ease-out forwards;
+}
+
+.order-filter-dropdown-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.order-filter-dropdown-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.order-filter-dropdown-list::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+}
+
+.order-filter-dropdown-item {
+  padding: clamp(0.65rem, 0.9vw, 0.75rem) 1rem;
+  font-family: "Lexend Exa", sans-serif;
+  font-size: clamp(0.82rem, 0.95vw, 0.95rem);
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.order-filter-dropdown-item:hover,
+.order-filter-dropdown-item.active {
+  background: #f5f5f5;
+}
+
+.order-filter-dropdown-item.active {
+  font-weight: 600;
+}
+
+@keyframes orderFilterSlideDownFade {
+  0% {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- GRID SYSTEM --- */
+.order-box-internal-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 65fr) minmax(260px, 35fr);
+  gap: clamp(0.85rem, 1.3vw, 1.15rem);
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.grid-section {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* --- CỘT 1: Order Box --- */
+.section-order {
+  padding-left: 1rem;
+  height: fit-content;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 1rem;
+  row-gap: 1rem;
+  min-width: 0;
+}
+
+.section-order > .order-box-container {
+  width: 100%;
+  min-width: 0;
+  justify-self: stretch;
+}
+
+.no-orders {
+  font-size: clamp(1rem, 1.2vw, 1.25rem);
+  color: #555;
+  margin-left: clamp(1rem, 2vw, 3rem);
+  grid-column: 1 / -1;
+}
+
+/* --- CỘT 2: RECOMMENDATION --- */
+.section-recs {
+  border-left: none;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Recommendation visuals live in common/RecommendationList.css (via RecommendationList) */
+
+/* Ensure pagination inside .section-order spans all columns */
+.section-order .order-pagination {
+  grid-column: 1 / -1;
+  justify-self: stretch;
+  width: 100%;
+  padding: 1rem 1rem 2rem;
+  box-sizing: border-box;
+}
+
+/* Pagination styles (PromotionManagement pattern) */
+.order-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: clamp(12px, 1.2vw, 16px);
+  font-size: clamp(0.78rem, 0.9vw, 0.95rem);
+  font-weight: 500;
+  color: #374151;
+}
+
+.order-pagination-info {
+  font-family: "Lexend Exa", sans-serif;
+  text-align: right;
+}
+
+.order-page-numbers {
+  display: flex;
+  gap: clamp(4px, 1vw, 8px);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.order-page-num {
+  width: clamp(26px, 2.2vw, 34px);
+  height: clamp(26px, 2.2vw, 34px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  cursor: pointer;
+  background-color: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: clamp(0.78rem, 0.9vw, 0.95rem);
+  font-weight: 600;
+  color: #374151;
+}
+
+.order-page-num.active {
+  background-color: #f3f4f6;
+  font-weight: 700;
+}
+
+.order-page-num:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+@media (max-width: 1980px) {
+  .order-box-internal-grid {
+    grid-template-columns: minmax(0, 62fr) minmax(280px, 38fr);
+  }
+  .section-order {
+    padding-left: 1rem;
+    height: fit-content;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 1rem;
+    row-gap: 1rem;
+  }
+}
+
+@media (min-width: 1981px) {
+  .section-order {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* RESPONSIVE */
+@media (max-width: 1650px) {
+  .order-box-internal-grid {
+    grid-template-columns: 100%;
+  }
+  .section-order {
+    padding: 0 1rem;
+    height: fit-content;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 1rem;
+    row-gap: 1rem;
+  }
+}
+@media (max-width: 1120px) {
+  .order-header {
+    padding: clamp(1.25rem, 2vw, 2rem) clamp(1.25rem, 2vw, 2rem)
+      clamp(0.75rem, 1.2vw, 1rem);
+  }
+  .order-box-internal-grid {
+    grid-template-columns: 1fr;
+  }
+  .section-order {
+    padding-left: 1rem;
+    height: fit-content;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    column-gap: 1rem;
+    row-gap: 1rem;
+  }
+
+  .section-recs {
+    border-top: none;
+    flex-direction: column;
+  }
+}
+@media (max-width: 990px) {
+  .order-internal-grid {
+    grid-template-columns: 1fr;
+  }
+  .section-order {
+    padding: 0 1rem;
+    height: fit-content;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 1rem;
+    row-gap: 1rem;
+  }
+}
+@media (max-width: 700px) {
+  .order-internal-grid {
+    grid-template-columns: 1fr;
+  }
+  .section-order {
+    padding: 0 1rem;
+    height: fit-content;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    column-gap: 1rem;
+    row-gap: 1rem;
+  }
+
+  .order-pagination {
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .order-page-numbers {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .order-pagination-info {
+    text-align: center;
+  }
+}
+
+/* Order Management & Purchase History — fill large / ultra-wide screens */
+@media (min-width: 1981px) {
+  .order-management-layout.my-order-card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .order-management-layout .order-box-internal-grid {
+    grid-template-columns: minmax(0, 58fr) minmax(320px, 42fr);
+    gap: clamp(0.85rem, 1.1vw, 1.25rem);
+  }
+
+  .order-management-layout .order-header {
+    padding: clamp(2rem, 2.5vw, 3rem) clamp(2rem, 3vw, 3.5rem)
+      clamp(1rem, 1.5vw, 1.5rem);
+  }
+
+  .order-management-layout .section-order {
+    padding-left: clamp(0.75rem, 1.5vw, 1.5rem);
+    padding-right: clamp(0.25rem, 0.75vw, 0.75rem);
+    column-gap: clamp(1rem, 1.2vw, 1.5rem);
+    row-gap: clamp(1rem, 1.2vw, 1.5rem);
+  }
+
+  .order-management-layout .order-title {
+    font-size: clamp(1.5rem, 1.8vw, 2.25rem);
+  }
+
+  .order-management-layout .filter-box {
+    font-size: clamp(0.88rem, 0.95vw, 1.05rem);
+  }
+
+  .order-management-layout .order-pagination {
+    font-size: clamp(0.82rem, 0.88vw, 0.95rem);
+  }
+}
+
+@media (min-width: 2560px) {
+  .order-management-layout .order-box-internal-grid {
+    grid-template-columns: minmax(0, 55fr) minmax(340px, 45fr);
+    gap: clamp(1rem, 1.2vw, 1.5rem);
+  }
+
+  .order-management-layout .order-title {
+    font-size: clamp(1.75rem, 1.6vw, 2.65rem);
+  }
+
+  .order-management-layout .filter-box,
+  .order-management-layout .order-filter-dropdown-item {
+    font-size: clamp(0.9rem, 0.9vw, 1.08rem);
+  }
+
+  .order-management-layout .order-pagination,
+  .order-management-layout .order-page-num {
+    font-size: clamp(0.85rem, 0.85vw, 1rem);
+  }
+
+  .order-management-layout .section-order {
+    column-gap: clamp(1.1rem, 1.3vw, 1.75rem);
+    row-gap: clamp(1.1rem, 1.3vw, 1.75rem);
+  }
+}
+
+@media (min-width: 3000px) {
+  .profile-ultra-wide-grid-card.order-management-layout
+    .order-box-internal-grid {
+    grid-template-columns: minmax(0, 72fr) minmax(300px, 28fr);
+    gap: clamp(1rem, 1.1vw, 1.35rem);
+  }
+
+  .profile-ultra-wide-grid-card.order-management-layout .section-order {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    column-gap: clamp(1rem, 1.1vw, 1.5rem);
+    row-gap: clamp(1rem, 1.1vw, 1.5rem);
+  }
+}
+
+@media (min-width: 3200px) {
+  .order-management-layout .order-box-internal-grid {
+    grid-template-columns: minmax(0, 52fr) minmax(360px, 48fr);
+  }
+
+  .profile-ultra-wide-grid-card.order-management-layout
+    .order-box-internal-grid {
+    grid-template-columns: minmax(0, 74fr) minmax(320px, 26fr);
+  }
+
+  .profile-ultra-wide-grid-card.order-management-layout .section-order {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .order-management-layout .order-title {
+    font-size: clamp(1.85rem, 1.4vw, 2.75rem);
+  }
+}

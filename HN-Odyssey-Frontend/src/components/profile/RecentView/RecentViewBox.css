@@ -1,0 +1,132 @@
+.box-container {
+  box-sizing: border-box;
+  width: 100%;
+  height: fit-content;
+  min-width: 0;
+  border: solid lightgrey 0.1rem;
+  border-radius: clamp(1.25rem, 3cqw, 2rem);
+  box-shadow:
+    0 0 0 1px rgb(202, 200, 200),
+    8px 8px 4px rgba(17, 24, 39, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.box-container .box-content {
+  box-sizing: border-box;
+  width: 100%;
+  flex: 1;
+  min-width: 0;
+  padding: clamp(0.75rem, 2cqw, 1rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.box-container .box-infor {
+  width: 100%;
+  height: fit-content;
+}
+
+.box-container .lbl-thumb-text {
+  font-weight: bolder;
+  font-size: clamp(0.95rem, 2.5vw, 1.05rem);
+  line-height: 1.2;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-decoration: none;
+  color: inherit;
+}
+
+.box-container a.lbl-thumb-text:hover {
+  text-decoration: underline;
+}
+
+.box-container .order-thumbnail-container {
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(0.5rem, 0.75vw, 0.85rem);
+}
+
+.box-container .thumbnail-img-container {
+  flex: 0 0 auto;
+  width: clamp(4.75rem, 32%, 6rem);
+  max-width: clamp(4.75rem, 32%, 6rem);
+  min-width: 4.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.box-container .order-img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  object-fit: cover;
+  background-color: #ddd;
+}
+
+.box-container .thumbnail-detail-container {
+  padding-top: 0.5rem;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 0;
+  width: 100%;
+  padding-left: 0;
+}
+
+.box-container .des-container,
+.box-container .price-container {
+  margin: 0;
+  width: 100%;
+  min-width: 0;
+}
+
+.box-container .span-text {
+  display: block;
+  width: 100%;
+  font-weight: 200;
+  font-size: clamp(0.85rem, 2vw, 0.95rem);
+  line-height: 1.2;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.box-container .recent-view-btn-container {
+  padding-top: 0.2rem;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.box-container .recent-view-btn-container button {
+  background-color: white;
+  border: solid #cfcfcf 0.1rem;
+  border-radius: 0.8rem;
+  cursor: pointer;
+  font-size: clamp(0.78rem, 1.8vw, 0.88rem);
+  padding: 0.45rem 0.65rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.box-container .recent-view-btn-container button:hover {
+  border-color: #000;
+  color: #000;
+  background-color: #f9f9f9;
+}

@@ -1,0 +1,119 @@
+/* container */
+.checkout-recommend-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  animation: checkoutFadeIn 0.5s ease-out forwards;
+}
+
+/* title */
+.checkout-recommend-title {
+  font-family: "Lexend Deca", sans-serif;
+  font-weight: 700;
+  font-size: clamp(18px, 1.8vw, 24px);
+  color: rgba(0, 0, 0, 0.9);
+  margin: 0 0 clamp(16px, 2vw, 24px) 0;
+}
+
+/* items list */
+.checkout-recommend-list {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 1.5vw, 24px);
+  /* Giới hạn độ cao hiển thị mượt mà tối đa 3-4 items, cuộn để xem 6 items */
+  max-height: clamp(400px, 60vh, 750px);
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+/* custom scrollbar */
+.checkout-recommend-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.checkout-recommend-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.checkout-recommend-list::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+}
+
+/* card (kế thừa UI của CheckoutSummary) */
+.checkout-recommend-card {
+  display: grid;
+  grid-template-columns: clamp(110px, 12vw, 220px) 1fr;
+  gap: clamp(12px, 1.5vw, 24px);
+  background: rgba(217, 217, 217, 0.5);
+  border-radius: 10px;
+  padding: clamp(10px, 1.2vw, 20px);
+  box-sizing: border-box;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+
+.checkout-recommend-card:hover {
+  background: rgba(217, 217, 217, 0.7);
+}
+
+.checkout-recommend-img-box {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.checkout-recommend-img-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* item typography */
+.checkout-recommend-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.checkout-recommend-name {
+  font-family: "Lexend Exa", sans-serif;
+  font-weight: 700;
+  font-size: clamp(14px, 1.2vw, 22px);
+  color: #000000;
+  margin: 0;
+}
+
+.checkout-recommend-desc {
+  font-family: "Lexend", sans-serif;
+  font-weight: 400;
+  font-size: clamp(12px, 1vw, 16px);
+  color: #000000;
+  line-height: 1.3;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.checkout-recommend-meta {
+  display: flex;
+  font-family: "Lexend", sans-serif;
+  font-weight: 400;
+  font-size: clamp(12px, 1vw, 16px);
+  color: #000000;
+}
+
+/* responsive */
+@media screen and (max-width: 480px) {
+  .checkout-recommend-card {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}

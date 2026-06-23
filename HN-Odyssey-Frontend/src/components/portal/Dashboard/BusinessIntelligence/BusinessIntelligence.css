@@ -1,0 +1,226 @@
+/* Layout tổng */
+.bi-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.bi-main-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0;
+}
+
+/* Khung thẻ xám */
+.bi-card {
+  background-color: #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bi-section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+/* Container bộ lọc */
+.bi-filter-container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  background-color: #ffffff;
+  padding: 12px 20px 16px 20px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: auto;
+  gap: 24px;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+/* Custom thanh cuộn ngang */
+.bi-filter-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.bi-filter-container::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 8px;
+}
+
+.bi-filter-container::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 8px;
+}
+
+.bi-filter-container::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
+}
+
+/* Nhóm bộ lọc trái/phải */
+.bi-filter-left,
+.bi-filter-right {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+
+.bi-filter-left {
+  gap: 16px;
+}
+
+.bi-filter-right {
+  gap: 12px;
+}
+
+.bi-filter-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #334155;
+  white-space: nowrap;
+}
+
+/* Các nút chọn nhanh */
+.bi-filter-buttons {
+  display: flex;
+  align-items: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.bi-filter-btn {
+  background: none;
+  border: none;
+  border-right: 1px solid #cbd5e1;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 0;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.bi-filter-btn:last-child {
+  border-right: none;
+}
+
+.bi-filter-btn.bi-active {
+  background-color: #9ca3af;
+  color: #ffffff;
+}
+
+/* Ô nhập ngày tháng */
+.bi-date-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px 12px;
+  background-color: #ffffff;
+  position: relative;
+}
+
+.bi-date-input {
+  border: none;
+  outline: none;
+  font-size: 0.9rem;
+  color: #475569;
+  font-weight: 500;
+  width: 85px;
+}
+
+/* Ẩn icon lịch mặc định */
+.bi-date-input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Nút Apply */
+.bi-apply-btn {
+  background-color: #e2e8f0;
+  color: #1e293b;
+  border: 1px solid #cbd5e1;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  white-space: nowrap;
+}
+
+.bi-apply-btn:hover {
+  background-color: #cbd5e1;
+}
+
+.bi-apply-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background-color: #cbd5e1;
+}
+
+/* Vùng hiển thị nội dung */
+.bi-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  transition: opacity 0.3s ease;
+  position: relative;
+}
+
+/* Trạng thái loading */
+.bi-content-wrapper.bi-is-loading {
+  opacity: 0.5;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Style lỗi input */
+.bi-date-wrapper.bi-has-error {
+  border-color: #ef4444;
+  background-color: #fef2f2;
+}
+
+.bi-date-wrapper.bi-has-error .bi-date-input {
+  color: #ef4444;
+}
+
+.bi-error-message {
+  font-size: 0.85rem;
+  color: #ef4444;
+  font-weight: 600;
+  margin-top: -8px;
+  text-align: right;
+}
+
+.bi-grid-2-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 24px;
+}
+
+/* responsive */
+@media screen and (max-width: 1024px) {
+  .bi-grid-2-cols {
+    grid-template-columns: 1fr;
+  }
+}

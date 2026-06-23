@@ -1,0 +1,114 @@
+@import "./profileModal.shared.css";
+
+.account-info-modal .account-field-readonly input:disabled {
+  background-color: #f3f4f6;
+  border-color: #e5e7eb;
+  color: #374151;
+}
+
+.account-field-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.account-editable-group {
+  gap: 10px;
+}
+
+.account-password-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.account-password-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-password-confirm-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.account-otp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
+  background-color: #fafafa;
+}
+
+.account-otp-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  user-select: none;
+}
+
+.account-otp-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: #6b46c1;
+  cursor: pointer;
+}
+
+.account-otp-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  outline: none;
+  box-sizing: border-box;
+  font-family: "Lexend Exa", sans-serif;
+  font-size: 0.95rem;
+  color: #111827;
+  letter-spacing: 0.08em;
+  transition: border-color 0.2s ease;
+}
+
+.account-otp-input:focus {
+  border-color: #6b46c1;
+}
+
+.account-otp-input::placeholder {
+  letter-spacing: normal;
+  color: #9ca3af;
+}
+
+@media (max-width: 480px) {
+  .account-password-row {
+    flex-direction: column;
+  }
+
+  .account-password-confirm-btn {
+    width: 100%;
+  }
+
+  .account-otp-section {
+    padding: 10px;
+  }
+
+  .account-otp-toggle {
+    font-size: 0.82rem;
+    align-items: flex-start;
+  }
+
+  .account-otp-input {
+    padding: 10px 12px;
+    font-size: 0.9rem;
+  }
+}

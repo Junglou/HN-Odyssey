@@ -1,0 +1,38 @@
+/* wrapper */
+.blog-featured-wrapper {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: clamp(16px, 2vw, 24px);
+  padding: clamp(20px, 4vw, 40px) clamp(16px, 6vw, 120px);
+  box-sizing: border-box;
+}
+
+/* main featured item (left) */
+.blog-featured-main {
+  width: 100%;
+  min-width: 0;
+}
+
+/* sub grid items (right) */
+.blog-featured-subgrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: clamp(16px, 2vw, 24px);
+  width: 100%;
+  min-width: 0;
+}
+
+/* tablet */
+@media screen and (max-width: 1024px) {
+  .blog-featured-wrapper {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* mobile */
+@media screen and (max-width: 600px) {
+  .blog-featured-subgrid {
+    grid-template-columns: 1fr;
+  }
+}

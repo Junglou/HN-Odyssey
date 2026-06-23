@@ -1,0 +1,109 @@
+/* Layout tổng */
+.bkpi-wrapper {
+  background-color: #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bkpi-section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+/* Lưới hiển thị */
+.bkpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+/* Card layout */
+.bkpi-card {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Header thẻ */
+.bkpi-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.bkpi-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+/* Icon */
+.bkpi-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background-color: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Giá trị */
+.bkpi-value {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #1e293b;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-all;
+}
+
+/* Xu hướng */
+.bkpi-trend-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.bkpi-trend-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+}
+
+/* Màu sắc xu hướng */
+.bkpi-trend-badge.bkpi-positive {
+  color: #16a34a;
+}
+
+.bkpi-trend-badge.bkpi-negative {
+  color: #dc2626;
+}
+
+.bkpi-trend-text-vs {
+  color: #64748b;
+}
+
+/* Responsive */
+@media screen and (max-width: 1280px) {
+  .bkpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media screen and (max-width: 640px) {
+  .bkpi-grid {
+    grid-template-columns: 1fr;
+  }
+}

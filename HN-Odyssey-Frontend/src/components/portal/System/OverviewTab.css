@@ -1,0 +1,196 @@
+/* Layout chính */
+.ov-tab-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  animation: ov-fadeIn 0.3s ease-in-out;
+}
+
+/* Các thẻ info KPI */
+.ov-top-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.ov-info-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.ov-info-icon {
+  width: 44px;
+  height: 44px;
+  color: #4b5563;
+}
+
+/* Info card cảnh báo */
+.ov-info-card.warning {
+  border-color: #fca5a5;
+  background-color: #fef2f2;
+}
+
+.ov-info-card.warning .ov-info-icon {
+  color: #ef4444;
+}
+
+.ov-info-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ov-info-label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #4b5563;
+}
+
+.ov-info-value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.ov-info-card.warning .ov-info-value,
+.ov-info-card.warning .ov-info-label {
+  color: #b91c1c;
+}
+
+/* Khu vực Gauge */
+.ov-gauge-section {
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.ov-section-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 24px 0;
+}
+
+.ov-gauge-grid {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.ov-gauge-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Svg Gauge tự tự động co giãn */
+.ov-gauge-svg {
+  width: 100%;
+  max-width: 180px;
+  height: auto;
+  aspect-ratio: 200 / 120;
+}
+
+.ov-gauge-label {
+  margin-top: 16px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #111827;
+  text-align: center;
+}
+
+.ov-gauge-sub {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+/* Layout bottom row */
+.ov-bottom-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.ov-chart-card,
+.ov-table-card {
+  flex: 1 1 400px;
+  min-width: 0;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.05),
+    0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+.ov-chart-container {
+  width: 100%;
+  height: 280px;
+  min-height: 280px; /* ĐÃ FIX: Chống co rút flexbox gây mất size */
+  margin-top: 20px;
+  padding-right: 20px;
+}
+
+/* Table styles */
+.ov-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+
+.ov-table th {
+  text-align: left;
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #4b5563;
+  background-color: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.ov-table td {
+  padding: 16px;
+  font-size: 0.85rem;
+  color: #111827;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.ov-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.ov-badge.warning {
+  background-color: #fef08a;
+  color: #854d0e;
+}
+.ov-badge.resolved {
+  background-color: #bbf7d0;
+  color: #166534;
+}
+
+@keyframes ov-fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

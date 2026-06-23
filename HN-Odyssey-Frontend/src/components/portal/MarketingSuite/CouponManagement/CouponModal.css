@@ -1,0 +1,550 @@
+/* Overlay */
+.coupon-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+}
+
+/* Container */
+.coupon-modal-container {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 500px;
+  max-width: 100vw;
+  background-color: #ffffff;
+  box-shadow: -4px 0 15px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  z-index: 1001;
+  font-family: "Lexend Exa", sans-serif;
+  animation: cm-slideInRight 0.3s ease-out forwards;
+}
+
+.coupon-modal-container * {
+  box-sizing: border-box;
+}
+
+.coupon-modal-form {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Header */
+.coupon-modal-header {
+  display: flex;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.coupon-modal-back-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-right: 16px;
+  display: flex;
+  align-items: center;
+  color: #374151;
+}
+
+.coupon-modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+  color: #111827;
+}
+
+/* Nội dung form */
+.coupon-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.coupon-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.coupon-form-row {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+}
+
+.coupon-form-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.coupon-form-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.coupon-required {
+  color: #ef4444;
+}
+
+.coupon-form-input,
+.coupon-form-select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+  background-color: #ffffff;
+}
+
+.coupon-form-input:focus,
+.coupon-form-select:focus {
+  border-color: #000000;
+}
+
+.coupon-form-input:disabled,
+.coupon-form-select:disabled {
+  background-color: #f9fafb;
+  cursor: not-allowed;
+  color: #6b7280;
+}
+
+/* Tabs phạm vi áp dụng */
+.coupon-scope-tab-bar {
+  display: flex;
+  background-color: #e5e7eb;
+  padding: 4px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  gap: 4px;
+}
+
+.coupon-scope-tab-btn {
+  flex: 1;
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #111827;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.coupon-scope-tab-btn.active {
+  background-color: #ffffff;
+  color: #000000;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  font-weight: 600;
+}
+
+.coupon-scope-tab-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Dropdown */
+.coupon-dynamic-dropdowns {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.coupon-multi-select-container {
+  display: flex;
+  flex-direction: column;
+  animation: cm-slideFadeIn 0.2s ease-out;
+}
+
+.coupon-select-input-wrapper {
+  position: relative;
+}
+
+.coupon-select-search {
+  width: 100%;
+}
+
+.coupon-select-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.coupon-select-option {
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #374151;
+  transition: background-color 0.2s;
+}
+
+.coupon-select-option:hover {
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+.coupon-select-empty {
+  padding: 10px 12px;
+  color: #9ca3af;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* Chips hiển thị */
+.coupon-selected-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.coupon-chip-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background-color: #d1d5db;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #000000;
+  font-weight: 500;
+}
+
+.coupon-chip-remove-btn {
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  color: #374151;
+  transition: color 0.2s;
+}
+
+.coupon-chip-remove-btn:hover {
+  color: #000000;
+}
+
+/* Xóa lựa chọn */
+.coupon-clear-scope-text {
+  font-size: 0.85rem;
+  color: #6b7280;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: color 0.2s;
+  margin-top: 4px;
+}
+
+.coupon-clear-scope-text:hover {
+  color: #ef4444;
+  text-decoration: underline;
+}
+
+/* Footer form */
+.coupon-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  background-color: #ffffff;
+}
+
+/* Trạng thái */
+.coupon-status-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.coupon-status-label {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.coupon-status-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.coupon-toggle-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.coupon-toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.coupon-toggle-input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.coupon-toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #d1d5db;
+  transition: 0.4s;
+  border-radius: 24px;
+}
+
+.coupon-toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+.coupon-toggle-input:checked + .coupon-toggle-slider {
+  background-color: #000000;
+}
+
+.coupon-toggle-input:checked + .coupon-toggle-slider:before {
+  transform: translateX(20px);
+}
+
+.coupon-toggle-text {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.coupon-footer-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.coupon-btn-primary,
+.coupon-btn-secondary {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.coupon-btn-primary {
+  background-color: #111827;
+  color: #ffffff;
+  border: none;
+}
+
+.coupon-btn-primary:hover {
+  background-color: #374151;
+}
+
+.coupon-btn-secondary {
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #374151;
+}
+
+.coupon-btn-secondary:hover {
+  background-color: #f9fafb;
+}
+
+/* Select Discount Type */
+.coupon-custom-select {
+  position: relative;
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.9rem;
+  user-select: none;
+}
+
+.coupon-custom-select.disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.coupon-select-trigger {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #374151;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.coupon-select-trigger.active,
+.coupon-select-trigger:hover {
+  border-color: #000000;
+}
+
+.coupon-custom-select.disabled .coupon-select-trigger {
+  background-color: #f9fafb;
+  color: #6b7280;
+  pointer-events: none;
+  border-color: #d1d5db;
+}
+
+.coupon-dropdown-arrow {
+  display: flex;
+  align-items: center;
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.coupon-dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.coupon-dropdown-arrow svg {
+  width: 16px;
+  height: 16px;
+}
+
+.coupon-select-options {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  overflow: hidden;
+  transform-origin: top center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+}
+
+.coupon-select-options.open {
+  pointer-events: auto;
+  animation: cm-slideFadeDown 0.2s ease-out forwards;
+}
+
+.coupon-select-options.closed {
+  pointer-events: none;
+  animation: cm-slideFadeUp 0.2s ease-out forwards;
+}
+
+.coupon-select-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  color: #374151;
+  transition: background-color 0.2s;
+}
+
+.coupon-select-item:hover {
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+.coupon-select-item.selected {
+  background-color: #e5e7eb;
+  color: #111827;
+  font-weight: 600;
+}
+
+.coupon-modal-overlay.closing {
+  animation: cm-fadeOut 0.3s ease-out forwards;
+}
+
+.coupon-modal-container.closing {
+  animation: cm-slideOutRight 0.3s ease-out forwards;
+}
+
+/* Animation */
+@keyframes cm-fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes cm-slideOutRight {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes cm-slideFadeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cm-slideFadeUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+@keyframes cm-slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}

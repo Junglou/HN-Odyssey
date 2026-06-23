@@ -1,0 +1,140 @@
+/* section */
+.sc-faq-section {
+  width: 100%;
+  padding: 80px 4%;
+  background-color: #f9fafb;
+  display: flex;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+/* container */
+.sc-faq-container {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 48px;
+  box-sizing: border-box;
+}
+
+.sc-faq-title {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+  font-size: 30px;
+  color: #111827;
+  text-align: center;
+}
+
+/* list */
+.sc-faq-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* item */
+.sc-faq-item {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.sc-faq-item:hover {
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+/* question row */
+.sc-faq-question-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.sc-faq-question-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.sc-faq-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background-color: #eff6ff;
+  color: #2563eb;
+  border-radius: 50%;
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.sc-faq-question {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  color: #111827;
+}
+
+.sc-faq-toggle-icon {
+  color: #9ca3af;
+  transition: transform 0.3s ease;
+  flex-shrink: 0;
+}
+
+/* hieu ung quay icon khi mo */
+.sc-faq-item.open .sc-faq-toggle-icon {
+  transform: rotate(180deg);
+}
+
+/* answer dropdown logic */
+.sc-faq-answer-wrapper {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s ease;
+}
+
+.sc-faq-item.open .sc-faq-answer-wrapper {
+  grid-template-rows: 1fr;
+}
+
+.sc-faq-answer {
+  margin: 0;
+  padding-left: 40px;
+  padding-top: 0;
+  font-family: "Inter", sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #4b5563;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    padding-top 0.3s ease,
+    opacity 0.3s ease;
+}
+
+.sc-faq-item.open .sc-faq-answer {
+  padding-top: 16px;
+  opacity: 1;
+}
+
+/* responsive */
+@media screen and (max-width: 640px) {
+  .sc-faq-answer {
+    padding-left: 0;
+  }
+}

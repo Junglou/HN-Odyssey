@@ -1,0 +1,197 @@
+/* src/pages/auth/AccountRecoVerifiedPage.css */
+
+/* Main Layout */
+.reco-verified-page-container {
+  position: relative;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 100vh;
+  z-index: 1000;
+  display: flex;
+  font-family: "Lexend Exa", sans-serif;
+  overflow: hidden;
+  background-color: #fff;
+  margin: 0;
+  padding: 0;
+}
+
+/* Left Section (Form) */
+.reco-verified-left-section {
+  flex: 0 0 50%;
+  max-width: 50%;
+  background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  padding: 2rem;
+  z-index: 20;
+  border-right: 1px solid #eee;
+  transition: all 1s cubic-bezier(0.25, 1, 0.5, 1);
+  overflow-y: auto;
+}
+
+/* Collapsed Left Section */
+.reco-verified-page-container.collapsed .reco-verified-left-section {
+  flex: 0 0 80px;
+  max-width: 80px;
+  padding: 0;
+  border: none;
+  background: linear-gradient(to right, #ffffff 0%, #f9f9f9 85%, #d1d1d1 100%);
+  box-shadow: 10px 0 30px -5px rgba(0, 0, 0, 0.15);
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
+  z-index: 50;
+}
+
+/* Right Section (Info) */
+.reco-verified-right-section {
+  flex: 1;
+  background-color: #eaddcd;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  transition: all 1s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.reco-verified-info-card {
+  background: #ffffff;
+  padding: 3.5rem;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  max-width: 500px;
+  width: 90%;
+  opacity: 0;
+  animation: verifiedFadeInUp 1s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation-delay: 0.5s;
+}
+
+/* Typography Right */
+.reco-verified-info-title {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+  color: #000;
+}
+.reco-verified-info-quote {
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  font-style: italic;
+  color: #111;
+}
+.reco-verified-benefit-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 2.5rem 0;
+}
+.reco-verified-benefit-item {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  color: #000;
+  line-height: 1.4;
+}
+.reco-verified-benefit-icon {
+  margin-right: 12px;
+  margin-top: 2px;
+}
+.reco-verified-explore-btn {
+  width: 160px;
+  padding: 0.8rem 2rem;
+  background-color: #000;
+  color: #fff;
+  border: none;
+  border-radius: 50px;
+  font-weight: 600;
+  cursor: pointer;
+  display: block;
+  margin: 0 auto;
+  transition: transform 0.2s;
+}
+.reco-verified-explore-btn:hover {
+  transform: translateY(-1px);
+}
+
+/* Arrow */
+.reco-verified-arrow-container {
+  position: absolute;
+  top: 50%;
+  z-index: 2000;
+  width: 48px;
+  height: 48px;
+  background: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  color: #000;
+  opacity: 0;
+  animation: verifiedFadeInUp 1s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation-delay: 0.6s;
+  transition: all 1s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.reco-verified-page-container:not(.collapsed) .reco-verified-arrow-container {
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.3);
+}
+.reco-verified-page-container.collapsed .reco-verified-arrow-container {
+  left: 40px;
+  transform: translate(-50%, -50%);
+  box-shadow: 4px 0 15px rgba(0, 0, 0, 0.2);
+}
+.reco-verified-arrow-icon {
+  transition: transform 1s ease;
+}
+.reco-verified-page-container.collapsed .reco-verified-arrow-icon {
+  transform: rotate(180deg);
+}
+
+/* Logic Ẩn Form khi đóng */
+.reco-verified-page-container.collapsed .verified-form-wrapper {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+
+@keyframes verifiedFadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 968px) {
+  .reco-verified-page-container {
+    flex-direction: column;
+    overflow-y: auto;
+    height: auto;
+  }
+  .reco-verified-left-section,
+  .reco-verified-right-section {
+    flex: none;
+    max-width: 100%;
+    padding: 3rem 1.5rem;
+  }
+  .reco-verified-arrow-container {
+    display: none;
+  }
+}

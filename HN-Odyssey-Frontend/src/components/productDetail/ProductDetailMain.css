@@ -1,0 +1,449 @@
+/* layout */
+.pdp-main-section {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 55fr) minmax(0, 40fr);
+  justify-content: space-between;
+  gap: clamp(16px, 4vw, 72px);
+  padding: clamp(16px, 3vw, 48px) clamp(16px, 6vw, 120px) clamp(24px, 4vw, 64px);
+  box-sizing: border-box;
+}
+
+@media (max-width: 700px) {
+  .pdp-main-section {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* gallery */
+.pdp-gallery-container {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1.5vw, 20px);
+  width: 100%;
+  min-width: 0;
+}
+
+.pdp-main-image-wrap {
+  position: relative;
+  width: 100%;
+  height: clamp(400px, 70vh, 850px);
+  border: 1px solid #e5e7eb;
+  border-radius: clamp(8px, 1vw, 14px);
+  overflow: hidden;
+  background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 700px) {
+  .pdp-main-image-wrap {
+    height: clamp(300px, 50vh, 500px);
+  }
+}
+
+.pdp-main-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: scale-down;
+  object-position: center;
+  cursor: zoom-in;
+  display: block;
+}
+
+/* heart button */
+.pdp-heart-btn {
+  position: absolute;
+  top: clamp(8px, 2%, 20px);
+  right: clamp(8px, 2%, 20px);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  transition: transform 0.2s;
+  z-index: 2;
+}
+
+.pdp-heart-btn svg {
+  width: clamp(20px, 2vw, 28px);
+  height: clamp(20px, 2vw, 28px);
+}
+
+.pdp-heart-btn:hover {
+  transform: scale(1.1);
+}
+
+.pdp-heart-btn.active svg path {
+  fill: #ef4444;
+  stroke: #ef4444;
+}
+
+/* thumbnails */
+.pdp-thumbnail-list {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: clamp(6px, 1vw, 14px);
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pdp-thumbnail-list::-webkit-scrollbar {
+  display: none;
+}
+
+.pdp-thumbnail-wrap {
+  flex: 0 0 calc(20% - 12px);
+  aspect-ratio: 16 / 9;
+  border: 1.5px solid #e5e7eb;
+  border-radius: clamp(6px, 0.8vw, 10px);
+  overflow: hidden;
+  cursor: pointer;
+  opacity: 0.65;
+  transition:
+    opacity 0.2s,
+    border-color 0.2s;
+}
+
+.pdp-thumbnail-wrap:hover {
+  opacity: 0.85;
+}
+
+.pdp-thumbnail-wrap.active {
+  opacity: 1;
+  border: 2px solid #000000;
+}
+
+.pdp-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  background-color: #f8f8f8;
+  display: block;
+}
+
+@media (max-width: 1024px) {
+  .pdp-thumbnail-wrap {
+    flex: 0 0 calc(25% - 10px);
+  }
+}
+
+@media (max-width: 700px) {
+  .pdp-thumbnail-wrap {
+    flex: 0 0 25vw;
+  }
+}
+
+/* info panel */
+.pdp-info-container {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.8vw, 24px);
+  width: 100%;
+  min-width: 0;
+}
+
+.pdp-title {
+  margin: 0;
+  font-size: clamp(18px, 2.5vw, 38px);
+  font-weight: 700;
+  color: #000000;
+  line-height: 1.2;
+}
+
+/* price */
+.pdp-price-container {
+  display: flex;
+  align-items: baseline;
+  gap: clamp(8px, 1vw, 16px);
+}
+
+.pdp-price {
+  font-size: clamp(18px, 2vw, 30px);
+  font-weight: 700;
+  color: #000000;
+}
+
+.pdp-price-original {
+  font-size: clamp(14px, 1.4vw, 22px);
+  font-weight: 400;
+  color: #9ca3af;
+  text-decoration: line-through;
+}
+
+/* description */
+.pdp-desc {
+  margin: 0;
+  font-size: clamp(13px, 1.1vw, 17px);
+  font-weight: 300;
+  line-height: 1.5;
+  color: #374151;
+}
+
+/* option groups */
+.pdp-option-group {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6px, 0.8vw, 12px);
+}
+
+.pdp-option-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pdp-option-label {
+  font-size: clamp(13px, 1.1vw, 18px);
+  font-weight: 600;
+  color: #111827;
+}
+
+.pdp-option-value {
+  font-size: clamp(13px, 1.1vw, 18px);
+  font-weight: 400;
+  color: #6b7280;
+}
+
+/* color swatches */
+.pdp-color-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(6px, 0.8vw, 12px);
+}
+
+.pdp-color-btn {
+  width: clamp(24px, 2vw, 34px);
+  height: clamp(24px, 2vw, 34px);
+  border-radius: 50%;
+  border: 1.5px solid rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  outline: none;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+
+.pdp-color-btn:focus,
+.pdp-color-btn:focus-visible {
+  outline: none;
+}
+
+.pdp-color-btn:hover {
+  transform: scale(1.1);
+  border-color: #000000;
+}
+
+.pdp-color-btn.active {
+  border-color: #000000;
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 0 0 4px #000000;
+  transform: scale(1.05);
+}
+
+/* size buttons */
+.pdp-size-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(6px, 0.8vw, 12px);
+}
+
+.pdp-size-btn {
+  min-width: clamp(44px, 4vw, 72px);
+  height: clamp(32px, 2.8vw, 44px);
+  padding: 0 clamp(10px, 1.2vw, 18px);
+  background: #ffffff;
+  border-radius: 999px;
+  border: 1px solid #000000;
+  font-size: clamp(12px, 1vw, 16px);
+  font-weight: 400;
+  color: #000000;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pdp-size-btn:hover {
+  background: #f3f4f6;
+  border-color: #000000;
+}
+
+.pdp-size-btn.active {
+  background: #ffffff;
+  color: #000000;
+  font-weight: 600;
+  border: 2.5px solid #000000;
+  padding: 0 calc(clamp(10px, 1.2vw, 18px) - 2px);
+}
+
+/* quantity */
+.pdp-quantity-selector {
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 1.2vw, 16px);
+  width: max-content;
+  border: 1px solid #000000;
+  border-radius: 999px;
+  padding: clamp(2px, 0.4vw, 6px) clamp(6px, 0.8vw, 12px);
+}
+
+.pdp-qty-btn {
+  width: clamp(24px, 2vw, 32px);
+  height: clamp(24px, 2vw, 32px);
+  background: transparent;
+  border: none;
+  font-size: clamp(16px, 1.5vw, 22px);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #111827;
+}
+
+.pdp-qty-input {
+  width: clamp(28px, 2.5vw, 40px);
+  font-size: clamp(14px, 1.2vw, 18px);
+  font-weight: 600;
+  text-align: center;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: inherit;
+}
+
+.pdp-qty-input::-webkit-outer-spin-button,
+.pdp-qty-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+
+/* details */
+.pdp-details-block {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6px, 0.8vw, 12px);
+}
+
+.pdp-details-title {
+  margin: 0;
+  font-size: clamp(13px, 1.1vw, 18px);
+  font-weight: 600;
+  color: #111827;
+}
+
+.pdp-details-content {
+  font-size: clamp(12px, 1vw, 16px);
+  line-height: 1.6;
+  color: #374151;
+}
+
+/* action buttons */
+.pdp-action-group {
+  display: flex;
+  flex-direction: row;
+  gap: clamp(8px, 1.2vw, 20px);
+}
+
+/* mobile: stack buttons vertically */
+@media (max-width: 480px) {
+  .pdp-action-group {
+    flex-direction: column;
+  }
+}
+
+.pdp-btn-add,
+.pdp-btn-checkout {
+  flex: 1;
+  height: clamp(38px, 3.2vw, 52px);
+  border-radius: clamp(6px, 0.8vw, 10px);
+  font-size: clamp(12px, 1vw, 16px);
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+
+.pdp-btn-add:hover,
+.pdp-btn-checkout:hover {
+  opacity: 0.8;
+  border-color: #575757;
+}
+
+.pdp-btn-add {
+  background: #ffffff;
+  border: 1.5px solid #000000;
+  color: #000000;
+}
+
+.pdp-btn-checkout {
+  background: #000000;
+  border: 1.5px solid #000000;
+  color: #ffffff;
+}
+
+/* error / disabled */
+.pdp-error-text {
+  color: #ef4444;
+  font-size: clamp(12px, 1vw, 15px);
+  margin-top: 4px;
+}
+
+.pdp-btn-add:disabled,
+.pdp-btn-checkout:disabled,
+.pdp-qty-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pdp-qty-input:disabled {
+  color: #9ca3af;
+}
+
+/* lightbox */
+.pdp-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: zoom-out;
+}
+
+.pdp-lightbox-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  cursor: default;
+}
+
+.pdp-lightbox-img {
+  max-width: 100%;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 10px;
+}
+
+.pdp-lightbox-close {
+  position: fixed;
+  top: clamp(12px, 2vw, 24px);
+  right: clamp(12px, 2vw, 24px);
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: clamp(24px, 2.5vw, 36px);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  z-index: 110;
+}

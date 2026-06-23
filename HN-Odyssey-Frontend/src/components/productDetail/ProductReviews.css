@@ -1,0 +1,739 @@
+/* wrapper */
+.pdp-reviews-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2.5vw, 36px);
+  box-sizing: border-box;
+  padding: clamp(24px, 4vw, 64px) clamp(16px, 6vw, 120px);
+}
+
+/* title */
+.pdp-reviews-heading {
+  margin: 0;
+  font-size: clamp(18px, 2.5vw, 36px);
+  font-weight: 700;
+  color: #000000;
+  text-decoration: underline;
+}
+
+/* overview */
+.pdp-reviews-overview {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: clamp(12px, 2vw, 24px);
+}
+
+.pdp-rating-score-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(217, 217, 217, 0.5);
+  padding: clamp(12px, 1.5vw, 24px);
+  border-radius: 5px;
+  min-width: clamp(140px, 14vw, 220px);
+}
+
+.pdp-rating-big {
+  font-size: clamp(22px, 2.5vw, 36px);
+  font-weight: 400;
+}
+
+.pdp-stars-row {
+  display: flex;
+  gap: 4px;
+}
+
+.pdp-stars-row svg,
+.pdp-review-stars svg {
+  width: clamp(14px, 1.4vw, 22px);
+  height: clamp(14px, 1.4vw, 22px);
+}
+
+.pdp-review-count {
+  font-size: clamp(12px, 1vw, 16px);
+  font-weight: 300;
+}
+
+.pdp-write-review-box {
+  display: flex;
+}
+
+.pdp-write-btn {
+  background: #000000;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  padding: clamp(8px, 1vw, 14px) clamp(16px, 1.5vw, 24px);
+  font-size: clamp(13px, 1.1vw, 17px);
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.2s;
+}
+
+.pdp-write-btn:hover {
+  opacity: 0.8;
+}
+
+/* review form */
+.pdp-review-form {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: clamp(16px, 2vw, 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pdp-form-title {
+  margin: 0;
+  font-size: clamp(14px, 1.1vw, 17px);
+  font-weight: 600;
+}
+
+.pdp-form-stars {
+  display: flex;
+  gap: 8px;
+}
+
+.pdp-review-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: clamp(13px, 1vw, 15px);
+  resize: vertical;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.pdp-review-textarea:focus {
+  border-color: #000000;
+}
+
+.pdp-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.pdp-form-cancel,
+.pdp-form-submit {
+  padding: clamp(6px, 0.6vw, 10px) clamp(12px, 1.2vw, 20px);
+  border-radius: 6px;
+  font-size: clamp(13px, 1vw, 15px);
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.2s;
+}
+
+.pdp-form-cancel {
+  background: transparent;
+  border: 1px solid #000000;
+  color: #000000;
+}
+
+.pdp-form-cancel:hover {
+  opacity: 0.6;
+}
+
+.pdp-form-submit {
+  background: #000000;
+  border: 1px solid #000000;
+  color: #ffffff;
+}
+
+.pdp-form-submit:hover {
+  opacity: 0.8;
+}
+
+/* toolbar */
+.pdp-reviews-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.2vw, 20px);
+  padding: clamp(12px, 1.5vw, 24px) 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.pdp-sort-box,
+.pdp-filter-box {
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 1vw, 16px);
+  flex-wrap: wrap;
+}
+
+.pdp-toolbar-label {
+  font-size: clamp(13px, 1vw, 16px);
+  font-weight: 300;
+  min-width: clamp(52px, 4vw, 80px);
+  flex-shrink: 0;
+}
+
+/* custom dropdown */
+.pdp-custom-dropdown {
+  position: relative;
+  font-family: inherit;
+  font-size: clamp(13px, 1vw, 16px);
+  user-select: none;
+  min-width: clamp(130px, 12vw, 190px);
+}
+
+.pdp-custom-dropdown.is-open {
+  z-index: 101;
+}
+
+.pdp-dropdown-trigger {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: clamp(6px, 0.6vw, 10px) clamp(10px, 1vw, 16px);
+  border: 1px solid #000000;
+  border-radius: 10px;
+  background-color: #ffffff;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.pdp-dropdown-trigger:hover {
+  opacity: 0.7;
+}
+
+.pdp-dropdown-arrow {
+  transition: transform 0.25s ease;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.pdp-dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.pdp-dropdown-options {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+  z-index: 10;
+}
+
+.pdp-dropdown-options.open {
+  pointer-events: auto;
+  animation: pdp-slideFadeDown 0.2s ease-out forwards;
+}
+
+.pdp-dropdown-options.closed {
+  pointer-events: none;
+  animation: pdp-slideFadeUp 0.2s ease-out forwards;
+}
+
+.pdp-dropdown-option {
+  padding: clamp(8px, 0.8vw, 12px) clamp(10px, 1vw, 16px);
+  cursor: pointer;
+  font-size: clamp(13px, 1vw, 16px);
+  transition: background-color 0.2s;
+}
+
+.pdp-dropdown-option:hover {
+  background-color: #f3f4f6;
+}
+
+.pdp-dropdown-option.selected {
+  background-color: #e9e9e9;
+  font-weight: 600;
+}
+
+@keyframes pdp-slideFadeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pdp-slideFadeUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+/* filter chips */
+.pdp-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(6px, 0.8vw, 12px);
+}
+
+.pdp-filter-chip {
+  padding: clamp(5px, 0.5vw, 8px) clamp(10px, 1vw, 16px);
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  border-radius: 30px;
+  background: #ffffff;
+  font-family: inherit;
+  font-size: clamp(12px, 1vw, 15px);
+  font-weight: 300;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.pdp-filter-chip:hover {
+  background: #000000;
+  color: #ffffff;
+  border-color: #000000;
+}
+
+.pdp-filter-chip.active {
+  background: #000000;
+  color: #ffffff;
+  border-color: #000000;
+}
+
+/* review cards */
+.pdp-reviews-list {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.2vw, 20px);
+}
+
+.pdp-review-card {
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  padding: clamp(14px, 1.5vw, 24px);
+  background: rgba(255, 255, 255, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 0.8vw, 12px);
+}
+
+.pdp-review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pdp-reviewer-info {
+  display: flex;
+  align-items: center;
+  gap: clamp(6px, 0.8vw, 14px);
+  flex-wrap: wrap;
+}
+
+.pdp-reviewer-name {
+  font-size: clamp(13px, 1vw, 16px);
+  font-weight: 500;
+}
+
+.pdp-verified-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(74, 146, 96, 0.3);
+  padding: clamp(3px, 0.3vw, 5px) clamp(7px, 0.7vw, 12px);
+  border-radius: 3px;
+  color: #02542d;
+  font-size: clamp(11px, 0.9vw, 14px);
+  font-weight: 300;
+}
+
+.pdp-verified-badge svg {
+  width: clamp(13px, 1.1vw, 18px);
+  height: clamp(13px, 1.1vw, 18px);
+}
+
+.pdp-review-date {
+  font-size: clamp(12px, 0.9vw, 15px);
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.4);
+}
+
+.pdp-review-stars {
+  display: flex;
+  gap: 2px;
+}
+
+.pdp-review-content {
+  margin: 0;
+  font-size: clamp(13px, 1vw, 16px);
+  font-weight: 400;
+  line-height: 1.5;
+  color: #111827;
+}
+
+.pdp-review-actions {
+  display: flex;
+  gap: clamp(6px, 0.8vw, 14px);
+  justify-content: flex-end;
+}
+
+.pdp-feedback-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 5px;
+  transition: background 0.2s;
+}
+
+.pdp-feedback-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.pdp-feedback-btn.active svg path {
+  fill: #000000;
+}
+
+.pdp-feedback-btn svg {
+  width: clamp(15px, 1.3vw, 20px);
+  height: clamp(15px, 1.3vw, 20px);
+}
+
+/* pagination */
+.pdp-reviews-pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: clamp(4px, 0.8vw, 12px);
+}
+
+/* dinh dang khung phan hoi chung */
+.pdp-review-reply {
+  margin-top: clamp(10px, 1.2vw, 14px);
+  padding: clamp(10px, 1.2vw, 14px);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-left: 3px solid transparent;
+}
+
+.pdp-review-reply-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pdp-review-reply-name {
+  font-weight: 600;
+  font-size: clamp(13px, 1vw, 15px);
+  color: #000000;
+}
+
+.pdp-review-reply-date {
+  font-size: clamp(12px, 0.9vw, 14px);
+  color: rgba(0, 0, 0, 0.4);
+}
+
+.pdp-review-reply-content {
+  margin: 0;
+  font-size: clamp(13px, 1vw, 15px);
+  color: #111827;
+  line-height: 1.5;
+}
+
+/* dinh dang phan hoi tu khach hang */
+.pdp-review-reply--customer {
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.pdp-review-reply--customer .pdp-review-reply-name {
+  color: #4b5563;
+  font-weight: 500;
+}
+
+/* dinh dang phan hoi tu quan tri vien */
+.pdp-review-reply--admin {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-left-color: #000000;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.pdp-review-reply--admin .pdp-review-reply-name {
+  color: #000000;
+  font-weight: 700;
+}
+
+.pdp-review-reply--admin .pdp-review-reply-content {
+  font-weight: 500;
+  color: #000000;
+}
+
+/* thao tac nut bam phan hoi cua khach hang */
+.pdp-reply-action-btn {
+  background: none;
+  border: none;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 10px;
+}
+
+.pdp-reply-action-btn:hover {
+  color: #000;
+  text-decoration: underline;
+}
+
+/* khung nhap lieu phan hoi */
+.pdp-reply-input-box {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid #e5e7eb;
+  padding: 10px;
+  border-radius: 8px;
+  background: #ffffff;
+  position: relative; /* Dung de neo bang Emoji Picker */
+}
+
+.pdp-reply-input-box textarea {
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.pdp-reply-input-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: 8px;
+  gap: 8px;
+}
+
+.pdp-reply-action-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.pdp-reply-action-right {
+  display: flex;
+  gap: 8px;
+}
+
+/* khu vuc tai anh va video */
+.pdp-form-media-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.pdp-upload-btn {
+  align-self: flex-start;
+  padding: 6px 14px;
+  background: #f3f4f6;
+  border: 1px dashed #9ca3af;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.pdp-upload-btn:hover {
+  background: #e5e7eb;
+  border-color: #6b7280;
+}
+
+.pdp-upload-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pdp-media-preview-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pdp-media-preview-item {
+  width: 60px;
+  height: 60px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #d1d5db;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.pdp-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Custom Buttons Emoji & Image */
+.pdp-icon-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.pdp-icon-action-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.pdp-icon-action-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pdp-action-buttons-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+/* Emoji Picker Wrapper */
+.pdp-emoji-picker-wrapper {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 0;
+  z-index: 50;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  background: #fff;
+}
+
+/* FIX XUNG DOT CSS CHO EMOJI PICKER */
+.pdp-emoji-picker-wrapper .EmojiPickerReact svg {
+  display: block;
+  vertical-align: baseline;
+}
+
+.pdp-emoji-picker-wrapper .EmojiPickerReact button {
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  border-radius: 0;
+  min-width: auto;
+  min-height: auto;
+  line-height: normal;
+}
+
+.pdp-emoji-picker-wrapper .EmojiPickerReact .epr-icn-clear-search {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pdp-emoji-picker-wrapper .EmojiPickerReact button:focus,
+.pdp-emoji-picker-wrapper .EmojiPickerReact button:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.pdp-emoji-picker-wrapper .EmojiPickerReact button:hover {
+  border-color: transparent;
+}
+
+/* --- TÍNH NĂNG PHÓNG TO ẢNH (MODAL ZOOM) --- */
+.pdp-preview-img-clickable {
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  /* FIX: Tối ưu hiệu ứng hover, chạy trên luồng GPU riêng */
+  will-change: opacity;
+}
+
+.pdp-preview-img-clickable:hover {
+  opacity: 0.8;
+}
+
+.pdp-media-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.85); /* Nền đen mờ 85% */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 99999; /* Đảm bảo nằm đè lên mọi thứ (kể cả Header) */
+}
+
+.pdp-media-modal-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.pdp-media-modal-content img,
+.pdp-media-modal-content video {
+  max-width: 100%;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+.pdp-media-modal-close {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  background: none;
+  border: none;
+  color: #ffffff;
+  font-size: 32px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s;
+  padding: 0;
+}
+
+.pdp-media-modal-close:hover {
+  color: #9ca3af;
+}
