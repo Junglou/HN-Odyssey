@@ -34,6 +34,7 @@ interface ServerMessage {
 
 // Định nghĩa kiểu cho cấu hình kết nối Socket
 interface SocketConnectionParams {
+  path?: string;
   transports: string[];
   auth?: { token: string };
   query?: { token: string };
@@ -104,21 +105,28 @@ export function useChatSupport() {
         }
 
         // Bước 3: Cấu hình và kết nối Socket.IO
-        const baseUrl = import.meta.env.VITE_API_URL.split("/api")[0];
+        const rawApiUrl =
+          import.meta.env.VITE_API_URL || "https://api.hnodyssey.id.vn/api";
+
+        const baseUrl = rawApiUrl.endsWith("/api")
+          ? rawApiUrl.slice(0, -4)
+          : rawApiUrl;
+
         const token = tokenStorage.getToken();
 
         const socketParams: SocketConnectionParams = {
+          path: "/socket.io",
           transports: ["polling", "websocket"],
         };
 
-        // Nạp token vào header cho WebSocket qua WsJwtGuard
         if (token) {
           socketParams.auth = { token };
           socketParams.query = { token };
           socketParams.extraHeaders = { Authorization: `Bearer ${token}` };
         }
 
-        const socket = io(`${baseUrl}/chat`, socketParams);
+        const socketUrl = `${baseUrl}/chat`;
+        const socket = io(socketUrl, socketParams);
         socketRef.current = socket;
 
         socket.on("connect", () => {
