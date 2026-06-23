@@ -1,5 +1,12 @@
 import type { UserAddress } from "../types/user";
-import type { AddressFormData } from "../components/profile/AddressManagement/AddressModal/AddressModal";
+
+// Định nghĩa trực tiếp interface tại đây thay vì import từ AddressModal
+export interface AddressFormData {
+  receiverName: string;
+  address: string;
+  city: string;
+  country: string;
+}
 
 export interface CustomerAddressApiResponse {
   _id?: string;
