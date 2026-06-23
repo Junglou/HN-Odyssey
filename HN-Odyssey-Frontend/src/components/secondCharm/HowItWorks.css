@@ -1,0 +1,143 @@
+/* section */
+.sc-hiw-section {
+  width: 100%;
+  padding: 80px 4%;
+  background-color: #ffffff;
+  display: flex;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+/* container */
+.sc-hiw-container {
+  width: 100%;
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 60px;
+  box-sizing: border-box;
+}
+
+/* header */
+.sc-hiw-header {
+  text-align: center;
+}
+
+.sc-hiw-title {
+  margin: 0 0 16px 0;
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+  font-size: 36px;
+  color: #111827;
+  letter-spacing: -0.5px;
+}
+
+.sc-hiw-subtitle {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  font-size: 20px;
+  color: #4b5563;
+}
+
+/* grid */
+.sc-hiw-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px;
+  width: 100%;
+}
+
+/* card */
+.sc-hiw-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+  transition: transform 0.3s ease;
+  cursor: default;
+}
+
+/* hieu ung noi */
+.sc-hiw-card:hover {
+  transform: translateY(-8px);
+}
+
+/* icon wrapper */
+.sc-hiw-icon-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 8px;
+}
+
+.sc-hiw-icon-circle {
+  width: 96px;
+  height: 96px;
+  background-color: #e0f2fe;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: background-color 0.3s ease;
+}
+
+.sc-hiw-card:hover .sc-hiw-icon-circle {
+  background-color: #bae6fd;
+}
+
+/* step number */
+.sc-hiw-step-number {
+  width: 40px;
+  height: 40px;
+  background-color: #000000;
+  color: #ffffff;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+/* typography */
+.sc-hiw-card-title {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  color: #111827;
+}
+
+.sc-hiw-card-desc {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #4b5563;
+  max-width: 384px;
+}
+
+/* responsive */
+@media screen and (max-width: 992px) {
+  .sc-hiw-grid {
+    grid-template-columns: 1fr;
+    max-width: 500px;
+    gap: 60px;
+  }
+}
+
+@media screen and (max-width: 576px) {
+  .sc-hiw-section {
+    padding: 60px 24px;
+  }
+  .sc-hiw-title {
+    font-size: 32px;
+  }
+  .sc-hiw-subtitle {
+    font-size: 16px;
+  }
+}

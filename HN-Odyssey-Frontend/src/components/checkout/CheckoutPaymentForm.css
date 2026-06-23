@@ -1,0 +1,191 @@
+/* container */
+.checkout-payment-container {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(24px, 3vw, 40px);
+  width: 100%;
+}
+
+/* payment cards */
+.checkout-payment-card {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 15px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.checkout-payment-card.active {
+  border: 1px solid #000000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* card header */
+.checkout-payment-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: clamp(16px, 2vw, 24px);
+  cursor: pointer;
+  background: transparent;
+  transition: background 0.2s;
+}
+
+.checkout-payment-header:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.checkout-payment-radio {
+  color: #000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkout-payment-title {
+  font-family: "Lexend Exa", sans-serif;
+  font-weight: 700;
+  font-size: clamp(16px, 1.5vw, 24px);
+  color: #000000;
+}
+
+/* card body */
+.checkout-payment-body {
+  padding: 0 clamp(16px, 2vw, 24px) clamp(24px, 3vw, 40px);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  animation: checkoutPaymentSlideDown 0.3s ease-out forwards;
+}
+
+@keyframes checkoutPaymentSlideDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* inputs */
+.checkout-payment-row {
+  display: flex;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.checkout-payment-row > * {
+  flex: 1;
+}
+
+.checkout-payment-input-group {
+  position: relative;
+  width: 100%;
+}
+
+.checkout-payment-input {
+  width: 100%;
+  padding: 1rem 1.5rem;
+  border-radius: 50px;
+  border: 1px solid #888;
+  font-size: clamp(14px, 1.2vw, 16px);
+  background-color: #ffffff;
+  outline: none;
+  box-sizing: border-box;
+  color: #333;
+  font-family: "Lexend Exa", sans-serif;
+  transition: all 0.2s ease;
+
+  /* Line gạch dưới đặc trưng từ Auth UI */
+  background-image: linear-gradient(to right, #ccc, #ccc);
+  background-repeat: no-repeat;
+  background-position: center bottom 12px;
+  background-size: calc(100% - 3rem) 1px;
+}
+
+.checkout-payment-input:focus {
+  border-color: #000;
+  border-width: 1.5px;
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.05);
+  background-image: linear-gradient(to right, #333, #333);
+}
+
+.checkout-payment-input::placeholder {
+  color: rgba(0, 0, 0, 0.5);
+  font-weight: 300;
+}
+
+/* qr wallet section */
+.checkout-wallet-body {
+  align-items: center;
+}
+
+.checkout-wallet-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(12px, 1.5vw, 20px);
+  justify-content: center;
+  width: 100%;
+  margin-bottom: 2rem;
+}
+
+.checkout-wallet-btn {
+  padding: 12px 24px;
+  border-radius: 50px;
+  border: 1px solid #000000;
+  background: #ffffff;
+  font-family: "Lexend Exa", sans-serif;
+  font-weight: 300;
+  font-size: clamp(12px, 1vw, 16px);
+  color: rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 100px;
+}
+
+.checkout-wallet-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #000000;
+}
+
+.checkout-wallet-btn.selected {
+  background: #000000;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* qr display */
+.checkout-qr-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.checkout-qr-display img {
+  width: 100%;
+  max-width: clamp(250px, 25vw, 355px);
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  padding: 10px;
+  background: #fff;
+}
+
+.checkout-qr-instruction {
+  font-family: "Lexend", sans-serif;
+  font-weight: 400;
+  font-size: clamp(14px, 1.2vw, 18px);
+  color: #333;
+}
+
+/* responsive */
+@media screen and (max-width: 768px) {
+  .checkout-payment-row {
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+}

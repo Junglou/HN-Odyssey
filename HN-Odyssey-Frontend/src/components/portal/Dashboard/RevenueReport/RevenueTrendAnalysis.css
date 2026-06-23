@@ -1,0 +1,146 @@
+/* khung bọc ngoài */
+.rta-wrapper {
+  background-color: #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rta-section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.rta-container {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.rta-header-text {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.rta-svg-wrapper {
+  display: flex;
+  gap: 12px;
+  height: 200px;
+  position: relative;
+}
+
+/* trục y */
+.rta-y-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: #64748b;
+  font-weight: 500;
+  padding-bottom: 24px;
+}
+
+.rta-chart-area {
+  flex: 1;
+  position: relative;
+}
+
+/* đường lưới */
+.rta-grid-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-bottom: 24px;
+}
+
+.rta-grid-line {
+  width: 100%;
+  height: 1px;
+  background-color: #e2e8f0;
+}
+
+.rta-line-chart-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: calc(100% - 24px);
+  z-index: 2;
+  overflow: visible;
+}
+
+.rta-chart-line {
+  fill: none;
+  stroke: #64748b;
+  stroke-width: 2px;
+}
+
+/* trục x */
+.rta-x-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: #64748b;
+  font-weight: 500;
+  padding-left: 36px;
+}
+
+/* trạng thái trống */
+.rta-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  background-color: #ffffff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* tooltip động */
+.rta-dynamic-tooltip {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  background-color: #1e293b;
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  z-index: 10;
+  margin-top: -12px;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.rta-dynamic-tooltip::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px 5px 0;
+  border-style: solid;
+  border-color: #1e293b transparent transparent transparent;
+}
+
+/* ẩn bớt nhãn x trên màn nhỏ */
+@media screen and (max-width: 768px) {
+  .rta-x-axis span:nth-child(even) {
+    display: none;
+  }
+}

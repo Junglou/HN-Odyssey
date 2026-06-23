@@ -1,0 +1,30 @@
+/* container */
+.home-page-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  background-color: #ffffff;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+.dynamic-html-wrapper > * {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.dynamic-btn-hover {
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.dynamic-btn-hover:hover {
+  transform: scale(1.05);
+  opacity: 0.9;
+}

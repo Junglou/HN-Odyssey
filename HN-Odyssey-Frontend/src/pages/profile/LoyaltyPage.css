@@ -1,0 +1,17 @@
+@import "./ProfilePageLayout.css";
+
+.my-loyalty-page-container {
+  background-color: #f6f5ff;
+}
+
+.my-loyalty-page-container .content-wrapper {
+  gap: 1.5rem;
+}
+
+.loyalty-page-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  color: #6b7280;
+}

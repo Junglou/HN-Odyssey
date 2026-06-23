@@ -1,0 +1,191 @@
+/* khung bọc ngoài */
+.laf-card {
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 24px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  width: 100%;
+}
+
+.laf-card-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 24px;
+}
+
+/* ẩn scrollbar nhưng vẫn lướt được */
+.laf-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
+  scrollbar-width: none;
+}
+.laf-wrapper::-webkit-scrollbar {
+  display: none;
+}
+
+.laf-container {
+  display: flex;
+  position: relative;
+  padding-top: 10px;
+  min-width: 800px;
+  padding-left: 20px;
+}
+
+/* block quy trình */
+.laf-item {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  position: relative;
+  padding-top: 36px;
+  transition: all 0.3s ease;
+}
+
+.laf-item.laf-offline {
+  filter: grayscale(100%);
+  opacity: 0.4;
+}
+
+/* vạch xám mở đầu */
+.laf-segment-start {
+  position: absolute;
+  top: 11px;
+  left: -20px;
+  width: 40px;
+  height: 2px;
+  background-color: #cbd5e1;
+  z-index: 1;
+}
+
+/* vạch màu chạy ngang */
+.laf-segment-main {
+  position: absolute;
+  top: 11px;
+  left: 20px;
+  width: 100%;
+  height: 2px;
+  z-index: 1;
+}
+
+/* vạch xám kết thúc */
+.laf-segment-end {
+  position: absolute;
+  top: 11px;
+  left: 20px;
+  width: 100%;
+  height: 2px;
+  background-color: #cbd5e1;
+  z-index: 1;
+}
+
+.laf-node {
+  position: absolute;
+  top: 5px;
+  left: 14px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  z-index: 2;
+}
+
+/* đường thả dọc */
+.laf-drop-line {
+  position: absolute;
+  top: 17px;
+  left: 19px;
+  width: 2px;
+  height: 14px;
+  background-color: #cbd5e1;
+  z-index: 1;
+}
+
+/* nội dung */
+.laf-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.laf-icon-box {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #1e293b;
+}
+
+.laf-text-wrapper {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.laf-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 2px;
+}
+
+.laf-desc {
+  font-size: 0.8rem;
+  color: #475569;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+/* theme server */
+.laf-node.laf-theme-server {
+  background-color: #d1bfae;
+}
+.laf-icon-box.laf-theme-server {
+  background-color: #d1bfae;
+}
+.laf-segment-main.laf-theme-server {
+  background-color: #d1bfae;
+}
+
+/* theme order */
+.laf-node.laf-theme-order {
+  background-color: #f7dcb0;
+}
+.laf-icon-box.laf-theme-order {
+  background-color: #f7dcb0;
+}
+.laf-segment-main.laf-theme-order {
+  background-color: #f7dcb0;
+}
+
+/* theme announcement */
+.laf-node.laf-theme-announcement {
+  background-color: #cbeafe;
+}
+.laf-icon-box.laf-theme-announcement {
+  background-color: #cbeafe;
+}
+.laf-segment-main.laf-theme-announcement {
+  background-color: #cbeafe;
+}
+
+/* theme alert */
+.laf-node.laf-theme-alert {
+  background-color: #fca5a5;
+}
+.laf-icon-box.laf-theme-alert {
+  background-color: #fca5a5;
+}
+.laf-segment-main.laf-theme-alert {
+  background-color: #fca5a5;
+}

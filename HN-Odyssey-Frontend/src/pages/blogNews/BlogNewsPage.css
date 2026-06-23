@@ -1,0 +1,39 @@
+/* wrapper */
+.blog-news-page-wrapper {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #fafafa;
+  overflow-x: hidden;
+}
+
+/* tiêu đề to vừa đủ, font chuẩn */
+.blog-category-main-title {
+  font-family: "Lexend Deca", sans-serif;
+  font-size: clamp(24px, 2.5vw, 28px);
+  font-weight: 500;
+  color: #000000;
+  margin: clamp(24px, 3vw, 32px) clamp(16px, 6vw, 120px) 0;
+  padding: 0;
+}
+
+/* wrapper bài nổi bật tab riêng lẻ */
+.blog-single-featured {
+  width: 100%;
+  padding: clamp(16px, 2vw, 24px) clamp(16px, 6vw, 120px);
+  box-sizing: border-box;
+}
+
+/* empty state */
+.blog-news-empty {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: clamp(40px, 8vw, 100px) 20px;
+  font-family: "Ledger", serif;
+  font-size: clamp(16px, 1.5vw, 20px);
+  color: rgba(0, 0, 0, 0.5);
+  text-align: center;
+  flex-grow: 1;
+}

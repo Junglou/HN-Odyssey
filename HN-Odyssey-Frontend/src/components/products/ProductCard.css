@@ -1,0 +1,283 @@
+/* wrapper */
+.pl-product-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  cursor: pointer;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.pl-product-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  border-color: #d1d5db;
+}
+
+/* image wrap */
+.pl-card-image-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 400 / 383;
+  background-color: #f9fafb;
+  overflow: hidden;
+}
+
+.pl-card-image-bg {
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  transition: transform 0.35s ease;
+  /* thêm con trỏ chuột khi đưa vào ảnh do đã gắn sự kiện click vào đây */
+  cursor: pointer;
+}
+
+.pl-product-card:hover .pl-card-image-bg {
+  transform: scale(1.03);
+}
+
+/* discount badge */
+.pl-card-discount-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background-color: #ef4444;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  z-index: 2;
+  letter-spacing: 0.5px;
+}
+
+/* heart button */
+.pl-card-heart {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  transition: transform 0.2s;
+  z-index: 2;
+}
+
+.pl-card-heart:hover {
+  transform: scale(1.1);
+}
+
+.pl-card-heart.wishlisted {
+  color: #ef4444;
+}
+
+/* xử lý trạng thái vô hiệu hóa khi đang gọi api thả tim */
+.pl-card-heart:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* info block */
+.pl-card-info {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 12px 10px;
+  gap: 4px;
+  background: #ffffff;
+  border-top: 1px solid #e5e7eb;
+}
+
+.pl-card-name {
+  margin: 0;
+  font-weight: 700;
+  font-size: clamp(14px, 1.5vw, 18px);
+  color: #000000;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* thêm con trỏ chuột khi đưa vào tên do đã gắn sự kiện click vào đây */
+  cursor: pointer;
+}
+
+.pl-card-desc {
+  margin: 0;
+  font-weight: 400;
+  font-size: clamp(12px, 1.2vw, 14px);
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pl-card-line {
+  width: 100%;
+  height: 1px;
+  background-color: rgba(0, 0, 0, 0.1);
+  margin: 4px 0;
+}
+
+/* footer */
+.pl-card-footer {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* price section */
+.pl-card-price-container {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.pl-card-price {
+  font-weight: 300;
+  font-size: clamp(14px, 1.4vw, 18px);
+  color: #4b5563;
+  transition:
+    color 0.2s ease,
+    font-weight 0.2s ease;
+}
+
+.pl-product-card:hover .pl-card-price {
+  color: #000000;
+  font-weight: 500;
+}
+
+.pl-card-price-old {
+  font-weight: 400;
+  font-size: clamp(11px, 1vw, 14px);
+  color: #9ca3af;
+  text-decoration: line-through;
+}
+
+.pl-card-price-new {
+  font-weight: 600;
+  font-size: clamp(14px, 1.4vw, 18px);
+  color: #ef4444;
+}
+
+/* add to cart btn */
+.pl-card-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.pl-card-add-btn:hover {
+  opacity: 0.7;
+}
+
+.pl-card-add-btn span {
+  font-weight: 300;
+  font-size: clamp(11px, 1.1vw, 14px);
+  color: #000000;
+}
+
+/* xử lý trạng thái vô hiệu hóa nút bấm khi đang gọi api thêm giỏ hàng */
+.pl-card-add-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  pointer-events: none;
+}
+
+.pl-promo-card {
+  width: 100%;
+  /* CHÌA KHÓA NẰM Ở ĐÂY: Ép thẻ banner cao bằng 100% dòng lưới, đồng bộ với ProductCard */
+  height: 100%;
+  display: flex;
+  align-items: center;
+  background-color: #f9fafb;
+
+  /* ĐỒNG BỘ UI VỚI PRODUCT CARD */
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+
+  /* SỬA LỖI ẢNH BỊ LẶP & KÉO GIÃN */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.pl-promo-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  border-color: #d1d5db;
+}
+
+.pl-promo-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.7) 0%,
+    rgba(0, 0, 0, 0.1) 100%
+  );
+  z-index: 1;
+}
+
+.pl-promo-content {
+  position: relative;
+  z-index: 2;
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.pl-promo-title {
+  margin: 0;
+  font-weight: 700;
+  font-size: clamp(24px, 2.5vw, 36px);
+  color: #ffffff; /* Đổi chữ thành trắng để nổi trên lớp phủ đen */
+}
+
+.pl-promo-subtitle {
+  margin: 0;
+  font-weight: 300;
+  font-size: clamp(14px, 1.5vw, 18px);
+  color: #f3f4f6;
+  max-width: 80%;
+  line-height: 1.5;
+}
+
+.pl-promo-btn {
+  padding: 10px 32px;
+  background: #ffffff;
+  color: #000000;
+  border-radius: 50px;
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition:
+    background-color 0.2s,
+    transform 0.2s;
+}
+
+.pl-promo-btn:hover {
+  background: #e5e7eb;
+  transform: scale(1.05);
+}

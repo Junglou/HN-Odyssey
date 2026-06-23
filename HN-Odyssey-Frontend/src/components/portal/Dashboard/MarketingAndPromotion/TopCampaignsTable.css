@@ -1,0 +1,138 @@
+/* khung bọc ngoài */
+.tct-wrapper {
+  background-color: #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tct-section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+/* khung cuộn ngang */
+.tct-table-wrapper {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tct-table {
+  width: 100%;
+  min-width: 800px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+.tct-table th,
+.tct-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* thanh tiêu đề */
+.tct-table th {
+  background-color: #e6d5c3;
+  color: #1e293b;
+  font-weight: 700;
+}
+
+.tct-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.tct-table td {
+  color: #475569;
+  font-weight: 500;
+}
+
+/* badge trạng thái */
+.tct-status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.tct-status-running {
+  background-color: #6ee7b7;
+  color: #065f46;
+}
+
+.tct-status-paused {
+  background-color: #fde047;
+  color: #854d0e;
+}
+
+/* màu roi (tăng độ ưu tiên để không bị đè màu) */
+.tct-table td.tct-roi-positive {
+  color: #22c55e;
+}
+
+/* căn phải */
+.tct-col-right {
+  text-align: right;
+}
+
+/* rỗng */
+.tct-empty-state {
+  padding: 40px;
+  text-align: center;
+  color: #64748b;
+  font-weight: 500;
+  background-color: #f8fafc;
+}
+
+/* phân trang */
+.tct-pagination-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px;
+  background-color: #ffffff;
+  border-top: 1px solid #e2e8f0;
+}
+
+.tct-page-numbers {
+  display: flex;
+  gap: 8px;
+}
+
+.tct-page-nav-btn,
+.tct-page-num-btn {
+  padding: 6px 12px;
+  border: 1px solid #cbd5e1;
+  background-color: #ffffff;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tct-page-num-btn.tct-active {
+  background-color: #1e293b;
+  color: #ffffff;
+  border-color: #1e293b;
+}
+
+.tct-page-nav-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tct-page-nav-btn:not(:disabled):hover,
+.tct-page-num-btn:not(.tct-active):hover {
+  background-color: #f1f5f9;
+}

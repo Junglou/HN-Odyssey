@@ -1,0 +1,73 @@
+/* section wrap */
+.loyalty-hero-section {
+  width: 100%;
+  padding: 60px 24px;
+  background: linear-gradient(135deg, #c9e3e8 0%, #c8e2e7 70.71%);
+  display: flex;
+  justify-content: center;
+}
+
+/* inner container */
+.loyalty-hero-container {
+  width: 100%;
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* text */
+.loyalty-hero-title {
+  margin: 0;
+  font-size: 48px;
+  font-weight: 700;
+  color: #000000;
+  letter-spacing: -0.5px;
+}
+
+.loyalty-hero-desc {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.4;
+  color: #000000;
+  max-width: 1000px;
+  letter-spacing: -0.5px;
+}
+
+/* button */
+.loyalty-hero-btn {
+  width: fit-content;
+  padding: 16px 32px;
+  background-color: #000000;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+
+.loyalty-hero-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* responsive */
+@media screen and (max-width: 768px) {
+  .loyalty-hero-section {
+    padding: 40px 16px;
+  }
+  .loyalty-hero-container {
+    align-items: center;
+    text-align: center;
+  }
+  .loyalty-hero-title {
+    font-size: 36px;
+  }
+  .loyalty-hero-desc {
+    font-size: 18px;
+  }
+}

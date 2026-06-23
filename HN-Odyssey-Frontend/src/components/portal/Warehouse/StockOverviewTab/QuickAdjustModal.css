@@ -1,0 +1,312 @@
+/* popup overlay */
+.qam-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 2000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: "Lexend Exa", sans-serif;
+}
+
+/* main modal container */
+.qam-modal-box {
+  background-color: #ffffff;
+  width: 100%;
+  max-width: 480px;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* header layout */
+.qam-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.qam-modal-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #000000;
+  margin: 0 0 8px 0;
+}
+
+.qam-modal-subtitle {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.qam-modal-subtitle strong {
+  color: #111827;
+  font-family: monospace;
+}
+
+.qam-modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 4px;
+  display: flex;
+  transition: color 0.2s;
+}
+
+.qam-modal-close:hover {
+  color: #000000;
+}
+
+/* form layout */
+.qam-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.qam-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.qam-form-group label {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #000000;
+}
+
+.qam-req {
+  color: #e1251b;
+}
+
+/* input & textarea */
+.qam-input,
+.qam-textarea {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.qam-input:focus,
+.qam-textarea:focus {
+  border-color: #000000;
+}
+
+.qam-textarea {
+  resize: vertical;
+}
+
+/* select component layout */
+.qam-custom-select {
+  position: relative;
+  width: 100%;
+}
+
+.qam-select-trigger {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #fff;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+}
+
+.qam-select-trigger.active,
+.qam-select-trigger:hover {
+  border-color: #000000;
+}
+
+.qam-select-arrow {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.3s ease;
+  color: #6b7280;
+}
+
+.qam-select-arrow.open {
+  transform: rotate(180deg);
+}
+
+.qam-select-options {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.qam-select-option {
+  padding: 12px 16px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.qam-select-option:hover {
+  background-color: #f3f4f6;
+}
+
+.qam-select-option.selected {
+  background-color: #e5e7eb;
+  font-weight: 700;
+}
+
+/* actions layout */
+.qam-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.qam-btn-submit {
+  padding: 10px 24px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 700;
+  font-size: 0.95rem;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.qam-btn-submit:hover:not(:disabled) {
+  background-color: #000000;
+}
+
+.qam-btn-submit:disabled {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.qam-btn-submit:not(:disabled) {
+  background-color: #000000;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.qam-btn-submit:not(:disabled):hover {
+  background-color: #374151;
+}
+
+.qam-btn-cancel {
+  background-color: #ffffff;
+  color: #000000;
+  border: 1px solid #000000;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.qam-btn-cancel:hover {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+.qam-select-options:not(.open):not(.closed) {
+  display: none;
+}
+
+.qam-select-options.open {
+  pointer-events: auto;
+  animation: qam-slideFadeDown 0.2s ease-out forwards;
+}
+
+.qam-select-options.closed {
+  pointer-events: none;
+  animation: qam-slideFadeUp 0.2s ease-out forwards;
+}
+
+/* animation */
+@keyframes qam-slideFadeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes qam-slideFadeUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+/* EXTRACTED INLINE CSS & MODAL TABS */
+.qam-mt-4 {
+  margin-top: 4px;
+}
+.qam-text-danger {
+  font-size: 0.85rem;
+  color: #e1251b;
+  margin-top: 4px;
+  font-weight: 500;
+}
+.qam-text-warning {
+  font-size: 0.85rem;
+  color: #d97706;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.qam-tabs-header {
+  display: flex;
+  gap: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 20px;
+}
+.qam-tab-btn {
+  background: none;
+  border: none;
+  padding: 8px 4px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #6b7280;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.qam-tab-btn:hover {
+  color: #111827;
+}
+.qam-tab-btn.active {
+  color: #111827;
+  border-bottom-color: #111827;
+}

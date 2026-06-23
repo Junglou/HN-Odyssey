@@ -1,0 +1,74 @@
+/* wrapper */
+.pl-promo-card {
+  width: 100%;
+  /* Bổ sung chiều cao 100% để card tự động giãn xuống khi rơi vào shape vertical/square */
+  height: 100%;
+  display: flex;
+  align-items: center;
+  background-color: #f3f4f6;
+
+  /* Bổ sung xử lý ảnh nền để ảnh không bị lặp hay méo khi đổi hình dáng */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  border-radius: 10px;
+  overflow: hidden;
+  min-height: 400px;
+  position: relative; /* Setup cho thẻ overlay và content đè lên ảnh */
+  cursor: pointer;
+}
+
+.pl-promo-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0.4) 0%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  z-index: 1;
+  pointer-events: none;
+}
+
+.pl-promo-content {
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+
+  /* Đảm bảo content nằm trên overlay */
+  position: relative;
+  z-index: 2;
+}
+
+.pl-promo-title {
+  margin: 0;
+  font-weight: 400;
+  font-size: 40px;
+  color: #000000;
+}
+
+.pl-promo-subtitle {
+  margin: 0;
+  font-weight: 400;
+  font-size: 24px;
+  color: #000000;
+  max-width: 340px;
+  line-height: 1.4;
+}
+
+.pl-promo-btn {
+  padding: 10px 40px;
+  background: #000000;
+  color: #ffffff;
+  border-radius: 50px;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  margin-top: 20px;
+}

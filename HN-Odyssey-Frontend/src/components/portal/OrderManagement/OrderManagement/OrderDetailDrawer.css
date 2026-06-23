@@ -1,0 +1,407 @@
+/* overlay & layout */
+.om-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.om-drawer-overlay.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.om-drawer {
+  position: fixed;
+  top: 0;
+  right: -100%;
+  width: 90%;
+  max-width: 1400px;
+  height: 100vh;
+  background-color: #ffffff;
+  z-index: 1001;
+  transition: right 0.3s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -5px 0 25px rgba(0, 0, 0, 0.1);
+  font-family: "Lexend Exa", sans-serif;
+}
+
+.om-drawer.open {
+  right: 0;
+}
+
+/* header */
+.om-drawer-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.om-drawer-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.om-drawer-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.om-btn-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #6b7280;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.om-btn-close:hover {
+  color: #111827;
+}
+
+/* body */
+.om-drawer-body {
+  padding: 24px;
+  display: grid;
+  grid-template-columns: 1.2fr 1.5fr 1fr;
+  gap: 40px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.om-drawer-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #f3f4f6;
+}
+
+/* info column */
+.om-col-info,
+.om-col-items,
+.om-col-timeline {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 24px;
+  background-color: #ffffff;
+  height: max-content;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.om-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.om-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.om-info-label {
+  font-size: 0.875rem;
+  color: #4b5563;
+  font-weight: 500;
+  flex-shrink: 0;
+  width: 140px;
+}
+
+.om-info-row:last-child {
+  margin-bottom: 0;
+}
+
+.om-info-value {
+  font-size: 0.875rem;
+  color: #111827;
+  font-weight: 600;
+  text-align: right;
+  flex: 1;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+.om-divider {
+  height: 1px;
+  background-color: #e5e7eb;
+  margin: 20px 0;
+  width: 100%;
+}
+
+.om-total-row {
+  margin-top: 8px;
+}
+
+.om-info-label-total {
+  font-size: 1rem;
+  color: #111827;
+  font-weight: 700;
+}
+
+.om-info-value-total {
+  font-size: 1.125rem;
+  color: #111827;
+  font-weight: 800;
+  text-align: right;
+}
+
+.om-note-box {
+  margin-top: 24px;
+  padding: 12px;
+  background-color: #f9fafb;
+  border-left: 4px solid #d1d5db;
+  border-radius: 4px;
+}
+.om-note-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #6b7280;
+  margin: 0 0 4px 0;
+  text-transform: uppercase;
+}
+.om-note-text {
+  font-size: 0.875rem;
+  color: #111827;
+  margin: 0;
+}
+
+/* items column */
+.om-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.om-item-card {
+  display: flex;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 16px;
+}
+
+.om-item-img {
+  width: 120px;
+  height: 80px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #f3f4f6;
+  flex-shrink: 0;
+}
+
+.om-item-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.om-item-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 8px 0;
+}
+.om-item-desc-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.om-item-desc-text {
+  font-size: 0.875rem;
+  color: #4b5563;
+  line-height: 1.4;
+  margin: 0;
+}
+.om-item-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: auto;
+}
+
+.om-item-price-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.om-item-price-text {
+  font-size: 0.9rem;
+  color: #4b5563;
+}
+
+.om-item-qty {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #111827;
+}
+.om-item-label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #111827;
+  white-space: nowrap;
+}
+.om-item-sku {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0;
+}
+.om-item-price {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #2563eb;
+  text-align: right;
+}
+
+/* timeline column */
+.om-timeline {
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+}
+
+.om-timeline-item {
+  position: relative;
+  padding-left: 36px;
+  padding-bottom: 24px;
+}
+
+/* Connecting Line */
+.om-timeline-item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 24px;
+  bottom: 0;
+  width: 2px;
+  background-color: #e5e7eb;
+}
+
+/* Vòng tròn có dấu Tick */
+.om-timeline-icon {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 20px;
+  height: 20px;
+  color: #d1d5db;
+  background-color: #fff;
+  z-index: 2;
+}
+
+.om-timeline-item.completed .om-timeline-icon {
+  color: #111827;
+}
+
+.om-timeline-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.om-timeline-status {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #9ca3af;
+  margin: 0;
+}
+
+.om-timeline-item.completed .om-timeline-status {
+  color: #111827;
+}
+
+.om-timeline-date {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.om-timeline-desc {
+  font-size: 0.875rem;
+  color: #4b5563;
+  margin: 4px 0 0 0;
+}
+
+/* Responsive */
+
+@media (max-width: 1024px) {
+  .om-drawer {
+    width: 95%;
+  }
+
+  .om-drawer-body {
+    grid-template-columns: 1fr 1.2fr;
+  }
+
+  .om-col-timeline {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 768px) {
+  .om-drawer {
+    width: 100%;
+  }
+
+  .om-drawer-header {
+    padding: 16px;
+  }
+
+  .om-drawer-title-group {
+    flex-wrap: wrap;
+  }
+
+  .om-drawer-body {
+    grid-template-columns: 1fr;
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .om-col-info,
+  .om-col-items,
+  .om-col-timeline {
+    padding: 16px;
+  }
+
+  .om-info-row {
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 16px;
+  }
+
+  .om-info-label {
+    width: auto;
+    font-size: 0.8rem;
+  }
+
+  .om-info-value,
+  .om-info-value-total {
+    text-align: left;
+  }
+
+  .om-item-bottom {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .om-item-qty {
+    align-self: flex-end;
+  }
+}

@@ -1,0 +1,235 @@
+/* container */
+.cart-list-container {
+  display: flex;
+  flex-direction: column;
+}
+
+/* title */
+.cart-list-title {
+  font-family: "Lexend Deca", sans-serif;
+  font-weight: 700;
+  font-size: clamp(28px, 3.5vw, 42px);
+  color: #000000;
+  margin: 0 0 24px 0;
+  letter-spacing: -0.5px;
+}
+
+/* backgrounds */
+.cart-list-outer-bg {
+  background: #d9d9d9;
+  padding: clamp(16px, 2.5vw, 32px);
+  border-radius: 10px;
+}
+
+.cart-list-white-box {
+  background: #ffffff;
+  padding: 0 clamp(16px, 2.5vw, 32px);
+  border-radius: 8px;
+}
+
+/* grid layout */
+.cart-list-item {
+  display: grid;
+  grid-template-columns: clamp(160px, 22vw, 280px) 1fr;
+  gap: clamp(20px, 3vw, 40px);
+  padding: clamp(24px, 3vw, 36px) 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.cart-list-item:last-child {
+  border-bottom: none;
+}
+
+/* image */
+.cart-list-item-img {
+  width: 100%;
+  aspect-ratio: 4/3;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.cart-list-item-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* details */
+.cart-list-item-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* header */
+.cart-list-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+/* text */
+.cart-list-item-name {
+  font-family: "Lexend Exa", sans-serif;
+  font-weight: 700;
+  font-size: clamp(16px, 1.4vw, 22px);
+  color: #000000;
+  margin: 0;
+}
+
+.cart-list-item-price {
+  font-family: "Lexend Exa", sans-serif;
+  font-size: clamp(16px, 1.4vw, 22px);
+  font-weight: 400;
+  color: #000000;
+}
+
+/* specs wrapper */
+.cart-list-item-specs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cart-list-item-text {
+  font-family: "Lexend", sans-serif;
+  font-weight: 400;
+  font-size: clamp(13px, 1.1vw, 16px);
+  color: #000000;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.cart-list-item-text span {
+  font-weight: 600;
+}
+
+/* qty wrapper */
+.cart-list-qty-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cart-list-qty-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #000000;
+}
+
+.cart-list-qty-controls button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  color: #000000;
+  outline: none;
+  box-shadow: none;
+}
+
+.cart-list-qty-controls span {
+  font-family: "Lexend", sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* action */
+.cart-list-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: auto;
+  flex-wrap: wrap;
+}
+
+/* buttons */
+.cart-list-btn-black {
+  background: #000000;
+  color: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 8px;
+  height: 36px;
+  padding: 0 16px;
+  font-family: "Lexend Exa", sans-serif;
+  font-weight: 700;
+  font-size: clamp(12px, 1vw, 13px);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  outline: none;
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cart-list-btn-black:hover {
+  background: #333333;
+  border-color: #000000;
+}
+/* clear focus */
+.cart-list-btn-black:focus,
+.cart-list-btn-black:focus-visible,
+.cart-list-btn-black:active {
+  outline: 0;
+  box-shadow: none;
+  border-color: #000000;
+}
+
+.cart-list-btn-black.active {
+  background: #ffffff;
+  color: #000000;
+}
+
+/* link */
+.cart-list-link-wishlist {
+  background: transparent;
+  border: none;
+  font-family: "Lexend Exa", sans-serif;
+  font-size: clamp(12px, 1vw, 13px);
+  text-decoration: underline;
+  color: #000000;
+  cursor: pointer;
+  margin-left: auto;
+  outline: none;
+  box-shadow: none;
+  transition: all 0.2s;
+}
+
+.cart-list-link-wishlist:hover {
+  color: #666666;
+  text-decoration: none;
+}
+
+/* clear focus */
+.cart-list-link-wishlist:focus,
+.cart-list-link-wishlist:focus-visible,
+.cart-list-link-wishlist:active {
+  outline: 0;
+  box-shadow: none;
+}
+
+/* responsive */
+@media screen and (max-width: 768px) {
+  .cart-list-item {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 20px 0;
+  }
+  .cart-list-link-wishlist {
+    margin-left: 0;
+    width: 100%;
+    text-align: left;
+  }
+}

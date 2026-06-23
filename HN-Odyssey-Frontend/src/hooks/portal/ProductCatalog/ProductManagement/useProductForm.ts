@@ -1,0 +1,673 @@
+import { useState, useEffect } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { toast } from "react-toastify";
+import axiosClient from "../../../../api/axiosClient";
+
+export interface ProductData {
+  sku: string;
+  name: string;
+  status: "Active" | "Inactive" | "Draft" | "Loading...";
+  description: string;
+  categoryIds: string[];
+}
+
+export interface PricingItem {
+  id: string;
+  variantName: string;
+  price: number;
+  currency?: string;
+  status: "draft" | "pending" | "approved" | "rejected";
+  sku?: string;
+}
+
+export interface CategoryNode {
+  id: string;
+  name: string;
+  children?: CategoryNode[];
+}
+
+export interface VariantAttribute {
+  id: string;
+  name: string;
+  values: string[];
+}
+
+export interface ApiTag {
+  name: string;
+}
+
+export interface ApiAttributeValue {
+  value: string;
+}
+
+export interface ApiAttribute {
+  _id?: string;
+  code?: string;
+  name: string;
+  values?: ApiAttributeValue[];
+}
+
+export interface ApiVariantAttribute {
+  code: string;
+  value: string;
+}
+
+export interface ApiVariant {
+  sku: string;
+  price: number;
+  attributes: ApiVariantAttribute[];
+}
+
+export interface ProductPayload {
+  name: string;
+  sku: string;
+  description: string;
+  category_ids: string[];
+  tags: string[];
+  price?: number;
+  variants?: {
+    sku: string;
+    stock: number;
+    price: number;
+    attributes: { code: string; value: string }[];
+  }[];
+}
+
+export interface ApiCategoryNode {
+  _id?: string;
+  id?: string;
+  name: string;
+  children?: ApiCategoryNode[];
+}
+
+// Interface chuẩn hóa lỗi từ Backend/Axios
+export interface ApiError {
+  response?: {
+    data?: {
+      message?: string | string[];
+    };
+  };
+  message?: string;
+}
+
+const generatePricingVariants = (
+  variants: VariantAttribute[],
+  currentPricing: PricingItem[],
+  baseSku: string,
+): PricingItem[] => {
+  const validAttrs = variants.filter((v) => v.values.length > 0);
+  let variantConfigs: { name: string; combination: string[] }[] = [];
+
+  if (validAttrs.length === 0) {
+    variantConfigs = [{ name: "Default / Base Product", combination: [] }];
+  } else {
+    const combinations = validAttrs.reduce((acc: string[][], attr) => {
+      if (acc.length === 0) return attr.values.map((v) => [v]);
+      const newAcc: string[][] = [];
+      acc.forEach((combo) => {
+        attr.values.forEach((val) => {
+          newAcc.push([...combo, val]);
+        });
+      });
+      return newAcc;
+    }, []);
+    variantConfigs = combinations.map((combo) => ({
+      name: combo.join(" / "),
+      combination: combo,
+    }));
+  }
+
+  // THÊM HÀM LÀM SẠCH SKU Ở ĐÂY
+  const sanitizeSkuPart = (str: string) => {
+    return str
+      .toUpperCase()
+      .replace(/\s+/g, "-") // Biến khoảng trắng thành dấu gạch ngang
+      .replace(/[^A-Z0-9_-]/g, "") // Loại bỏ mọi ký tự không phải chữ, số, gạch ngang, gạch dưới (VD: xóa dấu %)
+      .replace(/-+/g, "-") // Rút gọn nhiều dấu gạch ngang liên tiếp thành 1 dấu
+      .replace(/^-|-$/g, ""); // Xóa dấu gạch ngang ở đầu hoặc cuối chuỗi nếu có
+  };
+
+  return variantConfigs.map((config, index) => {
+    const existing = currentPricing.find((p) => p.variantName === config.name);
+    if (existing) return existing;
+
+    // ÁP DỤNG HÀM LÀM SẠCH VÀO SUFFIX
+    const suffix =
+      config.combination.length > 0
+        ? `-${config.combination.map(sanitizeSkuPart).join("-")}`
+        : "";
+
+    // Dọn dẹp lại một lần cuối để tránh trường hợp baseSku có kết thúc bằng gạch ngang nối với suffix
+    const finalSku = `${baseSku || "NEW"}${suffix}`.replace(/-+/g, "-");
+
+    return {
+      id: `p-${Date.now()}-${index}`,
+      sku: finalSku,
+      variantName: config.name,
+      price: 0,
+      status: "draft",
+    };
+  });
+};
+
+export function useProductForm() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const mode: "add" | "edit" | "view" = location.pathname.includes("/edit")
+    ? "edit"
+    : location.pathname.endsWith("/add") || id === "add"
+      ? "add"
+      : "view";
+
+  const [formData, setFormData] = useState<ProductData>({
+    sku: "",
+    name: "",
+    status: mode === "add" ? "Draft" : "Loading...",
+    description: "",
+    categoryIds: [],
+  });
+
+  const [pricingList, setPricingList] = useState<PricingItem[]>(
+    mode === "add"
+      ? [
+          {
+            id: "p1",
+            variantName: "Default / Base Product",
+            price: 0,
+            status: "draft",
+          },
+        ]
+      : [],
+  );
+
+  const [tags, setTags] = useState<string[]>([]);
+  const [productVariants, setProductVariants] = useState<VariantAttribute[]>(
+    [],
+  );
+  const [categoryError, setCategoryError] = useState<string>("");
+
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [availableAttributes, setAvailableAttributes] = useState<
+    VariantAttribute[]
+  >([]);
+  const [availableCategories, setAvailableCategories] = useState<
+    CategoryNode[]
+  >([]);
+
+  useEffect(() => {
+    const fetchDependencies = async () => {
+      try {
+        const [tagsRes, attrRes, catRes] = await Promise.all([
+          axiosClient.get("/tags"),
+          axiosClient.get("/attributes"),
+          axiosClient.get("/categories/admin/tree-view"),
+        ]);
+
+        setAvailableTags(tagsRes.data.map((t: ApiTag) => t.name));
+
+        const mappedAttrs = attrRes.data.map((a: ApiAttribute) => ({
+          id: a.code || a._id || "",
+          name: a.name,
+          values: a.values
+            ? a.values.map((v: ApiAttributeValue) => v.value.toUpperCase())
+            : [],
+        }));
+        setAvailableAttributes(mappedAttrs);
+
+        const treeData: ApiCategoryNode[] = Array.isArray(catRes.data?.data)
+          ? catRes.data.data
+          : Array.isArray(catRes.data)
+            ? catRes.data
+            : [];
+
+        const formatCategoryTree = (
+          nodes: ApiCategoryNode[],
+        ): CategoryNode[] => {
+          return nodes.map((node) => ({
+            id: node._id || node.id || "",
+            name: node.name,
+            children:
+              node.children && node.children.length > 0
+                ? formatCategoryTree(node.children)
+                : undefined,
+          }));
+        };
+
+        setAvailableCategories(formatCategoryTree(treeData));
+      } catch (error) {
+        console.error("Lỗi khi load Tags/Attributes/Categories", error);
+      }
+    };
+    fetchDependencies();
+  }, []);
+
+  useEffect(() => {
+    if ((mode === "edit" || mode === "view") && id) {
+      const loadProductData = async () => {
+        try {
+          const res = await axiosClient.get(`/products/${id}`);
+          const p = res.data;
+
+          const formattedStatus = p.status
+            ? ((p.status.charAt(0).toUpperCase() +
+                p.status.slice(1).toLowerCase()) as
+                | "Active"
+                | "Inactive"
+                | "Draft")
+            : "Draft";
+
+          setFormData({
+            sku: p.sku,
+            name: p.name,
+            status: formattedStatus,
+            description: p.description || "",
+            categoryIds:
+              p.categories && p.categories.length > 0
+                ? p.categories.map((c: ApiCategoryNode) => c._id || c.id || "")
+                : [],
+          });
+
+          setTags(p.tags || []);
+
+          if (p.variants && p.variants.length > 0) {
+            const attrMap = new Map<string, Set<string>>();
+
+            p.variants.forEach((v: ApiVariant) => {
+              v.attributes.forEach((attr: ApiVariantAttribute) => {
+                if (!attrMap.has(attr.code)) {
+                  attrMap.set(attr.code, new Set<string>());
+                }
+                attrMap.get(attr.code)!.add(attr.value.toUpperCase());
+              });
+            });
+
+            const restoredVariants: VariantAttribute[] = Array.from(
+              attrMap.entries(),
+            ).map(([code, valSet]) => ({
+              id: code,
+              name: code.charAt(0).toUpperCase() + code.slice(1),
+              values: Array.from(valSet),
+            }));
+
+            setProductVariants(restoredVariants);
+
+            const mappedPricing = p.variants.map(
+              (v: ApiVariant, idx: number) => {
+                const variantName = restoredVariants
+                  .map((rv) => {
+                    const match = v.attributes.find(
+                      (a: ApiVariantAttribute) => a.code === rv.id,
+                    );
+                    return match ? match.value.toUpperCase() : "";
+                  })
+                  .filter((val) => val !== "")
+                  .join(" / ");
+
+                let currentStatus:
+                  | "draft"
+                  | "pending"
+                  | "approved"
+                  | "rejected" = "draft";
+                let displayPrice = v.price;
+
+                if (p.price_request) {
+                  const reqVar = p.price_request.variants?.find(
+                    (reqV: { sku: string; price: number; status?: string }) =>
+                      reqV.sku === v.sku,
+                  );
+
+                  if (reqVar) {
+                    currentStatus = (
+                      reqVar.status || p.price_request.status
+                    ).toLowerCase() as
+                      | "draft"
+                      | "pending"
+                      | "approved"
+                      | "rejected";
+                    displayPrice = reqVar.price;
+                  }
+                } else if (v.price > 0) {
+                  currentStatus = "approved";
+                }
+
+                return {
+                  id: `v-${idx}`,
+                  sku: v.sku,
+                  variantName: variantName,
+                  price: displayPrice,
+                  status: currentStatus,
+                };
+              },
+            );
+            setPricingList(mappedPricing);
+          } else {
+            let currentStatus: "draft" | "pending" | "approved" | "rejected" =
+              "draft";
+            let displayPrice = p.price;
+
+            if (p.price_request) {
+              currentStatus = p.price_request.status.toLowerCase() as
+                | "draft"
+                | "pending"
+                | "approved"
+                | "rejected";
+              displayPrice = p.price_request.price;
+            } else if (p.price > 0) {
+              currentStatus = "approved";
+            }
+
+            setPricingList([
+              {
+                id: "p1",
+                sku: p.sku,
+                variantName: "Default / Base Product",
+                price: displayPrice,
+                status: currentStatus,
+              },
+            ]);
+            setProductVariants([]);
+          }
+        } catch (error) {
+          console.error(error);
+          toast.error("Không tìm thấy thông tin sản phẩm");
+          navigate("/portal/products");
+        }
+      };
+      loadProductData();
+    }
+  }, [mode, id, navigate]);
+
+  const actions = {
+    changeInput: (name: keyof ProductData, value: string) => {
+      setFormData((prev) => {
+        const newData = { ...prev, [name]: value };
+        if (name === "sku") {
+          setPricingList((curr) =>
+            generatePricingVariants(productVariants, curr, value),
+          );
+        }
+        return newData;
+      });
+    },
+
+    toggleCategorySelect: (categoryId: string) => {
+      setFormData((prev) => {
+        const isSelected = prev.categoryIds.includes(categoryId);
+        const newCategoryIds = isSelected
+          ? prev.categoryIds.filter((id) => id !== categoryId)
+          : [...prev.categoryIds, categoryId];
+        return { ...prev, categoryIds: newCategoryIds };
+      });
+      setCategoryError("");
+    },
+
+    updateTags: (newTags: string[]) => {
+      setTags(newTags);
+    },
+
+    removeTag: (tagToRemove: string) => {
+      setTags((prev) => prev.filter((tag) => tag !== tagToRemove));
+    },
+
+    confirmVariant: (
+      updatedAttributes: VariantAttribute[],
+      editingVariantId?: string,
+    ) => {
+      setProductVariants((prev) => {
+        let nextVariants: VariantAttribute[];
+        if (editingVariantId) {
+          nextVariants = prev.map((v) =>
+            v.id === updatedAttributes[0]?.id ? updatedAttributes[0] : v,
+          );
+        } else {
+          nextVariants = updatedAttributes;
+        }
+
+        setPricingList((currentPricing) =>
+          generatePricingVariants(nextVariants, currentPricing, formData.sku),
+        );
+        return nextVariants;
+      });
+    },
+
+    savePrice: (priceId: string, newPrice: number, currency: string) => {
+      setPricingList((prev) =>
+        prev.map((item) =>
+          item.id === priceId
+            ? { ...item, price: newPrice, currency: currency, status: "draft" }
+            : item,
+        ),
+      );
+    },
+
+    submitSinglePrice: async (pricingItemId: string) => {
+      if (mode === "add" || id === "add" || !id) {
+        toast.warning(
+          "Vui lòng 'Save Product' trước khi gửi yêu cầu duyệt giá!",
+        );
+        return;
+      }
+
+      const targetItem = pricingList.find((p) => p.id === pricingItemId);
+      if (!targetItem) return;
+
+      if (targetItem.price <= 0) {
+        toast.warning(
+          "Vui lòng thiết lập giá (Edit) lớn hơn 0 trước khi Submit!",
+        );
+        return;
+      }
+
+      try {
+        const isSingleProduct =
+          targetItem.variantName === "Default / Base Product";
+        const baseProduct = pricingList.find(
+          (p) => p.variantName === "Default / Base Product",
+        );
+        const basePrice = baseProduct ? baseProduct.price : targetItem.price;
+
+        const payload: {
+          price: number;
+          currency: string;
+          effective_date: string;
+          variants?: { sku: string; price: number }[];
+        } = {
+          price: isSingleProduct
+            ? targetItem.price
+            : basePrice > 0
+              ? basePrice
+              : targetItem.price,
+          currency: targetItem.currency || "USD",
+          effective_date: new Date().toISOString(),
+        };
+
+        if (!isSingleProduct) {
+          payload.variants = [
+            {
+              sku: targetItem.sku || `${formData.sku}-V`,
+              price: targetItem.price,
+            },
+          ];
+        }
+
+        await axiosClient.post(`/products/${id}/price-request`, payload);
+        await axiosClient.patch(`/products/${id}/price-request/submit`, {
+          sku: targetItem.sku,
+        });
+
+        setPricingList((prev) =>
+          prev.map((p) =>
+            p.id === pricingItemId ? { ...p, status: "pending" } : p,
+          ),
+        );
+        toast.success(
+          `Đã gửi yêu cầu phê duyệt giá cho biến thể ${targetItem.variantName}`,
+        );
+      } catch (error: unknown) {
+        const err = error as ApiError;
+        const msg =
+          err.response?.data?.message ||
+          err.message ||
+          "Lỗi khi gửi yêu cầu giá";
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
+      }
+    },
+
+    approveSinglePrice: async (pricingItemId: string) => {
+      if (!id) return;
+      const targetItem = pricingList.find((p) => p.id === pricingItemId);
+      if (!targetItem) return;
+
+      try {
+        await axiosClient.patch(`/products/${id}/price-approval`, {
+          action: "approve",
+          sku: targetItem.sku,
+        });
+
+        setPricingList((prev) =>
+          prev.map((item) =>
+            item.id === pricingItemId ? { ...item, status: "approved" } : item,
+          ),
+        );
+        toast.success(
+          `Duyệt giá thành công cho biến thể ${targetItem.variantName}`,
+        );
+      } catch (error: unknown) {
+        const err = error as ApiError;
+        const msg =
+          err.response?.data?.message || err.message || "Lỗi khi duyệt giá";
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
+      }
+    },
+
+    rejectSinglePrice: async (pricingItemId: string) => {
+      if (!id) return;
+      const targetItem = pricingList.find((p) => p.id === pricingItemId);
+      if (!targetItem) return;
+
+      try {
+        await axiosClient.patch(`/products/${id}/price-approval`, {
+          action: "reject",
+          sku: targetItem.sku,
+        });
+
+        setPricingList((prev) =>
+          prev.map((item) =>
+            item.id === pricingItemId ? { ...item, status: "rejected" } : item,
+          ),
+        );
+        toast.success(`Đã từ chối giá cho biến thể ${targetItem.variantName}`);
+      } catch (error: unknown) {
+        const err = error as ApiError;
+        const msg =
+          err.response?.data?.message || err.message || "Lỗi khi từ chối giá";
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
+      }
+    },
+
+    viewApproval: () => {
+      navigate("/portal/prices");
+    },
+
+    saveProduct: async () => {
+      if (formData.categoryIds.length === 0) {
+        setCategoryError("Vui lòng chọn ít nhất một danh mục cho sản phẩm.");
+        return false;
+      }
+      if (tags.length === 0) {
+        toast.warning("Sản phẩm phải có ít nhất 1 Tag để AI phân tích.");
+        return false;
+      }
+      setCategoryError("");
+
+      const isSimpleProduct =
+        pricingList.length === 1 &&
+        pricingList[0].variantName === "Default / Base Product";
+
+      const payload: ProductPayload = {
+        name: formData.name,
+        sku: formData.sku,
+        description: formData.description,
+        category_ids: formData.categoryIds,
+        tags: tags,
+      };
+
+      if (isSimpleProduct) {
+        payload.price = pricingList[0].price;
+      } else {
+        payload.variants = pricingList.map((p) => {
+          const valArray = p.variantName.split(" / ");
+          const attributes = productVariants
+            .map((attr, i) => ({
+              code: attr.id,
+              value: valArray[i] || "",
+            }))
+            .filter((a) => a.value !== "");
+
+          return {
+            sku: p.sku || `${formData.sku}-V`,
+            stock: 0,
+            price: p.price,
+            attributes: attributes,
+          };
+        });
+      }
+
+      try {
+        if (mode === "add") {
+          await axiosClient.post("/products", payload);
+          toast.success("Thêm sản phẩm thành công!");
+        } else {
+          await axiosClient.patch(`/products/${id}`, payload);
+
+          try {
+            await axiosClient.patch(`/products/${id}/status`, {
+              status: formData.status.toUpperCase(),
+            });
+            toast.success("Cập nhật thông tin và trạng thái thành công!");
+          } catch (statusError: unknown) {
+            const err = statusError as ApiError;
+            const msg = err.response?.data?.message || err.message;
+            let errorMsg =
+              "Lưu thông tin thành công, nhưng không thể đổi trạng thái! ";
+            if (Array.isArray(msg)) {
+              errorMsg += msg.join(", ");
+            } else if (typeof msg === "string") {
+              errorMsg += msg;
+            }
+            toast.warning(errorMsg);
+          }
+        }
+        navigate("/portal/products");
+        return true;
+      } catch (error: unknown) {
+        const err = error as ApiError;
+        const msg =
+          err.response?.data?.message ||
+          err.message ||
+          "Có lỗi xảy ra khi lưu sản phẩm";
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
+        return false;
+      }
+    },
+
+    cancel: () => {
+      navigate("/portal/products");
+    },
+  };
+
+  return {
+    mode,
+    formData,
+    tags,
+    pricingList,
+    productVariants,
+    categoryError,
+    actions,
+    AVAILABLE_TAGS: availableTags,
+    MOCK_AVAILABLE_ATTRIBUTES: availableAttributes,
+    AVAILABLE_CATEGORIES: availableCategories,
+  };
+}

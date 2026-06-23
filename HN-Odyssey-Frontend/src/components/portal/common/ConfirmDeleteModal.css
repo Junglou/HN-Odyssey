@@ -1,0 +1,103 @@
+.cd-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 3000; /* Hiển thị trên cùng */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: "Lexend Exa", sans-serif;
+}
+
+.cd-modal-box {
+  background-color: #ffffff;
+  width: 100%;
+  max-width: 420px; /* Độ rộng vừa phải theo thiết kế */
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cd-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.cd-modal-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #000000;
+  margin: 0;
+}
+
+.cd-modal-close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #000000;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s;
+}
+
+.cd-modal-close-btn:hover {
+  opacity: 0.6;
+}
+
+.cd-modal-message {
+  font-size: 1rem;
+  color: #000000;
+  margin: 0 0 20px 0;
+  font-weight: 500;
+}
+
+.cd-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* Nút Cancel: Nền trắng, viền đen, bo góc theo thiết kế */
+.cd-btn-cancel {
+  background-color: #ffffff;
+  color: #000000;
+  border: 1px solid #000000;
+  padding: 10px 24px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: background-color 0.2s;
+}
+
+.cd-btn-cancel:hover {
+  background-color: #f9fafb;
+}
+
+/* Nút Delete: Nền đỏ, chữ trắng, không viền */
+.cd-btn-delete {
+  background-color: #e1251b; /* Màu đỏ tiêu chuẩn */
+  color: #ffffff;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: opacity 0.2s;
+}
+
+.cd-btn-delete:hover {
+  opacity: 0.9;
+}

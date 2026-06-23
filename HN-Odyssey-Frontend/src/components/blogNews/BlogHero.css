@@ -1,0 +1,37 @@
+/* wrapper */
+.blog-hero-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(30px, 4vw, 50px) 20px;
+  background: rgba(0, 0, 0, 0.15);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+/* elements */
+.blog-hero-breadcrumb {
+  font-family: "Lexend Deca", sans-serif;
+  font-size: clamp(12px, 1vw, 16px);
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.4);
+  margin-bottom: clamp(10px, 1.5vw, 20px);
+}
+
+.blog-hero-title {
+  font-family: "Lemon", cursive, sans-serif;
+  font-size: clamp(24px, 3vw, 36px);
+  font-weight: 400;
+  color: #000000;
+  margin: 0 0 clamp(8px, 1vw, 12px) 0;
+}
+
+.blog-hero-subtitle {
+  font-family: "Ledger", serif;
+  font-size: clamp(14px, 1.5vw, 20px);
+  font-weight: 400;
+  color: #000000;
+  margin: 0;
+}

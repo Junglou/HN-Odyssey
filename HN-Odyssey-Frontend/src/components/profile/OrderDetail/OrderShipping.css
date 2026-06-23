@@ -1,0 +1,62 @@
+.order-shipping-box.order-box-container {
+  counter-increment: none;
+  min-height: auto;
+  height: fit-content;
+}
+
+.order-shipping-title {
+  padding-bottom: 0.35rem;
+  border-bottom: solid lightgray 0.1rem;
+}
+
+.order-tracking-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.order-tracking-note {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+
+.order-tracking-note svg {
+  flex-shrink: 0;
+  width: clamp(28px, 6vw, 40px);
+  height: clamp(28px, 6vw, 40px);
+}
+
+.order-tracking-text-container {
+  flex: 1;
+  min-width: 0;
+  padding-left: 0;
+}
+
+.order-tracking-text span {
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
+.order-tracking-time {
+  display: flex;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  margin-top: 0.2rem;
+}
+
+.order-tracking-time span {
+  font-weight: 400;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 700px) {
+  .order-tracking-note {
+    align-items: center;
+  }
+}

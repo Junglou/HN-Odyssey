@@ -1,0 +1,101 @@
+/* layout chung */
+.krm-wrapper {
+  background-color: #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.krm-section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+/* lưới */
+.krm-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+/* card */
+.krm-card {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.krm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.krm-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.krm-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background-color: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.krm-value {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.krm-trend-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.krm-trend-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+}
+
+.krm-trend-badge.krm-up {
+  color: #16a34a;
+}
+
+.krm-trend-badge.krm-down {
+  color: #dc2626;
+}
+
+.krm-trend-text-vs {
+  color: #64748b;
+}
+
+/* responsive */
+@media screen and (max-width: 1200px) {
+  .krm-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media screen and (max-width: 640px) {
+  .krm-grid {
+    grid-template-columns: 1fr;
+  }
+}

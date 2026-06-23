@@ -1,0 +1,96 @@
+/* Shared shell for all profile pages — sidebar sizing lives in AccountSidebar.css */
+.my-profile-page-container,
+.my-wishlist-page-container,
+.my-coupon-page-container,
+.my-loyalty-page-container,
+.recent-view-page-container {
+  display: flex;
+  align-items: flex-start;
+  background-color: #ffffff;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: clamp(1.5rem, 2.5vw, 3rem) clamp(1.25rem, 3vw, 4rem);
+  gap: clamp(0.8rem, 1.2vw, 1.75rem);
+  font-family: "Lexend Exa", sans-serif;
+  box-sizing: border-box;
+}
+
+.my-profile-page-container .content-wrapper,
+.my-wishlist-page-container .content-wrapper,
+.my-coupon-page-container .content-wrapper,
+.my-loyalty-page-container .content-wrapper,
+.recent-view-page-container .content-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 1200px) {
+  .my-profile-page-container,
+  .my-wishlist-page-container,
+  .my-coupon-page-container,
+  .my-loyalty-page-container,
+  .recent-view-page-container {
+    padding: 2rem;
+    gap: 1.5rem;
+  }
+}
+
+@media (max-width: 992px) {
+  .my-profile-page-container,
+  .my-wishlist-page-container,
+  .my-coupon-page-container,
+  .my-loyalty-page-container,
+  .recent-view-page-container {
+    flex-direction: column;
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .my-profile-page-container .sidebar-wrapper,
+  .my-wishlist-page-container .sidebar-wrapper,
+  .my-coupon-page-container .sidebar-wrapper,
+  .my-loyalty-page-container .sidebar-wrapper,
+  .recent-view-page-container .sidebar-wrapper {
+    width: 100%;
+    flex: none;
+    margin-bottom: 0;
+  }
+}
+
+@media (max-width: 576px) {
+  .my-profile-page-container,
+  .my-wishlist-page-container,
+  .my-coupon-page-container,
+  .my-loyalty-page-container,
+  .recent-view-page-container {
+    padding: 0.75rem;
+    gap: 0.75rem;
+  }
+}
+
+@media (min-width: 1981px) {
+  .my-profile-page-container,
+  .my-wishlist-page-container,
+  .my-coupon-page-container,
+  .my-loyalty-page-container,
+  .recent-view-page-container {
+    padding-left: clamp(1.5rem, 2.5vw, 3.5rem);
+    padding-right: clamp(1.5rem, 2.5vw, 3.5rem);
+  }
+}
+
+@media (min-width: 2560px) {
+  .my-profile-page-container,
+  .my-wishlist-page-container,
+  .my-coupon-page-container,
+  .my-loyalty-page-container,
+  .recent-view-page-container {
+    padding-left: clamp(2rem, 3vw, 4.5rem);
+    padding-right: clamp(2rem, 3vw, 4.5rem);
+  }
+}

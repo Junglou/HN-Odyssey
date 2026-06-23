@@ -1,0 +1,223 @@
+/* wrapper */
+.recovery-form-wrapper {
+  width: 100%;
+  max-width: 480px;
+  min-width: 350px;
+  margin: 0 auto;
+  font-family: inherit;
+  color: #000;
+  display: flex;
+  flex-direction: column;
+  animation: formFadeInUp 1s cubic-bezier(0.25, 1, 0.5, 1) both;
+  animation-delay: 0.5s;
+}
+
+/* typography */
+.recovery-title {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: #000;
+  margin-bottom: 2rem;
+  font-family: "Lexend Exa", sans-serif;
+  line-height: 1.2;
+}
+
+/* inputs */
+.recovery-input-group {
+  position: relative;
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+.recovery-form-input {
+  width: 100%;
+  padding: 1rem 1.5rem;
+  border-radius: 50px;
+  border: 1px solid #888;
+  font-size: 1rem;
+  background-color: #ffffff;
+  outline: none;
+  box-sizing: border-box;
+  color: #333;
+  font-family: "Lexend Exa", sans-serif;
+  transition: all 0.2s ease;
+  background-image: linear-gradient(to right, #ccc, #ccc);
+  background-repeat: no-repeat;
+  background-position: center bottom 12px;
+  background-size: calc(100% - 3rem) 1px;
+}
+
+/* Textarea */
+textarea.recovery-form-input {
+  border-radius: 20px;
+  resize: none;
+  height: 120px;
+  background-image: none;
+}
+
+/* Hiệu ứng Focus */
+.recovery-form-input:focus {
+  border-color: #000;
+  border-width: 1.5px;
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.05);
+  background-image: linear-gradient(to right, #333, #333);
+}
+
+textarea.recovery-form-input:focus {
+  background-image: none;
+}
+
+.recovery-required-mark {
+  position: absolute;
+  right: 25px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #666;
+  font-size: 1.2rem;
+  pointer-events: none;
+}
+
+/* otp */
+.recovery-otp-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  align-items: stretch;
+}
+
+.recovery-otp-input-container {
+  position: relative;
+  flex: 1;
+}
+
+/* Timer nằm bên phải trong input */
+.recovery-otp-timer {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-weight: 600;
+  color: #666;
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+
+/* buttons */
+.recovery-send-btn {
+  background-color: #000;
+  color: #fff;
+  border: none;
+  border-radius: 50px;
+  padding: 0 1.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: "Lexend Exa", sans-serif;
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
+}
+
+.recovery-send-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.recovery-send-btn:disabled {
+  background-color: #555;
+  cursor: not-allowed;
+}
+
+/* file input */
+.recovery-file-input-wrapper {
+  position: relative;
+  width: 100%;
+  margin-bottom: 1.5rem;
+}
+
+.recovery-file-input-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 1rem 1.5rem;
+  border-radius: 50px;
+  border: 1px solid #888;
+  background-color: #fff;
+  cursor: pointer;
+  box-sizing: border-box;
+  color: #888; /* Màu placeholder */
+  font-family: "Lexend Exa", sans-serif;
+  transition: all 0.2s ease;
+}
+
+.recovery-file-input-label.has-file {
+  color: #000;
+  border-color: #000;
+}
+
+.recovery-file-input-label:hover {
+  background-color: #f9f9f9;
+}
+
+.recovery-paperclip-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-left: 10px;
+}
+
+/* buttons & links */
+.recovery-process-btn {
+  width: 150px;
+  padding: 0.8rem 2rem;
+  background-color: #000;
+  color: #fff;
+  border: none;
+  border-radius: 50px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 2rem;
+  font-family: "Lexend Exa", sans-serif;
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
+}
+
+.recovery-process-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.recovery-footer-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.recovery-text-link {
+  color: #000;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  width: fit-content;
+  font-family: "Lexend Exa", sans-serif;
+}
+
+.recovery-text-link:hover {
+  opacity: 0.7;
+}
+
+/* animation */
+@keyframes formFadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

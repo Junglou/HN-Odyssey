@@ -1,0 +1,22 @@
+@import "../OrderManagement/OrderManagement.css";
+
+.section-recent > .box-container {
+  width: 100%;
+  min-width: 0;
+  justify-self: stretch;
+}
+
+.no-recent-view {
+  font-size: clamp(1rem, 1.2vw, 1.25rem);
+  color: #555;
+  margin-left: clamp(1rem, 2vw, 3rem);
+  width: 100%;
+  grid-column: 1 / -1;
+}
+
+.bottom-link-container {
+  margin-left: 1rem;
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: auto auto;
+}

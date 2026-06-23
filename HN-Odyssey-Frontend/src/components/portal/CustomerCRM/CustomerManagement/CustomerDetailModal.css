@@ -1,0 +1,315 @@
+/* Container Modal Chi Tiết (Rộng hơn Modal thường) */
+.crm-detail-modal-container {
+  background-color: #fff;
+  border-radius: 16px;
+  width: 850px;
+  max-width: 95vw;
+  max-height: 90vh;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: crm-slideUp 0.3s ease-out;
+  box-sizing: border-box;
+}
+
+/* Header Chi Tiết */
+.crm-detail-header {
+  padding: clamp(20px, 3vw, 32px) clamp(20px, 3vw, 32px) 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.crm-detail-user-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.crm-detail-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: #f3e8ff;
+  color: #7e22ce;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.crm-detail-name {
+  font-size: clamp(1.2rem, 2vw, 1.5rem);
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 4px 0;
+}
+
+.crm-detail-email {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Hệ thống Tabs */
+.crm-tabs-header {
+  display: flex;
+  gap: 32px;
+  padding: 0 clamp(20px, 3vw, 32px);
+  border-bottom: 1px solid #e5e7eb;
+  margin-top: 24px;
+}
+
+.crm-tab-btn {
+  padding: 12px 4px;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.2s;
+  white-space: nowrap;
+}
+
+.crm-tab-btn:hover {
+  color: #111827;
+}
+
+.crm-tab-btn:focus {
+  outline: none;
+}
+
+.crm-tab-btn.active {
+  color: #111827;
+}
+
+.crm-tab-btn.active::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: #111827;
+}
+
+/* Body Content */
+.crm-detail-body {
+  padding: clamp(20px, 3vw, 32px);
+  overflow-y: auto;
+  flex: 1;
+  scrollbar-width: thin;
+}
+
+/* Tab Hồ sơ */
+.crm-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 24px;
+}
+
+.crm-info-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.crm-info-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.crm-info-value {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #111827;
+  padding: 12px 16px;
+  background-color: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #f3f4f6;
+}
+
+/* Tab Lịch sử hoạt động */
+.crm-activity-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.crm-btn-export {
+  background-color: #10b981;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.crm-btn-export:hover:not(:disabled) {
+  background-color: #059669;
+}
+
+.crm-btn-export:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.crm-activity-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.crm-activity-table th {
+  background-color: #f9fafb;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 700;
+  color: #374151;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.crm-activity-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #4b5563;
+}
+
+.crm-activity-status.success {
+  color: #10b981;
+  font-weight: 600;
+}
+
+.crm-activity-status.failed {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+/* Close button */
+.crm-icon-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Section title trong tab body */
+.crm-section-title {
+  margin: 0 0 16px 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.crm-section-title--toolbar {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+/* Table wrapper */
+.crm-detail-table-wrapper {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* TD variants */
+.crm-td-order-code {
+  font-weight: 600;
+  color: #111827;
+}
+
+.crm-td-nowrap {
+  white-space: nowrap;
+}
+
+.crm-td-bold {
+  font-weight: 600;
+}
+
+.crm-td-action {
+  font-weight: 500;
+}
+
+/* Order status colors */
+.crm-order-status--pending,
+.crm-order-status--processing,
+.crm-order-status--shipping {
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.crm-order-status--delivered,
+.crm-order-status--completed {
+  color: #10b981;
+  font-weight: 600;
+}
+
+.crm-order-status--cancelled,
+.crm-order-status--returned {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.crm-order-status--default {
+  color: #6b7280;
+  font-weight: 600;
+}
+
+/* Account status colors */
+.crm-account-status--active {
+  color: #10b981;
+}
+
+.crm-account-status--locked {
+  color: #f59e0b;
+}
+
+.crm-account-status--inactive {
+  color: #ef4444;
+}
+
+/* Responsive cho Modal Chi Tiết */
+@media (max-width: 640px) {
+  .crm-tabs-header {
+    overflow-x: auto;
+    gap: 20px;
+    padding-bottom: 2px;
+  }
+  .crm-activity-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+}
+
+/* Các class bổ sung cho hiển thị số tiền và điểm thành viên (Loyalty) */
+.crm-loyalty-value--spent {
+  font-weight: 700;
+  color: #059669; /* Xanh lá */
+}
+
+.crm-loyalty-value--points {
+  font-weight: 700;
+  color: #d97706; /* Cam */
+}
