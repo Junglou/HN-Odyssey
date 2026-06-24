@@ -107,6 +107,7 @@ export class ChatService {
       return {
         is_new: false,
         conversation_id: conv._id.toString(),
+        session_id: conv.session_id,
         status: conv.status,
       };
     }
@@ -597,9 +598,28 @@ export class ChatService {
   }
 
   // AC8: Implement hàm lấy tin nhắn
-  async getMessagesBySession(sessionId: string) {
-    const conv = await this.convModel.findOne({ session_id: sessionId }).exec();
+  async getMessagesBySession(sessionId: string, customerId?: string) {
+    // 1. Nếu khách đã đăng nhập, ưu tiên tìm hội thoại đang Active theo customerId
+    const query: FilterQuery<Conversation> = customerId
+      ? {
+          customer_id: new Types.ObjectId(customerId),
+          status: { $ne: ConversationStatus.CLOSED },
+        }
+      : { session_id: sessionId };
+
+    let conv = await this.convModel
+      .findOne(query)
+      .sort({ createdAt: -1 })
+      .exec();
+
+    // 2. Fallback: Nếu không tìm thấy bằng customerId, thử tìm lại bằng sessionId
+    if (!conv && customerId) {
+      conv = await this.convModel.findOne({ session_id: sessionId }).exec();
+    }
+
     if (!conv) return [];
+
+    // 3. Trả về toàn bộ tin nhắn của hội thoại đó
     return this.msgModel
       .find({ conversation_id: conv._id })
       .sort({ createdAt: 1 })

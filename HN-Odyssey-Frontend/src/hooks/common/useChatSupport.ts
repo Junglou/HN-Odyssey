@@ -85,9 +85,15 @@ export function useChatSupport() {
         setConversationId(convId);
 
         // Bước 2: Gọi lịch sử tin nhắn bằng sessionIdRef ĐÃ ĐƯỢC ĐỒNG BỘ
-        const historyRes = await axiosClient.get(
-          `/support/chats/session/${sessionIdRef.current}/messages`,
-        );
+        let historyUrl = `/support/chats/session/${sessionIdRef.current}/messages`;
+
+        // Nếu user đã đăng nhập, đính kèm customerId vào URL để Backend nhận diện
+        if (user?._id) {
+          historyUrl += `?customerId=${user._id}`;
+        }
+
+        const historyRes = await axiosClient.get(historyUrl);
+
         const historyData: ServerMessage[] = historyRes.data || [];
 
         const formattedHistory: ChatMessage[] = historyData.map(

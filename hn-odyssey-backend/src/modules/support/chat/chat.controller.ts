@@ -97,8 +97,11 @@ export class ChatController {
   // AC8: Lấy lịch sử tin nhắn cho khách hàng (Dùng sessionId để nhận diện cả Guest)
   @Public()
   @Get('session/:sessionId/messages')
-  async getChatHistory(@Param('sessionId') sessionId: string) {
-    return this.chatService.getMessagesBySession(sessionId);
+  async getChatHistory(
+    @Param('sessionId') sessionId: string,
+    @Query('customerId') customerId?: string,
+  ) {
+    return this.chatService.getMessagesBySession(sessionId, customerId);
   }
 
   // AC13: Gửi đánh giá sau hội thoại (CSAT)
