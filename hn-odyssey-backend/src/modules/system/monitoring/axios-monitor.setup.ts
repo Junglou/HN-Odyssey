@@ -116,13 +116,17 @@ export class AxiosMonitorSetup implements OnModuleInit {
     } else if (config.data && typeof config.data === 'object') {
       requestData = config.data as Record<string, unknown>;
     }
-
     if (isError && status >= 500) {
-      this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
-        severity: 'HIGH',
-        error_code: `3RD_PARTY_FAIL_${provider}`,
-        message: `Mất kết nối hoặc đối tác ${provider} đang bị lỗi (HTTP ${status}). Độ trễ: ${duration}ms. URL: ${url}`,
-      });
+      // THÊM DÒNG NÀY: Chỉ bắn thông báo lên màn hình nếu lỗi không phải từ ML_ENGINE
+      if (provider !== 'ML_ENGINE') {
+        this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
+          severity: 'HIGH',
+          error_code: `3RD_PARTY_FAIL_${provider}`,
+          message: `Mất kết nối hoặc đối tác ${provider} đang bị lỗi (HTTP ${status}). Độ trễ: ${duration}ms. URL: ${url}`,
+        });
+      }
+
+      // Vẫn giữ lại log ghi ở console của Backend để Dev dễ theo dõi
       this.logger.warn(
         `[API ĐỐI TÁC LỖI] ${provider} phản hồi ${status} sau ${duration}ms`,
       );

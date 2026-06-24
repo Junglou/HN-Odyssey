@@ -1,6 +1,9 @@
 // imports
 import { useState, useRef, useEffect } from "react";
-import EmojiPicker, { EmojiStyle, type EmojiClickData } from "emoji-picker-react";
+import EmojiPicker, {
+  EmojiStyle,
+  type EmojiClickData,
+} from "emoji-picker-react";
 import {
   CloseIcon,
   PaperClipIcon,
@@ -11,6 +14,15 @@ import {
 import { useChatSupport } from "../../../hooks/common/useChatSupport";
 import axiosClient from "../../../api/axiosClient";
 import "./ChatWidget.css";
+
+// THÊM HÀM NÀY ĐỂ FIX LỖI LINK KÉP TỪ DB CŨ
+const getValidMediaUrl = (url: string) => {
+  if (!url) return "";
+  if (url.includes("https://res.cloudinary.com")) {
+    return url.substring(url.indexOf("https://res.cloudinary.com"));
+  }
+  return url;
+};
 
 // props
 interface ChatWidgetProps {
@@ -63,8 +75,14 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      const baseUrl = import.meta.env.VITE_API_URL.replace("/api", "");
-      const fileUrl = `${baseUrl}${uploadRes.data.path}`;
+      // FIX: Thông minh nhận diện link Cloudinary hay link Local
+      const rawPath = uploadRes.data.path;
+      let fileUrl = rawPath;
+
+      if (!rawPath.startsWith("http")) {
+        const baseUrl = import.meta.env.VITE_API_URL.replace("/api", "");
+        fileUrl = `${baseUrl}${rawPath.startsWith("/") ? "" : "/"}${rawPath}`;
+      }
 
       if (file.type.startsWith("image/")) {
         sendMessage(fileUrl, "IMAGE");
@@ -134,20 +152,26 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
               {/* image type */}
               {msg.message_type === "IMAGE" && (
                 <img
-                  src={msg.content}
+                  src={getValidMediaUrl(msg.content)}
                   alt="attachment"
                   className="cw-img-attach"
                 />
               )}
 
-              {/* file type */}
+              {/* file type - Đã thêm thẻ <a> để click vào tải file */}
               {msg.message_type === "FILE" && (
                 <div className="cw-file-attach">
                   <FilePdfIcon />
                   <div className="cw-file-info">
-                    <span className="cw-file-name">
+                    <a
+                      href={getValidMediaUrl(msg.content)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="cw-file-name"
+                      style={{ color: "inherit", textDecoration: "underline" }}
+                    >
                       {msg.metadata?.fileName || "Attachment"}
-                    </span>
+                    </a>
                     <span className="cw-file-size">
                       {msg.metadata?.fileSize || "Unknown"}
                     </span>

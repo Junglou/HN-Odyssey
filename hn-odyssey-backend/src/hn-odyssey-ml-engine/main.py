@@ -1,182 +1,158 @@
-# Import các thành phần cần thiết từ FastAPI để tạo API, xử lý lỗi và chạy tác vụ ngầm
 from fastapi import FastAPI, HTTPException, BackgroundTasks
-# Thư viện xử lý dữ liệu dạng bảng (DataFrame)
 import pandas as pd
-# Thư viện xử lý toán học và ma trận tốc độ cao
 import numpy as np
-# Trình điều khiển (driver) để kết nối và tương tác với cơ sở dữ liệu MongoDB
 from pymongo import MongoClient
-# Thuật toán Truncated Singular Value Decomposition dùng để giảm chiều dữ liệu và lọc cộng tác (Collaborative Filtering)
 from sklearn.decomposition import TruncatedSVD
-# Server ASGI để chạy ứng dụng FastAPI
 import uvicorn
-# Thư viện ghi log hệ thống
 import logging
-# Thư viện dùng để đọc các biến môi trường từ file .env
 from dotenv import load_dotenv
 import os
-# Các thư viện xử lý thời gian và toán học cơ bản
 from datetime import datetime, timezone, timedelta
 import math
 
-# Cấu hình hệ thống ghi log: Hiển thị thời gian, mức độ cảnh báo (INFO, ERROR...) và nội dung tin nhắn
+# Setup logging cơ bản để dễ debug, format có đủ timestamp và level
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# Load các biến môi trường từ file .env bảo mật vào hệ thống của Python
+# Load biến môi trường từ file .env
 load_dotenv()
 
-# Cấu hình MongoDB: Lấy URI và Tên Database từ biến môi trường, nếu không có sẽ dùng giá trị mặc định
+# Lấy config DB từ env, fallback về localhost nếu chưa set
 MONGO_URI = os.getenv("MONGO_URL", "mongodb://localhost:27017")
 DB_NAME = os.getenv("MONGO_DB_NAME", "hn-odyssey")
-# Lấy cổng (port) chạy server từ biến môi trường, mặc định là 8000
+# Port cho server, mặc định 8000
 PORT = int(os.getenv("ML_PORT", 8000))
 
-# Khởi tạo ứng dụng FastAPI với tên và phiên bản
+# Khởi tạo FastAPI app
 app = FastAPI(title="H&N Odyssey ML Engine", version="1.0")
-# Tạo đối tượng logger riêng cho ML Engine để theo dõi các hoạt động
+# Cắm riêng một con logger cho ML Engine để dễ track
 logger = logging.getLogger("ml_engine")
 
-# === KHAI BÁO BIẾN TOÀN CỤC (GLOBAL VARIABLES) ===
-# Global variables để lưu trữ Model và cấu trúc dữ liệu ngay trên RAM.
-# Việc này giúp API khi được gọi sẽ tra cứu trực tiếp trên RAM, cho thời gian phản hồi siêu tốc (< 100ms) 
-# thay vì phải tính toán lại từ đầu hoặc truy vấn DB liên tục.
-RECOMMENDATION_MATRIX = None # Ma trận kết quả sau khi đã train qua SVD chứa điểm dự đoán
-USER_INDEX_MAP = {}          # Dictionary ánh xạ từ user_id sang chỉ số dòng (row index) trong ma trận
-PRODUCT_IDS = []             # Danh sách ID sản phẩm tương ứng với các cột (column index) trong ma trận
-IS_TRAINING = False          # Cờ hiệu kiểm soát trạng thái train để chống quá tải (OOM)
+# GLOBAL VARIABLES
+# Cache model và data thẳng trên RAM.
+# Mục đích là để API respond cực nhanh (< 100ms) thay vì phải query DB hay tính toán lại mỗi lần gọi.
+RECOMMENDATION_MATRIX = None
+USER_INDEX_MAP = {}          
+PRODUCT_IDS = []             
+IS_TRAINING = False          
 
 def train_model():
     """
-    Hàm chạy ngầm (Background Task) mỗi khi NestJS gọi API POST /train.
-    Nhiệm vụ: Truy xuất dữ liệu từ DB, tính toán điểm số, tạo ma trận tương tác và huấn luyện model SVD.
+    Background task chạy mỗi khi có request từ NestJS (/train).
+    Flow: Kéo data từ Mongo -> Tính điểm -> Dựng ma trận -> Train SVD.
     """
-    # Khai báo sử dụng các biến toàn cục để có thể cập nhật kết quả sau khi train xong
+    # Lấy các biến global để ghi đè kết quả sau khi train xong
     global RECOMMENDATION_MATRIX, USER_INDEX_MAP, PRODUCT_IDS, IS_TRAINING
     
-    # Đánh dấu hệ thống đang bận để khóa các request train tiếp theo
+    # Khóa trạng thái để chặn các request train spam vào cùng lúc
     IS_TRAINING = True
     
     try:
         logger.info("Bắt đầu lấy dữ liệu từ MongoDB để Train Model...")
-        # Mở kết nối đến MongoDB
+        # Mở connection Mongo
         client = MongoClient(MONGO_URI)
         db = client[DB_NAME]
         
-        # Lấy thời gian hiện tại theo chuẩn UTC
         now = datetime.now(timezone.utc)
-        # Tính mốc thời gian cách đây 90 ngày
-        ninety_days_ago = now - timedelta(days=90) # [FIX RAM]: Giới hạn 90 ngày để tránh tải lượng dữ liệu quá lớn gây tràn RAM
+        # [FIX RAM]: Chỉ lấy data 90 ngày đổ lại. Lấy nhiều quá dễ tèo RAM.
+        ninety_days_ago = now - timedelta(days=90) 
         
-        # 1. Truy vấn lịch sử hành vi có giới hạn thời gian từ collection 'user_behaviors'
-        # Chỉ lấy các bản ghi có user_id, có product_id và được tạo trong vòng 90 ngày trở lại đây
+        # 1. Kéo lịch sử hành vi của user. 
+        # Chỉ query các field thực sự cần thiết để tiết kiệm memory & băng thông.
         behaviors = list(db.user_behaviors.find(
             {
                 "user_id": {"$exists": True},
                 "metadata.product_id": {"$exists": True},
                 "createdAt": {"$gte": ninety_days_ago} 
             },
-            # Projection: Chỉ lấy những trường cần thiết để tối ưu bộ nhớ và băng thông
             {"user_id": 1, "metadata": 1, "action": 1, "createdAt": 1}
         ))
         
-        # Đóng kết nối Database ngay sau khi lấy xong dữ liệu để giải phóng tài nguyên
+        # Xong việc thì đóng connection DB luôn cho nhẹ máy
         client.close()
         
-        # Kiểm tra nếu không có dữ liệu thì dừng quá trình train
         if not behaviors:
             logger.warning("Không có dữ liệu behavior để train model.")
             return
 
-        # 2. Xây dựng Dataframe và gán trọng số điểm cho từng hành vi
+        # 2. Xử lý Data và tính điểm (Scoring)
         data = []
         for b in behaviors:
             action = b.get("action")
             base_score = 0
             metadata = b.get("metadata", {})
             
-            # [FIX AC2]: Scoring Matrix Chuẩn Xác - Chấm điểm hệ thống dựa trên mức độ quan trọng của hành vi
+            # [FIX AC2]: Scoring Matrix - Chấm điểm dựa trên action của user
             if action == "VIEW_PRODUCT": 
-                base_score = 1 # Xem sản phẩm: Mức độ quan tâm thấp nhất
+                base_score = 1 # Xem thì cho 1 điểm
             elif action == "ADD_TO_CART": 
-                base_score = 3 # Thêm vào giỏ: Quan tâm nhiều
+                base_score = 3 # Thêm giỏ hàng cho 3 điểm
             elif action == "PURCHASE": 
-                base_score = 5 # Đã mua: Quan tâm cao nhất
+                base_score = 5 # Chốt đơn cho 5 điểm
             elif action == "REVIEW_PRODUCT":
-                # Đánh giá sản phẩm: Lấy số sao, nếu không có thì mặc định là 5
                 rating = metadata.get("rating", 5) 
                 if rating >= 4:
-                    base_score = 5 # Đánh giá tốt (4-5 sao): Tính bằng điểm mua hàng
+                    base_score = 5 # Đánh giá cao: tính như mua hàng
                 elif rating <= 2:
-                    base_score = -5 # Phạt điểm cực mạnh nếu khách ghét (1-2 sao) để hệ thống ngừng gợi ý
+                    base_score = -5 # Đánh giá tệ: Phạt điểm nặng để cấm gợi ý
                 else:
-                    base_score = 1 # 3 sao (Trung lập): Tính như điểm xem sản phẩm
+                    base_score = 1 # 3 sao bình thường: tính như view
             
-            # Nếu hành vi này có tạo ra điểm số (khác 0)
+            # Nếu có phát sinh điểm
             if base_score != 0:
-                # RECENCY WEIGHTING (Thời gian hiệu lực) - Hàm suy giảm thời gian (Time Decay)
-                # Dữ liệu càng cũ thì giá trị ảnh hưởng đến gợi ý càng thấp
+                # RECENCY WEIGHTING: Time Decay. Data càng cũ thì ảnh hưởng càng giảm.
                 created_at = b.get("createdAt")
                 weight = 1.0 
                 
-                # Xử lý đồng bộ múi giờ về chuẩn UTC để tính toán chính xác
+                # Đồng bộ UTC để tránh bug lệch múi giờ
                 if isinstance(created_at, datetime):
                     if created_at.tzinfo is None:
                         created_at = created_at.replace(tzinfo=timezone.utc)
                     
-                    # Tính số ngày chênh lệch từ lúc diễn ra hành vi đến hiện tại
                     days_diff = (now - created_at).days
                     if days_diff > 0:
-                        # Sử dụng hàm mũ (exponential decay) để giảm dần trọng số (giảm khoảng 2% mỗi ngày)
+                        # Giảm dần trọng số, cứ trôi qua 1 ngày là rớt tầm 2% giá trị
                         weight = math.exp(-0.02 * days_diff)
                 
-                # Điểm cuối cùng = Điểm hành vi * Trọng số thời gian
                 final_score = base_score * weight
 
-                # Đưa dữ liệu đã xử lý vào mảng lưu trữ
                 data.append({
                     "user_id": str(b["user_id"]),
                     "product_id": str(b["metadata"]["product_id"]),
                     "score": final_score
                 })
                 
-        # Chuyển mảng dữ liệu thành Pandas DataFrame để dễ dàng xử lý tính toán
+        # Bơm vào Pandas DataFrame xử lý cho lẹ
         df = pd.DataFrame(data)
         if df.empty:
             return
             
-        # Gộp (Group by) các bản ghi bị trùng lặp của cùng 1 user trên cùng 1 sản phẩm và cộng dồn điểm số lại
+        # Group by để cộng dồn điểm nếu 1 user tương tác 1 sản phẩm nhiều lần
         df = df.groupby(['user_id', 'product_id'])['score'].sum().reset_index()
         
-        # Tạo Pivot Table (Ma trận người dùng - sản phẩm)
-        # Hàng (Index) là User, Cột (Columns) là Product, Giá trị (Values) là điểm số.
-        # .fillna(0) để điền số 0 vào những ô trống (user chưa từng tương tác với sản phẩm đó)
+        # Dựng Pivot Table (User - Product). Chỗ nào chưa tương tác thì fill 0.
         pivot_table = df.pivot(index='user_id', columns='product_id', values='score').fillna(0)
         
-        # Ánh xạ từ User ID sang chỉ số hàng (0, 1, 2...) để tiện tra cứu mảng 2 chiều
+        # Map User ID ra index để sau này chọc vào mảng 2 chiều cho nhanh
         USER_INDEX_MAP = {user_id: idx for idx, user_id in enumerate(pivot_table.index)}
-        # Lưu lại danh sách Product ID theo đúng thứ tự cột
+        # Lưu lại list Product ID đúng thứ tự
         PRODUCT_IDS = list(pivot_table.columns)
-        # Lấy dữ liệu thuần (chỉ chứa các con số) để đưa vào thuật toán SVD
+        # Rút raw data ra chuẩn bị đẩy vào SVD
         matrix = pivot_table.values
         
-        # Kiểm tra vấn đề "Cold Start" (Khởi động lạnh): 
-        # Nếu hệ thống có ít hơn 2 người dùng hoặc ít hơn 2 sản phẩm, không đủ dữ liệu chạy SVD.
+        # Xử lý Cold Start: Dữ liệu quá mỏng (dưới 2 user hoặc 2 product) thì khỏi chạy SVD, xài tạm ma trận thô.
         if matrix.shape[0] < 2 or matrix.shape[1] < 2:
-            RECOMMENDATION_MATRIX = matrix # Dùng thẳng ma trận gốc chưa qua SVD
+            RECOMMENDATION_MATRIX = matrix 
             logger.info("Dữ liệu quá mỏng (Cold Start), tạm thời dùng ma trận thô.")
             return
 
-        # Thuật toán SVD yêu cầu số chiều (n_components) phải nhỏ hơn số dòng/số cột trừ 1
-        # Ở đây chọn tối đa 20 đặc trưng ẩn (latent features)
+        # Setup SVD. Lấy tối đa 20 latent features.
         n_components = min(20, matrix.shape[0] - 1, matrix.shape[1] - 1)
         if n_components < 1: n_components = 1
             
-        # Khởi tạo mô hình SVD với n_components đã tính toán. random_state để kết quả train luôn đồng nhất nếu cùng data.
         svd = TruncatedSVD(n_components=n_components, random_state=42)
-        # Huấn luyện mô hình và giảm chiều ma trận người dùng - tính năng
         matrix_svd = svd.fit_transform(matrix)
-        # Khôi phục lại ma trận (Nhân ma trận người dùng-tính năng với tính năng-sản phẩm)
-        # Ma trận kết quả RECOMMENDATION_MATRIX lúc này đã được làm đầy các ô có số 0 ban đầu bằng điểm số dự đoán.
+        
+        # Khôi phục ma trận: Nhân ngược lại để ra ma trận gợi ý hoàn chỉnh (nó sẽ điền điểm vào các ô 0 lúc nãy)
         RECOMMENDATION_MATRIX = np.dot(matrix_svd, svd.components_)
         
         logger.info("Hoàn tất Train ML Model thành công!")
@@ -184,75 +160,63 @@ def train_model():
     except Exception as e:
         logger.error(f"Tiến trình Train Model gặp lỗi: {str(e)}")
     finally:
-        # Quan trọng: Luôn mở khóa bất kể quá trình train thành công hay bị lỗi
+        # Nhớ xả cờ trạng thái ra để lần sau còn train tiếp
         IS_TRAINING = False
 
 
-# API endpoint: Nhận yêu cầu train model (phương thức POST)
+# API Endpoint nhận request train
 @app.post("/train")
 async def trigger_train(background_tasks: BackgroundTasks):
     global IS_TRAINING
     
-    # Nếu hệ thống đang bận re-train thì từ chối request mới để tránh quá tải
+    # Đang train dở thì chặn luôn, tránh dội request
     if IS_TRAINING:
         return {"message": "Hệ thống đang tiến hành re-train rồi, request bị bỏ qua để tránh quá tải."}
         
-    # Đẩy tác vụ train_model vào Background Tasks của FastAPI để chạy nền
-    # Giúp API phản hồi ngay lập tức cho client (NestJS) mà không cần bắt client chờ vài phút/vài giây cho đến khi train xong.
+    # Đẩy vào Background Tasks để API trả response liền cho NestJS mà không bị block.
     background_tasks.add_task(train_model)
     return {"message": "Lệnh Train Model đang được xử lý chạy ngầm..."}
 
 
-# API endpoint: Trả về danh sách sản phẩm gợi ý cho một user_id cụ thể (phương thức GET)
+# API Endpoint nhả đồ gợi ý cho user
 @app.get("/recommend/{user_id}")
 async def get_recommendation(user_id: str):
-    # Truy cập các biến chứa Model đã được load trên RAM
     global RECOMMENDATION_MATRIX, USER_INDEX_MAP, PRODUCT_IDS
     
-    # Nếu hệ thống vừa khởi động và chưa chạy hàm train_model lần nào, báo lỗi 503
+    # Chưa có model (chắc vừa sập/restart) thì quăng 503
     if RECOMMENDATION_MATRIX is None:
         raise HTTPException(status_code=503, detail="Model chưa sẵn sàng. Đang chờ Data.")
         
-    # Nếu user_id này chưa từng tồn tại trong quá khứ lúc train model (Khách mới / Cold Start)
+    # Khách mới tinh (Cold Start). Trả mảng rỗng để bên NestJS tự xử lý (gợi ý đồ hot trend, best seller...).
     if user_id not in USER_INDEX_MAP:
-        # Fallback Cold Start: Trả về mảng rỗng. 
-        # Thực tế ở NestJS có thể bắt mảng rỗng này và trả về "Sản phẩm phổ biến/Bán chạy nhất"
         return {"user_id": user_id, "recommended_product_ids": []}
         
-    # Lấy ra vị trí dòng của user này trong ma trận dự đoán
+    # Xác định vị trí của user trong ma trận dự đoán
     user_idx = USER_INDEX_MAP[user_id]
-    # Trích xuất toàn bộ hàng điểm số dự đoán của user này đối với tất cả sản phẩm
     user_predictions = RECOMMENDATION_MATRIX[user_idx]
     
-    # argsort() trả về chỉ số của mảng xếp hạng từ bé đến lớn.
-    # [::-1] là thủ thuật Python để lật ngược mảng lại thành từ Lớn Xuống Bé (Cao nhất xếp đầu).
+    # Lấy index các sản phẩm có điểm cao nhất (argsort xong flip ngược lại mảng)
     top_indices = user_predictions.argsort()[::-1]
     
     recommended_ids = []
 
     # [FIX AC17]: SIMILARITY THRESHOLD (Ngưỡng tối thiểu)
-    # Duyệt qua các vị trí sản phẩm đã được xếp hạng từ điểm cao xuống điểm thấp
     for i in top_indices:
-        # Chỉ lấy những sản phẩm có điểm dự đoán (độ tương đồng / độ quan tâm) lớn hơn hoặc bằng 0.3
-        # Tránh việc gợi ý cả những sản phẩm rác/điểm quá thấp
+        # Lọc bớt đồ rác. Chỉ recommend mấy món có điểm >= 0.3
         if user_predictions[i] >= 0.3:
             recommended_ids.append(PRODUCT_IDS[i])
             
-        # Tối ưu payload: Giới hạn chỉ trả về top 20 sản phẩm đạt chuẩn cao nhất
-        # Khi đủ 20 sản phẩm thì thoát vòng lặp ngay lập tức
+        # Cắt lấy top 20 món thôi cho nhẹ payload
         if len(recommended_ids) >= 20:
             break
     
-    # Trả về kết quả dạng JSON cho hệ thống backend gọi nó
     return {
         "user_id": user_id,
         "recommended_product_ids": recommended_ids
     }
 
-# Khối điều kiện để đảm bảo code bên trong chỉ chạy khi file này được thực thi trực tiếp 
-# (không chạy nếu file này bị import từ một file python khác)
 if __name__ == "__main__":
-    # Khi vừa khởi động Server, kích hoạt train_model 1 lần ngay lập tức để nạp dữ liệu ban đầu vào RAM
+    # Vừa boot server lên thì đá một nhát train liền để nhồi data vào RAM
     train_model()
-    # Chạy Web Server ASGI Uvicorn, lắng nghe trên tất cả các IP (0.0.0.0) và port đã cấu hình
+    # Chạy uvicorn server
     uvicorn.run(app, host="0.0.0.0", port=PORT)

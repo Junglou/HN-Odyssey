@@ -209,6 +209,7 @@ export class ReviewsService {
       reviewId: review._id.toString(),
       productId: dto.productId,
       orderId: dto.orderId,
+      rating: dto.rating,
     });
 
     return { message: 'Gửi đánh giá thành công', data: review };
@@ -266,6 +267,13 @@ export class ReviewsService {
 
     if (dto.rating !== undefined && dto.rating !== historyEntry.old_rating) {
       await this.updateProductRating(review.product_id.toString());
+
+      // Gửi tín hiệu để đồng bộ dữ liệu điểm số mới cho hệ thống máy học
+      this.eventEmitter.emit('review.updated', {
+        userId: userId,
+        reviewId: reviewId,
+        rating: dto.rating,
+      });
     }
 
     await this.auditLogsService.log({

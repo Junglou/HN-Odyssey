@@ -15,7 +15,6 @@ import {
   SystemMetricDocument,
 } from '../../modules/system/monitoring/schemas/system-metric.schema';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { NOTIFY_EVENTS } from '../constants/notification-events.constant';
 
 // 1. ĐỊNH NGHĨA INTERFACE ĐỂ KHỬ HOÀN TOÀN 'ANY' TỪ NESTJS
 interface IHttpRequest {

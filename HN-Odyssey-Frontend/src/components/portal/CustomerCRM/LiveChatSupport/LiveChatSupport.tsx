@@ -203,6 +203,15 @@ const InlineEmptyChatIcon = () => (
 
 const isImageUrl = (url: string) => /\.(jpeg|jpg|gif|png|webp)$/i.test(url);
 
+const getValidMediaUrl = (url: string) => {
+  if (!url) return "";
+  // Nếu link bị dính lỗi nối chuỗi kép (http://localhost:8080/https://res.cloudinary...)
+  if (url.includes("https://res.cloudinary.com")) {
+    return url.substring(url.indexOf("https://res.cloudinary.com"));
+  }
+  return url;
+};
+
 interface LiveChatSupportProps {
   filteredSessions: ChatSession[];
   hasMore: boolean;
@@ -252,6 +261,7 @@ export default function LiveChatSupport({
   };
 
   // LOGIC UPLOAD ẢNH/FILE GỌI API THỰC TẾ
+  // LOGIC UPLOAD ẢNH/FILE GỌI API THỰC TẾ
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !activeSessionId) return;
@@ -267,8 +277,15 @@ export default function LiveChatSupport({
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      const baseUrl = import.meta.env.VITE_API_URL.replace("/api", "");
-      const fileUrl = `${baseUrl}${uploadRes.data.path}`;
+      // FIX: Thông minh nhận diện link Cloudinary hay link Local
+      const rawPath = uploadRes.data.path;
+      let fileUrl = rawPath;
+
+      // Nếu path không bắt đầu bằng http (nghĩa là đang lưu Local), mới ghép baseUrl
+      if (!rawPath.startsWith("http")) {
+        const baseUrl = import.meta.env.VITE_API_URL.replace("/api", "");
+        fileUrl = `${baseUrl}${rawPath.startsWith("/") ? "" : "/"}${rawPath}`;
+      }
 
       const metadata = isImage
         ? {}
@@ -602,7 +619,11 @@ export default function LiveChatSupport({
                         {(msg.type === "image" ||
                           (msg.type === "text" && isImageUrl(msg.content))) && (
                           <div className="lcs-message-image">
-                            <img src={msg.content} alt="attachment" />
+                            {/* FIX: Dùng getValidMediaUrl để lọc link sạch */}
+                            <img
+                              src={getValidMediaUrl(msg.content)}
+                              alt="attachment"
+                            />
                           </div>
                         )}
 
@@ -611,7 +632,8 @@ export default function LiveChatSupport({
                             <InlineAttachmentIcon />
                             <div>
                               <a
-                                href={msg.fileData.url}
+                                // FIX: Dùng getValidMediaUrl để lọc link sạch
+                                href={getValidMediaUrl(msg.fileData.url)}
                                 target="_blank"
                                 rel="noreferrer"
                               >
