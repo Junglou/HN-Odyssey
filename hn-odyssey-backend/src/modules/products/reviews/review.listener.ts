@@ -14,6 +14,7 @@ interface ReviewPublishedPayload {
   reviewId: string;
   productId: string;
   orderId: string;
+  rating: number; // Thêm trường rating phục vụ hệ thống máy học
 }
 
 interface ReviewDeletedPayload {
@@ -28,6 +29,12 @@ interface ReviewRepliedPayload {
   reviewId: string;
   productId: string;
   replyContent: string;
+}
+
+interface ReviewUpdatedPayload {
+  userId: string;
+  reviewId: string;
+  rating: number;
 }
 
 @Injectable()
@@ -72,6 +79,26 @@ export class ReviewEventListener {
           updatedAt: new Date(),
         });
       }
+
+      // Ghi nhận hành vi tạo đánh giá sản phẩm làm dữ liệu đầu vào cho hệ thống học máy
+      await this.connection.collection('user_behaviors').insertOne({
+        session_id: `sys_review_${payload.reviewId}`,
+        user_id: new Types.ObjectId(payload.userId),
+        action: 'REVIEW_PRODUCT',
+        path: `/products/${payload.productId}`,
+        source: 'System',
+        device: 'DESKTOP',
+        dwell_time_seconds: 0,
+        is_bounce: false,
+        metadata: {
+          product_id: payload.productId,
+          order_id: payload.orderId,
+          review_id: payload.reviewId,
+          rating: payload.rating,
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
 
       await this.notificationsService.createAndSend({
         recipient_role: 'CUSTOMER',
@@ -149,6 +176,12 @@ export class ReviewEventListener {
           `[REVIEW EVENT] Đã thu hồi ${this.REVIEW_REWARD_POINTS} điểm của User ${payload.userId}`,
         );
       }
+
+      // Xóa bản ghi hành vi đánh giá cũ để không làm sai lệch ma trận gợi ý
+      await this.connection.collection('user_behaviors').deleteOne({
+        'metadata.review_id': payload.reviewId,
+        action: 'REVIEW_PRODUCT',
+      });
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -179,6 +212,31 @@ export class ReviewEventListener {
         error instanceof Error ? error.message : String(error);
       this.logger.error(
         `[REVIEW LỖI REPLY] User: ${payload.userId} - ${errorMessage}`,
+      );
+    }
+  }
+
+  // Cập nhật lại dữ liệu hành vi khi người dùng thay đổi số sao đánh giá
+  @OnEvent('review.updated', { async: true })
+  async handleReviewUpdated(payload: ReviewUpdatedPayload) {
+    try {
+      await this.connection.collection('user_behaviors').updateOne(
+        {
+          'metadata.review_id': payload.reviewId,
+          action: 'REVIEW_PRODUCT',
+        },
+        {
+          $set: {
+            'metadata.rating': payload.rating,
+            updatedAt: new Date(),
+          },
+        },
+      );
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `[REVIEW LỖI CẬP NHẬT ĐIỂM] User: ${payload.userId} - ${errorMessage}`,
       );
     }
   }

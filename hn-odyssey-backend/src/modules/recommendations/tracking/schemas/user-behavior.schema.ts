@@ -44,6 +44,7 @@ export interface TrackingMetadata {
   suggestion_type?: 'KEYWORD' | 'PRODUCT'; // Loại gợi ý user đã click
   filters_applied?: Record<string, any>; // Lưu object bộ lọc user đang dùng (vd: { color: 'red', size: 'M' })
   sort_applied?: string; // Lưu tiêu chí sắp xếp (vd: 'price_asc')
+  rating?: number;
 }
 
 @Schema({ collection: 'user_behaviors', timestamps: true })

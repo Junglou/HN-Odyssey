@@ -31,6 +31,13 @@ export interface ChatMessage {
   fileData?: FileData;
 }
 
+export interface TokenUser {
+  id?: string;
+  _id?: string;
+  fullName?: string;
+  email?: string;
+}
+
 export interface ChatSession {
   id: string;
   customerId: string;
@@ -194,6 +201,78 @@ export function useLiveChatSupport() {
     };
   }, []);
 
+  const fetchSingleConversationAndAppend = async (convId: string) => {
+    try {
+      // Gọi API lấy page 1 của các đoạn chat đang OPEN (Đoạn chat mới có tương tác sẽ luôn trồi lên đầu DB)
+      const res = await axiosClient.get(`/support/chats`, {
+        params: { limit: 20, page: 1, status: "OPEN" },
+      });
+
+      const data: BeConversation[] = res.data?.data || [];
+      const newConv = data.find((c) => c._id === convId);
+
+      if (newConv) {
+        const date = new Date(newConv.updatedAt);
+        const timeString = isNaN(date.getTime())
+          ? ""
+          : date.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+
+        let preview = newConv.latest_message?.content || "Chưa có tin nhắn";
+        if (newConv.latest_message?.message_type === "IMAGE")
+          preview = "[Hình ảnh]";
+        if (newConv.latest_message?.message_type === "FILE")
+          preview = "[Tệp đính kèm]";
+
+        let displayName = "Khách vãng lai";
+        const customer = newConv.customer_id;
+        if (customer) {
+          if (customer.username) displayName = customer.username;
+          else if (customer.first_Name && customer.last_Name)
+            displayName = `${customer.first_Name} ${customer.last_Name}`;
+          else if (customer.email) displayName = customer.email.split("@")[0];
+        }
+
+        const baseUrl = import.meta.env.VITE_API_URL.replace("/api", "");
+        let finalAvatar = undefined;
+        if (customer?.avatar) {
+          finalAvatar = customer.avatar.startsWith("http")
+            ? customer.avatar
+            : `${baseUrl}${customer.avatar.startsWith("/") ? "" : "/"}${customer.avatar}`;
+        }
+
+        const newSession: ChatSession = {
+          id: newConv._id,
+          customerId: customer?._id || newConv.session_id,
+          customerName: displayName,
+          customerHandle:
+            customer?.email || `#${newConv.session_id.substring(0, 8)}`,
+          customerAvatar: finalAvatar,
+          departmentTag: newConv.department_tag,
+          status: "Waitlist", // Đoạn chat mới luôn đưa vào Waitlist
+          lastMessageTime: timeString,
+          openedAt: newConv.opened_at
+            ? new Date(newConv.opened_at).toLocaleString("vi-VN")
+            : undefined,
+          closedAt: undefined,
+          messages: [], // Lịch sử sẽ tự động fetch khi click vào
+          previewText: preview,
+        };
+
+        // Đẩy đoạn chat mới tinh này lên vị trí ĐẦU TIÊN của danh sách hiện tại
+        setSessions((prev) => {
+          // Double check để tránh bị trùng lặp nếu API gọi 2 lần
+          if (prev.some((s) => s.id === convId)) return prev;
+          return [newSession, ...prev];
+        });
+      }
+    } catch (error) {
+      console.error("Lỗi khi tải bổ sung thông tin hội thoại mới:", error);
+    }
+  };
+
   useEffect(() => {
     const handler = setTimeout(() => {
       if (searchQuery !== debouncedSearch) {
@@ -210,14 +289,20 @@ export function useLiveChatSupport() {
   // 1. KHỞI TẠO SOCKET.IO
   useEffect(() => {
     const token = tokenStorage.getToken();
-    const user = tokenStorage.getUser() as {
-      id: string;
-      fullName?: string;
-      email?: string;
-    } | null;
+    // FIX 1: Lấy as any để linh hoạt bắt cả id hoặc _id
+    const user = tokenStorage.getUser() as TokenUser | null;
+
+    // Bắt gọn ID nhân viên bất kể cấu trúc API trả về là gì
+    const agentId = user?.id || user?._id;
+
     if (!token) return;
 
-    const baseUrl = import.meta.env.VITE_API_URL.split("/api")[0];
+    // FIX 2: Xử lý URL Socket chuẩn xác, an toàn tuyệt đối, có fallback
+    const rawApiUrl =
+      import.meta.env.VITE_API_URL || "http://localhost:8080/api";
+    const baseUrl = rawApiUrl.endsWith("/api")
+      ? rawApiUrl.slice(0, -4)
+      : rawApiUrl;
 
     const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(
       `${baseUrl}/chat`,
@@ -234,9 +319,10 @@ export function useLiveChatSupport() {
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      console.log("Socket connected:", socket.id);
-      if (user?.id) {
-        socket.emit("agent_connect", user.id);
+      console.log("Socket connected thành công:", socket.id);
+      // Gửi đúng ID nhân viên lên để Backend biết
+      if (agentId) {
+        socket.emit("agent_connect", agentId);
       }
     });
 
@@ -272,13 +358,22 @@ export function useLiveChatSupport() {
       },
     );
 
-    // FIX: Tách setTimeout để không render chèn lặp tin nhắn
-    socket.on("new_message", (incomingMsg: BeMessage) => {
+    socket.on("new_message", async (incomingMsg: BeMessage) => {
+      // 1. Kiểm tra xem hội thoại này đã có trong state chưa
       setSessions((prev) => {
+        const isExist = prev.some((s) => s.id === incomingMsg.conversation_id);
+
+        // NẾU CHƯA CÓ TRÊN MÀN HÌNH -> FETCH BỔ SUNG NGAY LẬP TỨC
+        if (!isExist) {
+          // Gọi một hàm độc lập bên ngoài để fetch dữ liệu 1 conversation và append vào Waitlist
+          fetchSingleConversationAndAppend(incomingMsg.conversation_id);
+          return prev; // Tạm thời trả về mảng cũ trong lúc đợi fetch
+        }
+
+        // NẾU ĐÃ CÓ RỒI THÌ LÀM NHƯ CŨ
         const targetSession = prev.find(
           (s) => s.id === incomingMsg.conversation_id,
         );
-
         if (targetSession && incomingMsg.sender_type === "USER") {
           setTimeout(() => {
             setTypingUsers((tPrev) => ({
@@ -312,15 +407,14 @@ export function useLiveChatSupport() {
       });
     });
 
-    // EVENT LỖI (CHỐNG SPAM)
     socket.on("error", (err: { message: string }) => {
       toast.error(err.message);
     });
 
     return () => {
       if (socket) {
-        if (user?.id) {
-          socket.emit("agent_disconnect", user.id);
+        if (agentId) {
+          socket.emit("agent_disconnect", agentId);
         }
         socket.disconnect();
       }
@@ -331,11 +425,8 @@ export function useLiveChatSupport() {
   useEffect(() => {
     const fetchConversations = async () => {
       try {
-        const user = tokenStorage.getUser() as {
-          id: string;
-          fullName?: string;
-          email?: string;
-        } | null;
+        const user = tokenStorage.getUser() as TokenUser | null;
+        const agentId = user?.id || user?._id;
         const queryParams: {
           limit: number;
           page: number;
@@ -354,7 +445,7 @@ export function useLiveChatSupport() {
           queryParams.unassigned = "true";
         } else if (activeTab === "Ongoing") {
           queryParams.status = "OPEN";
-          queryParams.agent_id = user?.id;
+          queryParams.agent_id = agentId;
         } else if (activeTab === "Complete") {
           queryParams.status = "CLOSED";
         }
@@ -543,16 +634,13 @@ export function useLiveChatSupport() {
 
     acceptConsultant: async (sessionId: string) => {
       try {
-        const user = tokenStorage.getUser() as {
-          id: string;
-          fullName?: string;
-          email?: string;
-        } | null;
+        const user = tokenStorage.getUser() as TokenUser | null;
+        const agentId = user?.id || user?._id;
         await axiosClient.patch(
           `/support/chats/${sessionId}/assign`,
           {},
           {
-            params: { agentId: user?.id },
+            params: { agentId: agentId },
           },
         );
 
@@ -608,11 +696,9 @@ export function useLiveChatSupport() {
 
     sendTyping: (sessionId: string, isTyping: boolean) => {
       if (!socketRef.current) return;
-      const user = tokenStorage.getUser() as {
-        id: string;
-        fullName?: string;
-        email?: string;
-      } | null;
+
+      const user = tokenStorage.getUser() as TokenUser | null;
+
       socketRef.current.emit("typing", {
         conversation_id: sessionId,
         user_name: user?.fullName || "Agent",

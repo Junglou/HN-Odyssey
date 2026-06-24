@@ -13,6 +13,7 @@ import { Message } from './schemas/message.schema';
 import { OrdersService } from 'src/modules/sales/orders/orders.service';
 import { OrderDocument } from 'src/modules/sales/orders/schemas/order.schema';
 import { EmailService } from 'src/modules/notifications/channels/email.service';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 // 1. Interfaces rõ ràng để tránh "any"
 interface ChatContext {
@@ -352,7 +353,8 @@ export class ChatService {
 
     await this.convModel
       .findByIdAndUpdate(conv._id, {
-        status: ConversationStatus.OFFLINE_TICKET,
+        status: ConversationStatus.OPEN,
+        department_tag: 'OFFLINE_TICKET',
       })
       .exec();
 
@@ -642,5 +644,48 @@ export class ChatService {
         { new: true },
       )
       .exec();
+  }
+
+  // TỰ ĐỘNG ĐÓNG HỘI THOẠI QUÁ 24 GIỜ (Phá luồng chết)
+  @Cron(CronExpression.EVERY_HOUR) // Chạy quét mỗi giờ 1 lần
+  async autoCloseIdleConversations() {
+    // Thời điểm 24 giờ trước
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    // Tìm tất cả hội thoại đang OPEN (kể cả Waitlist hoặc Ongoing) mà updatedAt đã quá 24h
+    const idleConversations = await this.convModel.find({
+      status: 'OPEN',
+      updatedAt: { $lte: twentyFourHoursAgo },
+    });
+
+    if (idleConversations.length === 0) return;
+
+    const convIds = idleConversations.map((c) => c._id);
+
+    // 1. Cập nhật đồng loạt trạng thái thành CLOSED
+    await this.convModel.updateMany(
+      { _id: { $in: convIds } },
+      {
+        $set: {
+          status: ConversationStatus.CLOSED,
+          closed_at: new Date(),
+        },
+      },
+    );
+
+    // 2. Gửi một tin nhắn báo cho khách hàng biết phiên chat đã đóng
+    const systemMessages = convIds.map((id) => ({
+      conversation_id: id,
+      sender_type: 'SYSTEM',
+      content:
+        'Phiên tư vấn đã tự động đóng do quá thời gian. Bạn hãy bắt đầu đoạn chat mới để Bot hoặc nhân viên tiếp tục hỗ trợ nhé.',
+      message_type: 'TEXT',
+    }));
+
+    await this.msgModel.insertMany(systemMessages);
+
+    this.logger.log(
+      `[Auto-Close] Đã đóng ${idleConversations.length} hội thoại treo quá 24h.`,
+    );
   }
 }

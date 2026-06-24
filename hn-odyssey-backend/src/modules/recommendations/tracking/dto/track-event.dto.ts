@@ -49,3 +49,14 @@ export class MergeSessionDto {
   @IsString()
   user_id: string;
 }
+
+export class TrackingMetadataDto {
+  @IsOptional()
+  @IsString()
+  product_id?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  rating?: number;
+}

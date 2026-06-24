@@ -387,7 +387,10 @@ export function useProductReviews() {
       !eligibility.orderId
     )
       return;
+
     try {
+      // Chỉ giữ lại 1 luồng duy nhất là gọi API tạo đánh giá
+      // Hệ thống Backend Listener sẽ tự động bắt sự kiện và lưu vào user_behaviors
       await axiosClient.post("/reviews", {
         productId,
         orderId: eligibility.orderId,
@@ -396,6 +399,7 @@ export function useProductReviews() {
         content: reviewText,
         media: reviewMedia,
       });
+
       handleCancelReview();
       fetchReviewStats();
       fetchReviews();

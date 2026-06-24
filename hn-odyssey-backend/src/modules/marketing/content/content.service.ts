@@ -26,9 +26,6 @@ import {
   UpdatePostDto,
   UpdateStaticPageDto,
 } from './dto/update-content.dto';
-import * as fs from 'fs';
-import * as path from 'path';
-import sharp from 'sharp';
 import { UpdatePageConfigDto } from './dto/page-config.dto';
 import { PageConfig } from './schemas/page-config.schema';
 import { UploadService } from 'src/modules/system/upload/upload.service';

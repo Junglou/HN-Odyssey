@@ -13,6 +13,7 @@ import { Message, MessageSchema } from './schemas/message.schema';
 import { OrdersModule } from 'src/modules/sales/orders/orders.module';
 import { WsJwtGuard } from 'src/common/guards/ws-jwt.guard';
 import { NotificationsModule } from 'src/modules/notifications/notifications.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { NotificationsModule } from 'src/modules/notifications/notifications.mod
     }),
     forwardRef(() => OrdersModule),
     NotificationsModule,
+    ScheduleModule.forRoot(),
   ],
   controllers: [ChatController],
   providers: [ChatService, ChatGateway, WsJwtGuard],
