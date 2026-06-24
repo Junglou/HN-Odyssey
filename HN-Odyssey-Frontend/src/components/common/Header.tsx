@@ -7,7 +7,7 @@ import { useClickOutside } from "../../hooks/common/useClickOutside";
 import CartDropdown from "./cartDrop/CartDropdown";
 import SearchDropdown from "./searchDrop/SearchDropdown";
 import { searchClient, ALGOLIA_INDEX_NAME } from "../../utils/algoliaClient";
-import logoImage from "../../assets/images/logo.png";
+import logoImage from "../../assets/images/Logo.png";
 import {
   HeartIcon,
   UserIcon,
