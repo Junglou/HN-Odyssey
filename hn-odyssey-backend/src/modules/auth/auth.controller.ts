@@ -198,9 +198,12 @@ export class AuthController {
       // Lấy URL của React Frontend (Nhớ sửa port nếu React của bạn chạy port khác)
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
+      // mã hóa thông tin người dùng thành chuỗi để có thể đính kèm vào tham số url an toàn
+      const userPayload = encodeURIComponent(JSON.stringify(result.user));
+
       // Dùng lệnh REDIRECT để đẩy trình duyệt bay ngược về React, kẹp thêm token
       return res.redirect(
-        `${frontendUrl}/login?accessToken=${result.access_token}`,
+        `${frontendUrl}/login?accessToken=${result.access_token}&refreshToken=${result.refresh_token}&user=${userPayload}`,
       );
     } catch (error) {
       const err = error as Error;

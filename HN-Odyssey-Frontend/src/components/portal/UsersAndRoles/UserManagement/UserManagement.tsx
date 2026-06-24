@@ -130,7 +130,6 @@ export default function UserManagement({
   // state
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
-  // Sửa [key: number] thành Record<string, boolean> (tương đương [key: string])
   const [hasDropdownOpened, setHasDropdownOpened] = useState<
     Record<string, boolean>
   >({});
@@ -296,11 +295,14 @@ export default function UserManagement({
                           <EditIcon stroke="#111827" />
                         </button>
 
+                        {/* Nút toggle trạng thái (Chặn thao tác nếu user đang Locked) */}
                         <div
                           className={`um-toggle-switch ${user.status === "Active" ? "on" : ""} ${user.status === "Locked" ? "disabled" : ""}`}
-                          onClick={() =>
-                            actions.toggleStatus(user.id, user.status)
-                          }
+                          onClick={() => {
+                            if (user.status !== "Locked") {
+                              actions.toggleStatus(user.id, user.status);
+                            }
+                          }}
                           role="switch"
                           aria-checked={user.status === "Active"}
                         ></div>

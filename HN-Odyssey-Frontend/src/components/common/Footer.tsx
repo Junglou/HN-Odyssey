@@ -1,13 +1,11 @@
-// imports
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import "./Footer.css";
 
-// nhớ đổi tên file logo.png thành tên file logo thực tế của bạn
+// Đảm bảo đường dẫn import logo chính xác với cấu trúc thư mục của H&N Odyssey
 import logoImage from "../../assets/images/Logo2.png";
 
-// import các icon
 import {
   FacebookIcon,
   YoutubeIcon,
@@ -16,16 +14,13 @@ import {
   TiktokIcon,
 } from "../../assets/icons/FooterIcons";
 
-// component
 export default function Footer() {
-  // hooks/states
-  const [email, setEmail] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [email, setEmail] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // handlers
-  const handleSubscribe = (e: FormEvent) => {
+  const handleSubscribe = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!email) {
+    if (!email.trim()) {
       toast.warning("Vui lòng nhập địa chỉ email của bạn.");
       return;
     }
@@ -38,19 +33,15 @@ export default function Footer() {
     }, 1000);
   };
 
-  // render
   return (
     <footer className="hn-footer-wrapper">
-      {/* top section */}
       <div className="footer-top">
-        {/* logo */}
         <div className="footer-top-col footer-logo-col">
           <Link to="/">
-            <img src={logoImage} alt="H&N Odyssey" />
+            <img src={logoImage} alt="H&N Odyssey Logo" />
           </Link>
         </div>
 
-        {/* contact */}
         <div className="footer-top-col footer-contact-col">
           <p className="contact-text">Hotline: (+84) 028 4532 6499</p>
           <p className="contact-text">Email: support@hnnodyssey.com</p>
@@ -62,6 +53,7 @@ export default function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               className="social-icon-wrapper"
+              aria-label="Facebook"
             >
               <FacebookIcon />
             </a>
@@ -70,6 +62,7 @@ export default function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               className="social-icon-wrapper"
+              aria-label="YouTube"
             >
               <YoutubeIcon />
             </a>
@@ -78,6 +71,7 @@ export default function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               className="social-icon-wrapper"
+              aria-label="X (Twitter)"
             >
               <XIcon />
             </a>
@@ -86,6 +80,7 @@ export default function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               className="social-icon-wrapper"
+              aria-label="Instagram"
             >
               <InstagramIcon />
             </a>
@@ -94,13 +89,13 @@ export default function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               className="social-icon-wrapper"
+              aria-label="TikTok"
             >
               <TiktokIcon />
             </a>
           </div>
         </div>
 
-        {/* newsletter */}
         <div className="footer-top-col footer-newsletter-col">
           <h4 className="newsletter-title">Join our newsletter</h4>
           <p className="newsletter-desc">
@@ -129,52 +124,48 @@ export default function Footer() {
         </div>
       </div>
 
-      {/* horizontal divider */}
       <div className="footer-divider"></div>
 
-      {/* bottom section */}
       <div className="footer-bottom">
-        {/* shop links */}
+        {/* Đồng bộ 4 Category cốt lõi từ Header để giữ layout đối xứng */}
         <div className="footer-nav-col">
           <h4 className="nav-col-title">Shop</h4>
-          <Link to="/products/tools" className="footer-nav-link">
-            Tools
+          <Link to="/products?category=men" className="footer-nav-link">
+            Men
           </Link>
-          <Link to="/products/equipment" className="footer-nav-link">
+          <Link to="/products?category=women" className="footer-nav-link">
+            Women
+          </Link>
+          <Link to="/products?category=kid" className="footer-nav-link">
+            Kid
+          </Link>
+          <Link to="/products?category=equipment" className="footer-nav-link">
             Equipment
-          </Link>
-          <Link to="/products/clothing" className="footer-nav-link">
-            Clothing
-          </Link>
-          <Link to="/products/accessories" className="footer-nav-link">
-            Accessories
           </Link>
         </div>
 
-        {/* support links */}
         <div className="footer-nav-col">
           <h4 className="nav-col-title">Support</h4>
           <Link to="/pages/faqs" className="footer-nav-link">
             FAQs
           </Link>
-          <Link to="/pages/contact" className="footer-nav-link">
+          <Link to="/pages/contact-us" className="footer-nav-link">
             Contact us
           </Link>
           <Link to="/pages/shipping-policy" className="footer-nav-link">
             Shipping Policy
           </Link>
-          <Link to="/pages/return-warranty" className="footer-nav-link">
+          <Link to="/pages/return-and-warranty" className="footer-nav-link">
             Return & Warranty
           </Link>
         </div>
 
-        {/* about links */}
         <div className="footer-nav-col">
           <h4 className="nav-col-title">About Us</h4>
-          <Link to="/pages/about" className="footer-nav-link">
+          <Link to="/pages/about-us" className="footer-nav-link">
             About Us
           </Link>
-          <Link to="/pages/story" className="footer-nav-link">
+          <Link to="/pages/our-story" className="footer-nav-link">
             Our Story
           </Link>
           <Link to="/pages/why-choose-us" className="footer-nav-link">
@@ -185,16 +176,15 @@ export default function Footer() {
           </Link>
         </div>
 
-        {/* company links */}
         <div className="footer-nav-col">
           <h4 className="nav-col-title">H&N Odysseys</h4>
           <Link to="/pages/careers" className="footer-nav-link">
             Careers
           </Link>
-          <Link to="/pages/company-info" className="footer-nav-link">
+          <Link to="/pages/company-information" className="footer-nav-link">
             Company Information
           </Link>
-          <Link to="/pages/press" className="footer-nav-link">
+          <Link to="/pages/press-media" className="footer-nav-link">
             Press / Media
           </Link>
           <Link to="/pages/partners" className="footer-nav-link">
