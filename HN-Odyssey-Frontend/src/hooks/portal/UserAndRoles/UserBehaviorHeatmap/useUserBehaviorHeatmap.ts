@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
 
 export type DeviceType = "ALL" | "Desktop" | "Mobile" | "Tablet";
@@ -37,8 +38,8 @@ export function useUserBehaviorHeatmap() {
         if (data.interactions) {
           setInteractionOptions(["ALL", ...data.interactions]);
         }
-      } catch (error) {
-        console.error("Lỗi khi lấy filters:", error);
+      } catch {
+        toast.error("Không thể tải danh sách bộ lọc bản đồ nhiệt.");
       }
     };
     fetchFilters();
@@ -83,6 +84,7 @@ export function useUserBehaviorHeatmap() {
         });
       } catch {
         setStats({ visits: "0", clicks: "0", duration: "0s" });
+        toast.error("Không thể tải dữ liệu thống kê bản đồ nhiệt.");
       }
     };
 

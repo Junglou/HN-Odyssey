@@ -12,7 +12,6 @@ import type {
   PageType,
 } from "../../../../hooks/portal/Communication/StaticPageManagement/useStaticPageManagement";
 
-// helpers
 function CustomSelect({
   value,
   options,
@@ -39,12 +38,14 @@ function CustomSelect({
   }, []);
 
   const selectedLabel =
-    options.find((o) => o.value === value)?.label || "Choose category";
+    options.find((o) => o.value === value)?.label || "Choose page type";
 
   return (
     <div className="sp-custom-select-wrapper" ref={ref}>
       <div
-        className={`sp-custom-select-trigger ${isOpen ? "active" : ""} ${disabled ? "disabled" : ""}`}
+        className={`sp-custom-select-trigger ${isOpen ? "active" : ""} ${
+          disabled ? "disabled" : ""
+        }`}
         onClick={() => {
           if (disabled) return;
           setIsOpen(!isOpen);
@@ -57,12 +58,16 @@ function CustomSelect({
         </div>
       </div>
       <div
-        className={`sp-custom-select-options ${isOpen ? "open" : hasOpened ? "closed" : ""}`}
+        className={`sp-custom-select-options ${
+          isOpen ? "open" : hasOpened ? "closed" : ""
+        }`}
       >
         {options.map((opt) => (
           <div
             key={opt.value}
-            className={`sp-custom-select-option ${value === opt.value ? "selected" : ""}`}
+            className={`sp-custom-select-option ${
+              value === opt.value ? "selected" : ""
+            }`}
             onClick={() => {
               onChange(opt.value);
               setIsOpen(false);
@@ -76,7 +81,6 @@ function CustomSelect({
   );
 }
 
-// props
 interface StaticPageModalProps {
   isOpen: boolean;
   mode: "add" | "edit" | "view";
@@ -85,7 +89,6 @@ interface StaticPageModalProps {
   onSubmit: (data: StaticPageFormData) => void;
 }
 
-// constants
 const defaultFormData: StaticPageFormData = {
   title: "",
   slug: "",
@@ -95,23 +98,26 @@ const defaultFormData: StaticPageFormData = {
 };
 
 const PAGE_TYPE_OPTIONS = [
+  { value: "FAQs", label: "FAQs" },
+  { value: "Contact us", label: "Contact us" },
+  { value: "Shipping Policy", label: "Shipping Policy" },
+  { value: "Return & Warranty", label: "Return & Warranty" },
   { value: "About Us", label: "About Us" },
-  { value: "Policy", label: "Policy" },
-  { value: "FAQ", label: "FAQ" },
-  { value: "Contact", label: "Contact" },
-  { value: "Guide", label: "Guide" },
-  { value: "Promotion", label: "Promotion" },
-  { value: "Company News", label: "Company News" },
+  { value: "Our Story", label: "Our Story" },
+  { value: "Why Choose Us", label: "Why Choose Us" },
+  { value: "Cookie Policy", label: "Cookie Policy" },
+  { value: "Careers", label: "Careers" },
+  { value: "Company Information", label: "Company Information" },
+  { value: "Press / Media", label: "Press / Media" },
+  { value: "Partners", label: "Partners" },
 ];
 
-// component
 export default function StaticPageModal(props: StaticPageModalProps) {
   if (!props.isOpen) return null;
   const componentKey = props.mode === "add" ? "add-new" : props.initialData?.id;
   return <ModalContent key={componentKey} {...props} />;
 }
 
-// sub-component
 function ModalContent({
   mode,
   initialData,
@@ -139,7 +145,6 @@ function ModalContent({
         ? "Edit Static Page"
         : "Static Page Details";
 
-  // handlers
   const handleChange = (field: keyof StaticPageFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
@@ -153,15 +158,14 @@ function ModalContent({
     onSubmit(formData);
   };
 
-  // Chuẩn hóa Slug đúng định dạng Backend
   const formatSlug = (text: string) => {
     let slug = text.toLowerCase();
-    slug = slug.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Bỏ dấu tiếng Việt
+    slug = slug.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     slug = slug.replace(/[đĐ]/g, "d");
-    slug = slug.replace(/[^a-z0-9\s-]/g, ""); // Bỏ ký tự đặc biệt
-    slug = slug.replace(/\s+/g, "-"); // Khoảng trắng thành gạch ngang
-    slug = slug.replace(/-+/g, "-"); // Xóa gạch ngang liên tiếp
-    slug = slug.replace(/^-+|-+$/g, ""); // Cắt gạch ngang thừa ở đầu và cuối
+    slug = slug.replace(/[^a-z0-9\s-]/g, "");
+    slug = slug.replace(/\s+/g, "-");
+    slug = slug.replace(/-+/g, "-");
+    slug = slug.replace(/^-+|-+$/g, "");
     return slug;
   };
 
@@ -176,7 +180,6 @@ function ModalContent({
     }
   };
 
-  // render
   return (
     <>
       <div
@@ -243,14 +246,15 @@ function ModalContent({
               />
             </div>
 
-            {/* ĐÃ CHỈNH SỬA: Bỏ inline style, thêm class .sp-form-group-editor */}
             <div className="sp-form-group sp-form-group-editor">
               <label className="sp-form-label">
                 Content <span className="sp-required">*</span>
               </label>
 
               <div
-                className={`sp-suneditor-wrapper ${isViewMode ? "disabled" : ""}`}
+                className={`sp-suneditor-wrapper ${
+                  isViewMode ? "disabled" : ""
+                }`}
               >
                 <SunEditor
                   setContents={formData.content}
@@ -306,7 +310,9 @@ function ModalContent({
               <label className="sp-status-label">Status</label>
               <div className="sp-status-indicator">
                 <span
-                  className={`sp-status-badge ${formData.status === "Published" ? "published" : "draft"}`}
+                  className={`sp-status-badge ${
+                    formData.status === "Published" ? "published" : "draft"
+                  }`}
                 >
                   {formData.status}
                 </span>

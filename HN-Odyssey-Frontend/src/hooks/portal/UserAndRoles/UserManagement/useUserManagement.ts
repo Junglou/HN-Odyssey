@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
-import axios from "axios";
 import type { UserFormData } from "../../../../components/portal/UsersAndRoles/UserManagement/UserModal";
 import axiosClient from "../../../../api/axiosClient";
 
@@ -63,16 +62,13 @@ const formatLastLogin = (dateString?: string) => {
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMins / 60);
 
-  // Định dạng linh hoạt theo thời gian thực giống các nền tảng mạng xã hội
   if (diffMins < 2) return "Vừa mới đây";
   if (diffMins < 60) return `${diffMins} phút trước`;
 
-  // Kiểm tra thời gian trong cùng ngày hôm nay
   if (diffHours < 24 && now.getDate() === date.getDate()) {
     return `Hôm nay, ${date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`;
   }
 
-  // Kiểm tra thời gian là ngày hôm qua
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
   if (
@@ -82,7 +78,6 @@ const formatLastLogin = (dateString?: string) => {
     return `Hôm qua, ${date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`;
   }
 
-  // Hiển thị ngày tháng đầy đủ nếu thời gian đã cũ
   return date.toLocaleDateString("vi-VN", {
     day: "2-digit",
     month: "2-digit",
@@ -148,8 +143,8 @@ export function useUserManagement() {
         }));
         setDepartmentOptions(dynamicDepts);
       }
-    } catch (error) {
-      console.error("Không thể tải dữ liệu vai trò và phòng ban", error);
+    } catch {
+      toast.error("Không thể tải danh sách phòng ban và vai trò.");
     }
   }, []);
 
@@ -190,32 +185,19 @@ export function useUserManagement() {
       setUsers(mappedUsers);
       setTotalPages(rawMeta.total_pages || 1);
       setTotalFiltered(rawMeta.total_docs || 0);
-    } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        const errorMsg =
-          (error.response?.data as { message?: string })?.message ||
-          "Đã xảy ra lỗi khi tải danh sách người dùng";
-        toast.error(errorMsg);
-      }
+    } catch {
+      toast.error("Không thể tải danh sách người dùng.");
     }
   }, [pagination.page, pagination.limit, filters]);
 
   useEffect(() => {
-    let ignore = false;
     const initData = async () => {
       await fetchMetadata();
       await fetchList();
-      if (!ignore) {
-        // Biến state đã được cập nhật bên trong hàm fetchList
-      }
     };
     void initData();
-    return () => {
-      ignore = true;
-    };
   }, [fetchMetadata, fetchList]);
 
-  // Hàm xử lý xóa người dùng đơn lẻ hoặc xóa hàng loạt
   const executeDelete = async () => {
     if (deleteConfig.type === "single" && deleteConfig.userId !== null) {
       try {
@@ -225,13 +207,10 @@ export function useUserManagement() {
         if (res?.data)
           toast.success(res.data.message || "Đã xóa nhân viên thành công!");
         void fetchList();
-      } catch (error: unknown) {
-        if (axios.isAxiosError(error)) {
-          const errorMsg =
-            (error.response?.data as { message?: string })?.message ||
-            "Lỗi xảy ra khi xóa người dùng";
-          toast.error(errorMsg);
-        }
+      } catch {
+        toast.error(
+          "Không thể xóa người dùng này do dữ liệu đang được ràng buộc.",
+        );
       }
     } else if (deleteConfig.type === "bulk") {
       try {
@@ -243,16 +222,13 @@ export function useUserManagement() {
 
         if (res?.data)
           toast.success(
-            res.data.message || "Đã xóa các nhân viên được chọn thành công!",
+            res.data.message || "Đã xóa danh sách người dùng được chọn.",
           );
         void fetchList();
-      } catch (error: unknown) {
-        if (axios.isAxiosError(error)) {
-          const errorMsg =
-            (error.response?.data as { message?: string })?.message ||
-            "Lỗi khi xóa hàng loạt";
-          toast.error(errorMsg);
-        }
+      } catch {
+        toast.error(
+          "Không thể xóa hàng loạt. Một số người dùng đang có dữ liệu ràng buộc.",
+        );
       }
     }
     setDeleteConfig({ isOpen: false, type: "single", userId: null });
@@ -277,8 +253,7 @@ export function useUserManagement() {
           department: data.department,
         };
         const res = await axiosClient.post(`/admin/users/staff`, payload);
-        if (res)
-          toast.success(res.data?.message || "Thêm nhân viên mới thành công!");
+        if (res) toast.success("Thêm nhân viên mới thành công!");
       } else if (modalConfig.mode === "edit" && modalConfig.editingUser) {
         const payload: Record<string, unknown> = {
           email: data.email,
@@ -301,19 +276,15 @@ export function useUserManagement() {
           `/admin/users/staff/${modalConfig.editingUser.id}`,
           payload,
         );
-        if (res)
-          toast.success(res.data?.message || "Cập nhật thông tin thành công!");
+        if (res) toast.success("Cập nhật thông tin thành công!");
       }
 
       setModalConfig((prev) => ({ ...prev, isOpen: false }));
       void fetchList();
-    } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        const errorMsg =
-          (error.response?.data as { message?: string })?.message ||
-          "Lỗi khi lưu dữ liệu người dùng!";
-        toast.error(errorMsg);
-      }
+    } catch {
+      toast.error(
+        "Không thể lưu thông tin. Email hoặc Số điện thoại có thể đã tồn tại.",
+      );
     }
   };
 
@@ -349,49 +320,49 @@ export function useUserManagement() {
 
       try {
         const is_active = action === "activate";
-        const res = await axiosClient.patch(`/admin/users/staff/bulk/status`, {
+        await axiosClient.patch(`/admin/users/staff/bulk/status`, {
           userIds: selectedIds,
           is_active,
         });
-        if (res)
-          toast.success(
-            res.data?.message ||
-              `Đã ${is_active ? "kích hoạt" : "khóa"} tài khoản hàng loạt!`,
-          );
+        toast.success(
+          `Đã ${is_active ? "kích hoạt" : "khóa"} tài khoản hàng loạt!`,
+        );
         void fetchList();
-      } catch (error: unknown) {
-        if (axios.isAxiosError(error)) {
-          const errorMsg =
-            (error.response?.data as { message?: string })?.message ||
-            "Lỗi đổi trạng thái hàng loạt";
-          toast.error(errorMsg);
-        }
+      } catch {
+        toast.error("Không thể cập nhật trạng thái hàng loạt.");
       }
     },
 
     toggleStatus: async (id: string, currentStatus: string) => {
-      if (currentStatus === "Inactive") return;
+      if (currentStatus === "Inactive" || currentStatus === "Locked") return;
       try {
         const newStatus = currentStatus === "Active" ? "SUSPENDED" : "ACTIVE";
-        const res = await axiosClient.patch(`/admin/users/staff/${id}/status`, {
+        await axiosClient.patch(`/admin/users/staff/${id}/status`, {
           status: newStatus,
           reason: "Cập nhật từ Portal",
         });
-        if (res)
-          toast.success(res.data?.message || "Đã đổi trạng thái thành công!");
+        toast.success("Đã đổi trạng thái thành công!");
         void fetchList();
-      } catch (error: unknown) {
-        if (axios.isAxiosError(error)) {
-          const errorMsg =
-            (error.response?.data as { message?: string })?.message ||
-            "Đã xảy ra lỗi khi thay đổi trạng thái";
-          toast.error(errorMsg);
-        }
+      } catch {
+        toast.error("Không thể cập nhật trạng thái hoạt động.");
       }
     },
 
     lockUnlock: (id: string, currentStatus: string) => {
-      actions.toggleStatus(id, currentStatus);
+      const runLockUnlock = async () => {
+        try {
+          const newStatus = currentStatus === "Active" ? "SUSPENDED" : "ACTIVE";
+          await axiosClient.patch(`/admin/users/staff/${id}/status`, {
+            status: newStatus,
+            reason: "Cập nhật từ Portal - Quản trị viên",
+          });
+          toast.success("Cập nhật trạng thái thành công!");
+          void fetchList();
+        } catch {
+          toast.error("Không thể thực hiện khóa/mở khóa người dùng.");
+        }
+      };
+      void runLockUnlock();
     },
 
     deleteSingle: (id: string) =>

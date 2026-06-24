@@ -1,16 +1,23 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
-import axiosClient from "../../../../api/axiosClient"; // <-- XEM LẠI ĐƯỜNG DẪN NÀY NẾU CẦN
+import axiosClient from "../../../../api/axiosClient";
 
 export type PageStatus = "Published" | "Draft" | "Hidden";
+
+// định nghĩa chính xác 12 loại trang tĩnh tương ứng với footer
 export type PageType =
+  | "FAQs"
+  | "Contact us"
+  | "Shipping Policy"
+  | "Return & Warranty"
   | "About Us"
-  | "Policy"
-  | "FAQ"
-  | "Contact"
-  | "Guide"
-  | "Promotion"
-  | "Company News";
+  | "Our Story"
+  | "Why Choose Us"
+  | "Cookie Policy"
+  | "Careers"
+  | "Company Information"
+  | "Press / Media"
+  | "Partners";
 
 export interface StaticPageRecord {
   id: string;
@@ -50,7 +57,6 @@ export function useStaticPageManagement() {
   const [totalFiltered, setTotalFiltered] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Filters & Pagination State
   const [search, setSearch] = useState<string>("");
   const [apiSearch, setApiSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<PageStatus | "All">("All");
@@ -58,7 +64,6 @@ export function useStaticPageManagement() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pagination, setPagination] = useState({ page: 1, limit: 10 });
 
-  // Modal State
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
     mode: "add" | "edit" | "view" | "delete";
@@ -130,7 +135,6 @@ export function useStaticPageManagement() {
   const totalPages = Math.ceil(totalFiltered / pagination.limit);
   const startIndex = (pagination.page - 1) * pagination.limit;
 
-  // 3. CÁC HÀM XỬ LÝ (ACTIONS)
   const actions = {
     changeSearch: (val: string) => {
       setSearch(val);
@@ -269,7 +273,6 @@ export function useStaticPageManagement() {
     },
   };
 
-  // 4. GỬI FORM (CREATE / UPDATE)
   const handleModalSubmit = async (data: StaticPageFormData) => {
     const { mode, editingRecord } = modalConfig;
 

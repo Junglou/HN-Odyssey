@@ -13,7 +13,7 @@ import type {
   PageType,
 } from "../../../../hooks/portal/Communication/StaticPageManagement/useStaticPageManagement";
 
-// props.
+// props
 interface StaticPageManagementProps {
   data: StaticPageRecord[];
   search: string;
@@ -127,7 +127,9 @@ export default function StaticPageManagement({
 
             <div className="sp-custom-dropdown" ref={statusRef}>
               <div
-                className={`sp-dropdown-trigger ${isStatusOpen ? "active" : ""}`}
+                className={`sp-dropdown-trigger ${
+                  isStatusOpen ? "active" : ""
+                }`}
                 onClick={() => {
                   setIsStatusOpen(!isStatusOpen);
                   if (!hasStatusOpened) setHasStatusOpened(true);
@@ -137,13 +139,17 @@ export default function StaticPageManagement({
                 <ChevronDownIcon />
               </div>
               <div
-                className={`sp-dropdown-options ${isStatusOpen ? "open" : hasStatusOpened ? "closed" : ""}`}
+                className={`sp-dropdown-options ${
+                  isStatusOpen ? "open" : hasStatusOpened ? "closed" : ""
+                }`}
               >
                 {(["All", "Published", "Draft", "Hidden"] as const).map(
                   (opt) => (
                     <div
                       key={opt}
-                      className={`sp-dropdown-option ${statusFilter === opt ? "active" : ""}`}
+                      className={`sp-dropdown-option ${
+                        statusFilter === opt ? "active" : ""
+                      }`}
                       onClick={() => {
                         actions.changeStatusFilter(opt);
                         setIsStatusOpen(false);
@@ -168,23 +174,32 @@ export default function StaticPageManagement({
                 <ChevronDownIcon />
               </div>
               <div
-                className={`sp-dropdown-options ${isTypeOpen ? "open" : hasTypeOpened ? "closed" : ""}`}
+                className={`sp-dropdown-options ${
+                  isTypeOpen ? "open" : hasTypeOpened ? "closed" : ""
+                }`}
               >
                 {(
                   [
                     "All",
+                    "FAQs",
+                    "Contact us",
+                    "Shipping Policy",
+                    "Return & Warranty",
                     "About Us",
-                    "Policy",
-                    "FAQ",
-                    "Contact",
-                    "Guide",
-                    "Promotion",
-                    "Company News",
+                    "Our Story",
+                    "Why Choose Us",
+                    "Cookie Policy",
+                    "Careers",
+                    "Company Information",
+                    "Press / Media",
+                    "Partners",
                   ] as const
                 ).map((opt) => (
                   <div
                     key={opt}
-                    className={`sp-dropdown-option ${typeFilter === opt ? "active" : ""}`}
+                    className={`sp-dropdown-option ${
+                      typeFilter === opt ? "active" : ""
+                    }`}
                     onClick={() => {
                       actions.changeTypeFilter(opt);
                       setIsTypeOpen(false);
@@ -225,7 +240,6 @@ export default function StaticPageManagement({
           </div>
         </div>
 
-        {/* khu vực bảng dữ liệu */}
         <div className="sp-table-wrapper">
           <table className="sp-table">
             <thead>
@@ -296,7 +310,9 @@ export default function StaticPageManagement({
                             type="button"
                             role="switch"
                             aria-checked={record.status === "Hidden"}
-                            className={`sp-table-toggle ${record.status === "Hidden" ? "on" : ""}`}
+                            className={`sp-table-toggle ${
+                              record.status === "Hidden" ? "on" : ""
+                            }`}
                             onClick={() =>
                               actions.toggleHiddenStatus(record.id)
                             }
@@ -322,7 +338,6 @@ export default function StaticPageManagement({
           </table>
         </div>
 
-        {/* khu vực phân trang */}
         <div className="sp-pagination">
           <span className="sp-pagination-info">
             Showing{" "}
@@ -345,7 +360,9 @@ export default function StaticPageManagement({
               (num) => (
                 <button
                   key={num}
-                  className={`sp-page-num ${pagination.page === num ? "active" : ""}`}
+                  className={`sp-page-num ${
+                    pagination.page === num ? "active" : ""
+                  }`}
                   onClick={() => actions.changePage(num)}
                 >
                   {num}
@@ -365,7 +382,9 @@ export default function StaticPageManagement({
 
             <div className="sp-limit-dropdown" ref={limitRef}>
               <div
-                className={`sp-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}
+                className={`sp-limit-trigger ${
+                  isLimitDropdownOpen ? "active" : ""
+                }`}
                 onClick={() => {
                   setIsLimitDropdownOpen(!isLimitDropdownOpen);
                   if (!hasLimitOpened) setHasLimitOpened(true);
@@ -373,18 +392,24 @@ export default function StaticPageManagement({
               >
                 <span>{pagination.limit} / page</span>
                 <div
-                  className={`sp-limit-icon ${isLimitDropdownOpen ? "open" : ""}`}
+                  className={`sp-limit-icon ${
+                    isLimitDropdownOpen ? "open" : ""
+                  }`}
                 >
                   <ChevronDownIcon />
                 </div>
               </div>
               <div
-                className={`sp-limit-options ${isLimitDropdownOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
+                className={`sp-limit-options ${
+                  isLimitDropdownOpen ? "open" : hasLimitOpened ? "closed" : ""
+                }`}
               >
                 {[10, 20, 50].map((val) => (
                   <div
                     key={val}
-                    className={`sp-limit-option ${pagination.limit === val ? "active" : ""}`}
+                    className={`sp-limit-option ${
+                      pagination.limit === val ? "active" : ""
+                    }`}
                     onClick={() => {
                       actions.changeLimit(val);
                       setIsLimitDropdownOpen(false);

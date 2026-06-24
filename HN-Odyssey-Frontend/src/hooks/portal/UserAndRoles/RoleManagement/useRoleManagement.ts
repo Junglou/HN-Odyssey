@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
-import axios from "axios";
 import axiosClient from "../../../../api/axiosClient";
 
 export const STANDARD_ACTIONS = ["READ", "CREATE", "UPDATE", "DELETE"];
@@ -137,13 +136,8 @@ export function useRoleManagement() {
       }));
 
       setRoles(mappedRoles);
-    } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        toast.error(
-          "Không thể tải dữ liệu: " +
-            (error.response?.data?.message || error.message),
-        );
-      }
+    } catch {
+      toast.error("Không thể tải danh sách vai trò và phân quyền.");
     }
   }, []);
 
@@ -169,10 +163,9 @@ export function useRoleManagement() {
 
   const handleModalSubmit = async (data: RoleFormData) => {
     try {
-      // Đảm bảo dữ liệu gửi lên khớp với cấu trúc được yêu cầu bởi hệ thống
       const payload = {
         name: data.name,
-        is_active: data.status === "Active", // Máy chủ nhận cấu trúc boolean
+        is_active: data.status === "Active",
         permissions: modalConfig.mode === "add" ? [] : undefined,
       };
 
@@ -189,10 +182,8 @@ export function useRoleManagement() {
 
       setModalConfig((prev) => ({ ...prev, isOpen: false }));
       void fetchList();
-    } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        toast.error(error.response?.data?.message || "Lỗi khi lưu vai trò!");
-      }
+    } catch {
+      toast.error("Không thể lưu vai trò. Tên vai trò có thể đã tồn tại.");
     }
   };
 
@@ -205,12 +196,8 @@ export function useRoleManagement() {
         }
         toast.success("Đã xóa vai trò thành công!");
         void fetchList();
-      } catch (error: unknown) {
-        if (axios.isAxiosError(error)) {
-          toast.error(
-            error.response?.data?.message || "Không thể xóa vai trò này.",
-          );
-        }
+      } catch {
+        toast.warning("Vai trò này đang được áp dụng, không thể xóa.");
       }
     }
     setDeleteConfig({ isOpen: false, roleId: null });
@@ -313,12 +300,8 @@ export function useRoleManagement() {
         setHasUnsavedChanges(false);
         toast.success("Đã lưu phân quyền thành công!");
         void fetchList();
-      } catch (error: unknown) {
-        if (axios.isAxiosError(error)) {
-          toast.error(
-            error.response?.data?.message || "Lỗi khi lưu phân quyền.",
-          );
-        }
+      } catch {
+        toast.error("Không thể cập nhật cấu hình phân quyền.");
       }
     },
 
