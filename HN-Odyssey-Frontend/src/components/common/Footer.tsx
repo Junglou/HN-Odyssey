@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 import "./Footer.css";
 
 // nhớ đổi tên file logo.png thành tên file logo thực tế của bạn
-import logoImage from "../../assets/images/logo2.png";
+import logoImage from "../../assets/images/Logo2.png";
 
 // import các icon
 import {
