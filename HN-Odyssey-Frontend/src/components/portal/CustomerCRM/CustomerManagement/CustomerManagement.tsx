@@ -207,27 +207,20 @@ export default function CustomerManagement({
               <div
                 className={`crm-dropdown-options ${isTypeOpen ? "open" : hasTypeOpened ? "closed" : ""}`}
               >
-                {(
-                  [
-                    "All",
-                    "Standard",
-                    "Trade-in Customer",
-                    "Silver",
-                    "Gold",
-                    "VIP",
-                  ] as const
-                ).map((opt) => (
-                  <div
-                    key={opt}
-                    className={`crm-dropdown-option ${typeFilter === opt ? "active" : ""}`}
-                    onClick={() => {
-                      actions.changeTypeFilter(opt);
-                      setIsTypeOpen(false);
-                    }}
-                  >
-                    {opt}
-                  </div>
-                ))}
+                {(["All", "Bronze", "Silver", "Gold", "Platinum"] as const).map(
+                  (opt) => (
+                    <div
+                      key={opt}
+                      className={`crm-dropdown-option ${typeFilter === opt ? "active" : ""}`}
+                      onClick={() => {
+                        actions.changeTypeFilter(opt);
+                        setIsTypeOpen(false);
+                      }}
+                    >
+                      {opt}
+                    </div>
+                  ),
+                )}
               </div>
             </div>
 
