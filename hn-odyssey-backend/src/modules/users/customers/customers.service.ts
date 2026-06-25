@@ -413,6 +413,8 @@ export class CustomersService {
       items?: Array<{
         image: string;
         product_name: string;
+        price: number;
+        quantity: number;
       }>;
     }
 
@@ -442,6 +444,8 @@ export class CustomersService {
           ? {
               image: firstItem.image,
               name: firstItem.product_name,
+              price: firstItem.price,
+              quantity: firstItem.quantity,
               remaining_count: remainingCount > 0 ? remainingCount : 0,
             }
           : null,

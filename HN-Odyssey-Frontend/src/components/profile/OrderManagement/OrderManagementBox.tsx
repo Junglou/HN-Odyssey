@@ -11,6 +11,15 @@ interface OrderBoxProp {
   order: UserOrder;
 }
 
+// Thêm hàm formatMoney để dùng chung
+const formatMoney = (value?: number) => {
+  const safeValue = typeof value === "number" && !isNaN(value) ? value : 0;
+  return `$${safeValue.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+};
+
 const OrderManagementBox = ({ id: orderId, order }: OrderBoxProp) => {
   const detailRouteId = order.id || order.orderCode || orderId;
 
@@ -50,7 +59,8 @@ const OrderManagementBox = ({ id: orderId, order }: OrderBoxProp) => {
                 <div className="price-container">
                   <span className="span-text">
                     <strong>Price: </strong>
-                    {primary.price}
+                    {/* Bọc formatMoney tại đây */}
+                    {formatMoney(primary.price)}
                   </span>
                 </div>
               </div>
@@ -59,7 +69,8 @@ const OrderManagementBox = ({ id: orderId, order }: OrderBoxProp) => {
 
           <div className="order-box-footer-row">
             <span className="span-text total-price-text">
-              Total Price: {order.totalAmount}
+              {/* Bọc formatMoney tại đây */}
+              Total Price: {formatMoney(order.totalAmount)}
             </span>
             <Link
               to={`/profile/orders/detail/${encodeURIComponent(detailRouteId)}`}
