@@ -422,12 +422,25 @@ export class TradeInService {
     const now = new Date();
 
     // 1. Luồng cấp phát điểm thưởng
+    // cấp phát điểm thưởng và lưu lịch sử truy vết để hệ thống quét cronjob quản lý được thời hạn
     if (dto.method === PayoutMethod.REWARD_POINTS) {
       request.payout_details = { points_earned: dto.finalValue };
       await this.customerModel.updateOne(
         { _id: request.customer_id },
         { $inc: { 'loyalty.point': dto.finalValue } },
       );
+
+      const loyaltyHistoryModel = this.tradeInModel.db.model('LoyaltyHistory');
+      await loyaltyHistoryModel.create({
+        customer_id: request.customer_id,
+        type: 'EARN',
+        status: 'AVAILABLE',
+        amount: dto.finalValue,
+        description: `Nhận điểm thưởng từ giao dịch quy đổi thu cũ đổi mới mã ${request.request_code}`,
+        base_order_amount: 0,
+        remaining_amount: dto.finalValue,
+        expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      });
     }
     // 2. Luồng cấp phát Voucher Fix Amount
     else if (dto.method === PayoutMethod.FIXED_AMOUNT) {

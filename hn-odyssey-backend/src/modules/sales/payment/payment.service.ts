@@ -179,9 +179,16 @@ export class PaymentService {
           'IPN_HANDLER',
         );
 
-        order.payment.status = 'PAID';
-        order.payment.transaction_id = transactionCode;
-        order.hold_expires_at = undefined;
+        await this.orderModel.updateOne(
+          { _id: order._id },
+          {
+            $set: {
+              'payment.status': 'PAID',
+              'payment.transaction_id': transactionCode,
+            },
+            $unset: { hold_expires_at: 1 }, // Xóa field đếm ngược thời gian
+          },
+        );
 
         await order.save();
         await this.logTransaction(

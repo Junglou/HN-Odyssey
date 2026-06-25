@@ -20,7 +20,7 @@ export class Customer extends User {
   // US.35 & US.51: Điểm thưởng & Hạng thành viên
   @Prop({
     type: Object,
-    default: { point: 0, tier: 'SILVER', total_spent: 0 },
+    default: { point: 0, tier: 'BRONZE', total_spent: 0 },
   })
   loyalty: {
     point: number;

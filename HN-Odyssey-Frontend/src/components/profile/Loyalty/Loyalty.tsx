@@ -89,21 +89,27 @@ const formatRelativeTime = (iso?: string) => {
 };
 
 const getActivityDescription = (item: LoyaltyHistoryItem): string => {
+  // Ưu tiên hiển thị log chi tiết từ Backend nếu có
+  if (item.description && item.description.trim() !== "") {
+    return item.description;
+  }
+
+  // Fallback tiếng Anh nếu Backend không trả về description
   switch (item.type) {
     case "EARN":
-      return item.orderId ? `Points earned from order` : "Points earned";
+      return item.orderId ? "Points earned from order" : "Points earned";
     case "REDEEM":
       return "Points redeemed for reward";
     case "REFUND":
       return item.orderId
-        ? `Points adjusted for refund`
+        ? "Points adjusted for refund"
         : "Points adjusted for refund";
     case "EXPIRE":
       return "Points expired";
     case "BIRTHDAY":
       return "Birthday bonus points";
     default:
-      return item.description.trim() || "Loyalty activity";
+      return "Loyalty activity";
   }
 };
 

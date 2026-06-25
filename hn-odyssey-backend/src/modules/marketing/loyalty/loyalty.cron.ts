@@ -169,13 +169,13 @@ export class LoyaltyCronService {
 
         // Bây giờ customer.loyalty.tier đã có Type đầy đủ, không còn lỗi ESLint nữa
         if (customer.loyalty.tier === 'SILVER') {
-          voucherValue = 50000;
+          voucherValue = 2; // Tương đương ~50k VNĐ cũ
         } else if (
           customer.loyalty.tier === 'GOLD' ||
           customer.loyalty.tier === 'PLATINUM' ||
           customer.loyalty.tier === 'DIAMOND'
         ) {
-          voucherValue = 200000;
+          voucherValue = 10; // Tương đương ~250k VNĐ cũ
           hasPhysicalGift = true;
         }
 

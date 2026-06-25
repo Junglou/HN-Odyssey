@@ -6,8 +6,8 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types, FilterQuery } from 'mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Model, Types, FilterQuery, Connection } from 'mongoose';
 import { Address, Customer, CustomerDocument } from './schemas/customer.schema';
 import { User, UserDocument } from '../schemas/user.schema';
 import {
@@ -96,6 +96,7 @@ export class CustomersAdminService {
     private readonly emailService: EmailService,
     @InjectModel(Review.name)
     private readonly reviewModel: Model<ReviewDocument>,
+    @InjectConnection() private readonly connection: Connection,
   ) {}
 
   // US.113 - AC1 -> AC6: Tìm kiếm, Lọc, Phân trang danh sách khách hàng
@@ -456,11 +457,47 @@ export class CustomersAdminService {
         is_default: addr.is_default ?? false,
       })) as unknown as Address[];
     }
-    if (dto.loyaltyTier) {
-      customer.loyalty = {
-        ...customer.loyalty,
-        tier: dto.loyaltyTier,
-      };
+
+    if (dto.loyaltyTier && dto.loyaltyTier !== customer.loyalty?.tier) {
+      // Định nghĩa Type an toàn để báo cho ESLint biết cấu trúc dữ liệu trả về
+      interface ITierConfig {
+        min_spent: number;
+        point_multiplier?: number;
+      }
+
+      // Truy vấn trực tiếp vào collection và ép kiểu rõ ràng
+      const tierConfig = (await this.connection
+        .collection('member_tiers')
+        .findOne({ code: dto.loyaltyTier })) as unknown as ITierConfig | null;
+
+      if (tierConfig) {
+        const requiredSpent = tierConfig.min_spent;
+        const equivalentPoints =
+          Math.floor(requiredSpent) * (tierConfig.point_multiplier || 1);
+
+        customer.loyalty = {
+          ...customer.loyalty,
+          tier: dto.loyaltyTier,
+          total_spent: requiredSpent,
+          point: equivalentPoints,
+        };
+
+        customer.markModified('loyalty');
+
+        // Sử dụng insertOne trên collection để tránh lỗi unsafe-call của Mongoose model
+        await this.connection.collection('loyalty_histories').insertOne({
+          customer_id: customer._id,
+          type: 'EARN',
+          status: 'AVAILABLE',
+          amount: equivalentPoints,
+          description: `Hệ thống tự động đồng bộ điểm khi thay đổi hạng thành viên lên ${dto.loyaltyTier}`,
+          base_order_amount: requiredSpent,
+          remaining_amount: equivalentPoints,
+          expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
     }
 
     await customer.save();
@@ -896,7 +933,7 @@ export class CustomersAdminService {
         phone: c.phone || 'Chưa có',
         email: c.email || 'Chưa có',
         gender: genderStr,
-        loyalty_tier: c.loyalty?.tier || 'SILVER',
+        loyalty_tier: c.loyalty?.tier || 'BRONZE',
         total_spent: c.loyalty?.total_spent || 0,
         point: c.loyalty?.point || 0,
         address: addrStr,
@@ -922,7 +959,7 @@ export class CustomersAdminService {
       });
 
       // Format Tiền tệ (Tổng chi tiêu)
-      row.getCell('total_spent').numFmt = '#,##0" ₫"';
+      row.getCell('total_spent').numFmt = '"$"#,##0.00';
       row.getCell('total_spent').alignment = {
         vertical: 'middle',
         horizontal: 'right',

@@ -38,7 +38,7 @@ function CustomerModalContent({
     email: initialData?.email || "",
     username: initialData?.username || "",
     password: "",
-    customerType: initialData?.customerType || "Standard",
+    customerType: initialData?.customerType || "Bronze",
     phone: initialData?.phone || "",
     status: initialData?.status || "Active",
     reviewAccess: initialData?.reviewAccess || "Allowed",
@@ -293,26 +293,20 @@ function CustomerModalContent({
               <div
                 className={`crm-modal-dropdown-options ${isTypeOpen ? "open" : hasTypeOpened ? "closed" : ""}`}
               >
-                {(
-                  [
-                    "Standard",
-                    "Trade-in Customer",
-                    "Silver",
-                    "Gold",
-                    "VIP",
-                  ] as const
-                ).map((opt) => (
-                  <div
-                    key={opt}
-                    className={`crm-modal-dropdown-option ${formData.customerType === opt ? "active" : ""}`}
-                    onClick={() => {
-                      updateField("customerType", opt);
-                      setIsTypeOpen(false);
-                    }}
-                  >
-                    {opt}
-                  </div>
-                ))}
+                {(["Bronze", "Silver", "Gold", "Platinum"] as const).map(
+                  (opt) => (
+                    <div
+                      key={opt}
+                      className={`crm-modal-dropdown-option ${formData.customerType === opt ? "active" : ""}`}
+                      onClick={() => {
+                        updateField("customerType", opt);
+                        setIsTypeOpen(false);
+                      }}
+                    >
+                      {opt}
+                    </div>
+                  ),
+                )}
               </div>
             </div>
             {errors.customerType && (

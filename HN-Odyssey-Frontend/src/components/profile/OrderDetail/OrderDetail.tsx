@@ -49,6 +49,7 @@ const getLineItems = (order: UserOrder | UserOrderDetail): OrderProduct[] =>
 const statusBadgeKey = (statusLabel: string) => {
   const map: Record<string, string> = {
     Pending: "Pending",
+    Confirmed: "Confirmed",
     Processing: "Packaging",
     Delivering: "Shipping",
     Delivered: "Delivered",
@@ -221,7 +222,8 @@ const OrderDetail = ({
             <span
               className={`pod-badge pod-badge-payment-${paymentBadgeKey(payment.status)}`}
             >
-              {payment.status}
+              {/* Đổi từ payment.status sang gọi hàm paymentBadgeKey để lấy chữ Unpaid/Paid */}
+              {paymentBadgeKey(payment.status)}
             </span>
           ) : null}
         </div>
