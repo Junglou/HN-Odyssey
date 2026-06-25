@@ -13,11 +13,21 @@ import type {
   UserOrderDetail,
 } from "../types/user";
 
-/** List API item with optional fields the backend may add later */
+// Khai báo interface rõ ràng để thay thế cho any[]
+export interface ApiSummaryItem {
+  image?: string;
+  product_name?: string;
+  name?: string;
+  quantity?: number;
+  price?: number;
+}
+
 export type CustomerOrderListApiItem = CustomerOrderListItem & {
   updatedAt?: string | Date;
   shipping_info?: CustomerOrderShippingInfo | null;
   shipping_fee?: number | null;
+  actual_shipping_fee?: number | null;
+  items?: ApiSummaryItem[]; // Đã loại bỏ any
   summary?:
     | (CustomerOrderListSummary & { quantity?: number; price?: number })
     | null;
@@ -29,30 +39,24 @@ export const mapOrderStatusLabel = (status?: string | null): string => {
     case "PENDING":
     case "PRIORITY":
       return "Pending";
-
     case "CONFIRMED":
-      return "Confirmed"; // <-- Đã tách riêng thành công
-
+      return "Confirmed";
     case "PROCESSING":
     case "ON_HOLD":
     case "TRADE_IN_REVIEW":
       return "Processing";
-
     case "SHIPPING":
     case "READY_TO_SHIP":
     case "DELIVERING":
       return "Delivering";
-
     case "DELIVERED":
     case "COMPLETED":
       return "Delivered";
-
     case "CANCELLED":
     case "CANCELED":
     case "DELIVERY_FAILED":
     case "RETURNED":
       return "Canceled";
-
     default:
       return status;
   }
@@ -92,29 +96,62 @@ const formatDate = (value?: string | Date): string => {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString();
+  return date.toISOString();
+};
+
+// Đổi từ tham số 'order: any' thành truyền trực tiếp giá trị số để thỏa mãn ESLint
+const getCorrectShippingFee = (
+  shippingFee?: number | null,
+  actualShippingFee?: number | null,
+): number | null => {
+  if (shippingFee != null && shippingFee > 0) return shippingFee;
+
+  if (actualShippingFee != null && actualShippingFee > 0) {
+    return actualShippingFee > 1000
+      ? actualShippingFee / 25400
+      : actualShippingFee;
+  }
+  return null;
 };
 
 export const mapCustomerOrderFromApi = (
   order: CustomerOrderListApiItem,
-): UserOrder => ({
-  id: order._id ? String(order._id) : "",
-  orderCode: order.order_code ?? "",
-  createdAt: formatDate(order.createdAt),
-  updatedAt: formatDate(order.updatedAt ?? order.createdAt),
-  totalAmount: order.total_amount ?? 0,
-  status: order.status ?? "",
-  statusLabel: mapOrderStatusLabel(order.status),
-  shippingInfo: mapShippingInfo(order.shipping_info ?? null),
-  shippingFee: order.shipping_fee ?? null,
-  summary: mapListSummary(order.summary),
-});
+): UserOrder => {
+  const firstItem =
+    order.items && order.items.length > 0 ? order.items[0] : null;
 
-/** Maps full detail document → list-style `UserOrder` for OrderDetail UI */
+  let finalSummary = mapListSummary(order.summary);
+  if (!finalSummary || finalSummary.price === 0) {
+    if (firstItem) {
+      finalSummary = {
+        image: firstItem.image ?? "",
+        name: firstItem.product_name ?? firstItem.name ?? "",
+        quantity: firstItem.quantity ?? 1,
+        price: firstItem.price ?? 0,
+        remainingCount: Math.max(0, (order.items?.length || 1) - 1),
+      };
+    }
+  }
+
+  return {
+    id: order._id ? String(order._id) : "",
+    orderCode: order.order_code ?? "",
+    createdAt: formatDate(order.createdAt),
+    updatedAt: formatDate(order.updatedAt ?? order.createdAt),
+    totalAmount: order.total_amount ?? 0,
+    status: order.status ?? "",
+    statusLabel: mapOrderStatusLabel(order.status),
+    shippingInfo: mapShippingInfo(order.shipping_info ?? null),
+    shippingFee:
+      getCorrectShippingFee(order.shipping_fee, order.actual_shipping_fee) ?? 0,
+    summary: finalSummary,
+  };
+};
+
 export const mapCustomerOrderDetailToUserOrder = (
   order: CustomerOrderDetail,
 ): UserOrder => {
-  const firstItem = order.items[0];
+  const firstItem = order.items?.[0];
   const remainingCount = Math.max(0, order.items.length - 1);
 
   return {
@@ -126,7 +163,7 @@ export const mapCustomerOrderDetailToUserOrder = (
     status: order.status,
     statusLabel: mapOrderStatusLabel(order.status),
     shippingInfo: mapShippingInfo(order.shipping_info),
-    shippingFee: order.actual_shipping_fee ?? null,
+    shippingFee: getCorrectShippingFee(undefined, order.actual_shipping_fee),
     summary: firstItem
       ? {
           image: firstItem.image,
@@ -187,7 +224,8 @@ export const mapCustomerOrderDetailFromApi = (
     cityCode: "",
   },
   waybillCode: order.waybill_code,
-  actualShippingFee: order.actual_shipping_fee,
+  actualShippingFee:
+    getCorrectShippingFee(undefined, order.actual_shipping_fee) ?? 0,
   timeline: order.timeline.map(
     (entry): OrderTimelineEntry => ({
       status: entry.status,
