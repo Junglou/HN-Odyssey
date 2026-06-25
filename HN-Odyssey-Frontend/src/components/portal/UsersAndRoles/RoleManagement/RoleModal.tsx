@@ -97,7 +97,7 @@ function RoleModalContent({
           </div>
 
           <div className="rm-form-group">
-            <label>Roles Status</label>
+            <label>Role Status</label>
             <div className="rm-modal-status-flex">
               <div
                 className={`rm-modal-switch ${formData.status === "Active" ? "on" : ""} ${initialData?.isLocked ? "disabled" : ""}`}
