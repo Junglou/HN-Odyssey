@@ -601,27 +601,26 @@ export class ChatService {
   async getMessagesBySession(sessionId: string, customerId?: string) {
     // 1. Nếu khách đã đăng nhập, ưu tiên tìm hội thoại đang Active theo customerId
     const query: FilterQuery<Conversation> = customerId
-      ? {
-          customer_id: new Types.ObjectId(customerId),
-          status: { $ne: ConversationStatus.CLOSED },
-        }
+      ? { customer_id: new Types.ObjectId(customerId) }
       : { session_id: sessionId };
 
-    let conv = await this.convModel
-      .findOne(query)
-      .sort({ createdAt: -1 })
-      .exec();
+    const convs = await this.convModel.find(query).exec();
 
     // 2. Fallback: Nếu không tìm thấy bằng customerId, thử tìm lại bằng sessionId
-    if (!conv && customerId) {
-      conv = await this.convModel.findOne({ session_id: sessionId }).exec();
+    if (convs.length === 0 && customerId) {
+      const fallbackConvs = await this.convModel
+        .find({ session_id: sessionId })
+        .exec();
+      convs.push(...fallbackConvs);
     }
 
-    if (!conv) return [];
+    if (convs.length === 0) return [];
+
+    const convIds = convs.map((c) => c._id);
 
     // 3. Trả về toàn bộ tin nhắn của hội thoại đó
     return this.msgModel
-      .find({ conversation_id: conv._id })
+      .find({ conversation_id: { $in: convIds } })
       .sort({ createdAt: 1 })
       .lean();
   }
@@ -675,6 +674,7 @@ export class ChatService {
     // Tìm tất cả hội thoại đang OPEN (kể cả Waitlist hoặc Ongoing) mà updatedAt đã quá 24h
     const idleConversations = await this.convModel.find({
       status: 'OPEN',
+      agent_id: { $exists: false },
       updatedAt: { $lte: twentyFourHoursAgo },
     });
 
