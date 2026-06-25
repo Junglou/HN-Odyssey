@@ -65,8 +65,6 @@ import type { Response } from 'express';
 //   actualShippingFee?: number;
 // };
 
-const EXCHANGE_RATE = 25400;
-
 @Injectable()
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
@@ -549,7 +547,7 @@ export class OrdersService {
 
       if (eligibleAmount < (extendedVoucher.min_order_value || 0)) {
         throw new BadRequestException(
-          `Mã này chỉ áp dụng cho sản phẩm thuộc danh mục quy định (Tối thiểu ${extendedVoucher.min_order_value}đ).`,
+          `Mã này chỉ áp dụng cho sản phẩm thuộc danh mục quy định (Tối thiểu $${extendedVoucher.min_order_value}).`,
         );
       }
     } else {
@@ -559,7 +557,7 @@ export class OrdersService {
         originalTotal < extendedVoucher.min_order_value
       ) {
         throw new BadRequestException(
-          `Đơn hàng chưa đủ ${extendedVoucher.min_order_value}đ để dùng mã này`,
+          `Đơn hàng chưa đủ $${extendedVoucher.min_order_value} để dùng mã này`,
         );
       }
     }
@@ -1084,9 +1082,9 @@ export class OrdersService {
 
         let pointsDiscount = 0;
         if (dto.pointsToUse && dto.pointsToUse > 0) {
-          pointsDiscount = dto.pointsToUse * 100; // Giả sử 1 điểm = 100đ
+          pointsDiscount = dto.pointsToUse / 100;
           if (pointsDiscount > totalAfterVoucher) {
-            pointsDiscount = totalAfterVoucher; // Tránh âm tiền
+            pointsDiscount = totalAfterVoucher;
           }
         }
 
@@ -1210,14 +1208,14 @@ export class OrdersService {
           );
         }
 
+        // áp dụng cho luồng BuyNow
         if (userId && dto.pointsToUse && dto.pointsToUse > 0) {
-          await this.connection
-            .collection('users')
-            .updateOne(
-              { _id: new Types.ObjectId(userId) },
-              { $inc: { 'loyalty.point': -dto.pointsToUse } },
-              { session },
-            );
+          await this.loyaltyService.deductPointsForOrder(
+            String(userId),
+            dto.pointsToUse,
+            String(order._id),
+            session,
+          );
         }
 
         // CHỐT TRANSACTION THÀNH CÔNG CHO LUỒNG MUA NGAY
@@ -1593,15 +1591,14 @@ export class OrdersService {
           totalAfterVoucher - pointsDiscount,
         );
 
-        // NẾU CÓ DÙNG ĐIỂM -> TRỪ ĐIỂM CỦA USER NGAY LẬP TỨC
+        // NẾU CÓ DÙNG ĐIỂM -> TRỪ ĐIỂM CỦA USER NGAY LẬP TỨC VÀ TẠO HISTORY
         if (pointsDiscount > 0) {
-          await this.connection
-            .collection('users')
-            .updateOne(
-              { _id: new Types.ObjectId(userId) },
-              { $inc: { 'loyalty.point': -(dto.pointsToUse || 0) } },
-              { session },
-            );
+          await this.loyaltyService.deductPointsForOrder(
+            String(userId),
+            dto.pointsToUse || 0,
+            String(newOrder._id),
+            session,
+          );
         }
 
         await this.cartModel.deleteOne({ _id: cart._id }).session(session);
@@ -1823,13 +1820,19 @@ export class OrdersService {
             { session },
           );
 
-          await this.loyaltyHistoryModel.create({
-            user_id: orderWithPoints.user_id,
-            order_id: order._id,
-            points: Number(orderWithPoints.points_used),
-            action: 'REVOKE',
-            reason: 'Hủy đơn hàng',
-          });
+          await this.loyaltyHistoryModel.create(
+            [
+              {
+                customer_id: orderWithPoints.user_id,
+                order_id: order._id,
+                type: 'REFUND',
+                status: PointStatus.AVAILABLE,
+                amount: Number(orderWithPoints.points_used),
+                description: 'Hoàn trả lại điểm do hủy đơn hàng',
+              },
+            ],
+            { session },
+          );
         }
 
         if (order.user_id && !order.isGuest) {

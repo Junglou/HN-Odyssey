@@ -27,25 +27,32 @@ export const mapOrderStatusLabel = (status?: string | null): string => {
   if (!status) return "";
   switch (status.toUpperCase()) {
     case "PENDING":
-    case "CONFIRMED":
     case "PRIORITY":
       return "Pending";
+
+    case "CONFIRMED":
+      return "Confirmed"; // <-- Đã tách riêng thành công
+
     case "PROCESSING":
     case "ON_HOLD":
     case "TRADE_IN_REVIEW":
       return "Processing";
+
     case "SHIPPING":
     case "READY_TO_SHIP":
     case "DELIVERING":
       return "Delivering";
+
     case "DELIVERED":
     case "COMPLETED":
       return "Delivered";
+
     case "CANCELLED":
     case "CANCELED":
     case "DELIVERY_FAILED":
     case "RETURNED":
       return "Canceled";
+
     default:
       return status;
   }

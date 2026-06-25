@@ -229,9 +229,7 @@ export default function CustomerDetailModal({
               <div className="crm-info-group">
                 <span className="crm-info-label">Total Spent</span>
                 <div className="crm-info-value crm-loyalty-value--spent">
-                  {/* Hàm toLocaleString("vi-VN") tự động thêm dấu . vào số tiền */}
-                  {customer.loyalty?.total_spent?.toLocaleString("vi-VN") || 0}{" "}
-                  ₫
+                  ${customer.loyalty?.total_spent?.toLocaleString("en-US") || 0}
                 </div>
               </div>
 
@@ -275,7 +273,7 @@ export default function CustomerDetailModal({
                             )}
                           </td>
                           <td className="crm-td-bold">
-                            {order.total_amount.toLocaleString("vi-VN")} ₫
+                            ${order.total_amount.toLocaleString("en-US")}
                           </td>
                           <td>{order.payment?.method || "N/A"}</td>
                           <td className={getOrderStatusClass(order.status)}>

@@ -3,12 +3,7 @@ import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
 
 export type CustomerStatus = "Active" | "Inactive" | "Locked" | "Deleted";
-export type CustomerType =
-  | "Standard"
-  | "Trade-in Customer"
-  | "Silver"
-  | "Gold"
-  | "VIP";
+export type CustomerType = "Bronze" | "Silver" | "Gold" | "Platinum";
 export type ReviewAccessStatus = "Allowed" | "Restricted";
 
 export interface CustomerRecord {
@@ -78,27 +73,25 @@ const mapStatusToBE = (feStatus: CustomerStatus): string => {
 };
 
 const mapTypeToBE = (feType: CustomerType): string => {
-  if (feType === "Standard") return "STANDARD";
+  if (feType === "Bronze") return "BRONZE";
   if (feType === "Silver") return "SILVER";
   if (feType === "Gold") return "GOLD";
-  if (feType === "VIP") return "VIP";
-  if (feType === "Trade-in Customer") return "TRADE_IN";
-  return "";
+  if (feType === "Platinum") return "PLATINUM";
+  return "BRONZE"; // Fallback an toàn
 };
 
 const mapBEToType = (beTier?: string): CustomerType => {
   switch (beTier) {
+    case "BRONZE":
+      return "Bronze";
     case "SILVER":
       return "Silver";
     case "GOLD":
       return "Gold";
-    case "VIP":
-      return "VIP";
-    case "TRADE_IN":
-      return "Trade-in Customer";
-    case "STANDARD":
+    case "PLATINUM":
+      return "Platinum";
     default:
-      return "Standard";
+      return "Bronze"; // Khách hàng mới mặc định là Bronze
   }
 };
 
