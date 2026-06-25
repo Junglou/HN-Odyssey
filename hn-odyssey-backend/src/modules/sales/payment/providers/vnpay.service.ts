@@ -40,7 +40,7 @@ export class VnpayService {
       vnp_TxnRef: dto.orderCode,
       vnp_OrderInfo: dto.description,
       vnp_OrderType: 'other',
-      vnp_Amount: Math.floor(dto.amount * 100),
+      vnp_Amount: Math.floor(dto.amount * 25400 * 100),
       vnp_ReturnUrl: config.return_url,
       vnp_IpAddr: dto.ipAddr,
       vnp_CreateDate: createDate,
@@ -83,7 +83,7 @@ export class VnpayService {
     const data = rawData as unknown as VnpayIpnData;
     return {
       transactionCode: data.vnp_TransactionNo,
-      amount: Number(data.vnp_Amount) / 100,
+      amount: Number(data.vnp_Amount) / 100 / 25400,
       responseCode: data.vnp_ResponseCode,
       orderCode: data.vnp_TxnRef,
     };
@@ -139,7 +139,7 @@ export class VnpayService {
     const vnp_TmnCode = config.merchant_id;
     const vnp_TransactionType = '02'; // 02: Hoàn toàn phần
     const vnp_TxnRef = orderCode;
-    const vnp_Amount = amount * 100;
+    const vnp_Amount = Math.floor(amount * 25400 * 100);
     const vnp_OrderInfo = `Hoan tien don hang ${orderCode}`;
     const vnp_TransactionNo = ''; // Để trống nếu dùng vnp_TransactionDate
 

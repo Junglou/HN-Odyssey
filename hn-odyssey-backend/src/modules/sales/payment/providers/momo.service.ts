@@ -23,7 +23,7 @@ export class MomoService implements PaymentStrategy {
     const secretKey = config.secret_key;
     const requestId = partnerCode + new Date().getTime();
     const orderId = dto.orderCode;
-    const amount = dto.amount;
+    const amount = Math.floor(dto.amount * 25400).toString();
     const orderInfo = dto.description;
     const redirectUrl = config.return_url;
     // URL IPN (Server-to-server)
@@ -119,7 +119,7 @@ export class MomoService implements PaymentStrategy {
     const data = rawData as unknown as MomoIpnData;
     return {
       transactionCode: String(data.transId),
-      amount: Number(data.amount),
+      amount: Number(data.amount) / 25400,
       responseCode: String(data.resultCode),
       orderCode: data.orderId,
     };
@@ -141,9 +141,10 @@ export class MomoService implements PaymentStrategy {
     const transId = transDate; // Tra cứu log để truyền đúng transId của MoMo
     const lang = 'vi';
     const description = `Hoan tien don hang ${orderId} boi ${userAction}`;
+    const amountVND = Math.floor(amount * 25400);
 
     // Tạo chữ ký theo chuẩn MoMo Refund
-    const rawSignature = `accessKey=${accessKey}&amount=${amount}&description=${description}&orderId=${orderId}&partnerCode=${partnerCode}&requestId=${requestId}&transId=${transId}`;
+    const rawSignature = `accessKey=${accessKey}&amount=${amountVND}&description=${description}&orderId=${orderId}&partnerCode=${partnerCode}&requestId=${requestId}&transId=${transId}`;
     const signature = crypto
       .createHmac('sha256', secretKey)
       .update(rawSignature)
@@ -154,7 +155,7 @@ export class MomoService implements PaymentStrategy {
       requestId,
       orderId,
       transId,
-      amount,
+      amount: amountVND,
       lang,
       description,
       signature,
