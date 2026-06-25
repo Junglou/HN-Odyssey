@@ -13,24 +13,34 @@ import type {
   UserOrderDetail,
 } from "../types/user";
 
-// Khai báo interface rõ ràng để thay thế cho any[]
-export interface ApiSummaryItem {
-  image?: string;
+// Interface nội bộ để bắt kiểu dữ liệu của các phần tử trong mảng items trả về từ API
+export interface CustomerOrderListApiItemItem {
+  product_id?: string | number;
+  sku?: string;
   product_name?: string;
   name?: string;
-  quantity?: number;
   price?: number;
+  quantity?: number;
+  image?: string;
+  variant_name?: string;
 }
 
+/** List API item with optional fields the backend may add later */
 export type CustomerOrderListApiItem = CustomerOrderListItem & {
   updatedAt?: string | Date;
   shipping_info?: CustomerOrderShippingInfo | null;
   shipping_fee?: number | null;
   actual_shipping_fee?: number | null;
-  items?: ApiSummaryItem[]; // Đã loại bỏ any
+  items?: CustomerOrderListApiItemItem[];
   summary?:
     | (CustomerOrderListSummary & { quantity?: number; price?: number })
     | null;
+};
+
+// Type trích xuất riêng phục vụ cho hàm tính toán phí giao hàng
+type OrderFeeInfo = {
+  shipping_fee?: number | null;
+  actual_shipping_fee?: number | null;
 };
 
 export const mapOrderStatusLabel = (status?: string | null): string => {
@@ -39,24 +49,30 @@ export const mapOrderStatusLabel = (status?: string | null): string => {
     case "PENDING":
     case "PRIORITY":
       return "Pending";
+
     case "CONFIRMED":
       return "Confirmed";
+
     case "PROCESSING":
     case "ON_HOLD":
     case "TRADE_IN_REVIEW":
       return "Processing";
+
     case "SHIPPING":
     case "READY_TO_SHIP":
     case "DELIVERING":
       return "Delivering";
+
     case "DELIVERED":
     case "COMPLETED":
       return "Delivered";
+
     case "CANCELLED":
     case "CANCELED":
     case "DELIVERY_FAILED":
     case "RETURNED":
       return "Canceled";
+
     default:
       return status;
   }
@@ -96,20 +112,20 @@ const formatDate = (value?: string | Date): string => {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
+  // Dùng toISOString để giữ nguyên thông tin giờ/phút/giây, không bị chặt đứt như toLocaleDateString
   return date.toISOString();
 };
 
-// Đổi từ tham số 'order: any' thành truyền trực tiếp giá trị số để thỏa mãn ESLint
-const getCorrectShippingFee = (
-  shippingFee?: number | null,
-  actualShippingFee?: number | null,
-): number | null => {
-  if (shippingFee != null && shippingFee > 0) return shippingFee;
+const getCorrectShippingFee = (order: OrderFeeInfo): number | null => {
+  if (order.shipping_fee != null && order.shipping_fee > 0) {
+    return order.shipping_fee;
+  }
 
-  if (actualShippingFee != null && actualShippingFee > 0) {
-    return actualShippingFee > 1000
-      ? actualShippingFee / 25400
-      : actualShippingFee;
+  if (order.actual_shipping_fee != null && order.actual_shipping_fee > 0) {
+    // Nếu phí > 1000 (tức là VNĐ do ĐVVC gửi về), thì chia tỷ giá 25400 để đưa về USD hiển thị
+    return order.actual_shipping_fee > 1000
+      ? order.actual_shipping_fee / 25400
+      : order.actual_shipping_fee;
   }
   return null;
 };
@@ -120,6 +136,7 @@ export const mapCustomerOrderFromApi = (
   const firstItem =
     order.items && order.items.length > 0 ? order.items[0] : null;
 
+  // "Vét" thông tin từ items[0] nếu backend không trả về summary.price hoặc price = 0
   let finalSummary = mapListSummary(order.summary);
   if (!finalSummary || finalSummary.price === 0) {
     if (firstItem) {
@@ -142,17 +159,17 @@ export const mapCustomerOrderFromApi = (
     status: order.status ?? "",
     statusLabel: mapOrderStatusLabel(order.status),
     shippingInfo: mapShippingInfo(order.shipping_info ?? null),
-    shippingFee:
-      getCorrectShippingFee(order.shipping_fee, order.actual_shipping_fee) ?? 0,
+    shippingFee: getCorrectShippingFee(order) ?? 0,
     summary: finalSummary,
   };
 };
 
+/** Maps full detail document → list-style `UserOrder` for OrderDetail UI */
 export const mapCustomerOrderDetailToUserOrder = (
   order: CustomerOrderDetail,
 ): UserOrder => {
   const firstItem = order.items?.[0];
-  const remainingCount = Math.max(0, order.items.length - 1);
+  const remainingCount = Math.max(0, (order.items?.length || 1) - 1);
 
   return {
     id: String(order._id),
@@ -163,13 +180,14 @@ export const mapCustomerOrderDetailToUserOrder = (
     status: order.status,
     statusLabel: mapOrderStatusLabel(order.status),
     shippingInfo: mapShippingInfo(order.shipping_info),
-    shippingFee: getCorrectShippingFee(undefined, order.actual_shipping_fee),
+    // Ép kiểu (Type Assertion) an toàn qua interface trung gian để loại bỏ lỗi no-unsafe-argument
+    shippingFee: getCorrectShippingFee(order as unknown as OrderFeeInfo) ?? 0,
     summary: firstItem
       ? {
-          image: firstItem.image,
-          name: firstItem.product_name,
-          quantity: firstItem.quantity,
-          price: firstItem.price,
+          image: firstItem.image ?? "",
+          name: firstItem.product_name ?? "",
+          quantity: firstItem.quantity ?? 1,
+          price: firstItem.price ?? 0,
           remainingCount,
         }
       : null,
@@ -225,7 +243,7 @@ export const mapCustomerOrderDetailFromApi = (
   },
   waybillCode: order.waybill_code,
   actualShippingFee:
-    getCorrectShippingFee(undefined, order.actual_shipping_fee) ?? 0,
+    getCorrectShippingFee(order as unknown as OrderFeeInfo) ?? 0,
   timeline: order.timeline.map(
     (entry): OrderTimelineEntry => ({
       status: entry.status,
