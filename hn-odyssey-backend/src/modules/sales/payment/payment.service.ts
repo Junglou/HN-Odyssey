@@ -143,13 +143,14 @@ export class PaymentService {
       const order = await this.orderModel.findOne({ order_code: orderCode });
       if (!order) return { RspCode: '01', Message: 'Order Not Found' };
 
-      if (order.total_amount !== amount) {
+      const tolerance = 0.05;
+      if (Math.abs(order.total_amount - amount) > tolerance) {
         await this.logTransaction(
           order,
           provider,
           rawData,
           'FAILED',
-          'Invalid Amount',
+          `Invalid Amount: Expected ${order.total_amount}, got ${amount}`,
         );
         return { RspCode: '04', Message: 'Invalid Amount' };
       }

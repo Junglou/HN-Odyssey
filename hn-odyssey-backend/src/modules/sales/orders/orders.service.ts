@@ -65,6 +65,8 @@ import type { Response } from 'express';
 //   actualShippingFee?: number;
 // };
 
+const EXCHANGE_RATE = 25400;
+
 @Injectable()
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
@@ -914,11 +916,14 @@ export class OrdersService {
         const variant = product.variants.find((v) => v.sku === cartItem.sku);
         const realPrice = variant ? variant.sale_price || variant.price : 0;
         const realImage = variant?.images?.[0] || product.thumbnail || '';
+        const productWithWeight = product as unknown as { weight?: number };
+        const weight = productWithWeight.weight || 0.5;
 
         return {
           product_id: cartItem.product_id,
           sku: cartItem.sku,
           quantity: cartItem.quantity,
+          weight: weight,
           product_name: product.name || 'Sản phẩm không xác định',
           price: realPrice,
           image: realImage,
@@ -1045,12 +1050,13 @@ export class OrdersService {
         }
 
         // 2. Tính phí vận chuyển
-        const shippingFee = await this.shippingService.calculateShippingFee(
+        const shippingFeeVND = await this.shippingService.calculateShippingFee(
           dto.shippingInfo.city_code,
           dto.shippingInfo.district_code,
           order.items as unknown as (CartItem | OrderItem)[],
           dto.isInstant,
         );
+        const shippingFee = shippingFeeVND > 0 ? shippingFeeVND / 25400 : 0;
 
         // 3. Kiểm tra trọng lượng
         const MAX_WEIGHT_KG = 50;
@@ -1121,7 +1127,10 @@ export class OrdersService {
         };
 
         order.status = 'PENDING';
-        order.hold_expires_at = undefined;
+        order.hold_expires_at =
+          dto.paymentMethod !== 'COD'
+            ? new Date(Date.now() + 15 * 60000)
+            : undefined;
         order.total_amount = finalOrderTotal;
         order.shipping_fee = shippingFee;
         (
@@ -1286,13 +1295,15 @@ export class OrdersService {
           reCalcTotal += item.price * item.quantity;
         }
 
-        const shippingFeeGuest =
+        const shippingFeeGuestVND =
           await this.shippingService.calculateShippingFee(
             dto.shippingInfo?.city_code,
             dto.shippingInfo?.district_code,
             confirmedItems,
             dto.isInstant,
           );
+        const shippingFeeGuest =
+          shippingFeeGuestVND > 0 ? shippingFeeGuestVND / 25400 : 0;
 
         const {
           finalTotal: totalAfterVoucherGuest,
@@ -1342,7 +1353,10 @@ export class OrdersService {
         tempOrder.shipping_fee = shippingFeeGuest;
         tempOrder.voucher_code = dto.voucherCode || '';
         tempOrder.status = 'PENDING';
-        tempOrder.hold_expires_at = undefined; // BỔ SUNG DÒNG NÀY ĐỂ XÓA HẸN GIỜ HỦY ĐƠN
+        tempOrder.hold_expires_at =
+          dto.paymentMethod !== 'COD'
+            ? new Date(Date.now() + 15 * 60000)
+            : undefined;
 
         if (!tempOrder.timeline) tempOrder.timeline = [];
         tempOrder.timeline.push({
@@ -1462,6 +1476,7 @@ export class OrdersService {
             price: currentPrice,
             quantity: item.quantity,
             image: mainImage,
+            weight: weight,
           });
         }
 
@@ -1495,12 +1510,13 @@ export class OrdersService {
           itemsTotalAmount += item.price * item.quantity;
         }
 
-        const shippingFee = await this.shippingService.calculateShippingFee(
+        const shippingFeeVND = await this.shippingService.calculateShippingFee(
           dto.shippingInfo?.city_code,
           dto.shippingInfo?.district_code,
           orderItems,
           dto.isInstant,
         );
+        const shippingFee = shippingFeeVND > 0 ? shippingFeeVND / 25400 : 0;
 
         const { finalTotal: totalAfterVoucher, discount: voucherDiscount } =
           await this.applyVoucher(
@@ -1553,6 +1569,10 @@ export class OrdersService {
           points_used: dto.pointsToUse || 0,
           status: 'PENDING',
           isGuest: false,
+          hold_expires_at:
+            dto.paymentMethod !== 'COD'
+              ? new Date(Date.now() + 15 * 60000)
+              : undefined,
           timeline: [
             {
               status: 'PENDING',
@@ -2243,12 +2263,13 @@ export class OrdersService {
     );
 
     // 3. Tính phí Ship
-    const shippingFee = await this.shippingService.calculateShippingFee(
+    const shippingFeeVND = await this.shippingService.calculateShippingFee(
       dto.shippingInfo?.city_code,
       dto.shippingInfo?.district_code,
       items,
       dto.isInstant,
     );
+    const shippingFee = shippingFeeVND > 0 ? shippingFeeVND / 25400 : 0;
 
     // 4. Tính Voucher
     const { discount, finalTotal: totalAfterVoucher } = await this.applyVoucher(
