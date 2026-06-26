@@ -214,6 +214,15 @@ export class PersonalizedService {
       ]);
 
       const hits = response.results[0]?.hits || [];
+
+      // KÍCH HOẠT FALLBACK NẾU ALGOLIA CHƯA CÓ DATA HOẶC TRẢ VỀ RỖNG
+      if (hits.length === 0) {
+        this.logger.log(
+          `[Looking Similar] Algolia trả về rỗng cho SP ${productId}. Kích hoạt Fallback Database.`,
+        );
+        return this.getFallbackLookingSimilar(productId, limit);
+      }
+
       const products = await this.fetchProductsFromHits(hits);
 
       return {
@@ -222,12 +231,10 @@ export class PersonalizedService {
         products,
       };
     } catch (error: unknown) {
-      // FIX LỖI [object Object]: Ép JSON stringify để bóc trần nguyên nhân thật từ Algolia
       let errorDetail = 'Lỗi không xác định';
       if (error instanceof Error) {
         errorDetail = error.message;
       } else if (typeof error === 'object' && error !== null) {
-        // Lấy chi tiết message lỗi từ response của Algolia
         const algoliaError = error as {
           message?: string;
           status?: number;
@@ -239,10 +246,68 @@ export class PersonalizedService {
       }
 
       this.logger.error(
-        `[Looking Similar] Lỗi khi gọi Algolia: ${errorDetail}`,
+        `[Looking Similar] Lỗi khi gọi Algolia: ${errorDetail}. Chuyển hướng sang Fallback.`,
       );
 
-      return { title: '', type: 'ERROR', products: [] };
+      // THAY VÌ TRẢ VỀ ERROR RỖNG, GỌI FALLBACK ĐỂ CỨU UI
+      return this.getFallbackLookingSimilar(productId, limit);
+    }
+  }
+
+  // HÀM HELPER: FALLBACK CHO LOOKING SIMILAR KHI ALGOLIA CHƯA SẴN SÀNG
+  private async getFallbackLookingSimilar(
+    productId: string,
+    limit: number,
+  ): Promise<IRecommendationResult> {
+    try {
+      const objectId = new Types.ObjectId(productId);
+
+      // Lấy thông tin sản phẩm gốc để làm mỏ neo (chỉ cần lấy danh mục)
+      const baseProduct = await this.productModel
+        .findById(objectId)
+        .select('categories')
+        .lean();
+
+      if (
+        !baseProduct ||
+        !baseProduct.categories ||
+        baseProduct.categories.length === 0
+      ) {
+        return {
+          title: 'Sản phẩm tương tự',
+          type: 'LOOKING_SIMILAR',
+          products: [],
+        };
+      }
+
+      // Quét các sản phẩm cùng danh mục, trừ chính nó ra, ưu tiên đồ đang có sẵn
+      const fallbackProducts = await this.productModel
+        .find({
+          _id: { $ne: objectId },
+          categories: { $in: baseProduct.categories },
+          status: 'ACTIVE',
+          is_deleted: false,
+          stock: { $gt: 0 },
+        })
+        .sort({ view_count: -1, rating_average: -1 }) // Ưu tiên đồ nhiều view và rating tốt
+        .limit(limit)
+        .select('-__v')
+        .lean();
+
+      return {
+        title: 'Sản phẩm tương tự',
+        type: 'LOOKING_SIMILAR',
+        products: fallbackProducts as unknown as ProductDocument[],
+      };
+    } catch (fallbackError) {
+      this.logger.error(
+        `Lỗi nghiêm trọng tại getFallbackLookingSimilar: ${String(fallbackError)}`,
+      );
+      return {
+        title: 'Sản phẩm tương tự',
+        type: 'LOOKING_SIMILAR',
+        products: [],
+      };
     }
   }
 
