@@ -68,6 +68,8 @@ export interface UserProfile {
   dateOfBirth: string | null;
   social_auth: UserSocialAuth;
   roles: string[];
+  permissions?: string[];
+  is_portal_access?: boolean;
   status: UserStatus;
   is_deleted: boolean;
   token_version: number;

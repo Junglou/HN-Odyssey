@@ -47,7 +47,7 @@ import { CartModule } from '../cart/cart.module';
     MarketingModule,
     StockModule,
     forwardRef(() => PaymentModule),
-    forwardRef(() => ShippingModule), // <--- ĐÃ SỬA THÀNH FORWARD REF Ở ĐÂY
+    forwardRef(() => ShippingModule),
     JwtModule.register({}),
     LoyaltyModule,
     CommandModule,

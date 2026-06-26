@@ -10,7 +10,6 @@ import { Role } from '../enums/role.enum';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
-// Interface User & Request
 interface RequestUser {
   roles: string[];
 }
@@ -23,14 +22,13 @@ export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    // 2. THÊM ĐOẠN CHECK PUBLIC NÀY VÀO ĐẦU HÀM
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
 
     if (isPublic) {
-      return true; // Nếu là Public -> Cho qua luôn, không cần check Role
+      return true;
     }
 
     const requiredRoles = this.reflector.getAllAndOverride<string[]>(
@@ -38,7 +36,7 @@ export class RolesGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
-    if (!requiredRoles) {
+    if (!requiredRoles || requiredRoles.length === 0) {
       return true;
     }
 
@@ -49,6 +47,7 @@ export class RolesGuard implements CanActivate {
       throw new UnauthorizedException('User không tồn tại hoặc không có roles');
     }
 
+    // VẪN GIỮ ĐẶC QUYỀN SUPER_ADMIN NHƯ BẠN YÊU CẦU
     const superAdminRole = Role.SUPER_ADMIN as unknown as string;
     if (user.roles.includes(superAdminRole)) {
       return true;
@@ -56,6 +55,14 @@ export class RolesGuard implements CanActivate {
 
     const hasRole = requiredRoles.some((role) => {
       const roleStr = role as unknown as string;
+
+      // LOGIC CHỐT CHẶN:
+      // Nếu API (như Wishlist, Profile) đang yêu cầu quyền CUSTOMER
+      // Thì cho phép TOÀN BỘ user đã vượt qua được bước check Token truy cập (Bao gồm Staff, Admin, TEST).
+      if (roleStr === 'CUSTOMER') {
+        return true;
+      }
+
       return user.roles.includes(roleStr);
     });
 

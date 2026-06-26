@@ -395,4 +395,13 @@ export class ContentController {
       type: result.data[0].type,
     });
   }
+
+  // BỔ SUNG: API Lấy chi tiết bài viết cho Admin (để Edit có data)
+  @Get('posts/:id/detail') // Dùng /detail để tránh đụng route public
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Resource.BLOG, Action.READ)
+  async getPostDetailForAdmin(@Param('id') id: string) {
+    const data = await this.contentService.findPostById(id);
+    return new BaseResponse(true, 'Lấy chi tiết thành công', data);
+  }
 }

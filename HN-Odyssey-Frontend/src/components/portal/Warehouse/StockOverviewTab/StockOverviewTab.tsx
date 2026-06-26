@@ -28,7 +28,7 @@ function CustomDropdown({
   className?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [hasOpened, setHasOpened] = useState(false);
+  const [search, setSearch] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -49,13 +49,18 @@ function CustomDropdown({
     options[0]?.label ||
     "Select";
 
+  // Đồng bộ logic filter
+  const filteredOptions = options.filter((opt) =>
+    opt.label.toLowerCase().includes(search.toLowerCase()),
+  );
+
   return (
     <div className={`sot-custom-dropdown ${className}`} ref={dropdownRef}>
       <div
         className={`sot-dropdown-trigger ${isOpen ? "active" : ""}`}
         onClick={() => {
           setIsOpen(!isOpen);
-          if (!hasOpened) setHasOpened(true);
+          if (isOpen) setSearch(""); // Đóng lại thì clear search
         }}
       >
         <span>{selectedLabel}</span>
@@ -63,22 +68,69 @@ function CustomDropdown({
           className={`sot-dropdown-arrow ${isOpen ? "open" : ""}`}
         />
       </div>
-      <div
-        className={`sot-dropdown-options ${isOpen ? "open" : hasOpened ? "closed" : ""}`}
-      >
-        {options.map((opt) => (
+
+      {isOpen && (
+        <div
+          className="sot-dropdown-options open"
+          style={{ maxHeight: "250px", overflowY: "auto", padding: 0 }}
+        >
+          {/* Đồng bộ UI search */}
           <div
-            key={opt.value}
-            className={`sot-dropdown-option ${value === opt.value ? "selected" : ""}`}
-            onClick={() => {
-              onChange(opt.value);
-              setIsOpen(false);
+            style={{
+              position: "sticky",
+              top: 0,
+              background: "#fff",
+              zIndex: 10,
+              padding: "8px",
+              borderBottom: "1px solid #e5e7eb",
             }}
+            onClick={(e) => e.stopPropagation()}
           >
-            {opt.label}
+            <input
+              type="text"
+              className="promo-form-input promo-select-search"
+              placeholder="Search..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{
+                width: "100%",
+                outline: "none",
+                border: "1px solid #d1d5db",
+                borderRadius: "4px",
+                padding: "6px 12px",
+              }}
+            />
           </div>
-        ))}
-      </div>
+
+          <div style={{ padding: "4px" }}>
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((opt) => (
+                <div
+                  key={opt.value}
+                  className={`sot-dropdown-option ${value === opt.value ? "selected" : ""}`}
+                  onClick={() => {
+                    onChange(opt.value);
+                    setIsOpen(false);
+                    setSearch("");
+                  }}
+                >
+                  {opt.label}
+                </div>
+              ))
+            ) : (
+              <div
+                style={{
+                  padding: "12px",
+                  textAlign: "center",
+                  color: "#6b7280",
+                }}
+              >
+                No results found
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

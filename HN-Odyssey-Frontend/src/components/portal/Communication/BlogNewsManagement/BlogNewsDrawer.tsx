@@ -16,6 +16,7 @@ import {
   type BECategoryResponse,
   type BEProductResponse,
 } from "../../../../hooks/portal/Communication/BlogNewsManagement/useBlogNewsManagement";
+import axiosClient from "../../../../api/axiosClient";
 
 interface BlogNewsDrawerProps {
   isOpen: boolean;
@@ -48,8 +49,7 @@ function DrawerContent({
     if (initialData && (mode === "edit" || mode === "view")) {
       return {
         ...initialData,
-        categoryId:
-          categories.find((c) => c.name === initialData.category)?._id || "",
+        categoryId: initialData.categoryId || "",
         attachedProducts: initialData.attachedProducts || [],
       };
     }
@@ -67,6 +67,7 @@ function DrawerContent({
   });
 
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [categorySearchTerm, setCategorySearchTerm] = useState("");
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [hasCategoryOpened, setHasCategoryOpened] = useState(false);
 
@@ -96,12 +97,10 @@ function DrawerContent({
   ) => {
     setFormData((prev) => {
       const newData = { ...prev, [field]: value };
-      // Auto tạo slug
       if (field === "title" && mode === "add" && typeof value === "string") {
         newData.slug = generateSlug(value);
         if (!newData.metaTitle) newData.metaTitle = value;
       }
-      // THÊM MỚI: Nếu người dùng thay đổi danh mục -> Xóa trắng danh sách sản phẩm cũ
       if (field === "categoryId" && prev.categoryId !== value) {
         newData.attachedProducts = [];
       }
@@ -149,17 +148,67 @@ function DrawerContent({
     return products.find((p) => p._id === id)?.name || id;
   };
 
-  const currentCategoryName = categories.find(
-    (c) => c._id === formData.categoryId,
+  // Hàm can thiệp quá trình tải ảnh của editor để gọi thẳng lên API upload thay vì dùng base64
+  const handleImageUploadBefore = (
+    files: File[],
+    _info: object,
+    uploadHandler: (
+      response?:
+        | { result: { url: string; name: string; size: number }[] }
+        | string,
+    ) => void,
+  ) => {
+    const file = files[0];
+    if (!file) return true;
+
+    const uploadData = new FormData();
+    uploadData.append("file", file);
+
+    axiosClient
+      .post("/upload/single", uploadData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((res) => {
+        if (res.data && res.data.path) {
+          uploadHandler({
+            result: [
+              {
+                url: res.data.path,
+                name: res.data.filename,
+                size: file.size,
+              },
+            ],
+          });
+        } else {
+          uploadHandler();
+        }
+      })
+      .catch((err: Error) => {
+        console.error("Lỗi khi tải ảnh của bài viết lên máy chủ:", err);
+        uploadHandler(err.message);
+      });
+
+    // Trả về false để huỷ hành vi mặc định của SunEditor
+    return false;
+  };
+
+  const flattenedCategories = categories.map((c) => ({
+    id: c._id,
+    name: c.name,
+  }));
+
+  const currentCategoryName = flattenedCategories.find(
+    (c) => c.id === formData.categoryId,
   )?.name;
 
-  // LỌC SẢN PHẨM DỰA THEO DANH MỤC ĐÃ CHỌN
+  const filteredDrawerCategories = flattenedCategories.filter((cat) =>
+    cat.name.toLowerCase().includes(categorySearchTerm.toLowerCase()),
+  );
+
   const filteredProducts = products.filter((p) => {
     if (!formData.categoryId || !p.categories || !Array.isArray(p.categories)) {
       return false;
     }
-
-    // Kiểm tra xem trong mảng danh mục của sản phẩm có chứa danh mục đang chọn không
     return p.categories.some((cat) => {
       const pCatId = typeof cat === "object" && cat !== null ? cat._id : cat;
       return pCatId === formData.categoryId;
@@ -221,6 +270,7 @@ function DrawerContent({
                   if (!isViewMode && !isSubmitting) {
                     setIsCategoryOpen(!isCategoryOpen);
                     if (!hasCategoryOpened) setHasCategoryOpened(true);
+                    if (isCategoryOpen) setCategorySearchTerm("");
                   }
                 }}
               >
@@ -232,22 +282,67 @@ function DrawerContent({
                 <ChevronDownIcon className={isCategoryOpen ? "open" : ""} />
               </div>
 
-              <div
-                className={`ban-drawer-dropdown-options ${isCategoryOpen ? "open" : hasCategoryOpened ? "closed" : ""}`}
-              >
-                {categories.map((cat) => (
+              {isCategoryOpen && (
+                <div
+                  className="ban-drawer-dropdown-options open"
+                  style={{
+                    maxHeight: "250px",
+                    overflowY: "auto",
+                    display: "block",
+                    padding: 0,
+                  }}
+                >
                   <div
-                    key={cat._id}
-                    className={`ban-drawer-dropdown-option ${formData.categoryId === cat._id ? "active" : ""}`}
-                    onClick={() => {
-                      handleChange("categoryId", cat._id);
-                      setIsCategoryOpen(false);
+                    className="promo-select-input-wrapper"
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#fff",
+                      zIndex: 10,
+                      padding: "8px",
+                      borderBottom: "1px solid #e5e7eb",
                     }}
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    {cat.name}
+                    <input
+                      type="text"
+                      className="promo-form-input promo-select-search"
+                      placeholder="Search category..."
+                      value={categorySearchTerm}
+                      onChange={(e) => setCategorySearchTerm(e.target.value)}
+                      style={{ width: "100%", marginBottom: 0 }}
+                    />
                   </div>
-                ))}
-              </div>
+
+                  <div style={{ padding: "4px" }}>
+                    {filteredDrawerCategories.length > 0 ? (
+                      filteredDrawerCategories.map((cat) => (
+                        <div
+                          key={cat.id}
+                          className={`ban-drawer-dropdown-option ${formData.categoryId === cat.id ? "active" : ""}`}
+                          onClick={() => {
+                            handleChange("categoryId", cat.id);
+                            setIsCategoryOpen(false);
+                            setCategorySearchTerm("");
+                          }}
+                        >
+                          {cat.name}
+                        </div>
+                      ))
+                    ) : (
+                      <div
+                        style={{
+                          padding: "12px",
+                          textAlign: "center",
+                          color: "#6b7280",
+                        }}
+                      >
+                        No results found
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -303,8 +398,9 @@ function DrawerContent({
               className={`ban-suneditor-wrapper ${isViewMode ? "disabled" : ""}`}
             >
               <SunEditor
-                setContents={formData.content}
+                defaultValue={formData.content} // đổi từ setContents thành defaultValue để tránh re-render liên tục
                 onChange={(content) => handleChange("content", content)}
+                onImageUploadBefore={handleImageUploadBefore}
                 disable={isViewMode || isSubmitting}
                 setOptions={{
                   height: "550px",
@@ -344,37 +440,37 @@ function DrawerContent({
                 }}
               />
             </div>
-
-            {formData.attachedProducts.length > 0 && (
-              <div className="ban-attached-products-list">
-                {formData.attachedProducts.map((id) => (
-                  <span key={id} className="ban-product-tag">
-                    🛍️ {getProductName(id)}
-                    {!isViewMode && (
-                      <button
-                        type="button"
-                        onClick={() => handleToggleProduct(id)}
-                      >
-                        <CloseIcon />
-                      </button>
-                    )}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {!isViewMode && (
-              <button
-                type="button"
-                className="ban-btn-attach-product"
-                disabled={isSubmitting || !formData.categoryId}
-                onClick={() => setIsProductModalOpen(true)}
-              >
-                + Select Attached Products{" "}
-                {!formData.categoryId && "(Please select a category first)"}
-              </button>
-            )}
           </div>
+
+          {formData.attachedProducts.length > 0 && (
+            <div className="ban-attached-products-list">
+              {formData.attachedProducts.map((id) => (
+                <span key={id} className="ban-product-tag">
+                  🛍️ {getProductName(id)}
+                  {!isViewMode && (
+                    <button
+                      type="button"
+                      onClick={() => handleToggleProduct(id)}
+                    >
+                      <CloseIcon />
+                    </button>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {!isViewMode && (
+            <button
+              type="button"
+              className="ban-btn-attach-product"
+              disabled={isSubmitting || !formData.categoryId}
+              onClick={() => setIsProductModalOpen(true)}
+            >
+              + Select Attached Products{" "}
+              {!formData.categoryId && "(Please select a category first)"}
+            </button>
+          )}
 
           <div className="ban-form-group">
             <label>
