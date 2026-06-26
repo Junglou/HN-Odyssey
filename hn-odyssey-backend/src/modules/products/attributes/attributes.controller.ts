@@ -41,7 +41,8 @@ export class AttributesController {
 
   // 2. DANH SÁCH
   @Get()
-  @Public()
+  // @Public()
+  @RequirePermissions(Resource.ATTRIBUTES, Action.READ)
   findAll() {
     return this.attributesService.findAll();
   }

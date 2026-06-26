@@ -244,11 +244,22 @@ export default function TradeInForm() {
 
                 <div
                   className={`sc-select-dropdown ${isCategoryOpen ? "show" : ""}`}
+                  style={{
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "column",
+                  }} // Cố định layout cha
                 >
                   {/* thanh tìm kiếm chặn click lan truyền */}
                   <div
                     className="sc-select-search-box"
                     onClick={(e) => e.stopPropagation()}
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      backgroundColor: "#fff",
+                      zIndex: 2,
+                    }} // Ghim thanh tìm kiếm
                   >
                     <input
                       type="text"
@@ -259,24 +270,27 @@ export default function TradeInForm() {
                     />
                   </div>
 
-                  {filteredCategories.length > 0 ? (
-                    filteredCategories.map((cat) => (
-                      <div
-                        key={cat.id}
-                        className={`sc-select-option ${formData.category === cat.id ? "selected" : ""}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCategorySelect(cat.id);
-                        }}
-                      >
-                        {cat.name}
+                  {/* Vùng cuộn chứa danh sách Category */}
+                  <div style={{ maxHeight: "250px", overflowY: "auto" }}>
+                    {filteredCategories.length > 0 ? (
+                      filteredCategories.map((cat) => (
+                        <div
+                          key={cat.id}
+                          className={`sc-select-option ${formData.category === cat.id ? "selected" : ""}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCategorySelect(cat.id);
+                          }}
+                        >
+                          {cat.name}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="sc-select-option-empty">
+                        No categories found
                       </div>
-                    ))
-                  ) : (
-                    <div className="sc-select-option-empty">
-                      No categories found
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

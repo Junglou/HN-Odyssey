@@ -8,6 +8,9 @@ export interface LoginResponse {
     full_name: string;
     roles: string[];
     avatar?: string;
+    status: string;
+    permissions?: string[];
+    is_portal_access?: boolean;
   };
 }
 

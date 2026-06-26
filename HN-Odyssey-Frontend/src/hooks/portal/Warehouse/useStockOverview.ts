@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
-import { toast } from "react-toastify"; // ĐÃ THÊM THƯ VIỆN THÔNG BÁO
+import { toast } from "react-toastify";
 import axiosClient from "../../../api/axiosClient";
 
 export type StockStatusColor = "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK";
@@ -48,6 +48,25 @@ export interface ThresholdPayload {
   maxStock: number;
 }
 
+// DI CHUYỂN HÀM RA NGOÀI HOOK ĐỂ GIẢI QUYẾT LỖI DEPENDENCY VÀ TỐI ƯU HIỆU SUẤT
+const flattenCategoriesForStock = (
+  nodes: CategoryTree[],
+  parentPath = "",
+): { value: string; label: string }[] => {
+  let result: { value: string; label: string }[] = [];
+  for (const node of nodes) {
+    const currentPath = parentPath ? `${parentPath} > ${node.name}` : node.name;
+    // Giữ nguyên value là slug để BE filter chính xác
+    result.push({ value: node.slug, label: currentPath });
+    if (node.children && node.children.length > 0) {
+      result = result.concat(
+        flattenCategoriesForStock(node.children, currentPath),
+      );
+    }
+  }
+  return result;
+};
+
 export function useStockOverview() {
   // --- STATES ---
   const [data, setData] = useState<StockRowData[]>([]);
@@ -89,20 +108,19 @@ export function useStockOverview() {
   // --- FETCH DATA ---
   const fetchCategories = useCallback(async () => {
     try {
+      // Dùng endpoint admin để lấy chuẩn xác cấu trúc tree giống Promotion
       const response = await axiosClient.get<CategoryTree[]>(
-        "/categories/tree-view",
+        "/categories/admin/tree-view",
       );
-      const fetchedCats = response.data.map((cat) => ({
-        value: cat.slug,
-        label: cat.name,
-      }));
+      const fetchedCats = flattenCategoriesForStock(response.data);
+
       setCategories([
         { value: "all", label: "All Categories" },
         ...fetchedCats,
       ]);
     } catch (error) {
       console.error("Failed to fetch categories", error);
-      toast.error("Lỗi khi tải danh mục sản phẩm"); // Đã thêm toast
+      toast.error("Lỗi khi tải danh mục sản phẩm");
     }
   }, []);
 
@@ -132,7 +150,7 @@ export function useStockOverview() {
       }));
     } catch (error) {
       console.error("Fetch stock failed", error);
-      toast.error("Lỗi khi tải danh sách tồn kho"); // Đã thêm toast
+      toast.error("Lỗi khi tải danh sách tồn kho");
     } finally {
       setLoading(false);
     }
@@ -272,7 +290,6 @@ export function useStockOverview() {
         });
         setRefetchTrigger((prev) => prev + 1);
       } catch (error: unknown) {
-        // SỬA 'any' THÀNH 'unknown'
         console.error(error);
 
         // Ép kiểu an toàn cho error để lấy message
@@ -307,7 +324,6 @@ export function useStockOverview() {
         });
         setRefetchTrigger((prev) => prev + 1);
       } catch (error: unknown) {
-        // SỬA 'any' THÀNH 'unknown'
         console.error(error);
 
         // Ép kiểu an toàn cho error

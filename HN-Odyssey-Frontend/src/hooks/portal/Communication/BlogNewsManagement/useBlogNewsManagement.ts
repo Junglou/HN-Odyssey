@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
 
-// --- INTERFACES & TYPES ---
+// interfaces and types
 export type BlogNewsStatus = "Published" | "Draft" | "Hidden";
 
 interface CategoryTree {
@@ -57,6 +57,7 @@ export interface BlogNewsRecord {
   title: string;
   slug: string;
   category: string;
+  categoryId: string;
   author: string;
   status: BlogNewsStatus;
   publishDate: string;
@@ -95,7 +96,7 @@ interface PaginatedData<T> {
   };
 }
 
-// --- UTILS ---
+// utils
 export const generateSlug = (title: string): string => {
   return title
     .toLowerCase()
@@ -108,10 +109,10 @@ export const generateSlug = (title: string): string => {
 
 export const getFullImageUrl = (path: string) => {
   if (!path) return "";
-  // Nếu đã là link web hoặc base64 thì giữ nguyên
+  // nếu đã là link web hoặc base64 thì giữ nguyên
   if (path.startsWith("http") || path.startsWith("data:image")) return path;
 
-  // Lấy VITE_API_URL (VD: http://localhost:8080/api) và cắt bỏ chữ /api đi
+  // lấy biến môi trường và cắt bỏ chữ api ở đuôi
   const baseUrl = import.meta.env.VITE_API_URL
     ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, "")
     : "http://localhost:8080";
@@ -119,7 +120,7 @@ export const getFullImageUrl = (path: string) => {
   return `${baseUrl}${path.startsWith("/") ? "" : "/"}${path}`;
 };
 
-// Hàm phụ trợ: Cắt domain BE đi để gửi path tương đối gọn gàng xuống DB lưu trữ
+// hàm phụ trợ cắt domain backend để gửi path tương đối xuống database lưu trữ
 export const getRelativeImageUrl = (fullUrl: string) => {
   if (!fullUrl) return "";
   const baseUrl = import.meta.env.VITE_API_URL
@@ -140,6 +141,12 @@ const mapBEToFE = (post: BEPostResponse): BlogNewsRecord => ({
     typeof post.category_id === "object" && post.category_id !== null
       ? post.category_id.name || "Uncategorized"
       : "Uncategorized",
+  categoryId:
+    typeof post.category_id === "object" && post.category_id !== null
+      ? post.category_id._id
+      : typeof post.category_id === "string"
+        ? post.category_id
+        : "",
   author: post.author_id
     ? post.author_id.full_name ||
       post.author_id.name ||
@@ -194,22 +201,23 @@ const base64ToFile = async (
   return new File([blob], fileName, { type: blob.type });
 };
 
-// 2. DI CHUYỂN HÀM NÀY RA NGOÀI HOÀN TOÀN (Bên trên export function useBlogNewsManagement)
-// Đã thay 'any' bằng 'CategoryTree' để fix lỗi Eslint line 202
+// di chuyển hàm này ra ngoài hoàn toàn
 const flattenCategories = (
   categories: CategoryTree[],
+  parentPath = "",
 ): BECategoryResponse[] => {
   let flatList: BECategoryResponse[] = [];
   for (const cat of categories) {
-    flatList.push({ _id: cat._id, name: cat.name });
+    const currentPath = parentPath ? `${parentPath} > ${cat.name}` : cat.name;
+    flatList.push({ _id: cat._id, name: currentPath });
     if (cat.children && cat.children.length > 0) {
-      flatList = flatList.concat(flattenCategories(cat.children));
+      flatList = flatList.concat(flattenCategories(cat.children, currentPath));
     }
   }
   return flatList;
 };
 
-// --- MAIN HOOK ---
+// main hook
 export function useBlogNewsManagement() {
   const [records, setRecords] = useState<BlogNewsRecord[]>([]);
   const [categoriesList, setCategoriesList] = useState<BECategoryResponse[]>(
@@ -254,7 +262,6 @@ export function useBlogNewsManagement() {
       if (search) params.search = search;
       if (statusFilter !== "All") params.status = statusFilter.toUpperCase();
 
-      // ĐÃ SỬA URL Ở ĐÂY: Dùng đúng Endpoint của dự án
       const [resPosts, resCats, resProds] = await Promise.all([
         axiosClient.get<ApiResponse<PaginatedData<BEPostResponse>>>(
           "/marketing/content/posts",
@@ -266,16 +273,15 @@ export function useBlogNewsManagement() {
           .catch(() => null),
       ]);
 
-      // Xử lý Bài viết (Giữ nguyên vì đã chuẩn BaseResponse)
+      // xử lý bài viết
       if (resPosts.data?.success) {
         setRecords(resPosts.data.data.data.map(mapBEToFE));
         setTotalFiltered(resPosts.data.data.meta.totalItems);
         setTotalPages(resPosts.data.data.meta.totalPages);
       }
 
-      // Xử lý Danh mục (Tránh lỗi cây thư mục và không có BaseResponse)
+      // xử lý danh mục
       if (resCats?.data) {
-        // Backend có thể trả thẳng mảng array, hoặc bọc trong data
         const catData = Array.isArray(resCats.data)
           ? resCats.data
           : resCats.data.data;
@@ -284,9 +290,8 @@ export function useBlogNewsManagement() {
         }
       }
 
-      // Xử lý Sản phẩm
+      // xử lý sản phẩm
       if (resProds?.data) {
-        // Backend có thể trả về Pagination Object { data: [], meta: {} } hoặc Array
         const prodData = Array.isArray(resProds.data)
           ? resProds.data
           : resProds.data.data || [];
@@ -344,20 +349,49 @@ export function useBlogNewsManagement() {
       editingRecord: null,
       isSubmitting: false,
     });
-  const openEditDrawer = (record: BlogNewsRecord) =>
-    setDrawerConfig({
-      isOpen: true,
-      mode: "edit",
-      editingRecord: record,
-      isSubmitting: false,
-    });
-  const openViewDrawer = (record: BlogNewsRecord) =>
-    setDrawerConfig({
-      isOpen: true,
-      mode: "view",
-      editingRecord: record,
-      isSubmitting: false,
-    });
+
+  // gọi api lấy chi tiết bài viết để lấy đầy đủ trường content phục vụ việc edit
+  const openEditDrawer = async (record: BlogNewsRecord) => {
+    try {
+      const res = await axiosClient.get(
+        `/marketing/content/posts/${record.id}/detail`,
+      );
+      if (res.data?.success) {
+        const fullRecord = mapBEToFE(res.data.data);
+        setDrawerConfig({
+          isOpen: true,
+          mode: "edit",
+          editingRecord: fullRecord,
+          isSubmitting: false,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch post detail:", error);
+      toast.error("Đã xảy ra lỗi khi tải chi tiết bài viết!");
+    }
+  };
+
+  // gọi api lấy chi tiết bài viết để lấy đầy đủ trường content phục vụ việc view
+  const openViewDrawer = async (record: BlogNewsRecord) => {
+    try {
+      const res = await axiosClient.get(
+        `/marketing/content/posts/${record.id}/detail`,
+      );
+      if (res.data?.success) {
+        const fullRecord = mapBEToFE(res.data.data);
+        setDrawerConfig({
+          isOpen: true,
+          mode: "view",
+          editingRecord: fullRecord,
+          isSubmitting: false,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch post detail:", error);
+      toast.error("Đã xảy ra lỗi khi tải chi tiết bài viết!");
+    }
+  };
+
   const closeDrawer = () =>
     setDrawerConfig((prev) => ({ ...prev, isOpen: false }));
 

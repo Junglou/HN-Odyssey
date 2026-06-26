@@ -37,6 +37,7 @@ import type {
 } from 'src/common/interfaces/OAuthProfile';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
+import { Role, RoleDocument } from '../users/roles/schemas/role.schema';
 
 @Injectable()
 export class AuthService {
@@ -56,7 +57,41 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly auditLogsService: AuditLogsService,
     private readonly eventEmitter: EventEmitter2,
+    @InjectModel(Role.name) private readonly roleModel: Model<RoleDocument>,
   ) {}
+
+  // Helper lấy động Permissions từ DB
+  private async resolveUserPermissions(
+    roles: string[],
+  ): Promise<{ permissions: string[]; is_portal_access: boolean }> {
+    const isPortalAccess = roles.some((role) => role !== 'CUSTOMER');
+
+    const userRolesDb = await this.roleModel
+      .find({ slug: { $in: roles }, is_active: true })
+      .select('permissions')
+      .exec();
+
+    const permissionsSet = new Set<string>();
+
+    userRolesDb.forEach((role) => {
+      if (role.permissions && Array.isArray(role.permissions)) {
+        role.permissions.forEach((p) => {
+          const resource = p.resource as unknown as string;
+          const actions = p.actions as unknown as string[];
+          if (actions && Array.isArray(actions)) {
+            actions.forEach((action) => {
+              permissionsSet.add(`${resource}:${action}`);
+            });
+          }
+        });
+      }
+    });
+
+    return {
+      permissions: Array.from(permissionsSet),
+      is_portal_access: isPortalAccess,
+    };
+  }
 
   //1. ĐĂNG KÝ TÀI KHOẢN (US.01)
   async register(dto: RegisterDto, ip: string, userAgent: string) {
@@ -313,6 +348,9 @@ export class AuthService {
         { new: true },
       )) as UserDocument;
 
+      const { permissions, is_portal_access } =
+        await this.resolveUserPermissions(user.roles);
+
       if (!user)
         throw new NotFoundException('Không tìm thấy tài khoản tương ứng.');
 
@@ -354,6 +392,8 @@ export class AuthService {
           full_name: user.last_Name + ' ' + user.first_Name,
           roles: user.roles,
           status: user.status,
+          permissions: permissions,
+          is_portal_access: is_portal_access,
         },
       };
     }
@@ -492,10 +532,13 @@ export class AuthService {
 
   //5. LOGIN
   private async generateAccessToken(user: UserDocument) {
+    // Tự động đính kèm quyền CUSTOMER cho mọi loại tài khoản
+    const mergedRoles = Array.from(new Set([...user.roles, 'CUSTOMER']));
+
     const payload = {
       sub: user._id.toString(),
       email: user.email,
-      roles: user.roles,
+      roles: mergedRoles, // Dùng mảng đã gộp
       token_version: user.token_version ?? 0,
     };
 
@@ -512,10 +555,13 @@ export class AuthService {
     user: UserDocument,
     isRemember: boolean,
   ): Promise<string> {
+    // Tự động đính kèm quyền CUSTOMER
+    const mergedRoles = Array.from(new Set([...user.roles, 'CUSTOMER']));
+
     const payload = {
       sub: user._id.toString(),
       email: user.email,
-      roles: user.roles,
+      roles: mergedRoles, // Dùng mảng đã gộp
       token_version: user.token_version ?? 0,
     };
 
@@ -542,10 +588,9 @@ export class AuthService {
 
     const hashed = await bcrypt.hash(refreshToken, 10);
 
-    // FIX: Luôn luôn cập nhật last_login_at cho bất kỳ ai login thành công
-    const updatePayload: Record<string, any> = {
+    const updatePayload: Record<string, unknown> = {
       refresh_token: hashed,
-      last_login_at: new Date(), // Cập nhật cho mọi user
+      last_login_at: new Date(),
     };
 
     await this.userModel.updateOne({ _id: user._id }, { $set: updatePayload });
@@ -555,6 +600,11 @@ export class AuthService {
       const staffUser = user as unknown as Staff;
       employeeCode = staffUser.employee_code;
     }
+
+    // Sử dụng mảng gộp để lấy Permissions chính xác
+    const mergedRoles = Array.from(new Set([...user.roles, 'CUSTOMER']));
+    const { permissions, is_portal_access } =
+      await this.resolveUserPermissions(mergedRoles);
 
     this.eventEmitter.emit('user.logged_in', {
       userId: user._id.toString(),
@@ -572,7 +622,7 @@ export class AuthService {
       target_id: user._id.toString(),
       department: Department.SUPPORT,
       detail: {
-        roles: user.roles,
+        roles: mergedRoles, // Lưu lại mảng roles thực tế đã cấp
         method: user.social_auth ? 'OAUTH' : 'LOCAL',
         remember_me: isRemember,
       },
@@ -587,9 +637,11 @@ export class AuthService {
         _id: user._id,
         email: user.email,
         full_name: user.fullName,
-        roles: user.roles,
+        roles: mergedRoles,
         avatar: user.avatar,
         status: user.status,
+        permissions: permissions,
+        is_portal_access: is_portal_access,
       },
     };
   }

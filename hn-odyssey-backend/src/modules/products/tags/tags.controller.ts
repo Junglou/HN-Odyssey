@@ -37,7 +37,8 @@ export class TagsController {
   }
 
   @Get()
-  @Public()
+  // @Public()
+  @RequirePermissions(Resource.ATTRIBUTES, Action.READ)
   findAll(@Query('scope') scope?: TagScope) {
     return this.tagsService.findAll(scope);
   }

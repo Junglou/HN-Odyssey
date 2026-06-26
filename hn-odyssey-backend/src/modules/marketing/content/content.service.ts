@@ -103,6 +103,7 @@ export class ContentService {
     const [data, total] = await Promise.all([
       this.pageModel
         .find(filter)
+        .select('-content')
         .sort({ created_at: -1 })
         .skip(skip)
         .limit(limit)
@@ -210,6 +211,7 @@ export class ContentService {
     const [data, total] = await Promise.all([
       this.postModel
         .find(filter)
+        .select('-content')
         .populate('embedded_product_ids', 'name price thumbnail')
         .populate('author_id', 'email full_name name') // Kéo info user
         .populate('category_id', 'name')
@@ -229,6 +231,15 @@ export class ContentService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  async findPostById(id: string) {
+    const post = await this.postModel
+      .findById(id)
+      .populate('embedded_product_ids', 'name price thumbnail')
+      .lean();
+    if (!post) throw new NotFoundException('Không tìm thấy bài viết');
+    return post;
   }
 
   async softDeletePost(id: string, userId: string, email: string) {

@@ -211,7 +211,7 @@ export const router = createBrowserRouter([
   {
     path: "/portal",
     element: (
-      <AuthGuard excludedRoles={["CUSTOMER"]}>
+      <AuthGuard requirePortalAccess={true}>
         <PortalLayout />
       </AuthGuard>
     ),
