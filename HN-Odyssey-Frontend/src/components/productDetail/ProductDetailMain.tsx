@@ -19,6 +19,17 @@ interface ProductDetailMainProps {
   onQuantityBlur: () => void;
 }
 
+// KHAI BÁO HELPER Ở ĐÂY (NGOÀI COMPONENT)
+const generateShortDesc = (
+  htmlString?: string,
+  maxLength: number = 120,
+): string => {
+  if (!htmlString) return "";
+  const cleanText = htmlString.replace(/<[^>]+>/g, "");
+  if (cleanText.length <= maxLength) return cleanText;
+  return cleanText.substring(0, maxLength) + "...";
+};
+
 export default function ProductDetailMain({
   product,
   selectedOptions,
@@ -57,14 +68,14 @@ export default function ProductDetailMain({
       : "/Logo.png";
 
   const safeQuantity = typeof quantity === "number" ? quantity : 1;
-  const isOutOfStock = product.stock <= 0;
+  const isOutOfStock = product.stock - (product.stockOnHold || 0) <= 0;
 
   // Xử lý fallback khi URL ảnh bị chết (404) hoặc nhập bậy bạ
   const handleImageError = (
     e: React.SyntheticEvent<HTMLImageElement, Event>,
   ) => {
     e.currentTarget.src = "/Logo.png";
-    e.currentTarget.onerror = null; // Chống lặp vô hạn nếu bản thân Logo.png cũng lỗi
+    e.currentTarget.onerror = null;
   };
 
   return (
@@ -119,7 +130,9 @@ export default function ProductDetailMain({
               </span>
             )}
           </div>
-          <p className="pdp-desc">{product.desc}</p>
+
+          {/* GỌI HÀM SHORT DESC TẠI ĐÂY */}
+          <p className="pdp-desc">{generateShortDesc(product.details)}</p>
 
           {/* RENDER ĐỘNG TẤT CẢ THUỘC TÍNH */}
           {product.options.map((option) => {
@@ -170,7 +183,10 @@ export default function ProductDetailMain({
           <div className="pdp-option-group">
             <div className="pdp-option-header">
               <span className="pdp-option-label">Quantity</span>
-              <span className="pdp-option-value">Kho: {product.stock}</span>
+              {/* LƯU Ý: Nếu muốn hiển thị số lượng Available thay vì Stock tổng, bạn phải sửa chỗ này dựa vào data BE trả về */}
+              <span className="pdp-option-value">
+                Kho: {product.stock - (product.stockOnHold || 0)}
+              </span>
             </div>
             <div className="pdp-quantity-selector">
               <button

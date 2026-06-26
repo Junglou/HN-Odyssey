@@ -88,7 +88,7 @@ export default function BlogNewsManagement({
               <input
                 type="text"
                 className="ban-filter-input"
-                placeholder="Search by Title, Category or Author"
+                placeholder="Search by Title"
                 value={search}
                 onChange={(e) => actions.changeSearch(e.target.value)}
               />

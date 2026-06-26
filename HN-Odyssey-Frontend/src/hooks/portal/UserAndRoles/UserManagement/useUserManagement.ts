@@ -99,6 +99,7 @@ export function useUserManagement() {
     status: "Status",
     role: "Role",
   });
+  const [debouncedSearch, setDebouncedSearch] = useState(filters.search);
 
   const [pagination, setPagination] = useState({ page: 1, limit: 10 });
   const [totalPages, setTotalPages] = useState(1);
@@ -148,6 +149,16 @@ export function useUserManagement() {
     }
   }, []);
 
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (debouncedSearch !== filters.search) {
+        setDebouncedSearch(filters.search);
+        setPagination((prev) => ({ ...prev, page: 1 }));
+      }
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [filters.search, debouncedSearch]);
+
   const fetchList = useCallback(async () => {
     try {
       const params: Record<string, string | number> = {
@@ -155,7 +166,7 @@ export function useUserManagement() {
         limit: pagination.limit,
       };
 
-      if (filters.search) params.search = filters.search;
+      if (debouncedSearch) params.search = debouncedSearch;
       if (filters.status && filters.status !== "Status")
         params.status = filters.status;
       if (filters.role && filters.role !== "Role") params.role = filters.role;
@@ -188,7 +199,13 @@ export function useUserManagement() {
     } catch {
       toast.error("Không thể tải danh sách người dùng.");
     }
-  }, [pagination.page, pagination.limit, filters]);
+  }, [
+    pagination.page,
+    pagination.limit,
+    debouncedSearch,
+    filters.status,
+    filters.role,
+  ]);
 
   useEffect(() => {
     const initData = async () => {
@@ -291,7 +308,9 @@ export function useUserManagement() {
   const actions = {
     changeFilter: (key: keyof typeof filters, val: string) => {
       setFilters((prev) => ({ ...prev, [key]: val }));
-      setPagination((prev) => ({ ...prev, page: 1 }));
+      if (key !== "search") {
+        setPagination((prev) => ({ ...prev, page: 1 }));
+      }
     },
     clearFilter: () => {
       setFilters({ search: "", status: "Status", role: "Role" });

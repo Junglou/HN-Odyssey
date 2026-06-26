@@ -426,7 +426,7 @@ export default function OrderManagement({
                         const minutes = Math.floor(
                           (remainingMs % (1000 * 60 * 60)) / (1000 * 60),
                         );
-                        remainingTimeText = `Refund ends: ${hours}h ${minutes}m`;
+                        remainingTimeText = `Status locks in: ${hours}h ${minutes}m`;
                       }
                     }
                   }

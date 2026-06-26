@@ -187,9 +187,11 @@ export function usePriceManagement() {
     startIndex,
     startIndex + pagination.limit,
   );
-
   const actions = {
-    changeSearch: (val: string) => setSearch(val),
+    changeSearch: (val: string) => {
+      setSearch(val);
+      setPagination((p) => ({ ...p, page: 1 }));
+    },
     changeStatusFilter: (status: PriceStatus | "All") =>
       setStatusFilter(status),
     changeCurrencyFilter: (currency: string) => setCurrencyFilter(currency),

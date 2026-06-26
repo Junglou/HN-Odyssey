@@ -217,7 +217,7 @@ export default function CouponManagement({
               <input
                 type="text"
                 className="coupon-filter-input with-icon"
-                placeholder="Search by name, type"
+                placeholder="Search by code"
                 value={search}
                 onChange={(e) => actions.changeSearch(e.target.value)}
               />

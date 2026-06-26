@@ -128,8 +128,38 @@ export class CustomersAdminService {
     if (keyword) {
       const searchRegex = { $regex: keyword, $options: 'i' };
       filter.$or = [
-        { first_Name: searchRegex },
-        { last_Name: searchRegex },
+        // Ghép chuỗi theo thứ tự: last_Name + " " + first_Name
+        {
+          $expr: {
+            $regexMatch: {
+              input: {
+                $concat: [
+                  { $ifNull: ['$last_Name', ''] },
+                  ' ',
+                  { $ifNull: ['$first_Name', ''] },
+                ],
+              },
+              regex: keyword,
+              options: 'i',
+            },
+          },
+        },
+        // Ghép chuỗi theo thứ tự: first_Name + " " + last_Name (để dự phòng user gõ ngược)
+        {
+          $expr: {
+            $regexMatch: {
+              input: {
+                $concat: [
+                  { $ifNull: ['$first_Name', ''] },
+                  ' ',
+                  { $ifNull: ['$last_Name', ''] },
+                ],
+              },
+              regex: keyword,
+              options: 'i',
+            },
+          },
+        },
         { email: searchRegex },
         { phone: searchRegex },
       ];
