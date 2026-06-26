@@ -442,10 +442,39 @@ export class AdminService {
     };
 
     if (search) {
+      const searchRegex = { $regex: search, $options: 'i' };
       filter.$or = [
-        { email: { $regex: search, $options: 'i' } }, // Tìm theo email (không phân biệt hoa thường)
-        { first_Name: { $regex: search, $options: 'i' } }, // Tìm theo tên
-        { last_Name: { $regex: search, $options: 'i' } }, // Tìm theo họ
+        {
+          $expr: {
+            $regexMatch: {
+              input: {
+                $concat: [
+                  { $ifNull: ['$last_Name', ''] },
+                  ' ',
+                  { $ifNull: ['$first_Name', ''] },
+                ],
+              },
+              regex: search,
+              options: 'i',
+            },
+          },
+        },
+        {
+          $expr: {
+            $regexMatch: {
+              input: {
+                $concat: [
+                  { $ifNull: ['$first_Name', ''] },
+                  ' ',
+                  { $ifNull: ['$last_Name', ''] },
+                ],
+              },
+              regex: search,
+              options: 'i',
+            },
+          },
+        },
+        { email: searchRegex },
       ];
     }
 

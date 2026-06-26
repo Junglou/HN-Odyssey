@@ -38,6 +38,7 @@ export interface ProductDetailState {
   price: number;
   originalPrice?: number;
   stock: number;
+  stockOnHold: number; // [BỔ SUNG] Thêm trường này để quản lý hàng tạm giữ
   desc: string;
   details: string;
   hasVariants: boolean;
@@ -61,6 +62,7 @@ interface BeVariant {
   price: number;
   sale_price: number;
   stock: number;
+  stock_on_hold?: number; // [BỔ SUNG] Từ backend trả về
   images?: string[];
   active: boolean;
   attributes: BeAttribute[];
@@ -79,6 +81,7 @@ interface BeProduct {
   price: number;
   sale_price: number;
   stock: number;
+  stock_on_hold?: number; // [BỔ SUNG] Từ backend trả về
   short_description?: string;
   description?: string;
   thumbnail: string;
@@ -264,6 +267,7 @@ export function useProductDetail() {
           originalPrice:
             beSalePrice > 0 && beSalePrice < bePrice ? bePrice : undefined,
           stock: beData.stock,
+          stockOnHold: beData.stock_on_hold || 0, // [BỔ SUNG] Map dữ liệu stock_on_hold
           desc:
             beData.short_description ||
             beData.description?.replace(/<[^>]+>/g, "").substring(0, 150) ||
@@ -302,7 +306,6 @@ export function useProductDetail() {
               const matchedAttr = defaultVariant.attributes.find(
                 (a) => a.code.toLowerCase() === opt.code.toLowerCase(),
               );
-              // Đồng bộ giá trị khởi tạo chính xác với cấu trúc đã chuẩn hóa
               const matchedUiValue = matchedAttr
                 ? opt.values.find(
                     (v) =>
@@ -324,7 +327,6 @@ export function useProductDetail() {
           beData.variants &&
           beData.variants.length > 0
         ) {
-          // Bắt buộc so sánh không phân biệt hoa thường
           const matchedVariant = beData.variants.find((v) => {
             return v.attributes.every(
               (attr) =>
@@ -356,6 +358,7 @@ export function useProductDetail() {
     let finalPrice = product.price;
     let finalOriginalPrice = product.originalPrice;
     let finalStock = product.stock;
+    let finalStockOnHold = product.stockOnHold; // [BỔ SUNG]
     let finalSku = product.sku;
     let filteredImages: string[] = [];
 
@@ -364,7 +367,6 @@ export function useProductDetail() {
       rawBeProduct?.variants &&
       rawBeProduct.variants.length > 0
     ) {
-      // Bắt buộc so sánh không phân biệt hoa thường
       const matchedVariant = rawBeProduct.variants.find((v) => {
         return v.attributes.every(
           (attr) =>
@@ -380,7 +382,6 @@ export function useProductDetail() {
         ? selectedOptions[primaryOptionCode]
         : null;
 
-      // Bắt buộc so sánh không phân biệt hoa thường
       const relatedVariants = rawBeProduct.variants.filter((v) => {
         return v.attributes.some(
           (attr) =>
@@ -405,6 +406,7 @@ export function useProductDetail() {
             ? matchedVariant.price
             : undefined;
         finalStock = matchedVariant.active === false ? 0 : matchedVariant.stock;
+        finalStockOnHold = matchedVariant.stock_on_hold || 0; // [BỔ SUNG] Lấy hàng tạm giữ của biến thể
         finalSku = matchedVariant.sku || product.sku;
 
         if (matchedVariant.images && matchedVariant.images.length > 0) {
@@ -416,6 +418,7 @@ export function useProductDetail() {
         }
       } else {
         finalStock = 0;
+        finalStockOnHold = 0;
         finalSku = "";
       }
     }
@@ -429,6 +432,7 @@ export function useProductDetail() {
       price: finalPrice,
       originalPrice: finalOriginalPrice,
       stock: finalStock,
+      stockOnHold: finalStockOnHold, // [BỔ SUNG] Trả ra cho UI
       sku: finalSku,
       images: filteredImages,
     };
@@ -442,11 +446,16 @@ export function useProductDetail() {
         : parseInt(rawQuantity as string, 10);
     if (isNaN(q) || q < 1) return 1;
 
-    const maxStock = derivedProduct?.stock || 1;
-    if (maxStock === 0) return 1;
-    if (q > maxStock) return maxStock;
+    // [BỔ SUNG] Tính Available Stock thay vì Total Stock
+    const availableStock = Math.max(
+      0,
+      (derivedProduct?.stock || 0) - (derivedProduct?.stockOnHold || 0),
+    );
+
+    if (availableStock === 0) return 1;
+    if (q > availableStock) return availableStock;
     return q;
-  }, [rawQuantity, derivedProduct?.stock]);
+  }, [rawQuantity, derivedProduct?.stock, derivedProduct?.stockOnHold]);
 
   const handleOptionChange = (code: string, value: string) => {
     const nextOptions = { ...selectedOptions, [code]: value };
@@ -458,11 +467,16 @@ export function useProductDetail() {
 
   const handleQuantityChange = (type: "inc" | "dec") => {
     const current = typeof quantity === "number" ? quantity : 1;
-    const maxStock = derivedProduct?.stock || 1;
+
+    // [BỔ SUNG] Tính Available Stock
+    const availableStock = Math.max(
+      0,
+      (derivedProduct?.stock || 0) - (derivedProduct?.stockOnHold || 0),
+    );
     let next = current;
 
     if (type === "dec" && current > 1) next = current - 1;
-    if (type === "inc" && current < maxStock) next = current + 1;
+    if (type === "inc" && current < availableStock) next = current + 1;
     setRawQuantity(next);
   };
 

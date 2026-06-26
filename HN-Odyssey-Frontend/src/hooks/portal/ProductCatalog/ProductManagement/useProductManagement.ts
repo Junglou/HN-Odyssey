@@ -22,6 +22,7 @@ export interface ProductVariantItem {
   sku?: string;
   price: number;
   sale_price?: number;
+  stock?: number;
   attributes?: { code: string; value: string }[];
 }
 
@@ -33,9 +34,19 @@ export interface Product {
   status: ProductStatus;
   price: number;
   sale_price?: number;
+  stock?: number;
   currency?: string;
   has_variants?: boolean;
   variants?: ProductVariantItem[];
+}
+
+export interface ApiErrorResponse {
+  response?: {
+    data?: {
+      message?: string | string[];
+    };
+  };
+  message?: string;
 }
 
 export interface DropdownOption {
@@ -85,7 +96,7 @@ export function useProductManagement() {
         setDebouncedSearch(filters.search);
         setPagination((prev) => ({ ...prev, page: 1 }));
       }
-    }, 500);
+    }, 300);
     return () => clearTimeout(handler);
   }, [filters.search, debouncedSearch]);
 
@@ -192,11 +203,35 @@ export function useProductManagement() {
 
       if (newStatusBE === "ACTIVE") {
         const targetProduct = products.find((p) => p._id === id);
-        if (targetProduct && targetProduct.price <= 0) {
-          toast.warning(
-            "Sản phẩm chưa có giá được duyệt xong (Giá = 0). Không thể kích hoạt!",
-          );
-          return;
+        if (targetProduct) {
+          if (!targetProduct.has_variants) {
+            // Kiểm tra giá của sản phẩm đơn
+            if (targetProduct.price <= 0) {
+              toast.warning(
+                "Sản phẩm chưa có giá được duyệt xong (Giá = 0). Không thể kích hoạt!",
+              );
+              return;
+            }
+            // Kiểm tra số lượng tồn kho của sản phẩm đơn
+            if ((targetProduct.stock || 0) <= 0) {
+              toast.warning(
+                "Sản phẩm chưa được nhập kho (Số lượng = 0). Không thể kích hoạt!",
+              );
+              return;
+            }
+          } else {
+            // Kiểm tra gộp cho sản phẩm biến thể: ít nhất 1 biến thể phải hoàn thiện cả giá lẫn kho
+            const hasValidVariant = targetProduct.variants?.some(
+              (v) => (v.price || 0) > 0 && (v.stock || 0) > 0,
+            );
+
+            if (!hasValidVariant) {
+              toast.warning(
+                "Sản phẩm phải có ít nhất một biến thể thoả mãn CẢ 2 ĐIỀU KIỆN (giá > 0 VÀ tồn kho > 0) mới được phép kích hoạt!",
+              );
+              return;
+            }
+          }
         }
       }
 
@@ -207,8 +242,12 @@ export function useProductManagement() {
         toast.success("Cập nhật trạng thái thành công");
         fetchProducts();
       } catch (error: unknown) {
-        const err = error as { message?: string | string[] };
-        const msg = err?.message || "Lỗi khi cập nhật trạng thái";
+        // Ép kiểu an toàn thông qua Interface đã khai báo để tránh eslint báo lỗi any
+        const err = error as ApiErrorResponse;
+        const msg =
+          err.response?.data?.message ||
+          err.message ||
+          "Lỗi khi cập nhật trạng thái";
         toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
       }
     },
@@ -224,18 +263,62 @@ export function useProductManagement() {
       }
 
       const newStatusBE = action === "activate" ? "ACTIVE" : "INACTIVE";
+      let validIdsToUpdate = [...selectedIds];
+
+      // thực hiện lọc loại trừ trước khi đẩy dữ liệu xuống máy chủ
+      if (newStatusBE === "ACTIVE") {
+        const invalidSkus: string[] = [];
+
+        validIdsToUpdate = selectedIds.filter((id) => {
+          const targetProduct = products.find((p) => p._id === id);
+          if (!targetProduct) return false;
+
+          if (!targetProduct.has_variants) {
+            if (targetProduct.price <= 0 || (targetProduct.stock || 0) <= 0) {
+              invalidSkus.push(targetProduct.sku);
+              return false;
+            }
+          } else {
+            const hasValidVariant = targetProduct.variants?.some(
+              (v) => (v.price || 0) > 0 && (v.stock || 0) > 0,
+            );
+            if (!hasValidVariant) {
+              invalidSkus.push(targetProduct.sku);
+              return false;
+            }
+          }
+          return true;
+        });
+
+        if (invalidSkus.length > 0) {
+          toast.warning(
+            `Các sản phẩm sau bị loại khỏi danh sách kích hoạt do chưa đủ điều kiện (giá = 0 hoặc tồn kho = 0): ${invalidSkus.join(", ")}`,
+          );
+        }
+
+        // chặn tiến trình gọi api nếu danh sách lọc không còn sản phẩm nào hợp lệ
+        if (validIdsToUpdate.length === 0) {
+          return;
+        }
+      }
+
       try {
         const res = await axiosClient.patch(`/products/bulk/status`, {
-          product_ids: selectedIds,
+          product_ids: validIdsToUpdate,
           status: newStatusBE,
         });
 
-        toast.success(res.data?.message || `Đã xử lý hàng loạt thành công.`);
+        toast.success(res.data?.message || "Đã xử lý hàng loạt thành công.");
         setSelectedIds([]);
         fetchProducts();
       } catch (error: unknown) {
-        const err = error as { message?: string | string[] };
-        const msg = err?.message || "Có lỗi xảy ra.";
+        // trích xuất và hiển thị chính xác nguyên nhân từ chối trả về từ máy chủ
+        const err = error as ApiErrorResponse;
+        const msg =
+          err.response?.data?.message ||
+          err.message ||
+          "Có lỗi xảy ra trong quá trình xử lý.";
+
         toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
         fetchProducts();
       }

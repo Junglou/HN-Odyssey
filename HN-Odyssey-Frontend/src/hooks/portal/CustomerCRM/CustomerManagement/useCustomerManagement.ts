@@ -98,6 +98,7 @@ const mapBEToType = (beTier?: string): CustomerType => {
 export function useCustomerManagement() {
   const [records, setRecords] = useState<CustomerRecord[]>([]);
   const [search, setSearch] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<CustomerStatus | "All">(
     "All",
   );
@@ -121,6 +122,17 @@ export function useCustomerManagement() {
     isSubmitting: false,
   });
 
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (debouncedSearch !== search) {
+        setDebouncedSearch(search);
+        // Reset page về 1 khi search thay đổi
+        setPagination((p) => ({ ...p, page: 1 }));
+      }
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [search, debouncedSearch]);
+
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
     mode: "add" | "edit" | "view";
@@ -135,7 +147,8 @@ export function useCustomerManagement() {
         limit: pagination.limit.toString(),
       });
 
-      if (search.trim()) queryParams.append("keyword", search.trim());
+      if (debouncedSearch.trim())
+        queryParams.append("keyword", debouncedSearch.trim());
       if (statusFilter !== "All")
         queryParams.append("status", mapStatusToBE(statusFilter));
       if (typeFilter !== "All")
@@ -177,7 +190,13 @@ export function useCustomerManagement() {
       toast.error("Không thể tải danh sách khách hàng từ hệ thống.");
       console.error("Fetch Error:", error);
     }
-  }, [pagination.page, pagination.limit, search, statusFilter, typeFilter]);
+  }, [
+    pagination.page,
+    pagination.limit,
+    debouncedSearch,
+    statusFilter,
+    typeFilter,
+  ]);
 
   const isModalOpenRef = useRef(false);
 
@@ -197,7 +216,6 @@ export function useCustomerManagement() {
     changeSearch: (val: string) => {
       if (isModalOpenRef.current) return;
       setSearch(val);
-      setPagination((p) => ({ ...p, page: 1 }));
     },
     changeStatusFilter: (status: CustomerStatus | "All") => {
       setStatusFilter(status);

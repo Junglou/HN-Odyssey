@@ -77,17 +77,47 @@ export class AdminReviewsService {
 
       const productIds = matchingProducts.map((p) => p._id);
 
-      const matchingUsers = (await this.customerModel
+      const matchingUsers = (await this.connection
+        .collection('users')
         .find({
           $or: [
             { first_Name: keywordRegex },
             { last_Name: keywordRegex },
             { email: keywordRegex },
+            {
+              $expr: {
+                $regexMatch: {
+                  input: {
+                    $concat: [
+                      { $ifNull: ['$last_Name', ''] },
+                      ' ',
+                      { $ifNull: ['$first_Name', ''] },
+                    ],
+                  },
+                  regex: query.keyword,
+                  options: 'i',
+                },
+              },
+            },
+            {
+              $expr: {
+                $regexMatch: {
+                  input: {
+                    $concat: [
+                      { $ifNull: ['$first_Name', ''] },
+                      ' ',
+                      { $ifNull: ['$last_Name', ''] },
+                    ],
+                  },
+                  regex: query.keyword,
+                  options: 'i',
+                },
+              },
+            },
           ],
         })
-        .select('_id')
-        .lean()
-        .exec()) as Array<{ _id: Types.ObjectId }>;
+        .project({ _id: 1 }) // Dùng .project thay cho .select vì đây là Native Driver
+        .toArray()) as Array<{ _id: Types.ObjectId }>;
 
       const userIds = matchingUsers.map((u) => u._id);
 

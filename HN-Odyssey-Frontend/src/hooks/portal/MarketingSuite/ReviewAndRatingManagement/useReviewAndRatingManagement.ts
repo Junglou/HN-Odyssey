@@ -145,6 +145,7 @@ export function useReviewAndRatingManagement() {
   const [totalRecords, setTotalRecords] = useState(0);
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<
     ReviewStatus | "All" | "hidden"
   >("All");
@@ -166,10 +167,20 @@ export function useReviewAndRatingManagement() {
     editingRecord: ReviewRecord | null;
   }>({ isOpen: false, mode: null, editingRecord: null });
 
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (debouncedSearch !== search) {
+        setDebouncedSearch(search);
+        setPage(1); // Reset page khi từ khóa thực sự thay đổi
+      }
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [search, debouncedSearch]);
+
   const fetchReviews = useCallback(async () => {
     try {
       const params: Record<string, string | number> = { page, limit };
-      if (search) params.keyword = search;
+      if (debouncedSearch) params.keyword = debouncedSearch;
       if (ratingFilter !== "All") params.rating = Number(ratingFilter);
 
       if (statusFilter === "hidden") params.status = ReviewStatusEnum.HIDDEN;
@@ -192,13 +203,11 @@ export function useReviewAndRatingManagement() {
       console.error(error);
       toast.error("Lỗi khi tải danh sách đánh giá.");
     }
-  }, [page, limit, search, statusFilter, ratingFilter]);
+  }, [page, limit, debouncedSearch, statusFilter, ratingFilter]);
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      fetchReviews();
-    }, 300);
-    return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchReviews();
   }, [fetchReviews]);
 
   const totalPages = Math.ceil(totalRecords / limit);
@@ -207,7 +216,6 @@ export function useReviewAndRatingManagement() {
   const actions = {
     changeSearch: (val: string) => {
       setSearch(val);
-      setPage(1);
     },
     changeStatusFilter: (status: ReviewStatus | "All" | "hidden") => {
       setStatusFilter(status);

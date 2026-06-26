@@ -455,7 +455,7 @@ export class ProductsService {
     if (keyword && typeof keyword === 'string' && keyword.trim() !== '') {
       const cleanKeyword = keyword.trim();
       filter.$or = [
-        { $text: { $search: cleanKeyword } },
+        { name: { $regex: cleanKeyword, $options: 'i' } },
         { sku: { $regex: cleanKeyword, $options: 'i' } },
       ];
     }
@@ -994,23 +994,38 @@ export class ProductsService {
             'Sản phẩm này chưa từng được duyệt giá bán (Giá gốc = 0). Vui lòng cập nhật và duyệt giá thành công trước khi kích hoạt bán!',
           );
         }
-      } else {
-        const hasValidPrice = product.variants.some((v) => v.price > 0);
-        if (!hasValidPrice) {
+
+        if ((product.stock ?? 0) <= 0) {
           throw new BadRequestException(
-            'Sản phẩm không có bất kỳ biến thể nào được duyệt giá (Tất cả giá = 0). Vui lòng duyệt giá ít nhất 1 biến thể để kích hoạt lại!',
+            'Sản phẩm chưa được nhập kho (Số lượng = 0). Vui lòng nhập kho để có thể kích hoạt bán!',
+          );
+        }
+      } else {
+        const hasValidVariantToActive = product.variants.some(
+          (v) => (v.price ?? 0) > 0 && (v.stock ?? 0) > 0,
+        );
+
+        if (!hasValidVariantToActive) {
+          throw new BadRequestException(
+            'Sản phẩm không có biến thể nào đủ điều kiện bán. Cần ít nhất 1 biến thể thỏa mãn cả 2 điều kiện: Đã duyệt giá (>0) và Đã nhập kho (>0)!',
           );
         }
 
         let isModified = false;
+
         product.variants.forEach((v) => {
-          if (v.price <= 0 && v.active !== false) {
+          // quy chuẩn hóa giá trị về 0 nếu dữ liệu trong cơ sở dữ liệu bị khuyết
+          const currentPrice = v.price ?? 0;
+          const currentStock = v.stock ?? 0;
+
+          // tự động tắt biến thể nếu không đáp ứng đủ cả hai điều kiện bắt buộc
+          if ((currentPrice <= 0 || currentStock <= 0) && v.active !== false) {
             v.active = false;
             isModified = true;
           }
-          // BỔ SUNG ĐOẠN ELSE IF NÀY VÀO:
-          else if (v.price > 0 && v.active === false) {
-            v.active = true; // Tự động bật biến thể nếu đã được duyệt giá
+          // tự động mở lại biến thể khi các chỉ số đều hợp lệ
+          else if (currentPrice > 0 && currentStock > 0 && v.active === false) {
+            v.active = true;
             isModified = true;
           }
         });
@@ -1037,7 +1052,7 @@ export class ProductsService {
 
       if (!product.tags || product.tags.length === 0) {
         throw new BadRequestException(
-          'Sản phẩm chưa có thẻ từ khóa (Tags). AI cần ít nhất 1 Tag để phân tích!',
+          'Sản phẩm chưa có thẻ từ khóa (Tags). Hệ thống phân tích cần ít nhất 1 Tag!',
         );
       }
     }

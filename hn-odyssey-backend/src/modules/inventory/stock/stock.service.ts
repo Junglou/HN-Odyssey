@@ -880,9 +880,20 @@ export class StockService {
 
     if (product?.has_variants) {
       filter['variants.sku'] = sku;
-      update = { $inc: { 'variants.$.stock_on_hold': -quantity } };
+      update = {
+        $inc: {
+          'variants.$.stock_on_hold': -quantity, // Giải phóng lượng hold
+          'variants.$.stock': -quantity, // FIX: Trừ đứt stock của biến thể
+          stock: -quantity, // FIX: Trừ đứt stock tổng của sản phẩm
+        },
+      };
     } else {
-      update = { $inc: { stock_on_hold: -quantity } };
+      update = {
+        $inc: {
+          stock_on_hold: -quantity, // Giải phóng lượng hold
+          stock: -quantity, // FIX: Trừ đứt stock tổng của sản phẩm
+        },
+      };
     }
 
     const result = await this.productModel.findOneAndUpdate(filter, update, {
