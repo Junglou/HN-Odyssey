@@ -116,8 +116,8 @@ def train_model():
                 final_score = base_score * weight
 
                 data.append({
-                    "user_id": str(b["user_id"]),
-                    "product_id": str(b["metadata"]["product_id"]),
+                    "user_id": str(b.get("user_id", b.get("userId"))),
+                    "product_id": str(b.get("metadata", {}).get("product_id")),
                     "score": final_score
                 })
                 
