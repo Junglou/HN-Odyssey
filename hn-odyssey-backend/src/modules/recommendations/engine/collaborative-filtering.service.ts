@@ -64,7 +64,7 @@ export class CollaborativeFilteringService {
 
       const aiSuggestedIds = await this.mlEngine.getAiRecommendations(userId);
 
-      if (!aiSuggestedIds || aiSuggestedIds.length < 5) {
+      if (!aiSuggestedIds || aiSuggestedIds.length < 1) {
         this.logger.log(
           `Cold start / Thiếu Neighbor cho User ${userId}. Fallback to Trending.`,
         );

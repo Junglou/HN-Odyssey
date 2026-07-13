@@ -12,12 +12,24 @@ import {
 
 export const PROFILE_RECOMMEND_COUNT = 3;
 
-/** Profile recommendation item — same shape as `Product` for UI components. */
 export type RecommendProduct = Product;
 
+// Khai báo Interface chuẩn để dọn sạch lỗi "Unexpected any"
+interface AuthUser {
+  _id?: string | { $oid: string };
+  id?: string;
+  [key: string]: unknown;
+}
+
 const getLoggedInUserId = (): string | undefined => {
-  const user = tokenStorage.getUser() as { _id?: string; id?: string } | null;
-  const id = user?._id ?? user?.id;
+  const user = tokenStorage.getUser<AuthUser>();
+  if (!user) return undefined;
+
+  if (user._id && typeof user._id === "object" && "$oid" in user._id) {
+    return String(user._id.$oid);
+  }
+
+  const id = user._id || user.id;
   return id ? String(id) : undefined;
 };
 
@@ -116,9 +128,9 @@ async function loadRecommendProducts(
   let rawList: CartRecommendationApiItem[] = [];
 
   try {
-    rawList = await fetchCartRecommendationProducts(limit);
-  } catch (cartErr) {
-    console.warn("Cart recommendations unavailable:", cartErr);
+    rawList = await fetchDiscoverProducts(userId);
+  } catch (discoverErr) {
+    console.warn("Discover recommendations unavailable:", discoverErr);
   }
 
   if (rawList.length === 0) {
@@ -134,9 +146,9 @@ async function loadRecommendProducts(
 
   if (rawList.length === 0) {
     try {
-      rawList = await fetchDiscoverProducts(userId);
-    } catch (discoverErr) {
-      console.warn("Discover recommendations unavailable:", discoverErr);
+      rawList = await fetchCartRecommendationProducts(limit);
+    } catch (cartErr) {
+      console.warn("Cart recommendations unavailable:", cartErr);
     }
   }
 
