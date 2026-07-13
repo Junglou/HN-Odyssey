@@ -203,7 +203,7 @@ async def get_recommendation(user_id: str):
     # [FIX AC17]: SIMILARITY THRESHOLD (Ngưỡng tối thiểu)
     for i in top_indices:
         # Lọc bớt đồ rác. Chỉ recommend mấy món có điểm >= 0.3
-        if user_predictions[i] >= 0.3:
+        if user_predictions[i] >= 0.5:
             recommended_ids.append(PRODUCT_IDS[i])
             
         # Cắt lấy top 20 món thôi cho nhẹ payload

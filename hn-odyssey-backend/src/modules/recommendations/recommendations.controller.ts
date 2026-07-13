@@ -223,8 +223,9 @@ export class RecommendationsController {
     }
 
     const userIdStr = String(userId);
-    const lastChar = userIdStr.slice(-1);
-    const isGroupA = parseInt(lastChar, 16) % 2 === 0;
+
+    // [FIX DEMO]: Bỏ chia phe, ép tất cả vào Group A để show sức mạnh của AI Python
+    const isGroupA = true;
 
     let products: ProductDocument[];
     let testGroup: 'ALGO_SVD' | 'ALGO_TRENDING';
