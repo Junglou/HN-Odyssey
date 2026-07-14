@@ -81,11 +81,22 @@ export class CollaborativeFilteringService {
         o.items.map((i) => String(i.product_id)),
       );
 
+      // Lọc bỏ các string không hợp lệ trước khi parse sang ObjectId để chống crash
+      const validObjectIds = aiSuggestedIds
+        .filter((id) => Types.ObjectId.isValid(id))
+        .map((id) => new Types.ObjectId(id));
+
       const validProducts = await this.productModel
         .find({
-          _id: { $in: aiSuggestedIds.map((id) => new Types.ObjectId(id)) },
-          status: ProductStatus.ACTIVE,
-          is_deleted: false,
+          _id: { $in: validObjectIds },
+          // Chấp nhận cả 2 trường hợp: DB dùng 'active: true' HOẶC 'status: ACTIVE'
+          $or: [
+            { active: true },
+            {
+              status: { $regex: new RegExp(`^${ProductStatus.ACTIVE}$`, 'i') },
+            },
+          ],
+          is_deleted: { $ne: true },
           stock: { $gt: 0 },
         })
         .populate('categories', 'slug')
