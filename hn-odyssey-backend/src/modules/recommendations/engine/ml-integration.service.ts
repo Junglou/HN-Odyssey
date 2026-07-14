@@ -16,7 +16,7 @@ export class MlIntegrationService {
   constructor(private readonly configService: ConfigService) {
     this.mlApiUrl =
       this.configService.get<string>('ML_ENGINE_URL') ||
-      'http://localhost:8080/api';
+      'http://127.0.0.1:8000';
   }
 
   // AC1 & AC8: Gọi API suy luận nhanh (<200ms)
@@ -25,7 +25,7 @@ export class MlIntegrationService {
       const response = await axios.get<MLRecommendResponse>(
         `${this.mlApiUrl}/recommend/${userId}`,
         {
-          timeout: 200,
+          timeout: 3000,
         },
       );
       return response.data.recommended_product_ids || [];
