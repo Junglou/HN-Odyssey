@@ -42,14 +42,13 @@ export class AttributesController {
   // 2. DANH SÁCH
   @Get()
   @Public()
-  @RequirePermissions(Resource.ATTRIBUTES, Action.READ)
   findAll() {
     return this.attributesService.findAll();
   }
 
   // 3. CHI TIẾT
   @Get(':id')
-  @RequirePermissions(Resource.ATTRIBUTES, Action.READ)
+  @Public()
   findOne(@Param('id') id: string) {
     return this.attributesService.findOne(id);
   }
