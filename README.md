@@ -53,8 +53,10 @@ Hệ thống quản trị áp dụng mô hình phân quyền RBAC, chia thành 6
 * **Caching:** Redis Server (Port `6379`)
 
 ### 1. Thiết lập Backend
+```bash
 cd hn-odyssey-backend
 npm install
+```
 
 ### 2. Thiết lập Frontend
 cd HN-Odyssey-Frontend
