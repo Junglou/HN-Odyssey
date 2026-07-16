@@ -77,5 +77,5 @@ npm run start:dev
 npm run dev
 ```
 
-Quy trình Phát triển
+## 📈 Quy trình Phát triển
 Dự án được quản lý theo mô hình Agile/Scrum. Lịch sử thay đổi (Commit), tính năng mới và các bản vá lỗi (Bug Tracking) được theo dõi, đánh giá định kỳ qua các buổi Sprint Retrospective và quản lý phiên bản bằng Git.
