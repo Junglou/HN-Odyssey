@@ -4,6 +4,7 @@ H&N Odyssey là hệ thống thương mại điện tử B2C chuyên cung cấp 
 🌐 **Website chính thức:** [https://hnodyssey.id.vn/](https://hnodyssey.id.vn/)
 
 🔑 **Tài khoản trải nghiệm H&N-Portal (Admin):**
+* **Link Portal:** [https://hnodyssey.id.vn/portal](https://hnodyssey.id.vn/portal)
 * **Email:** `admin@hnodyssey.com`
 * **Mật khẩu:** `HnOdyssey@2025`
 ---
