@@ -39,10 +39,14 @@ export class TrackingController {
   // AC1, AC2, AC3: Nhận tín hiệu Tracking từ FE
   @Public()
   @Post('event')
-  @HttpCode(HttpStatus.ACCEPTED) // Status 202: Nhận yêu cầu và xử lý ngầm (Non-blocking)
+  @HttpCode(HttpStatus.ACCEPTED)
   trackEvent(@Body() trackEventDto: TrackEventDto) {
-    this.trackingService.logEvent(trackEventDto);
-    // Trả về ngay lập tức để không làm chậm thao tác người dùng
+    // Kích hoạt hàm bất đồng bộ nhưng KHÔNG DÙNG await để trả về response ngay cho FE
+    this.trackingService.logEvent(trackEventDto).catch((err) => {
+      // Bắt lỗi ở tầng cao nhất nếu promise bị reject
+      console.error('Lỗi ở TrackEvent Controller:', err);
+    });
+
     return { success: true };
   }
 

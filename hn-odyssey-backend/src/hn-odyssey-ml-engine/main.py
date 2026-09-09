@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 import os
 from datetime import datetime, timezone, timedelta
 import math
+import asyncio
 
 # Setup logging cơ bản để dễ debug, format có đủ timestamp và level
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -18,7 +19,7 @@ load_dotenv()
 
 # Lấy config DB từ env, fallback về localhost nếu chưa set
 MONGO_URI = os.getenv("MONGO_URL", "mongodb://localhost:27017")
-DB_NAME = os.getenv("MONGO_DB_NAME", "hn-odyssey")
+DB_NAME = os.getenv("MONGO_DB_NAME", "hn_odyssey_db")
 # Port cho server, mặc định 8000
 PORT = int(os.getenv("ML_PORT", 8000))
 
@@ -57,11 +58,11 @@ def train_model():
         ninety_days_ago = now - timedelta(days=90) 
         
         # 1. Kéo lịch sử hành vi của user. 
-        # Chỉ query các field thực sự cần thiết để tiết kiệm memory & băng thông.
+        # [FIX 1]: Chỉ lấy các hành vi CÓ product_id hợp lệ để tránh rác (Bóng ma None)
         behaviors = list(db.user_behaviors.find(
             {
                 "user_id": {"$exists": True},
-                "metadata.product_id": {"$exists": True},
+                "metadata.product_id": {"$exists": True, "$ne": None}, 
                 "createdAt": {"$gte": ninety_days_ago} 
             },
             {"user_id": 1, "metadata": 1, "action": 1, "createdAt": 1}
@@ -77,6 +78,13 @@ def train_model():
         # 2. Xử lý Data và tính điểm (Scoring)
         data = []
         for b in behaviors:
+            # [FIX 1]: Kiểm tra kép an toàn để đảm bảo không lọt chuỗi "None"
+            raw_product_id = b.get("metadata", {}).get("product_id")
+            raw_user_id = b.get("user_id", b.get("userId"))
+            
+            if not raw_product_id or not raw_user_id:
+                continue
+                
             action = b.get("action")
             base_score = 0
             metadata = b.get("metadata", {})
@@ -84,7 +92,7 @@ def train_model():
             # [FIX AC2]: Scoring Matrix - Chấm điểm dựa trên action của user
             if action == "VIEW_PRODUCT": 
                 base_score = 1 # Xem thì cho 1 điểm
-            elif action == "ADD_TO_CART": 
+            elif action in ["ADD_TO_CART", "UPDATE_CART_QUANTITY", "CLICK_ADD_TO_CART"]: 
                 base_score = 3 # Thêm giỏ hàng cho 3 điểm
             elif action == "PURCHASE": 
                 base_score = 5 # Chốt đơn cho 5 điểm
@@ -116,8 +124,8 @@ def train_model():
                 final_score = base_score * weight
 
                 data.append({
-                    "user_id": str(b.get("user_id", b.get("userId"))),
-                    "product_id": str(b.get("metadata", {}).get("product_id")),
+                    "user_id": str(raw_user_id),
+                    "product_id": str(raw_product_id),
                     "score": final_score
                 })
                 
@@ -195,28 +203,40 @@ async def get_recommendation(user_id: str):
     user_idx = USER_INDEX_MAP[user_id]
     user_predictions = RECOMMENDATION_MATRIX[user_idx]
     
-    # Lấy index các sản phẩm có điểm cao nhất (argsort xong flip ngược lại mảng)
+   # Lấy index các sản phẩm có điểm cao nhất (argsort xong flip ngược lại mảng)
     top_indices = user_predictions.argsort()[::-1]
     
     recommended_ids = []
 
-    # [FIX AC17]: SIMILARITY THRESHOLD (Ngưỡng tối thiểu)
+    # [FIX] DYNAMIC THRESHOLD (Ngưỡng thích ứng theo mật độ dữ liệu)
+    # 1. Lấy điểm dự đoán cao nhất của user này (nếu có)
+    max_score = user_predictions[top_indices[0]] if len(top_indices) > 0 else 0
+    
+    # 2. Ngưỡng động: Lấy 20% của đỉnh, nhưng chốt đáy ở mức siêu nhỏ (0.01) để vớt data mỏng.
+    # Nếu ma trận hoàn toàn bằng 0, set threshold = 0 để nhả data thô cho NestJS tự filter.
+    dynamic_threshold = max(0.01, max_score * 0.2) if max_score > 0 else 0
+
     for i in top_indices:
-        # Lọc bớt đồ rác. Chỉ recommend mấy món có điểm >= 0.3
-        if user_predictions[i] >= 0.3:
+        # Áp dụng ngưỡng động thay vì fix cứng 0.3
+        if user_predictions[i] >= dynamic_threshold:
             recommended_ids.append(PRODUCT_IDS[i])
             
         # Cắt lấy top 20 món thôi cho nhẹ payload
         if len(recommended_ids) >= 20:
             break
-    
+            
     return {
         "user_id": user_id,
         "recommended_product_ids": recommended_ids
     }
 
+# [FIX 2]: Đưa hàm Train vào Event Startup của FastAPI để không bị block Server
+@app.on_event("startup")
+async def startup_event():
+    # Chạy lệnh train trên một thread riêng biệt, giúp cổng 8000 được mở ngay lập tức
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(None, train_model)
+
 if __name__ == "__main__":
-    # Vừa boot server lên thì đá một nhát train liền để nhồi data vào RAM
-    train_model()
-    # Chạy uvicorn server
+    # Chạy uvicorn server thẳng luôn, bỏ gọi train_model() ở đây
     uvicorn.run(app, host="0.0.0.0", port=PORT)
