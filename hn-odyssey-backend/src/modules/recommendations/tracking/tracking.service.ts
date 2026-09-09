@@ -58,6 +58,13 @@ export interface UserExportInfo {
   email?: string;
 }
 
+// Định nghĩa Error chuẩn của Node.js OS
+interface NodeSystemError extends Error {
+  code?: string;
+  syscall?: string;
+  hostname?: string;
+}
+
 @Injectable()
 export class TrackingService {
   private readonly logger = new Logger(TrackingService.name);
@@ -108,23 +115,64 @@ export class TrackingService {
   }
 
   // AC6: HIỆU NĂNG GHI LOG - Request xử lý Không đồng bộ (Fail-silently)
-  logEvent(dto: TrackEventDto): void {
+  async logEvent(dto: TrackEventDto): Promise<void> {
     try {
-      // AC2: Logic xác định Bounce (Thoát trang quá nhanh)
       const is_bounce = (dto.dwell_time_seconds ?? 0) < 3;
 
+      // 1. KIỂM TRA OBJECT ID AN TOÀN TRÁNH CRASH APP
+      let validUserId: Types.ObjectId | undefined = undefined;
+      if (dto.user_id && Types.ObjectId.isValid(dto.user_id)) {
+        validUserId = new Types.ObjectId(dto.user_id);
+      }
+
+      // 2. LƯU VÀO MONGODB ĐỂ PHỤC VỤ DASHBOARD BÁO CÁO
       const behavior = new this.behaviorModel({
         ...dto,
         is_bounce,
-        user_id: dto.user_id ? new Types.ObjectId(dto.user_id) : undefined,
+        user_id: validUserId,
       });
 
-      // KHÔNG DÙNG AWAIT ở đây để không chặn request của Frontend
-      behavior.save().catch((err) => {
-        this.logger.error(
-          `Failed to save tracking event: ${(err as Error).message}`,
-        );
-      });
+      // Dùng await ở đây là an toàn vì Controller bên ngoài không await hàm này
+      await behavior.save();
+
+      // 3. ĐỒNG BỘ SANG ALGOLIA INSIGHTS ĐỂ TRAIN MODEL AI
+      const productId = dto.metadata?.product_id;
+
+      // Algolia cần userToken (có thể là ID thật nếu đã login, hoặc SessionID nếu khách vãng lai)
+      const userToken = validUserId ? validUserId.toString() : dto.session_id;
+
+      if (productId) {
+        switch (dto.action) {
+          case BehaviorAction.VIEW_PRODUCT:
+            void this.sendAlgoliaInsight(
+              'VIEW',
+              userToken,
+              productId,
+              'Product_Detail',
+            );
+            break;
+
+          case BehaviorAction.ADD_TO_CART:
+          case BehaviorAction.CLICK_ADD_TO_CART:
+            void this.sendAlgoliaInsight(
+              'ADD_TO_CART',
+              userToken,
+              productId,
+              'Cart',
+            );
+            break;
+
+          case BehaviorAction.CLICK_SEARCH_SUGGESTION:
+            // Phân biệt user click từ Widget gợi ý
+            void this.sendAlgoliaInsight(
+              'CLICK',
+              userToken,
+              productId,
+              'Recommendation_Widget',
+            );
+            break;
+        }
+      }
     } catch (error) {
       this.logger.error(
         `Tracking processing error: ${(error as Error).message}`,
@@ -952,11 +1000,16 @@ export class TrackingService {
         break;
     }
 
+    // [FIX ESLINT]: Xóa dấu \ thừa trước dấu - (no-useless-escape)
+    const cleanUserToken = (userToken || 'anonymous_user')
+      .replace(/[^a-zA-Z0-9_=-]/g, '_')
+      .substring(0, 64);
+
     const eventPayload: IAlgoliaInsightEvent = {
       eventType,
       eventName,
       index: this.indexName,
-      userToken: userToken || 'anonymous_user', // Algolia yêu cầu bắt buộc có userToken
+      userToken: cleanUserToken,
       objectIDs: [objectID],
     };
 
@@ -967,15 +1020,44 @@ export class TrackingService {
     try {
       await axios.post(this.insightsApiUrl, data, {
         headers: this.headers,
-        timeout: 1000,
+        timeout: 2000,
       });
       this.logger.log(
-        `[Algolia Insights] Đã đẩy event ${eventName} cho sản phẩm ${objectID}`,
+        `[Algolia Insights] Đã đẩy event [${eventName}] cho SP [${objectID}] (User: ${cleanUserToken})`,
       );
     } catch (error: unknown) {
-      // Bọc try-catch không throw để không làm đứt mạch API chính của User
-      const msg = error instanceof Error ? error.message : String(error);
+      // 1. Ép kiểu an toàn sang NodeSystemError thay vì any
+      const sysError = error as NodeSystemError;
+
+      // 2. Bắt chết các lỗi do môi trường mạng/Firewall/DNS của máy tính hiện tại
+      if (['ENOTFOUND', 'ENOENT', 'ETIMEDOUT'].includes(sysError.code || '')) {
+        this.logger.warn(
+          `[Algolia Insights] Môi trường mạng chặn kết nối (DNS/Firewall). Đã bỏ qua đẩy data AI để không block hệ thống.`,
+        );
+        return; // Thoát êm ái, không văng lỗi đỏ
+      }
+
+      // 3. Xử lý các lỗi khác (VD: sai cấu hình API Key)
+      const msg = sysError.message || String(error);
       this.logger.error(`[Algolia Insights] Thất bại: ${msg}`);
+
+      if (
+        error &&
+        typeof error === 'object' &&
+        'isAxiosError' in error &&
+        'response' in error
+      ) {
+        const axiosErr = error as Record<string, unknown>;
+        const response = axiosErr.response as
+          | Record<string, unknown>
+          | undefined;
+
+        if (response && response.data !== undefined) {
+          this.logger.error(
+            `Chi tiết lỗi Algolia: ${JSON.stringify(response.data)}`,
+          );
+        }
+      }
     }
   }
 

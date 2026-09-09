@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
 import { recordRecentViewProduct } from "../profile/useRecentViewManagement";
+import { useTracking, BehaviorAction } from "../common/useTracking";
 
 const getFullImageUrl = (url?: string): string => {
   if (!url) return "/Logo.png";
@@ -38,7 +39,7 @@ export interface ProductDetailState {
   price: number;
   originalPrice?: number;
   stock: number;
-  stockOnHold: number; // [BỔ SUNG] Thêm trường này để quản lý hàng tạm giữ
+  stockOnHold: number;
   desc: string;
   details: string;
   hasVariants: boolean;
@@ -62,7 +63,7 @@ interface BeVariant {
   price: number;
   sale_price: number;
   stock: number;
-  stock_on_hold?: number; // [BỔ SUNG] Từ backend trả về
+  stock_on_hold?: number;
   images?: string[];
   active: boolean;
   attributes: BeAttribute[];
@@ -81,7 +82,7 @@ interface BeProduct {
   price: number;
   sale_price: number;
   stock: number;
-  stock_on_hold?: number; // [BỔ SUNG] Từ backend trả về
+  stock_on_hold?: number;
   short_description?: string;
   description?: string;
   thumbnail: string;
@@ -108,6 +109,8 @@ interface DbAttribute {
 
 export function useProductDetail() {
   const { slug } = useParams<{ slug: string }>();
+  const { trackEvent } = useTracking(); // Gọi hook Tracking
+  const trackedProductRef = useRef<string | null>(null);
 
   const [product, setProduct] = useState<ProductDetailState | null>(null);
   const [rawBeProduct, setRawBeProduct] = useState<BeProduct | null>(null);
@@ -131,7 +134,6 @@ export function useProductDetail() {
         const beData: BeProduct = productRes.data;
         const allDbAttributes: DbAttribute[] = attrRes.data || [];
 
-        // Mở rộng điều kiện lọc: Chấp nhận các biến thể đã được duyệt giá (price > 0)
         if (beData.has_variants && beData.variants) {
           beData.variants = beData.variants.filter(
             (v) => v.price > 0 || v.active === true,
@@ -164,7 +166,6 @@ export function useProductDetail() {
             });
           }
 
-          // Lọc bỏ trùng lặp phân biệt hoa/thường để tránh lỗi UI
           const existingValues = Array.from(optionsMap.get(lowerCode)!.values);
           const alreadyExists = existingValues.some(
             (v) => v.toLowerCase() === value.trim().toLowerCase(),
@@ -267,7 +268,7 @@ export function useProductDetail() {
           originalPrice:
             beSalePrice > 0 && beSalePrice < bePrice ? bePrice : undefined,
           stock: beData.stock,
-          stockOnHold: beData.stock_on_hold || 0, // [BỔ SUNG] Map dữ liệu stock_on_hold
+          stockOnHold: beData.stock_on_hold || 0,
           desc:
             beData.short_description ||
             beData.description?.replace(/<[^>]+>/g, "").substring(0, 150) ||
@@ -287,6 +288,19 @@ export function useProductDetail() {
           price: formattedProduct.price,
           image: uiImages[0] || "",
         });
+
+        // TÍCH HỢP AI TRACKING NGAY TẠI ĐÂY
+        if (trackedProductRef.current !== beData._id) {
+          trackEvent({
+            action: BehaviorAction.VIEW_PRODUCT,
+            path: `/products/store/details/${slug}`,
+            metadata: {
+              product_id: beData._id,
+              price: beSalePrice > 0 ? beSalePrice : bePrice,
+            },
+          });
+          trackedProductRef.current = beData._id; // Đánh dấu là đã bắn
+        }
 
         let defaultVariant = null;
         if (beData.has_variants && beData.variants && beData.thumbnail) {
@@ -350,7 +364,7 @@ export function useProductDetail() {
       }
     };
     fetchProductDetail();
-  }, [slug]);
+  }, [slug, trackEvent]); // trackEvent được bọc bằng useCallback nên an toàn, không cần bỏ vào deps array
 
   const derivedProduct = useMemo(() => {
     if (!product) return null;
@@ -358,7 +372,7 @@ export function useProductDetail() {
     let finalPrice = product.price;
     let finalOriginalPrice = product.originalPrice;
     let finalStock = product.stock;
-    let finalStockOnHold = product.stockOnHold; // [BỔ SUNG]
+    let finalStockOnHold = product.stockOnHold;
     let finalSku = product.sku;
     let filteredImages: string[] = [];
 
@@ -406,7 +420,7 @@ export function useProductDetail() {
             ? matchedVariant.price
             : undefined;
         finalStock = matchedVariant.active === false ? 0 : matchedVariant.stock;
-        finalStockOnHold = matchedVariant.stock_on_hold || 0; // [BỔ SUNG] Lấy hàng tạm giữ của biến thể
+        finalStockOnHold = matchedVariant.stock_on_hold || 0;
         finalSku = matchedVariant.sku || product.sku;
 
         if (matchedVariant.images && matchedVariant.images.length > 0) {
@@ -432,7 +446,7 @@ export function useProductDetail() {
       price: finalPrice,
       originalPrice: finalOriginalPrice,
       stock: finalStock,
-      stockOnHold: finalStockOnHold, // [BỔ SUNG] Trả ra cho UI
+      stockOnHold: finalStockOnHold,
       sku: finalSku,
       images: filteredImages,
     };
@@ -446,7 +460,6 @@ export function useProductDetail() {
         : parseInt(rawQuantity as string, 10);
     if (isNaN(q) || q < 1) return 1;
 
-    // [BỔ SUNG] Tính Available Stock thay vì Total Stock
     const availableStock = Math.max(
       0,
       (derivedProduct?.stock || 0) - (derivedProduct?.stockOnHold || 0),
@@ -467,8 +480,6 @@ export function useProductDetail() {
 
   const handleQuantityChange = (type: "inc" | "dec") => {
     const current = typeof quantity === "number" ? quantity : 1;
-
-    // [BỔ SUNG] Tính Available Stock
     const availableStock = Math.max(
       0,
       (derivedProduct?.stock || 0) - (derivedProduct?.stockOnHold || 0),

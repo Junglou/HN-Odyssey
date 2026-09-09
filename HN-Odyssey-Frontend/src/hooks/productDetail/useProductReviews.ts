@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
 import tokenStorage from "../../utils/tokenStorage";
 import { toast } from "react-toastify";
+import { useTracking, BehaviorAction } from "../common/useTracking"; // [BỔ SUNG] Import hook AI Tracking
 
 export interface ReviewUser {
   _id: string;
@@ -93,6 +94,7 @@ const SORT_OPTIONS = [
 
 export function useProductReviews() {
   const { slug: productId } = useParams<{ slug: string }>();
+  const { trackEvent } = useTracking(); // [BỔ SUNG] Khởi tạo hook
 
   const [reviewStats, setReviewStats] = useState({ average: 0, total: 0 });
 
@@ -118,7 +120,6 @@ export function useProductReviews() {
     variantSku?: string;
   }>({ isEligible: false });
 
-  // THÊM: Quản lý Reply Media
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState<string>("");
   const [replyMedia, setReplyMedia] = useState<ReviewMedia[]>([]);
@@ -207,7 +208,7 @@ export function useProductReviews() {
               year: "numeric",
             }),
             content: cr.content,
-            media: cr.media || [], // Ánh xạ media trả về từ BE
+            media: cr.media || [],
           };
         });
 
@@ -308,7 +309,6 @@ export function useProductReviews() {
     }
   };
 
-  // THÊM: Logic Upload cho Form Reply
   const handleUploadReplyMedia = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -348,7 +348,6 @@ export function useProductReviews() {
     _setIsWritingReview(false);
   };
 
-  // THÊM: Logic mở đóng Reply để clear dữ liệu rác
   const handleOpenReply = (reviewId: string) => {
     if (replyingTo === reviewId) {
       handleCloseReply();
@@ -389,8 +388,6 @@ export function useProductReviews() {
       return;
 
     try {
-      // Chỉ giữ lại 1 luồng duy nhất là gọi API tạo đánh giá
-      // Hệ thống Backend Listener sẽ tự động bắt sự kiện và lưu vào user_behaviors
       await axiosClient.post("/reviews", {
         productId,
         orderId: eligibility.orderId,
@@ -398,6 +395,16 @@ export function useProductReviews() {
         rating: newRating,
         content: reviewText,
         media: reviewMedia,
+      });
+
+      // [BỔ SUNG CHÍNH]: Gửi tracking chấm điểm cho AI Algolia
+      trackEvent({
+        action: BehaviorAction.REVIEW_PRODUCT, // Dùng as any để tương thích type cũ nếu bị Eslint bắt bẻ
+        path: window.location.pathname,
+        metadata: {
+          product_id: productId,
+          rating: newRating, // Quan trọng nhất: Gửi rating lên để ML tính điểm +/-
+        },
       });
 
       handleCancelReview();
@@ -415,13 +422,12 @@ export function useProductReviews() {
       toast.warning("Vui lòng đăng nhập.");
       return;
     }
-    // Cho phép gửi nếu có text HOẶC có hình ảnh
     if (!replyText.trim() && replyMedia.length === 0) return;
 
     try {
       await axiosClient.post(`/reviews/${reviewId}/reply`, {
         content: replyText,
-        media: replyMedia, // Đính kèm mảng hình ảnh Reply
+        media: replyMedia,
       });
       handleCloseReply();
       fetchReviews();
