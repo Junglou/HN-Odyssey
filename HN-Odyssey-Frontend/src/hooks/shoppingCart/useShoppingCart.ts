@@ -79,6 +79,7 @@ interface RecParams {
   current_cart_total: number;
   exclude_ids: string;
   session_id?: string;
+  user_id?: string; // Đã bổ sung param này
 }
 
 interface ApiError {
@@ -99,11 +100,38 @@ const getOrCreateGuestSessionId = (): string => {
   return sessionId;
 };
 
+// Hàm giải mã Token để lấy UserID
+const getUserIdFromToken = (): string | undefined => {
+  const token = tokenStorage.getToken();
+  if (!token) return undefined;
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      window
+        .atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(""),
+    );
+    const payload = JSON.parse(jsonPayload);
+
+    // Log ra để kiểm tra xem Token có thực sự chứa ID không
+    console.log("Payload từ Token:", payload);
+
+    // Quét toàn bộ các định dạng lưu ID phổ biến
+    return payload._id || payload.id || payload.sub || payload.userId;
+  } catch {
+    return undefined;
+  }
+};
+
 export function useShoppingCart() {
   const navigate = useNavigate();
   const [cartItems, setCartItems] = useState<DetailedCartItem[]>([]);
   const [recommendations, setRecommendations] = useState<RecommendItem[]>([]);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [isUpdatingCart, setIsUpdatingCart] = useState<boolean>(false);
 
   const [cartSummary, setCartSummary] = useState({
     subtotal: 0,
@@ -116,6 +144,7 @@ export function useShoppingCart() {
     try {
       const isLogged = !!tokenStorage.getToken();
       const guestSessionId = isLogged ? undefined : getOrCreateGuestSessionId();
+      const userId = isLogged ? getUserIdFromToken() : undefined; // Lấy User ID
 
       const wishlistSet = new Set<string>();
       if (isLogged) {
@@ -186,7 +215,10 @@ export function useShoppingCart() {
         exclude_ids: excludeIds,
       };
 
-      if (!isLogged && guestSessionId) {
+      // Đẩy ID tương ứng để BE AI có dữ liệu context
+      if (userId) {
+        recParams.user_id = userId;
+      } else if (guestSessionId) {
         recParams.session_id = guestSessionId;
       }
 
@@ -304,8 +336,13 @@ export function useShoppingCart() {
   };
 
   const updateQuantity = async (id: string, newQuantity: number) => {
+    // FIX: Bật bức tường chặn spam. Đang update thì không cho click tiếp
+    if (isUpdatingCart) return;
+
     const [productId, variantSku] = id.split("|");
     try {
+      setIsUpdatingCart(true); // Khóa API
+
       const isLogged = !!tokenStorage.getToken();
       const guestSessionId = isLogged ? undefined : getOrCreateGuestSessionId();
 
@@ -321,6 +358,8 @@ export function useShoppingCart() {
     } catch (error: unknown) {
       const err = error as ApiError;
       toast.error(err?.message || "Số lượng cập nhật không hợp lệ");
+    } finally {
+      setIsUpdatingCart(false); // Xong thì mở khoá
     }
   };
 
@@ -374,11 +413,17 @@ export function useShoppingCart() {
   const subtotalFormatted = cartSummary.subtotal.toFixed(2);
   const taxesFormatted = (cartSummary.subtotal * 0.05).toFixed(2);
   const shippingFeeFormatted =
-    cartSummary.shippingFee === 0 ? "Free" : `${cartSummary.shippingFee}$`;
+    cartSummary.shippingFee === 0
+      ? "Free"
+      : `${cartSummary.shippingFee.toFixed(2)}$`;
   const totalFormatted =
     cartSummary.grandTotal > 0
       ? cartSummary.grandTotal.toFixed(2)
-      : (cartSummary.subtotal + parseFloat(taxesFormatted)).toFixed(2);
+      : (
+          cartSummary.subtotal +
+          parseFloat(taxesFormatted) +
+          cartSummary.shippingFee
+        ).toFixed(2);
 
   return {
     cartItems,
@@ -388,6 +433,7 @@ export function useShoppingCart() {
     shippingFee: shippingFeeFormatted,
     total: totalFormatted,
     editingItemId,
+    isUpdatingCart,
     handleRemoveItem,
     handleAddRecommendation,
     toggleEdit,

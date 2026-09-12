@@ -71,45 +71,68 @@ export class PurchaseBasedService {
       .populate('user_id', 'fullName email')
       .lean();
 
-    for (const order of orders) {
-      // 1. Ép kiểu an toàn bằng unknown -> IPopulatedUser TRƯỚC khi check
-      const user = order.user_id as unknown as IPopulatedUser;
+    // --- FIX 1: LẤY ALL PRODUCT IDs VÀ QUERY 1 LẦN DUY NHẤT ---
+    const allProductIds = new Set<string>();
+    orders.forEach((order) => {
+      (order.items || []).forEach((item) => {
+        if (item.product_id) allProductIds.add(item.product_id.toString());
+      });
+    });
 
-      // 2. Check an toàn hoàn toàn không dùng any, ESLint sẽ pass 100%
+    const validProducts = await this.productModel
+      .find({
+        _id: {
+          $in: Array.from(allProductIds).map((id) => new Types.ObjectId(id)),
+        },
+        tags: { $in: ['fmcg', 'tieu-dung', 'gas', 'thuc-pham'] },
+      })
+      .select('name')
+      .lean();
+
+    // Lưu vào Map để truy xuất siêu tốc (O(1))
+    const validProductMap = new Map<string, string>();
+    validProducts.forEach((p) => validProductMap.set(p._id.toString(), p.name));
+
+    // --- FIX 2: CHẠY KIỂM TRA MUA LẠI SONG SONG BẰNG PROMISE.ALL ---
+    const checkPromises: Promise<void>[] = [];
+
+    for (const order of orders) {
+      const user = order.user_id as unknown as IPopulatedUser;
       if (!user || !user._id || !order.createdAt) continue;
 
-      for (const item of order.items) {
-        const product = await this.productModel
-          .findOne({
-            _id: item.product_id,
-            tags: { $in: ['fmcg', 'tieu-dung', 'gas', 'thuc-pham'] },
-          })
-          .select('name')
-          .lean();
+      for (const item of order.items || []) {
+        const pIdStr = item.product_id.toString();
 
-        if (product) {
-          const hasRepurchased = await this.orderModel.exists({
-            user_id: user._id,
-            'items.product_id': item.product_id,
-            createdAt: { $gt: order.createdAt },
-          });
-
-          if (!hasRepurchased) {
-            candidates.push({
-              customer_id: user._id.toString(),
-              customer_name: user.fullName || 'Khách hàng',
-              customer_email: user.email,
-              product_id: product._id.toString(),
-              product_name: product.name,
-              last_purchased_at: order.createdAt,
-              estimated_expiry: new Date(
-                order.createdAt.getTime() + cycleDays * 24 * 60 * 60 * 1000,
-              ),
+        // Chỉ xử lý nếu sản phẩm thuộc nhóm FMCG
+        if (validProductMap.has(pIdStr)) {
+          const checkTask = async () => {
+            const hasRepurchased = await this.orderModel.exists({
+              user_id: user._id,
+              'items.product_id': item.product_id,
+              createdAt: { $gt: order.createdAt },
             });
-          }
+
+            if (!hasRepurchased) {
+              candidates.push({
+                customer_id: user._id.toString(),
+                customer_name: user.fullName || 'Khách hàng',
+                customer_email: user.email,
+                product_id: pIdStr,
+                product_name: validProductMap.get(pIdStr) || '',
+                last_purchased_at: order.createdAt as Date,
+                estimated_expiry: new Date(
+                  (order.createdAt as Date).getTime() +
+                    cycleDays * 24 * 60 * 60 * 1000,
+                ),
+              });
+            }
+          };
+          checkPromises.push(checkTask());
         }
       }
     }
+
+    await Promise.all(checkPromises);
     return candidates;
   }
 

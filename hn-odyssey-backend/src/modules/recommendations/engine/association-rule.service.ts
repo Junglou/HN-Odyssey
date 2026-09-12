@@ -108,10 +108,10 @@ export class AssociationRuleService {
     }
 
     if (!finalClient) {
-      this.logger.error(
-        'Khởi tạo thất bại: Không tìm thấy phương thức getFrequentlyBoughtTogether trong module.',
-      );
-      throw new Error('Algolia Recommend Init Failure');
+      this.logger.error('Khởi tạo thất bại: Không tìm thấy phương thức...');
+      finalClient = {
+        getFrequentlyBoughtTogether: async () => ({ results: [] }),
+      } as unknown as IRecommendClient;
     }
 
     this.recommendClient = finalClient;

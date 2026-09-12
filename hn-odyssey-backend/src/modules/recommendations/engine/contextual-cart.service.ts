@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model, Types, FilterQuery } from 'mongoose';
 import { Cart } from 'src/modules/sales/cart/schemas/cart.schema';
 import {
   Product,
@@ -13,7 +13,7 @@ import {
 
 @Injectable()
 export class ContextualCartService {
-  private readonly FREESHIP_THRESHOLD = 500000;
+  private readonly FREESHIP_THRESHOLD = 150; // Hệ USD
 
   constructor(
     @InjectModel(Cart.name) private cartModel: Model<Cart>,
@@ -25,15 +25,15 @@ export class ContextualCartService {
     sessionId: string,
     userId: string | undefined,
     currentTotal: number,
-    excludeIdsStr?: string, // <--- 1. THÊM THAM SỐ NÀY
+    excludeIdsStr?: string,
   ) {
     const cartMatch = userId
       ? { user_id: new Types.ObjectId(userId) }
       : { session_id: sessionId };
+
     const currentCart = await this.cartModel.findOne(cartMatch).lean();
     const cartProductIds = currentCart?.items.map((i) => i.product_id) || [];
 
-    // 2. TẠO MẢNG LOẠI TRỪ (GỘP GIỎ HÀNG VÀ DỮ LIỆU FRONTEND GỬI LÊN)
     const excludeList = excludeIdsStr ? excludeIdsStr.split(',') : [];
     const mergedExcludeIds = [
       ...new Set([...cartProductIds.map(String), ...excludeList]),
@@ -42,69 +42,7 @@ export class ContextualCartService {
       .filter((id) => Types.ObjectId.isValid(id))
       .map((id) => new Types.ObjectId(id));
 
-    // AC8: Xử lý giỏ hàng rỗng (Empty Cart State hoặc đã Checkout xong)
-    if (cartProductIds.length === 0) {
-      const trendingProducts = await this.productModel
-        .find({
-          _id: { $nin: objectIdsToExclude }, // <--- 3. THÊM LỌC Ở ĐÂY (LOẠI TRỪ ĐỒ VỪA MUA)
-          status: 'ACTIVE',
-          is_deleted: false,
-          stock: { $gt: 0 },
-          tags: { $in: ['Trending', 'trending'] },
-        })
-        .sort({ is_flash_sale: -1, margin_tier: -1, rating_average: -1 })
-        .limit(8)
-        .lean();
-
-      return trendingProducts as unknown as ProductDocument[];
-    }
-
-    const cartProducts = await this.productModel
-      .find({ _id: { $in: cartProductIds } })
-      .select('categories tags')
-      .lean();
-
-    const cartCategoryIds = cartProducts.flatMap((p) => p.categories);
-    const cartTags = cartProducts.flatMap((p) => p.tags || []);
-    const hasBulkyItem =
-      cartTags.includes('bulky') || cartTags.includes('cong-kenh');
-    // [FIX AC18]: Đổi logic sang kiểm tra tính tương thích đồ dã ngoại
-    const isCampingCart = cartTags.some((tag) =>
-      ['tent', 'cam-trai', 'leu'].includes(tag.toLowerCase()),
-    );
-
-    const isTrekkingCart = cartTags.some((tag) =>
-      ['giay-trekking', 'balo-leo-nui', 'hiking'].includes(tag.toLowerCase()),
-    );
-
-    const excludedTags = ['flight-restricted', 'liquid'];
-    if (hasBulkyItem) excludedTags.push('fragile', 'de-vo');
-
-    const baseQuery: Record<string, unknown> = {
-      _id: { $nin: objectIdsToExclude },
-      status: 'ACTIVE',
-      is_deleted: false,
-      stock: { $gt: 0 },
-      max_purchase_qty: { $ne: 0 },
-      tags: { $nin: excludedTags },
-    };
-
-    // Áp dụng tính tương thích
-    if (isCampingCart) {
-      const currentTagsQuery = baseQuery.tags as Record<string, unknown>;
-      baseQuery.tags = {
-        ...currentTagsQuery,
-        $in: ['phu-kien-cam-trai', 'coc-leu', 'den-pin', 'tui-ngu'], // Nếu mua lều, gợi ý túi ngủ/đèn pin
-      };
-    } else if (isTrekkingCart) {
-      const currentTagsQuery = baseQuery.tags as Record<string, unknown>;
-      baseQuery.tags = {
-        ...currentTagsQuery,
-        $in: ['vo-merino', 'binh-nuoc', 'gay-leo-nui'], // Nếu mua giày/balo, gợi ý vớ/bình nước/gậy
-      };
-    }
-
-    // [FIX AC16]: Behavior-based Recommendation (Nếu user đăng nhập)
+    // --- 1. LẤY HỒ SƠ GU CÁ NHÂN (USER AFFINITY) ĐỂ CÁ NHÂN HÓA ---
     let userAffinityCategoryIds: string[] = [];
     if (userId) {
       const userBehaviors = await this.behaviorModel
@@ -118,7 +56,6 @@ export class ContextualCartService {
         .limit(20)
         .lean();
 
-      // [FIX 1: no-unnecessary-type-assertion]: Dùng typeof an toàn thay vì as string
       const viewedProductIds = userBehaviors
         .map((b) => b.metadata?.product_id)
         .filter((id) => typeof id === 'string' && Types.ObjectId.isValid(id));
@@ -129,12 +66,12 @@ export class ContextualCartService {
           .select('categories')
           .lean();
 
+        // [FIX ESLINT]: Bóc tách dữ liệu Category an toàn
         userAffinityCategoryIds = [
           ...new Set(
             viewedProducts
               .flatMap((p) => p.categories)
               .map((c) => {
-                // [FIX 2: no-base-to-string]: Phân loại rạch ròi kiểu dữ liệu của category
                 if (c instanceof Types.ObjectId) return c.toHexString();
                 if (typeof c === 'string') return c;
                 if (c && typeof c === 'object' && '_id' in c) {
@@ -148,98 +85,187 @@ export class ContextualCartService {
       }
     }
 
-    // [FIX AC14 & AC17]: Object Sort ưu tiên Event FlashSale -> Lợi nhuận -> Rating
+    const baseQuery: FilterQuery<ProductDocument> = {
+      _id: { $nin: objectIdsToExclude },
+      status: 'ACTIVE',
+      is_deleted: false,
+      stock: { $gt: 0 },
+    };
+
     const prioritySort: Record<string, 1 | -1> = {
       is_flash_sale: -1,
       margin_tier: -1,
       rating_average: -1,
     };
 
-    let recommendedProducts: ProductDocument[] = [];
-
-    // AC2: Threshold Gap Filling (Lấp đầy Freeship)
-    if (currentTotal > 0 && currentTotal < this.FREESHIP_THRESHOLD) {
-      const gap = this.FREESHIP_THRESHOLD - currentTotal;
-
-      const gapQuery: Record<string, unknown> = {
+    // --- 2. KỊCH BẢN GIỎ HÀNG TRỐNG ---
+    if (cartProductIds.length === 0) {
+      const emptyCartQuery: FilterQuery<ProductDocument> = {
         ...baseQuery,
-        // [FIX CHO HIGH-END]: Đảm bảo giá gợi ý ít nhất cũng phải từ 400k trở lên,
-        // cho dù gap có nhỏ đến mức nào.
-        sale_price: {
-          $gte: Math.max(gap * 0.8, 400000),
-          $lte: Math.max(gap * 2.0, 2500000),
-        },
+        tags: { $in: ['Trending', 'trending', 'best seller', 'new arrival'] },
       };
 
       if (userAffinityCategoryIds.length > 0) {
-        gapQuery.categories = { $in: userAffinityCategoryIds };
+        emptyCartQuery.categories = { $in: userAffinityCategoryIds };
       }
 
-      recommendedProducts = (await this.productModel
-        .find(gapQuery)
+      let recs = (await this.productModel
+        .find(emptyCartQuery)
         .sort(prioritySort)
         .limit(6)
         .lean()) as unknown as ProductDocument[];
-    }
 
-    // AC3: Impulse Buying (Mua ngẫu hứng)
-    if (recommendedProducts.length === 0) {
-      // [FIX CHO HIGH-END]: Đồ mua ngẫu hứng ở phân khúc này dao động từ 500k - 1.5 triệu.
-      const impulseLimit = currentTotal > 0 ? currentTotal * 0.25 : 1500000;
-      const finalImpulseLimit = Math.max(impulseLimit, 1500000); // Tối thiểu quét đồ < 1.5 triệu
-
-      // Tạo object query linh hoạt thay vì fix cứng Regex
-      const impulseQuery: Record<string, unknown> = {
-        ...baseQuery,
-        sale_price: { $lt: finalImpulseLimit },
-      };
-
-      // CHỈ GẮN ĐIỀU KIỆN LỌC CATEGORY NẾU GIỎ HÀNG THỰC SỰ CÓ ĐỒ
-      if (cartCategoryIds.length > 0) {
-        impulseQuery.categories = { $in: cartCategoryIds };
+      if (recs.length < 6) {
+        const currentRecIds = recs.map((r) => r._id);
+        const fallback = (await this.productModel
+          .find({
+            ...baseQuery,
+            _id: { $nin: [...objectIdsToExclude, ...currentRecIds] },
+            tags: { $in: ['Trending', 'trending', 'best seller'] },
+          })
+          .sort(prioritySort)
+          .limit(6 - recs.length)
+          .lean()) as unknown as ProductDocument[];
+        recs = [...recs, ...fallback];
       }
-
-      recommendedProducts = (await this.productModel
-        .find(impulseQuery)
-        .sort(prioritySort)
-        .limit(6)
-        .lean()) as unknown as ProductDocument[];
-    }
-    const hasGiftWrapInCart = cartTags.includes('gift-wrap');
-    const serviceTagsToSuggest = ['service', 'warranty']; // Luôn có thể gợi ý bảo hành
-
-    if (!hasGiftWrapInCart) {
-      serviceTagsToSuggest.push('gift-wrap'); // Chỉ gợi ý gói quà nếu giỏ hàng chưa có
+      return recs;
     }
 
-    // AC9: Service Upselling
-    const serviceProducts = (await this.productModel
-      .find({
-        _id: { $nin: objectIdsToExclude },
-        status: 'ACTIVE',
-        is_deleted: false,
-        tags: { $in: serviceTagsToSuggest }, // Đã áp dụng bộ lọc xung đột
+    // --- 3. KỊCH BẢN GIỎ HÀNG CÓ ĐỒ ---
+    const cartProducts = await this.productModel
+      .find({ _id: { $in: cartProductIds } })
+      .select('categories tags')
+      .lean();
+
+    // [FIX ESLINT]: Bóc tách dữ liệu Category an toàn
+    const cartCategoryIds = cartProducts
+      .flatMap((p) => p.categories)
+      .map((c) => {
+        if (c instanceof Types.ObjectId) return c.toHexString();
+        if (typeof c === 'string') return c;
+        if (c && typeof c === 'object' && '_id' in c) {
+          return String((c as { _id: unknown })._id);
+        }
+        return '';
       })
-      .select(
-        'name sku price sale_price thumbnail stock tags variants.sku variants.active variants._id',
-      )
-      .limit(2)
-      .lean()) as unknown as ProductDocument[];
+      .filter((id) => id !== '');
 
-    if (serviceProducts.length > 0) {
-      recommendedProducts = [...serviceProducts, ...recommendedProducts].slice(
-        0,
-        8,
-      );
-    }
+    const cartTags = cartProducts.flatMap((p) => p.tags || []);
 
-    // AC8: Fallback Empty Cart
-    if (recommendedProducts.length === 0) {
+    const combinedCategories = [
+      ...new Set([...cartCategoryIds, ...userAffinityCategoryIds]),
+    ];
+
+    const contextQuery: FilterQuery<ProductDocument> = {
+      ...baseQuery,
+      $or: [
+        { categories: { $in: combinedCategories } },
+        { tags: { $in: cartTags } },
+      ],
+    };
+
+    let recommendedProducts: ProductDocument[] = [];
+
+    // THUẬT TOÁN GAP FILLING (Mồi Freeship)
+    if (currentTotal > 0 && currentTotal < this.FREESHIP_THRESHOLD) {
+      const gap = this.FREESHIP_THRESHOLD - currentTotal;
+      const minPrice = Math.max(gap * 0.3, 5);
+      const maxPrice = Math.max(gap * 1.5, 45);
+
       recommendedProducts = (await this.productModel
-        .find({ ...baseQuery, tags: 'Trending' })
+        .find({
+          ...contextQuery,
+          $or: [
+            { sale_price: { $gt: 0, $gte: minPrice, $lte: maxPrice } },
+            {
+              sale_price: { $in: [0, null] },
+              price: { $gte: minPrice, $lte: maxPrice },
+            },
+          ],
+        })
         .sort(prioritySort)
         .limit(6)
         .lean()) as unknown as ProductDocument[];
+
+      if (recommendedProducts.length === 0) {
+        recommendedProducts = (await this.productModel
+          .find({
+            ...baseQuery,
+            $or: [
+              { sale_price: { $gt: 0, $gte: minPrice, $lte: maxPrice } },
+              {
+                sale_price: { $in: [0, null] },
+                price: { $gte: minPrice, $lte: maxPrice },
+              },
+            ],
+          })
+          .sort(prioritySort)
+          .limit(6)
+          .lean()) as unknown as ProductDocument[];
+      }
+    }
+
+    // THUẬT TOÁN IMPULSE BUYING
+    if (recommendedProducts.length === 0) {
+      const impulseLimit = currentTotal > 0 ? currentTotal * 0.4 : 30;
+      const finalImpulseLimit = Math.max(impulseLimit, 20);
+
+      recommendedProducts = (await this.productModel
+        .find({
+          ...contextQuery,
+          $or: [
+            { sale_price: { $gt: 0, $lt: finalImpulseLimit } },
+            {
+              sale_price: { $in: [0, null] },
+              price: { $lt: finalImpulseLimit },
+            },
+          ],
+        })
+        .sort(prioritySort)
+        .limit(6)
+        .lean()) as unknown as ProductDocument[];
+    }
+
+    // --- 4. BÙ ĐẮP SẢN PHẨM CHỐNG TRÙNG LẶP ---
+    if (recommendedProducts.length < 6) {
+      const currentRecIds = recommendedProducts.map((p) => p._id);
+      const additionalExcludes = [...objectIdsToExclude, ...currentRecIds];
+
+      if (userAffinityCategoryIds.length > 0) {
+        const personalizedFiller = (await this.productModel
+          .find({
+            _id: { $nin: additionalExcludes },
+            status: 'ACTIVE',
+            is_deleted: false,
+            stock: { $gt: 0 },
+            categories: { $in: userAffinityCategoryIds },
+          })
+          .sort(prioritySort)
+          .limit(6 - recommendedProducts.length)
+          .lean()) as unknown as ProductDocument[];
+
+        recommendedProducts = [...recommendedProducts, ...personalizedFiller];
+      }
+
+      if (recommendedProducts.length < 6) {
+        const finalExcludes = [
+          ...objectIdsToExclude,
+          ...recommendedProducts.map((p) => p._id),
+        ];
+        const fillerProducts = (await this.productModel
+          .find({
+            _id: { $nin: finalExcludes },
+            status: 'ACTIVE',
+            is_deleted: false,
+            stock: { $gt: 0 },
+            tags: { $in: ['Trending', 'best seller', 'camping essentials'] },
+          })
+          .sort(prioritySort)
+          .limit(6 - recommendedProducts.length)
+          .lean()) as unknown as ProductDocument[];
+
+        recommendedProducts = [...recommendedProducts, ...fillerProducts];
+      }
     }
 
     return recommendedProducts;

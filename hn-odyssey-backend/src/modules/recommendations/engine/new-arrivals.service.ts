@@ -267,7 +267,6 @@ export class NewArrivalsService {
       .select('_id email first_Name')
       .lean();
 
-    // Khai báo giao diện định kiểu để loại bỏ hoàn toàn "any"
     interface ICustomerData {
       _id: Types.ObjectId;
       email: string;
@@ -279,43 +278,55 @@ export class NewArrivalsService {
       thumbnail: string;
     }
 
-    for (const customer of customers) {
-      // Ép kiểu an toàn chuẩn TS
-      const userData = customer as unknown as ICustomerData;
+    // --- FIX: BATCHING VÀ XỬ LÝ BẤT ĐỒNG BỘ SONG SONG ---
+    const BATCH_SIZE = 50;
 
-      let emailHtml = `<div style="font-family: sans-serif; padding: 20px;"><h2>Chào ${userData.first_Name},</h2><p>Hệ thống vừa ra mắt các sản phẩm mới trong tuần này!</p>`;
+    for (let i = 0; i < customers.length; i += BATCH_SIZE) {
+      const batch = customers.slice(i, i + BATCH_SIZE);
 
-      emailHtml += `<h3>🔥 ${newProducts.length} sản phẩm mới</h3>`;
+      const batchPromises = batch.map(async (customer) => {
+        const userData = customer as unknown as ICustomerData;
+        let emailHtml = `<div style="font-family: sans-serif; padding: 20px;"><h2>Chào ${userData.first_Name},</h2><p>Hệ thống vừa ra mắt các sản phẩm mới trong tuần này!</p><h3>🔥 ${newProducts.length} sản phẩm mới</h3>`;
 
-      newProducts.slice(0, 5).forEach((rawItem) => {
-        // Ép kiểu an toàn cho phần tử trong mảng sản phẩm
-        const item = rawItem as unknown as INewProductData;
-        emailHtml += `<div style="display: flex; margin-bottom: 10px;"><img src="${item.thumbnail}" width="50" style="margin-right: 10px;"/><span>${item.name}</span></div>`;
+        newProducts.slice(0, 5).forEach((rawItem) => {
+          const item = rawItem as unknown as INewProductData;
+          emailHtml += `<div style="display: flex; margin-bottom: 10px;"><img src="${item.thumbnail}" width="50" style="margin-right: 10px;"/><span>${item.name}</span></div>`;
+        });
+
+        emailHtml += `<a href="https://hnodyssey.id.vn/new-arrivals" style="display: inline-block; padding: 10px 20px; background: black; color: white; text-decoration: none; margin-top: 20px;">KHÁM PHÁ NGAY</a></div>`;
+
+        try {
+          // Chạy song song Email và Push cho cùng 1 user
+          await Promise.allSettled([
+            this.emailService.sendRaw(
+              userData.email,
+              'Sản phẩm mới tuần này đã có mặt!',
+              emailHtml,
+            ),
+            this.notificationsService.createAndSend({
+              recipient_role: 'CUSTOMER',
+              recipient_id: userData._id.toString(),
+              title: 'Sản phẩm mới đã lên kệ! 🔥',
+              message: `Hệ thống vừa cập nhật ${newProducts.length} sản phẩm mới. Khám phá ngay!`,
+              type: NotificationType.PROMOTION,
+              priority: NotificationPriority.HIGH,
+              metadata: { target_url: '/new-arrivals' },
+            }),
+          ]);
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          this.logger.error(
+            `[NEW ARRIVALS] Lỗi gửi thông báo cho ${userData.email}: ${msg}`,
+          );
+        }
       });
 
-      emailHtml += `<a href="https://hn-odyssey.com/new-arrivals" style="display: inline-block; padding: 10px 20px; background: black; color: white; text-decoration: none; margin-top: 20px;">KHÁM PHÁ NGAY</a></div>`;
-
-      await this.emailService.sendRaw(
-        userData.email,
-        'Sản phẩm mới tuần này đã có mặt!',
-        emailHtml,
-      );
-
-      try {
-        await this.notificationsService.createAndSend({
-          recipient_role: 'CUSTOMER',
-          recipient_id: userData._id.toString(),
-          title: 'Sản phẩm mới đã lên kệ! 🔥',
-          message: `Hệ thống vừa cập nhật ${newProducts.length} sản phẩm mới. Khám phá ngay!`,
-          type: NotificationType.PROMOTION,
-          priority: NotificationPriority.HIGH,
-          metadata: { target_url: '/new-arrivals' },
-        });
-      } catch (error) {
-        this.logger.error(
-          `[NEW ARRIVALS] Lỗi gửi push: ${(error as Error).message}`,
-        );
-      }
+      // Chờ hoàn thành 50 khách hàng mới xử lý 50 khách hàng tiếp theo, tránh tràn RAM
+      await Promise.allSettled(batchPromises);
     }
+
+    this.logger.log(
+      `[NEW ARRIVALS] Đã hoàn tất gửi thông báo cho ${customers.length} khách hàng.`,
+    );
   }
 }

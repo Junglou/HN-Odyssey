@@ -50,6 +50,10 @@ import { SupportModule } from './modules/support/support.module';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         uri: configService.get<string>('MONGO_URL'),
+        serverSelectionTimeoutMS: 5000, // Thử lại nhanh trong 5s nếu lag
+        socketTimeoutMS: 45000, // Đóng socket nếu kẹt 45s
+        minPoolSize: 5, // Giữ tối thiểu 5 kết nối mở sẵn cho CronJob
+        maxPoolSize: 50, // Tránh tràn RAM
       }),
       inject: [ConfigService],
     }),

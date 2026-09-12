@@ -1,4 +1,5 @@
 import axiosClient from "../api/axiosClient";
+import tokenStorage from "./tokenStorage";
 
 const GUEST_SESSION_KEY = "guestSessionId";
 
@@ -10,6 +11,26 @@ export const getGuestSessionId = (): string => {
     localStorage.setItem(GUEST_SESSION_KEY, sessionId);
   }
   return sessionId;
+};
+
+const getUserIdFromToken = (): string | undefined => {
+  const token = tokenStorage.getToken();
+  if (!token) return undefined;
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      window
+        .atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(""),
+    );
+    const payload = JSON.parse(jsonPayload);
+    return payload._id || payload.id;
+  } catch {
+    return undefined;
+  }
 };
 
 export interface CartRecommendationApiItem {
@@ -68,16 +89,22 @@ const loadCartSnapshot = async (): Promise<CartSnapshot> => {
 
 /**
  * Cart-context recommendations — same endpoint as checkout success sidebar.
- * `GET /recommendations/cart?session_id&current_cart_total&exclude_ids`
+ * `GET /recommendations/cart?session_id&user_id&current_cart_total&exclude_ids`
  */
 export async function fetchCartRecommendationProducts(
   limit = 6,
 ): Promise<CartRecommendationApiItem[]> {
   const { sessionId, subtotal, excludeIds } = await loadCartSnapshot();
+  const userId = getUserIdFromToken();
 
-  const res = await axiosClient.get(
-    `/recommendations/cart?session_id=${sessionId}&current_cart_total=${subtotal}&exclude_ids=${excludeIds}`,
-  );
+  let url = `/recommendations/cart?current_cart_total=${subtotal}&exclude_ids=${excludeIds}`;
+  if (userId) {
+    url += `&user_id=${userId}`;
+  } else {
+    url += `&session_id=${sessionId}`;
+  }
+
+  const res = await axiosClient.get(url);
 
   return extractRecommendationList(res.data).slice(0, limit);
 }

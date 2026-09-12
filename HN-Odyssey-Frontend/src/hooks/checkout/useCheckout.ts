@@ -355,6 +355,9 @@ export function useCheckout() {
       return;
     }
 
+    // FIX: Thêm cờ để huỷ kết quả trả về của các request cũ (Race Condition)
+    let isCurrentRequest = true;
+
     const payload = {
       cityCode: formData.provinceCode,
       districtCode: formData.districtCode,
@@ -369,8 +372,22 @@ export function useCheckout() {
 
     axiosClient
       .post("/shipping/calculate", payload)
-      .then((res) => setShippingFee(res.data.shipping_fee || 0))
-      .catch(() => setShippingFee(0));
+      .then((res) => {
+        // Chỉ cập nhật UI nếu đây là request cuối cùng
+        if (isCurrentRequest) {
+          setShippingFee(res.data.shipping_fee || 0);
+        }
+      })
+      .catch(() => {
+        if (isCurrentRequest) {
+          setShippingFee(0);
+        }
+      });
+
+    // Cleanup function: Khi dependency đổi, request cũ sẽ bị đánh dấu là false
+    return () => {
+      isCurrentRequest = false;
+    };
   }, [formData.provinceCode, formData.districtCode, items, summary.subtotal]);
 
   useEffect(() => {
@@ -466,6 +483,21 @@ export function useCheckout() {
     ward_code: formData.wardCode,
   });
 
+  useEffect(() => {
+    let timerInterval: ReturnType<typeof setInterval> | undefined;
+
+    if (otpTimer > 0) {
+      timerInterval = setInterval(() => {
+        setOtpTimer((prev) => prev - 1);
+      }, 1000);
+    }
+
+    // Tự động dọn dẹp interval khi component bị huỷ hoặc khi otpTimer về 0
+    return () => {
+      if (timerInterval) clearInterval(timerInterval);
+    };
+  }, [otpTimer]);
+
   const handleSendOtp = async () => {
     if (!formData.phone || !formData.email) {
       toast.warning(
@@ -480,17 +512,10 @@ export function useCheckout() {
         cartSessionId: guestSessionId,
         phone: formData.phone,
       });
+
+      // FIX: Chuyển trách nhiệm đếm lùi cho useEffect bên trên, ở đây chỉ cần set 60
       setOtpTimer(60);
       toast.success(`Mã xác thực đã được gửi đến hộp thư ${formData.email}`);
-      const timerInterval = setInterval(() => {
-        setOtpTimer((prev) => {
-          if (prev <= 1) {
-            clearInterval(timerInterval);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
     } catch (error: unknown) {
       const err = error as ApiError;
       toast.error(err?.message || "Hệ thống gặp sự cố khi gửi mã xác thực.");

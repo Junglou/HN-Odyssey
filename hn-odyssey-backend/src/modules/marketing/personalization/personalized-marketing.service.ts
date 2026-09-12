@@ -233,7 +233,7 @@ export class PersonalizedMarketingService {
           </table>
           
           <div style="text-align: center; margin-top: 30px;">
-            <a href="https://hn-odyssey.com/cart" style="padding: 12px 25px; background: #000; color: #fff; text-decoration: none; border-radius: 4px; font-weight: bold;">THANH TOÁN NGAY</a>
+            <a href="https://hnodyssey.id.vn/cart" style="padding: 12px 25px; background: #000; color: #fff; text-decoration: none; border-radius: 4px; font-weight: bold;">THANH TOÁN NGAY</a>
           </div>
         </div>
       `;
@@ -286,7 +286,7 @@ export class PersonalizedMarketingService {
           </div>
           
           <div style="text-align: center; margin-top: 30px;">
-            <a href="https://hn-odyssey.com/wallet/vouchers" style="padding: 12px 25px; background: #000; color: #fff; text-decoration: none; border-radius: 4px; font-weight: bold;">KIỂM TRA VÍ VOUCHER</a>
+            <a href="https://hnodyssey.id.vn/wallet/vouchers" style="padding: 12px 25px; background: #000; color: #fff; text-decoration: none; border-radius: 4px; font-weight: bold;">KIỂM TRA VÍ VOUCHER</a>
           </div>
         </div>
       `;
@@ -386,7 +386,7 @@ export class PersonalizedMarketingService {
       const htmlContent = `
         <div style="font-family: Arial, sans-serif; padding: 30px; text-align: center; background-color: #f9f9f9;">
           <div style="background-color: #fff; padding: 40px; border-radius: 8px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
-            <img src="https://hn-odyssey.com/logo.png" width="120" style="margin-bottom: 20px;" />
+            <img src="https://hnodyssey.id.vn/logo.png" width="120" style="margin-bottom: 20px;" />
             <h2 style="color: #2c3e50;">Chào ${customer.fullName}, chúng tôi nhớ bạn!</h2>
             <p style="color: #555; line-height: 1.6; margin-bottom: 30px;">
               Đã một thời gian kể từ lần cuối bạn ghé thăm. Để chào mừng bạn quay trở lại, H&N Odyssey dành tặng riêng bạn một phần quà nhỏ.
@@ -398,7 +398,7 @@ export class PersonalizedMarketingService {
               <p style="margin: 0; color: #666; font-size: 12px;">Áp dụng cho đơn từ 200.000đ. Hạn dùng 7 ngày.</p>
             </div>
 
-            <a href="https://hn-odyssey.com?utm_source=winback_email" 
+            <a href="https://hnodyssey.id.vn?utm_source=winback_email" 
                style="display: inline-block; padding: 15px 30px; background-color: #000; color: #fff; text-decoration: none; border-radius: 4px; font-weight: bold; text-transform: uppercase;">
               MUA SẮM NGAY
             </a>
@@ -537,7 +537,7 @@ export class PersonalizedMarketingService {
           <p>Cuối tuần vui vẻ! Chúng tôi đã chuẩn bị sẵn một số ưu đãi và gợi ý thời trang hoàn hảo cho bạn.</p>
           ${productBlocksHtml}
           <div style="text-align: center; margin-top: 30px;">
-            <a href="https://hn-odyssey.com/" style="padding: 12px 24px; background-color: #000; color: #fff; text-decoration: none; border-radius: 4px;">Khám Phá Ngay</a>
+            <a href="https://hnodyssey.id.vn/" style="padding: 12px 24px; background-color: #000; color: #fff; text-decoration: none; border-radius: 4px;">Khám Phá Ngay</a>
           </div>
         </div>
       `;
