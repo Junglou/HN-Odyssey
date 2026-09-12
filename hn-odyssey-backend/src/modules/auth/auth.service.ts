@@ -1042,7 +1042,7 @@ export class AuthService {
       request.processed_at = new Date();
       await request.save();
 
-      const link = `https://hn-odyssey.com/recovery-reset?token=${resetToken}&email=${request.contact_email}`;
+      const link = `https://hnodyssey.id.vn/recovery-reset?token=${resetToken}&email=${request.contact_email}`;
 
       // 5. PHẢI AWAIT gửi mail link reset
       await this.emailService.sendResetPasswordLink(
@@ -1125,7 +1125,7 @@ export class AuthService {
 
     if (isEmail) {
       code = this.generateRandomString(32);
-      const link = `https://hn-odyssey.com/reset-password?token=${code}&email=${account}`;
+      const link = `https://hnodyssey.id.vn/reset-password?token=${code}&email=${account}`;
       this.emailService
         .sendResetPasswordLink(account, link)
         .catch((e) => this.logger.error(e));

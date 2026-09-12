@@ -149,7 +149,7 @@ export class RecommendationsController {
   async submitFeedback(
     @Body() dto: SubmitFeedbackDto,
   ): Promise<{ success: boolean; message: string }> {
-    this.trackingService.logEvent({
+    await this.trackingService.logEvent({
       session_id: dto.session_id,
       user_id: dto.user_id,
       action:

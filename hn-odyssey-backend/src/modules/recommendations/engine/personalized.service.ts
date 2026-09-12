@@ -104,10 +104,14 @@ export class PersonalizedService {
     }
 
     if (!finalClient) {
-      this.logger.error(
-        'Khởi tạo thất bại: Không tìm thấy phương thức getTrendingItems trong module.',
-      );
-      throw new Error('Algolia Recommend Init Failure');
+      this.logger.error('Khởi tạo thất bại: Không tìm thấy phương thức...');
+      // THAY THẾ LỆNH THROW NEW ERROR BẰNG ĐOẠN DƯỚI ĐÂY:
+      finalClient = {
+        getTrendingItems: async () => ({ results: [] }),
+        getTrendingFacets: async () => ({ results: [] }),
+        getRelatedProducts: async () => ({ results: [] }),
+        getLookingSimilar: async () => ({ results: [] }),
+      } as unknown as IAlgoliaRecommendClient;
     }
 
     this.recommendClient = finalClient;
@@ -417,11 +421,10 @@ export class PersonalizedService {
           }
 
           // Gọi Algolia Related
-          for (const v of recentViews) {
+          const algoliaPromises = recentViews.map(async (v) => {
             const productId = v.metadata?.product_id;
             if (productId && typeof productId === 'string') {
               try {
-                // Bọc try catch nhỏ để lỗi của 1 SP Algolia không làm chết cả vòng lặp
                 const recs = await this.recommendClient.getRelatedProducts([
                   {
                     indexName: this.indexName,
@@ -429,16 +432,20 @@ export class PersonalizedService {
                     maxRecommendations: limit,
                   },
                 ]);
-                candidateIds.push(
-                  ...(recs.results[0]?.hits.map((h) => h.objectID) || []),
-                );
+                return recs.results[0]?.hits.map((h) => h.objectID) || [];
               } catch (algoliaErr) {
                 this.logger.warn(
-                  `Algolia getRelatedProducts lỗi bỏ qua: ${algoliaErr}`,
+                  `Algolia getRelatedProducts lỗi bỏ qua: ${String(algoliaErr)}`,
                 );
+                return [];
               }
             }
-          }
+            return [];
+          });
+
+          // Chờ tất cả API Algolia trả kết quả cùng lúc
+          const algoliaResults = await Promise.all(algoliaPromises);
+          algoliaResults.forEach((ids) => candidateIds.push(...ids));
         }
       }
 
