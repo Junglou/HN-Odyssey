@@ -19,6 +19,8 @@ export interface Product {
   variantId?: string | null;
   sku?: string;
   hasVariants?: boolean;
+  // FIX 1: Khai báo trường query_id để Frontend nhận
+  query_id?: string;
 }
 
 interface BackendProduct {
@@ -33,6 +35,9 @@ interface BackendProduct {
   has_variants?: boolean;
   tags?: string[];
   is_flash_sale?: boolean;
+  // FIX 2: Khai báo các định dạng queryID mà Algolia hay trả về
+  queryID?: string;
+  __queryID?: string;
 }
 
 interface DiscoverResponse {
@@ -157,6 +162,9 @@ export function useProductRecommendations() {
               tags: item.tags || [],
               type: "product",
               discountBadge: badge,
+
+              // FIX 3: Bóc queryID từ Backend truyền ra ngoài để Component Card có thể gửi Tracking
+              query_id: item.queryID || item.__queryID,
             };
           });
 

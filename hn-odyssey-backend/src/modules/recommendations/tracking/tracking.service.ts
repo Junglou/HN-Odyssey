@@ -119,26 +119,23 @@ export class TrackingService {
     try {
       const is_bounce = (dto.dwell_time_seconds ?? 0) < 3;
 
-      // 1. KIỂM TRA OBJECT ID AN TOÀN TRÁNH CRASH APP
       let validUserId: Types.ObjectId | undefined = undefined;
       if (dto.user_id && Types.ObjectId.isValid(dto.user_id)) {
         validUserId = new Types.ObjectId(dto.user_id);
       }
 
-      // 2. LƯU VÀO MONGODB ĐỂ PHỤC VỤ DASHBOARD BÁO CÁO
       const behavior = new this.behaviorModel({
         ...dto,
         is_bounce,
         user_id: validUserId,
       });
 
-      // Dùng await ở đây là an toàn vì Controller bên ngoài không await hàm này
       await behavior.save();
 
-      // 3. ĐỒNG BỘ SANG ALGOLIA INSIGHTS ĐỂ TRAIN MODEL AI
       const productId = dto.metadata?.product_id;
+      const queryId = dto.metadata?.query_id; // FIX 3: Trích xuất query_id từ request
+      const position = dto.metadata?.position;
 
-      // Algolia cần userToken (có thể là ID thật nếu đã login, hoặc SessionID nếu khách vãng lai)
       const userToken = validUserId ? validUserId.toString() : dto.session_id;
 
       if (productId) {
@@ -149,6 +146,8 @@ export class TrackingService {
               userToken,
               productId,
               'Product_Detail',
+              queryId,
+              position,
             );
             break;
 
@@ -159,17 +158,33 @@ export class TrackingService {
               userToken,
               productId,
               'Cart',
+              queryId,
+              position,
             );
             break;
 
           case BehaviorAction.CLICK_SEARCH_SUGGESTION:
-            // Phân biệt user click từ Widget gợi ý
             void this.sendAlgoliaInsight(
               'CLICK',
               userToken,
               productId,
               'Recommendation_Widget',
+              queryId,
+              position,
             );
+            break;
+
+          // Bổ sung vào switch (dto.action)
+          case BehaviorAction.VIEW_PAGE:
+            if (dto.path === '/widget/recommendation') {
+              void this.sendAlgoliaInsight(
+                'VIEW',
+                userToken,
+                productId,
+                'Recommendation_Widget',
+                queryId,
+              );
+            }
             break;
         }
       }
@@ -980,6 +995,8 @@ export class TrackingService {
     userToken: string,
     objectID: string,
     widgetType: string,
+    queryID?: string,
+    position?: number,
   ): Promise<void> {
     let eventType: 'click' | 'conversion' | 'view';
     let eventName: string;
@@ -1005,13 +1022,26 @@ export class TrackingService {
       .replace(/[^a-zA-Z0-9_=-]/g, '_')
       .substring(0, 64);
 
+    const productIdsArray = objectID.includes(',')
+      ? objectID.split(',')
+      : [objectID];
+
     const eventPayload: IAlgoliaInsightEvent = {
       eventType,
       eventName,
       index: this.indexName,
       userToken: cleanUserToken,
-      objectIDs: [objectID],
+      objectIDs: productIdsArray,
     };
+
+    // FIX 3: Gắn queryID và mảng positions vào payload
+    if (queryID) {
+      eventPayload.queryID = queryID;
+      // Thuật toán Algolia yêu cầu mảng positions đối với hành động Click/Conversion
+      if (position && action !== 'VIEW') {
+        eventPayload.positions = [position];
+      }
+    }
 
     const data: IAlgoliaInsightPayload = {
       events: [eventPayload],

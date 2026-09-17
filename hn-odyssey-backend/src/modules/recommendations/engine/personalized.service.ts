@@ -17,14 +17,16 @@ import {
   OrderDocument,
 } from 'src/modules/sales/orders/schemas/order.schema';
 
-// 1. ĐỊNH NGHĨA TYPE Ở CẤP ĐỘ GLOBAL (NGOÀI CLASS) ĐỂ TS LUÔN TÌM THẤY
-
 interface IRecommendQuery {
   indexName: string;
   maxRecommendations?: number;
   facetName?: string;
   facetValue?: string;
   objectID?: string;
+  queryParameters?: {
+    clickAnalytics?: boolean;
+    [key: string]: any; // Mở rộng phòng hờ tương lai dùng thêm parameter khác
+  };
 }
 
 interface IRecommendResponse<T> {
@@ -78,7 +80,6 @@ export class PersonalizedService {
           ) => Record<string, unknown>;
           const instance = factory(appId, apiKey);
 
-          // Kiểm chứng: Phải có getTrendingItems mới nhận
           if (instance && typeof instance.getTrendingItems === 'function') {
             return instance as unknown as IAlgoliaRecommendClient;
           }
@@ -105,7 +106,6 @@ export class PersonalizedService {
 
     if (!finalClient) {
       this.logger.error('Khởi tạo thất bại: Không tìm thấy phương thức...');
-      // THAY THẾ LỆNH THROW NEW ERROR BẰNG ĐOẠN DƯỚI ĐÂY:
       finalClient = {
         getTrendingItems: async () => ({ results: [] }),
         getTrendingFacets: async () => ({ results: [] }),
@@ -117,7 +117,6 @@ export class PersonalizedService {
     this.recommendClient = finalClient;
   }
 
-  //  1. TRENDING ITEMS
   async getTrendingItems(
     limit: number = 10,
     facetName?: string,
@@ -130,6 +129,9 @@ export class PersonalizedService {
           maxRecommendations: limit,
           facetName: facetName,
           facetValue: facetValue,
+          queryParameters: {
+            clickAnalytics: true,
+          },
         },
       ]);
 
@@ -150,7 +152,6 @@ export class PersonalizedService {
     }
   }
 
-  //  2. TRENDING FACET VALUES
   async getTrendingFacets(facetName: string = 'categories'): Promise<string[]> {
     try {
       const response = await this.recommendClient.getTrendingFacets([
@@ -172,7 +173,6 @@ export class PersonalizedService {
     }
   }
 
-  //  3. RELATED ITEMS
   async getRelatedProducts(
     productId: string,
     limit: number = 10,
@@ -183,6 +183,9 @@ export class PersonalizedService {
           indexName: this.indexName,
           objectID: productId,
           maxRecommendations: limit,
+          queryParameters: {
+            clickAnalytics: true,
+          },
         },
       ]);
 
@@ -203,7 +206,6 @@ export class PersonalizedService {
     }
   }
 
-  //  4. LOOKING SIMILAR
   async getLookingSimilar(
     productId: string,
     limit: number = 10,
@@ -214,12 +216,14 @@ export class PersonalizedService {
           indexName: this.indexName,
           objectID: productId,
           maxRecommendations: limit,
+          queryParameters: {
+            clickAnalytics: true,
+          },
         },
       ]);
 
       const hits = response.results[0]?.hits || [];
 
-      // KÍCH HOẠT FALLBACK NẾU ALGOLIA CHƯA CÓ DATA HOẶC TRẢ VỀ RỖNG
       if (hits.length === 0) {
         this.logger.log(
           `[Looking Similar] Algolia trả về rỗng cho SP ${productId}. Kích hoạt Fallback Database.`,
@@ -253,12 +257,10 @@ export class PersonalizedService {
         `[Looking Similar] Lỗi khi gọi Algolia: ${errorDetail}. Chuyển hướng sang Fallback.`,
       );
 
-      // THAY VÌ TRẢ VỀ ERROR RỖNG, GỌI FALLBACK ĐỂ CỨU UI
       return this.getFallbackLookingSimilar(productId, limit);
     }
   }
 
-  // HÀM HELPER: FALLBACK CHO LOOKING SIMILAR KHI ALGOLIA CHƯA SẴN SÀNG
   private async getFallbackLookingSimilar(
     productId: string,
     limit: number,
@@ -266,7 +268,6 @@ export class PersonalizedService {
     try {
       const objectId = new Types.ObjectId(productId);
 
-      // Lấy thông tin sản phẩm gốc để làm mỏ neo (chỉ cần lấy danh mục)
       const baseProduct = await this.productModel
         .findById(objectId)
         .select('categories')
@@ -284,7 +285,6 @@ export class PersonalizedService {
         };
       }
 
-      // Quét các sản phẩm cùng danh mục, trừ chính nó ra, ưu tiên đồ đang có sẵn
       const fallbackProducts = await this.productModel
         .find({
           _id: { $ne: objectId },
@@ -293,7 +293,7 @@ export class PersonalizedService {
           is_deleted: false,
           stock: { $gt: 0 },
         })
-        .sort({ view_count: -1, rating_average: -1 }) // Ưu tiên đồ nhiều view và rating tốt
+        .sort({ view_count: -1, rating_average: -1 })
         .limit(limit)
         .select('-__v')
         .lean();
@@ -315,7 +315,7 @@ export class PersonalizedService {
     }
   }
 
-  //  HÀM HELPER QUERY DB
+  // FIX: Giữ lại queryID từ Algolia
   private async fetchProductsFromHits(
     hits: IAlgoliaRecommendHit[],
   ): Promise<ProductDocument[]> {
@@ -340,13 +340,29 @@ export class PersonalizedService {
     const sortedProducts: ProductDocument[] = [];
     for (const hit of hits) {
       const p = productsMap.get(hit.objectID);
-      if (p) sortedProducts.push(p);
+      if (p) {
+        // Định nghĩa type trung gian an toàn
+        type AlgoliaHitWithQueryID = IAlgoliaRecommendHit & {
+          queryID?: string;
+          __queryID?: string;
+        };
+
+        const hitWithQueryId = hit as AlgoliaHitWithQueryID;
+        const queryID = hitWithQueryId.queryID || hitWithQueryId.__queryID;
+
+        // Tạo object mới thay vì gán đè để tránh mutate
+        const productWithQueryId = {
+          ...p.toObject(), // Nếu p là mongoose document
+          query_id: queryID,
+        } as unknown as ProductDocument;
+
+        sortedProducts.push(productWithQueryId);
+      }
     }
 
     return sortedProducts;
   }
 
-  //  [FIX AC1, AC4, AC5]: THUẬT TOÁN JUST FOR YOU
   async getJustForYouWidget(
     sessionId: string,
     userId?: string,
@@ -362,7 +378,6 @@ export class PersonalizedService {
       }
 
       if (userId && Types.ObjectId.isValid(userId)) {
-        // [FIX AC7]: Lấy danh sách ID sản phẩm khách đã mua để khử trùng
         const orders = await this.orderModel
           .find({
             user_id: new Types.ObjectId(userId),
@@ -371,12 +386,10 @@ export class PersonalizedService {
           .select('items.product_id')
           .lean();
 
-        // CHỐNG CRASH: Sử dụng fallback (o.items || []) để phòng hờ mảng items bị undefined
         boughtIds = orders.flatMap((o) =>
           (o.items || []).map((i) => String(i.product_id)),
         );
 
-        // Ưu tiên 1: Lấy ID sản phẩm dựa trên Lịch sử Xem / Giỏ hàng
         const recentViews = (await this.behaviorModel
           .find({
             user_id: new Types.ObjectId(userId),
@@ -387,13 +400,12 @@ export class PersonalizedService {
           .lean()) as IBehaviorRecord[];
 
         if (recentViews.length > 0) {
-          // [FIX AC3]: Tính toán khoảng giá tương đồng (+/- 20%) từ sản phẩm vừa xem
           const viewedIds = recentViews
             .map((v) => v.metadata?.product_id)
             .filter(
               (id): id is string =>
                 typeof id === 'string' && Types.ObjectId.isValid(id),
-            ); // Lọc cực chuẩn
+            );
 
           if (viewedIds.length > 0) {
             const viewedProducts = await this.productModel
@@ -404,7 +416,6 @@ export class PersonalizedService {
               .lean();
 
             if (viewedProducts.length > 0) {
-              // [FIX ESLINT]: Ép kiểu qua unknown rồi định nghĩa cấu trúc an toàn thay vì dùng 'any'
               const prices = viewedProducts.map((p) => {
                 const doc = p as unknown as {
                   sale_price: number;
@@ -415,12 +426,11 @@ export class PersonalizedService {
 
               const avgPrice =
                 prices.reduce((a, b) => a + b, 0) / prices.length;
-              priceRange.min = avgPrice * 0.8; // Trừ 20%
-              priceRange.max = avgPrice * 1.2; // Cộng 20%
+              priceRange.min = avgPrice * 0.8;
+              priceRange.max = avgPrice * 1.2;
             }
           }
 
-          // Gọi Algolia Related
           const algoliaPromises = recentViews.map(async (v) => {
             const productId = v.metadata?.product_id;
             if (productId && typeof productId === 'string') {
@@ -443,7 +453,6 @@ export class PersonalizedService {
             return [];
           });
 
-          // Chờ tất cả API Algolia trả kết quả cùng lúc
           const algoliaResults = await Promise.all(algoliaPromises);
           algoliaResults.forEach((ids) => candidateIds.push(...ids));
         }
@@ -466,7 +475,6 @@ export class PersonalizedService {
 
       candidateIds = [...new Set(candidateIds)];
 
-      // [CHỐNG CRASH 500 NGHIÊM TRỌNG]: Bắt buộc phải check .isValid(id) trước khi chạy new Types.ObjectId(id)
       const validCandidateObjectIds = candidateIds
         .filter((id) => Types.ObjectId.isValid(id))
         .map((id) => new Types.ObjectId(id));
@@ -475,11 +483,10 @@ export class PersonalizedService {
         .filter((id) => Types.ObjectId.isValid(id))
         .map((id) => new Types.ObjectId(id));
 
-      // [FIX AC3 & AC4 & AC5 & AC7]: Thiết lập bộ lọc Database Query
       const matchQuery: Record<string, any> = {
         _id: {
           $in: validCandidateObjectIds,
-          $nin: validBoughtObjectIds, // AC7: Chặn gợi ý đồ đã mua
+          $nin: validBoughtObjectIds,
         },
         status: 'ACTIVE',
         is_deleted: false,
@@ -487,7 +494,6 @@ export class PersonalizedService {
         tags: { $nin: ['durable-goods'] },
       };
 
-      // AC3: Áp dụng ràng buộc giá (+/- 20%)
       if (priceRange.min > 0 && priceRange.max < Infinity) {
         matchQuery.$or = [
           { sale_price: { $gte: priceRange.min, $lte: priceRange.max } },
@@ -523,7 +529,6 @@ export class PersonalizedService {
 
         const count = categoryCountMap.get(pCategory) || 0;
 
-        // Diversity: Không gợi ý quá 3 sản phẩm trùng Category
         if (count < 3) {
           finalProducts.push(doc);
           categoryCountMap.set(pCategory, count + 1);
@@ -532,7 +537,6 @@ export class PersonalizedService {
         if (finalProducts.length >= limit) break;
       }
 
-      // Cơ chế an toàn 1: Đắp thêm bằng đồ Trending nếu list bị thiếu sau khi lọc giá
       if (finalProducts.length < limit) {
         const excludedIds = [
           ...validBoughtObjectIds,
@@ -565,7 +569,6 @@ export class PersonalizedService {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
 
-      // [FIX AC8]: Cơ chế Fallback tối thượng. Không bao giờ quăng lỗi 500 ra Front-End.
       this.logger.error(
         `Lỗi hệ thống tại getJustForYouWidget: ${errorMessage}`,
       );

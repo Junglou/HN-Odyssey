@@ -181,6 +181,9 @@ async def trigger_train(background_tasks: BackgroundTasks):
     if IS_TRAINING:
         return {"message": "Hệ thống đang tiến hành re-train rồi, request bị bỏ qua để tránh quá tải."}
         
+    # FIX: KHÓA NGAY LẬP TỨC TẠI ĐÂY! Không đợi background task chạy mới khóa.
+    IS_TRAINING = True 
+        
     # Đẩy vào Background Tasks để API trả response liền cho NestJS mà không bị block.
     background_tasks.add_task(train_model)
     return {"message": "Lệnh Train Model đang được xử lý chạy ngầm..."}

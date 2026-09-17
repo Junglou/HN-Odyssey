@@ -24,6 +24,8 @@ export default function ProductCard({ product }: { product: ProductItem }) {
     product.sku,
     product.hasVariants,
     product.initialWishlisted,
+    product.query_id,
+    product.position,
   );
 
   // render
