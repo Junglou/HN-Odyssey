@@ -58,11 +58,21 @@ export class SecurityMonitorInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const url = request.url;
 
+    // [FIX SPAM 1] - Lấy chuẩn IP gốc từ chuỗi Proxy/LoadBalancer và loại bỏ IPv6 mapping
     const forwardedFor = request.headers['x-forwarded-for'];
-    const ip =
+    let rawIp =
       (Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor) ||
       request.socket.remoteAddress ||
       'unknown';
+
+    if (typeof rawIp === 'string') {
+      rawIp = rawIp
+        .split(',')[0]
+        .trim()
+        .replace(/^::ffff:/, '');
+    }
+    const ip = rawIp;
+
     const userAgent = request.headers['user-agent'] || 'unknown';
 
     return next.handle().pipe(
@@ -70,7 +80,6 @@ export class SecurityMonitorInterceptor implements NestInterceptor {
         const payload = responsePayload as LoginResponsePayload;
         const loggedInUser = request.user || payload?.user;
 
-        // Chỉ trigger khi route login và có user trả về
         if (loggedInUser && url.includes('/auth/login')) {
           let idStr = '';
           if ('userId' in loggedInUser && loggedInUser.userId) {
@@ -96,12 +105,10 @@ export class SecurityMonitorInterceptor implements NestInterceptor {
     userAgent: string,
   ) {
     try {
-      // [AC10] KIỂM TRA WHITELIST IP TỪ BIẾN MÔI TRƯỜNG
       const whitelistStr =
         this.configService.get<string>('WHITELIST_IPS') || '';
       const whitelistIps = whitelistStr.split(',').map((i) => i.trim());
 
-      // Nếu IP nằm trong danh sách trắng -> Bỏ qua toàn bộ cảnh báo
       if (whitelistIps.includes(ip)) {
         this.logger.log(`IP ${ip} thuộc Whitelist. Bỏ qua kiểm tra bảo mật.`);
         return;
@@ -114,7 +121,6 @@ export class SecurityMonitorInterceptor implements NestInterceptor {
       if (lastDeviceInfoJson) {
         const lastData = JSON.parse(lastDeviceInfoJson) as DeviceInfo;
 
-        // AC2: PHÁT HIỆN VỊ TRÍ BẤT THƯỜNG (IMPOSSIBLE TRAVEL)
         const geoOld = geoip.lookup(lastData.lastIp);
         const geoNew = geoip.lookup(ip);
 
@@ -123,7 +129,6 @@ export class SecurityMonitorInterceptor implements NestInterceptor {
           const timeDiffHours =
             (currentTimestamp - lastData.lastTimestamp) / 3600000;
 
-          // Nếu vận tốc > 800km/h (tốc độ máy bay)
           if (
             timeDiffHours > 0 &&
             distance / timeDiffHours > 800 &&
@@ -138,7 +143,7 @@ export class SecurityMonitorInterceptor implements NestInterceptor {
 
             await this.auditLogsService.log({
               action: 'IMPOSSIBLE_TRAVEL_DETECTED',
-              collection_name: Resource.SYSTEM, // Thuộc về an ninh hệ thống
+              collection_name: Resource.SYSTEM,
               actor_id: user.userId,
               department: Department.MANAGEMENT,
               detail: {
@@ -150,12 +155,12 @@ export class SecurityMonitorInterceptor implements NestInterceptor {
               },
               ip,
               user_agent: userAgent,
-              is_success: false, // Đánh dấu là một vụ việc cần chú ý
+              is_success: false,
             });
           }
         }
 
-        // AC3: PHÁT HIỆN THIẾT BỊ/IP LẠ
+        // Kiểm tra IP lạ (Bây giờ ip đã chuẩn, sẽ không bị rác)
         if (lastData.lastIp !== ip || lastData.lastUA !== userAgent) {
           this.eventEmitter.emit(NOTIFY_EVENTS.SECURITY_ALERT, {
             severity: 'HIGH',
@@ -176,7 +181,6 @@ export class SecurityMonitorInterceptor implements NestInterceptor {
         }
       }
 
-      // Luôn cập nhật thông tin mới nhất vào Redis
       await this.redis.set(
         redisKey,
         JSON.stringify({
