@@ -11,6 +11,7 @@ export interface IFBTRecommendation {
   product: ProductDocument;
   confidence: number;
   reason: string; // AC21: Hiển thị lý do
+  query_id?: string;
 }
 
 export interface IRecommendationFeedback {

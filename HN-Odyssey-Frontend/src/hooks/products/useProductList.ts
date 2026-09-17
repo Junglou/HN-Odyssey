@@ -77,6 +77,8 @@ export type ProductItem = {
   imageUrl: string;
   tags: string[];
   initialWishlisted: boolean;
+  query_id?: string;
+  position?: number;
 };
 
 export type BannerItem = {

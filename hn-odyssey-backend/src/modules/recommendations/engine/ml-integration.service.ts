@@ -13,6 +13,9 @@ export class MlIntegrationService {
   private readonly logger = new Logger(MlIntegrationService.name);
   private readonly mlApiUrl: string;
 
+  // FIX 1: Thêm biến tĩnh (static) để dùng chung bộ nhớ cho tất cả 7 instances
+  private static isCronRunning = false;
+
   constructor(private readonly configService: ConfigService) {
     this.mlApiUrl =
       this.configService.get<string>('ML_ENGINE_URL') ||
@@ -43,9 +46,15 @@ export class MlIntegrationService {
     }
   }
 
-  // AC8: Huấn luyện định kỳ mỗi đêm
+  // FIX 2: Bọc khóa tĩnh vào CronJob và trả về đúng 2h sáng
   @Cron(CronExpression.EVERY_DAY_AT_2AM, { timeZone: 'Asia/Ho_Chi_Minh' })
   async triggerNightlyModelRetrain(): Promise<void> {
+    // Nếu đã có 1 instance chạy rồi thì 6 instance đằng sau lập tức bị chặn
+    if (MlIntegrationService.isCronRunning) return;
+
+    // Đóng khóa
+    MlIntegrationService.isCronRunning = true;
+
     this.logger.log('Bắt đầu trigger Re-train ML Model...');
     try {
       await axios.post(`${this.mlApiUrl}/train`, {}, { timeout: 300000 }); // Timeout 5 phút
@@ -57,7 +66,6 @@ export class MlIntegrationService {
         msg = error.message;
 
         // Xử lý Axios Error bằng TypeScript thuần (Record & in operator)
-        // Triệt tiêu hoàn toàn sự xuất hiện của Type Axios bị lỗi trong NodeNext
         if ('isAxiosError' in error && 'response' in error) {
           const axiosErr = error as Record<string, unknown>;
           const response = axiosErr.response as
@@ -73,6 +81,11 @@ export class MlIntegrationService {
       }
 
       this.logger.error(`Lỗi khi Re-train: ${msg}`);
+    } finally {
+      // Giữ khóa trong 60 giây để chắc chắn cùng một thời điểm không có sự cố lặp lại
+      setTimeout(() => {
+        MlIntegrationService.isCronRunning = false;
+      }, 60000);
     }
   }
 }

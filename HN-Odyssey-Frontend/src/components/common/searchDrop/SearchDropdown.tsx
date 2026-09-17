@@ -1,5 +1,6 @@
 import { useHits } from "react-instantsearch";
 import { Link } from "react-router-dom";
+import axiosClient from "../../../api/axiosClient";
 import "./SearchDropdown.css";
 
 interface SearchDropdownProps {
@@ -11,9 +12,11 @@ interface SearchDropdownProps {
 interface AlgoliaProductRecord {
   objectID: string;
   name: string;
-  slug: string; // khai báo thêm trường slug để nhận dữ liệu từ algolia
+  slug: string;
   thumbnail?: string;
   price: number;
+  __queryID?: string;
+  __position?: number;
 }
 
 export default function SearchDropdown({
@@ -21,11 +24,28 @@ export default function SearchDropdown({
   searchQuery,
   onClose,
 }: SearchDropdownProps) {
-  // Trích xuất kết quả từ ngữ cảnh Algolia InstantSearch
   const { hits } = useHits<AlgoliaProductRecord>();
 
-  // Không hiển thị nếu dropdown đóng hoặc chưa nhập từ khóa
   if (!isOpen || !searchQuery.trim()) return null;
+
+  const handleHitClick = (hit: AlgoliaProductRecord) => {
+    if (hit.__queryID) {
+      axiosClient
+        .post("/tracking/event", {
+          session_id: localStorage.getItem("guestSessionId") || "guest",
+          action: "CLICK_SEARCH_SUGGESTION",
+          path: `/product/${hit.slug}`,
+          device: window.innerWidth < 768 ? "MOBILE" : "DESKTOP",
+          metadata: {
+            product_id: hit.objectID,
+            query_id: hit.__queryID,
+            position: hit.__position || 1,
+          },
+        })
+        .catch((err) => console.error("Search Tracking Error:", err));
+    }
+    onClose();
+  };
 
   return (
     <div className="search-dropdown-wrapper">
@@ -35,9 +55,9 @@ export default function SearchDropdown({
             {hits.slice(0, 5).map((hit) => (
               <Link
                 key={hit.objectID}
-                to={`/products/${hit.slug}`} // chuyển hướng bằng slug thay vì objectID
+                to={`/products/${hit.slug}`}
                 className="search-hit-item"
-                onClick={onClose}
+                onClick={() => handleHitClick(hit)}
               >
                 <div className="search-hit-img-box">
                   <img

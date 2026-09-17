@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "react-toastify"; // Thêm import toast
+import { toast } from "react-toastify";
 import axiosClient from "../../api/axiosClient";
 
 // 1. KHAI BÁO GIAO DIỆN CHẶT CHẼ THEO BACKEND DTO
@@ -23,15 +23,12 @@ interface INormalizedError {
   data?: unknown;
 }
 
-// 2. HÀM TIỆN ÍCH TẠO SESSION CHO GUEST (Người dùng chưa đăng nhập)
+// 2. HÀM TIỆN ÍCH TẠO SESSION CHO GUEST
 const getGuestSessionId = (): string => {
-  // Đổi từ "guest_session_id" thành "guestSessionId"
   let sessionId = localStorage.getItem("guestSessionId");
   if (!sessionId) {
-    // Tạo ID ngẫu nhiên kết hợp timestamp
     sessionId =
       Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
-    // Đổi từ "guest_session_id" thành "guestSessionId"
     localStorage.setItem("guestSessionId", sessionId);
   }
   return sessionId;
@@ -43,27 +40,44 @@ export function useProductCard(
   variantSku: string,
   hasVariants: boolean,
   initialWishlisted: boolean,
+  query_id?: string, // Đã nhận từ Frontend component
+  position?: number, // Đã nhận từ Frontend component
 ) {
   const navigate = useNavigate();
 
-  // 2. Đặt giá trị mặc định là initialWishlisted nhận từ danh sách
   const [isWishlisted, setIsWishlisted] = useState<boolean>(initialWishlisted);
   const [isAddingToCart, setIsAddingToCart] = useState<boolean>(false);
   const [isTogglingWishlist, setIsTogglingWishlist] = useState<boolean>(false);
 
-  // 3. Đảm bảo state luôn đồng bộ nếu initialWishlisted từ API thay đổi
   useEffect(() => {
     setIsWishlisted(initialWishlisted);
   }, [initialWishlisted]);
 
+  // FIX 1: Bắn Tracking khi user BẤM VÀO SẢN PHẨM (Xem chi tiết)
   const handleCardClick = () => {
+    // Gọi API ngầm (Fire & Forget) không cần await để không làm chậm thao tác chuyển trang của user
+    axiosClient
+      .post("/tracking/event", {
+        session_id: getGuestSessionId(),
+        // Nếu có query_id tức là user bấm từ khu vực Recommend của AI, nếu không là click bình thường
+        action: query_id ? "CLICK_SEARCH_SUGGESTION" : "VIEW_PRODUCT",
+        path: `/product/${slug}`,
+        device: window.innerWidth < 768 ? "MOBILE" : "DESKTOP",
+        metadata: {
+          product_id: productId,
+          query_id: query_id, // Truyền cho Algolia
+          position: position, // Truyền cho Algolia
+        },
+      })
+      .catch((err) => console.error("Tracking Error:", err));
+
     navigate(`/products/${slug}`);
   };
 
   // 3. XỬ LÝ THÊM/BỎ WISHLIST
   const handleHeartClick = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // Ngăn chặn sự kiện click lan ra thẻ card bên ngoài
-    if (isTogglingWishlist) return; // Chống click spam
+    e.stopPropagation();
+    if (isTogglingWishlist) return;
 
     setIsTogglingWishlist(true);
     try {
@@ -74,22 +88,21 @@ export function useProductCard(
 
       if (response.data.success) {
         setIsWishlisted(response.data.isAdded);
-        toast.success(response.data.message); // Chuyển từ alert sang toast.success
+        toast.success(response.data.message);
       }
     } catch (error: unknown) {
       console.error("Lỗi Wishlist:", error);
       const err = error as INormalizedError;
 
-      // Backend yêu cầu Auth Guard cho Wishlist, nếu 401 thì nhắc nhở
       if (err.status === 401) {
         toast.warning(
           "Vui lòng đăng nhập để sử dụng tính năng danh sách yêu thích!",
-        ); // Chuyển từ alert sang toast.warning
+        );
         navigate("/login");
       } else {
         toast.error(
           err.message || "Có lỗi xảy ra khi cập nhật danh sách yêu thích.",
-        ); // Chuyển từ alert sang toast.error
+        );
       }
     } finally {
       setIsTogglingWishlist(false);
@@ -100,7 +113,8 @@ export function useProductCard(
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (hasVariants) {
-      navigate(`/products/${slug}`);
+      // Nếu sản phẩm có biến thể, bấm vào giỏ hàng sẽ chuyển hướng sang trang chi tiết
+      handleCardClick();
       return;
     }
     if (isAddingToCart) return;
@@ -110,16 +124,31 @@ export function useProductCard(
       const payload: IAddToCartPayload = {
         productId,
         variantSku,
-        quantity: 1, // Mặc định mua 1 món khi bấm từ giao diện list ngoài
+        quantity: 1,
         guestSessionId: getGuestSessionId(),
       };
 
       await axiosClient.post("/cart/add", payload);
-      toast.success("Đã thêm sản phẩm vào giỏ hàng thành công!"); // Chuyển từ alert sang toast.success
+      toast.success("Đã thêm sản phẩm vào giỏ hàng thành công!");
+
+      // FIX 2: Bắn Tracking khi user BẤM THÊM VÀO GIỎ HÀNG THÀNH CÔNG
+      axiosClient
+        .post("/tracking/event", {
+          session_id: getGuestSessionId(),
+          action: "CLICK_ADD_TO_CART",
+          path: `/product/${slug}`,
+          device: window.innerWidth < 768 ? "MOBILE" : "DESKTOP",
+          metadata: {
+            product_id: productId,
+            query_id: query_id, // Truyền cho Algolia
+            position: position, // Truyền cho Algolia
+          },
+        })
+        .catch((err) => console.error("Tracking Error:", err));
     } catch (error: unknown) {
       console.error("Lỗi Add to Cart:", error);
       const err = error as INormalizedError;
-      toast.error(err.message || "Có lỗi xảy ra khi thêm vào giỏ hàng."); // Chuyển từ alert sang toast.error
+      toast.error(err.message || "Có lỗi xảy ra khi thêm vào giỏ hàng.");
     } finally {
       setIsAddingToCart(false);
     }

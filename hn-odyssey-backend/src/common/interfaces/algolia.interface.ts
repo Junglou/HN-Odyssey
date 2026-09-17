@@ -35,4 +35,5 @@ export interface IRecommendationResult {
   title: string; // Dùng để Frontend hiển thị title Widget
   type: string; // 'TRENDING' | 'RELATED' | 'SIMILAR'
   products: any[]; // Sẽ map sang ProductDocument
+  query_id?: string;
 }

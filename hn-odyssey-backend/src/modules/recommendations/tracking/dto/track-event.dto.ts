@@ -59,4 +59,15 @@ export class TrackingMetadataDto {
   @IsNumber()
   @Min(1)
   rating?: number;
+
+  // FIX: Mở luồng nhận queryID từ Algolia trả về Frontend
+  @IsOptional()
+  @IsString()
+  query_id?: string;
+
+  // FIX: Thêm position để Algolia biết user click vào vị trí thứ mấy
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  position?: number;
 }

@@ -45,6 +45,8 @@ export interface TrackingMetadata {
   filters_applied?: Record<string, any>; // Lưu object bộ lọc user đang dùng (vd: { color: 'red', size: 'M' })
   sort_applied?: string; // Lưu tiêu chí sắp xếp (vd: 'price_asc')
   rating?: number;
+  query_id?: string;
+  position?: number;
 }
 
 @Schema({ collection: 'user_behaviors', timestamps: true })
