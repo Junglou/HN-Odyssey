@@ -8,15 +8,15 @@ import {
 } from '../../system/monitoring/schemas/integration-log.schema';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
+import { InjectRedis } from '@nestjs-modules/ioredis';
+import Redis from 'ioredis';
 
-// 1. Khai báo Interface độc lập, không phụ thuộc vào version của Axios để tránh lỗi Generic
 interface ITrackerConfig {
   url?: string;
   data?: unknown;
   metadata?: { startTime: number };
 }
 
-// 2. Duck-typing cho Axios Error thay vì import AxiosError từ thư viện
 interface ISafeAxiosError extends Error {
   isAxiosError: boolean;
   config?: ITrackerConfig;
@@ -34,12 +34,11 @@ export class AxiosMonitorSetup implements OnModuleInit {
     @InjectModel(IntegrationLog.name)
     private logModel: Model<IntegrationLogDocument>,
     private readonly eventEmitter: EventEmitter2,
+    @InjectRedis() private readonly redis: Redis, // Bổ sung Redis để Throttle
   ) {}
 
   onModuleInit() {
-    // Để TypeScript tự suy luận (infer) kiểu của config dựa vào đúng version Axios bạn đang dùng
     axios.interceptors.request.use((config) => {
-      // Ép kiểu qua unknown rồi mới sang Interface tự chế để ESLint không báo lỗi Unsafe
       const tracker = config as unknown as ITrackerConfig;
       tracker.metadata = { startTime: Date.now() };
       return config;
@@ -51,7 +50,7 @@ export class AxiosMonitorSetup implements OnModuleInit {
         const status = response.status;
         const data = response.data;
 
-        this.saveLog(tracker, status, data, false);
+        void this.saveLog(tracker, status, data, false);
         return response;
       },
       (err: unknown) => {
@@ -60,7 +59,6 @@ export class AxiosMonitorSetup implements OnModuleInit {
         let data: unknown = { message: 'Unknown error' };
         let rejectError: Error;
 
-        // Tự kiểm tra đối tượng an toàn thay vì gọi axios.isAxiosError(err) để né lỗi Type
         const isAxiosErr =
           typeof err === 'object' && err !== null && 'isAxiosError' in err;
 
@@ -75,7 +73,7 @@ export class AxiosMonitorSetup implements OnModuleInit {
         }
 
         if (tracker) {
-          this.saveLog(tracker, status, data, true);
+          void this.saveLog(tracker, status, data, true);
         }
 
         return Promise.reject(rejectError);
@@ -86,7 +84,7 @@ export class AxiosMonitorSetup implements OnModuleInit {
     );
   }
 
-  private saveLog(
+  private async saveLog(
     config: ITrackerConfig,
     status: number,
     responseData: unknown,
@@ -102,6 +100,9 @@ export class AxiosMonitorSetup implements OnModuleInit {
     else if (url.includes('ghtklab')) provider = 'GHTK';
     else if (url.includes('momo.vn')) provider = 'MOMO';
     else if (url.includes('vnpay.vn')) provider = 'VNPAY';
+    // [FIX SPAM 2]: Bổ sung nhận diện Algolia
+    else if (url.includes('algolia.io') || url.includes('algolianet.com'))
+      provider = 'ALGOLIA';
     else if (url.includes('127.0.0.1') || url.includes('localhost'))
       provider = 'ML_ENGINE';
 
@@ -116,23 +117,33 @@ export class AxiosMonitorSetup implements OnModuleInit {
     } else if (config.data && typeof config.data === 'object') {
       requestData = config.data as Record<string, unknown>;
     }
+
     if (isError && status >= 500) {
-      // THÊM DÒNG NÀY: Chỉ bắn thông báo lên màn hình nếu lỗi không phải từ ML_ENGINE
       if (provider !== 'ML_ENGINE') {
-        this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
-          severity: 'HIGH',
-          error_code: `3RD_PARTY_FAIL_${provider}`,
-          message: `Mất kết nối hoặc đối tác ${provider} đang bị lỗi (HTTP ${status}). Độ trễ: ${duration}ms. URL: ${url}`,
-        });
+        try {
+          // [FIX SPAM 2]: Thuật toán Debounce bằng Redis - Chỉ thông báo 1 lần mỗi 5 phút cho 1 đối tác bị lỗi
+          const redisKey = `throttle:system_error:${provider}`;
+          const errCount = await this.redis.incr(redisKey);
+
+          if (errCount === 1) {
+            await this.redis.expire(redisKey, 300); // 300s = 5 phút
+
+            this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
+              severity: 'HIGH',
+              error_code: `3RD_PARTY_FAIL_${provider}`,
+              message: `Mất kết nối hoặc đối tác ${provider} đang bị lỗi (HTTP ${status}). Độ trễ: ${duration}ms. URL: ${url}`,
+            });
+          }
+        } catch (redisErr) {
+          this.logger.error('Lỗi khi set throttle hệ thống', redisErr);
+        }
       }
 
-      // Vẫn giữ lại log ghi ở console của Backend để Dev dễ theo dõi
       this.logger.warn(
         `[API ĐỐI TÁC LỖI] ${provider} phản hồi ${status} sau ${duration}ms`,
       );
     }
 
-    // Lưu ngầm
     this.logModel
       .create({
         provider,
