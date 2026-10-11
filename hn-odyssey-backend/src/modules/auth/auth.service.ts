@@ -38,6 +38,8 @@ import type {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
 import { Role, RoleDocument } from '../users/roles/schemas/role.schema';
+import { isReservedRoleKey } from 'src/common/constants/system-roles.constant';
+import { Action, Resource } from 'src/common/enums/resource.enum';
 
 @Injectable()
 export class AuthService {
@@ -60,35 +62,65 @@ export class AuthService {
     @InjectModel(Role.name) private readonly roleModel: Model<RoleDocument>,
   ) {}
 
-  // Helper lấy động Permissions từ DB
-  private async resolveUserPermissions(
-    roles: string[],
-  ): Promise<{ permissions: string[]; is_portal_access: boolean }> {
+  // Helper lấy động Permissions từ DB (Đã fix định dạng chuẩn cho Frontend)
+  private async resolveUserPermissions(roles: string[]): Promise<{
+    permissions: { resource: string; actions: string[] }[];
+    is_portal_access: boolean;
+  }> {
     const isPortalAccess = roles.some((role) => role !== 'CUSTOMER');
 
     const userRolesDb = await this.roleModel
       .find({ slug: { $in: roles }, is_active: true })
-      .select('permissions')
+      .select('permissions is_system')
       .exec();
 
-    const permissionsSet = new Set<string>();
+    // Đồng bộ với PermissionsGuard: role dành riêng hoặc role hệ thống → toàn quyền
+    const isPrivileged =
+      roles.some((r) => isReservedRoleKey(String(r))) ||
+      userRolesDb.some((r) => r.is_system);
+
+    if (isPrivileged) {
+      return {
+        permissions: Object.values(Resource).map((resource) => ({
+          resource,
+          actions: [Action.MANAGE],
+        })),
+        is_portal_access: true,
+      };
+    }
+
+    // Dùng Map để gộp các actions nếu user có nhiều role cùng trỏ vào 1 resource
+    const permissionsMap = new Map<string, Set<string>>();
 
     userRolesDb.forEach((role) => {
       if (role.permissions && Array.isArray(role.permissions)) {
         role.permissions.forEach((p) => {
           const resource = p.resource as unknown as string;
           const actions = p.actions as unknown as string[];
+
+          if (!permissionsMap.has(resource)) {
+            permissionsMap.set(resource, new Set<string>());
+          }
+
           if (actions && Array.isArray(actions)) {
             actions.forEach((action) => {
-              permissionsSet.add(`${resource}:${action}`);
+              permissionsMap.get(resource)!.add(action);
             });
           }
         });
       }
     });
 
+    // Chuyển Map thành mảng Object chuẩn xác cho Frontend AuthGuard
+    const formattedPermissions = Array.from(permissionsMap.entries()).map(
+      ([resource, actionsSet]) => ({
+        resource,
+        actions: Array.from(actionsSet),
+      }),
+    );
+
     return {
-      permissions: Array.from(permissionsSet),
+      permissions: formattedPermissions,
       is_portal_access: isPortalAccess,
     };
   }
@@ -348,11 +380,11 @@ export class AuthService {
         { new: true },
       )) as UserDocument;
 
-      const { permissions, is_portal_access } =
-        await this.resolveUserPermissions(user.roles);
-
       if (!user)
         throw new NotFoundException('Không tìm thấy tài khoản tương ứng.');
+
+      const { permissions, is_portal_access } =
+        await this.resolveUserPermissions(user.roles);
 
       // AC14: Tự động đăng nhập
       const accessToken = await this.generateAccessToken(user);
@@ -505,10 +537,11 @@ export class AuthService {
       throw new UnauthorizedException('Tài khoản đang bị khóa tạm thời');
     }
 
-    if (user.login_attempts >= 5) {
-      throw new UnauthorizedException(
-        'Bạn đã nhập sai quá nhiều lần, vui lòng thử lại sau',
-      );
+    // Hết thời gian khóa → cho thử lại từ đầu
+    if (user.lock_until && user.lock_until <= new Date()) {
+      await this.usersService.resetFailedAttempt(String(user.id));
+      user.login_attempts = 0;
+      user.lock_until = null;
     }
 
     if (!user.password) {
@@ -649,22 +682,18 @@ export class AuthService {
   async refreshTokens(refreshToken: string) {
     if (!refreshToken) throw new BadRequestException('Thiếu refresh token');
 
-    // 1. Định nghĩa kiểu cho decoded để tránh lỗi 'unsafe member access'
     let decoded: { sub: string };
 
     try {
-      // Ép kiểu kết quả trả về
       decoded = await this.jwtService.verifyAsync(refreshToken, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        secret: this.configService.get('JWT_REFRESH_SECRET'),
       });
     } catch {
-      // 2. Bỏ '(e)' nếu không dùng biến lỗi để tránh lỗi 'unused-vars'
       throw new UnauthorizedException(
         'Refresh token không hợp lệ hoặc hết hạn',
       );
     }
 
-    // 3. Ép kiểu UserDocument để đảm bảo biến user có đầy đủ thuộc tính (_id, refresh_token...)
     const user = (await this.userModel.findById(decoded.sub)) as UserDocument;
 
     if (!user) throw new NotFoundException('User không tồn tại');
@@ -676,10 +705,8 @@ export class AuthService {
     const isValid = await bcrypt.compare(refreshToken, user.refresh_token);
     if (!isValid) throw new UnauthorizedException('Refresh token không khớp');
 
-    // Lúc này 'user' đã chuẩn kiểu UserDocument, truyền vào không bị lỗi nữa
     const newAccessToken = await this.generateAccessToken(user);
     const newRefreshToken = await this.generateRefreshToken(user, false);
-
     const newHash = await bcrypt.hash(newRefreshToken, 10);
 
     await this.userModel.updateOne(
@@ -687,9 +714,24 @@ export class AuthService {
       { $set: { refresh_token: newHash } },
     );
 
+    // [FIX KIẾN TRÚC]: Resolve lại Permissions và trả kèm object user y hệt như hàm login()
+    const mergedRoles = Array.from(new Set([...user.roles, 'CUSTOMER']));
+    const { permissions, is_portal_access } =
+      await this.resolveUserPermissions(mergedRoles);
+
     return {
       access_token: newAccessToken,
       refresh_token: newRefreshToken,
+      user: {
+        _id: user._id,
+        email: user.email,
+        full_name: user.fullName || user.last_Name + ' ' + user.first_Name,
+        roles: mergedRoles,
+        avatar: user.avatar,
+        status: user.status,
+        permissions: permissions, // <-- QUAN TRỌNG NHẤT LÀ ĐÂY
+        is_portal_access: is_portal_access,
+      },
     };
   }
 

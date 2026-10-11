@@ -1,0 +1,407 @@
+﻿src\modules\auth\auth.controller.ts:34: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\auth\auth.controller.ts:243: @RequirePermissions(Resource.SYSTEM_USERS, Action.READ)
+src\modules\auth\auth.controller.ts:250: @RequirePermissions(Resource.SYSTEM_USERS, Action.UPDATE)
+src\modules\auth\auth.service.ts:8: ForbiddenException,
+src\modules\auth\auth.service.ts:63: // Helper lấy động Permissions từ DB (Đã fix định dạng chuẩn cho Frontend)
+src\modules\auth\auth.service.ts:64: private async resolveUserPermissions(roles: string[]): Promise<{
+src\modules\auth\auth.service.ts:65: permissions: { resource: string; actions: string[] }[];
+src\modules\auth\auth.service.ts:72: .select('permissions')
+src\modules\auth\auth.service.ts:76: const permissionsMap = new Map<string, Set<string>>();
+src\modules\auth\auth.service.ts:79: if (role.permissions && Array.isArray(role.permissions)) {
+src\modules\auth\auth.service.ts:80: role.permissions.forEach((p) => {
+src\modules\auth\auth.service.ts:84: if (!permissionsMap.has(resource)) {
+src\modules\auth\auth.service.ts:85: permissionsMap.set(resource, new Set<string>());
+src\modules\auth\auth.service.ts:90: permissionsMap.get(resource)!.add(action);
+src\modules\auth\auth.service.ts:98: const formattedPermissions = Array.from(permissionsMap.entries()).map(
+src\modules\auth\auth.service.ts:106: permissions: formattedPermissions,
+src\modules\auth\auth.service.ts:119: throw new ForbiddenException(
+src\modules\auth\auth.service.ts:369: const { permissions, is_portal_access } =
+src\modules\auth\auth.service.ts:370: await this.resolveUserPermissions(user.roles);
+src\modules\auth\auth.service.ts:410: permissions: permissions,
+src\modules\auth\auth.service.ts:585: throw new ForbiddenException('Tài khoản của bạn đã bị khóa.');
+src\modules\auth\auth.service.ts:620: // Sử dụng mảng gộp để lấy Permissions chính xác
+src\modules\auth\auth.service.ts:622: const { permissions, is_portal_access } =
+src\modules\auth\auth.service.ts:623: await this.resolveUserPermissions(mergedRoles);
+src\modules\auth\auth.service.ts:659: permissions: permissions,
+src\modules\auth\auth.service.ts:700: // [FIX KIẾN TRÚC]: Resolve lại Permissions và trả kèm object user y hệt như hàm login()
+src\modules\auth\auth.service.ts:702: const { permissions, is_portal_access } =
+src\modules\auth\auth.service.ts:703: await this.resolveUserPermissions(mergedRoles);
+src\modules\auth\auth.service.ts:715: permissions: permissions, // <-- QUAN TRỌNG NHẤT LÀ ĐÂY
+src\modules\inventory\stock\stock.controller.ts:21: import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+src\modules\inventory\stock\stock.controller.ts:22: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\inventory\stock\stock.controller.ts:39: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\inventory\stock\stock.controller.ts:45: @RequirePermissions(Resource.INVENTORY_STOCK, Action.READ)
+src\modules\inventory\stock\stock.controller.ts:53: @RequirePermissions(Resource.INVENTORY_STOCK, Action.UPDATE)
+src\modules\inventory\stock\stock.controller.ts:67: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.APPROVE)
+src\modules\inventory\stock\stock.controller.ts:78: @RequirePermissions(Resource.INVENTORY_STOCK, Action.UPDATE)
+src\modules\inventory\stock\stock.controller.ts:89: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.CANCEL)
+src\modules\inventory\stock\stock.controller.ts:119: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.READ)
+src\modules\inventory\transactions\transactions.controller.ts:24: import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+src\modules\inventory\transactions\transactions.controller.ts:25: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\inventory\transactions\transactions.controller.ts:41: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\inventory\transactions\transactions.controller.ts:49: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.CREATE)
+src\modules\inventory\transactions\transactions.controller.ts:80: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.READ)
+src\modules\inventory\transactions\transactions.controller.ts:99: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.EXPORT)
+src\modules\inventory\transactions\transactions.controller.ts:109: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.EXPORT)
+src\modules\inventory\transactions\transactions.controller.ts:116: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.CREATE)
+src\modules\inventory\transactions\transactions.controller.ts:143: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.CREATE)
+src\modules\inventory\transactions\transactions.controller.ts:150: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.READ)
+src\modules\inventory\transactions\transactions.controller.ts:157: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.READ)
+src\modules\inventory\transactions\transactions.controller.ts:167: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.CREATE)
+src\modules\inventory\transactions\transactions.controller.ts:194: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.READ)
+src\modules\inventory\transactions\transactions.controller.ts:213: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.EXPORT)
+src\modules\inventory\transactions\transactions.controller.ts:223: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.EXPORT)
+src\modules\inventory\transactions\transactions.controller.ts:230: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.READ)
+src\modules\inventory\transactions\transactions.controller.ts:237: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.CREATE)
+src\modules\inventory\transactions\transactions.controller.ts:260: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.CREATE)
+src\modules\inventory\transactions\transactions.controller.ts:267: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.READ)
+src\modules\inventory\transactions\transactions.controller.ts:277: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.READ)
+src\modules\inventory\transactions\transactions.controller.ts:296: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.UPDATE)
+src\modules\inventory\transactions\transactions.controller.ts:317: @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.CANCEL)
+src\modules\marketing\content\content.controller.ts:26: import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+src\modules\marketing\content\content.controller.ts:27: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\marketing\content\content.controller.ts:58: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:59: @RequirePermissions(Resource.CONTENT_POSTS, Action.CREATE)
+src\modules\marketing\content\content.controller.ts:70: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:71: @RequirePermissions(Resource.CONTENT_POSTS, Action.READ)
+src\modules\marketing\content\content.controller.ts:89: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:90: @RequirePermissions(Resource.CONTENT_POSTS, Action.DELETE)
+src\modules\marketing\content\content.controller.ts:103: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:104: @RequirePermissions(Resource.CONTENT_PAGES, Action.CREATE) // Dùng chung quyền quản lý Nội dung
+src\modules\marketing\content\content.controller.ts:118: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:119: @RequirePermissions(Resource.CONTENT_PAGES, Action.READ)
+src\modules\marketing\content\content.controller.ts:127: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:128: @RequirePermissions(Resource.CONTENT_PAGES, Action.DELETE)
+src\modules\marketing\content\content.controller.ts:151: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:152: @RequirePermissions(Resource.CONTENT_POSTS, Action.UPDATE)
+src\modules\marketing\content\content.controller.ts:168: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:169: @RequirePermissions(Resource.CONTENT_PAGES, Action.UPDATE)
+src\modules\marketing\content\content.controller.ts:186: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:187: @RequirePermissions(Resource.CONTENT_CONFIG, Action.UPDATE) // Quyền cấu hình hệ thống/giao diện
+src\modules\marketing\content\content.controller.ts:222: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:223: @RequirePermissions(Resource.CONTENT_BANNERS, Action.CREATE)
+src\modules\marketing\content\content.controller.ts:237: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:238: @RequirePermissions(Resource.CONTENT_BANNERS, Action.READ)
+src\modules\marketing\content\content.controller.ts:245: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:246: @RequirePermissions(Resource.CONTENT_BANNERS, Action.READ)
+src\modules\marketing\content\content.controller.ts:253: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:254: @RequirePermissions(Resource.CONTENT_BANNERS, Action.UPDATE)
+src\modules\marketing\content\content.controller.ts:261: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:262: @RequirePermissions(Resource.CONTENT_BANNERS, Action.UPDATE)
+src\modules\marketing\content\content.controller.ts:269: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:270: @RequirePermissions(Resource.CONTENT_BANNERS, Action.DELETE)
+src\modules\marketing\content\content.controller.ts:302: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:303: @RequirePermissions(Resource.CONTENT_BANNERS, Action.UPDATE)
+src\modules\marketing\content\content.controller.ts:319: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:320: @RequirePermissions(Resource.CONTENT_POSTS, Action.UPDATE)
+src\modules\marketing\content\content.controller.ts:335: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:336: @RequirePermissions(Resource.CONTENT_POSTS, Action.DELETE)
+src\modules\marketing\content\content.controller.ts:359: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:360: @RequirePermissions(Resource.CONTENT_CONFIG, Action.UPDATE)
+src\modules\marketing\content\content.controller.ts:381: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:382: @RequirePermissions(Resource.CONTENT_CONFIG, Action.UPDATE)
+src\modules\marketing\content\content.controller.ts:401: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\content.controller.ts:402: @RequirePermissions(Resource.CONTENT_POSTS, Action.READ)
+src\modules\marketing\content\content.service.ts:333: if (page.is_system) {
+src\modules\marketing\content\media.controller.ts:20: import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+src\modules\marketing\content\media.controller.ts:21: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\marketing\content\media.controller.ts:38: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\marketing\content\media.controller.ts:44: @RequirePermissions(Resource.CONTENT_MEDIA, Action.READ) // Có thể thay bằng Resource.MEDIA nếu bạn tạo Enum mới
+src\modules\marketing\content\media.controller.ts:52: @RequirePermissions(Resource.CONTENT_MEDIA, Action.CREATE)
+src\modules\marketing\content\media.controller.ts:88: @RequirePermissions(Resource.CONTENT_MEDIA, Action.UPDATE)
+src\modules\marketing\content\media.controller.ts:103: @RequirePermissions(Resource.CONTENT_MEDIA, Action.UPDATE)
+src\modules\marketing\content\media.controller.ts:111: @RequirePermissions(Resource.CONTENT_MEDIA, Action.UPDATE)
+src\modules\marketing\content\media.controller.ts:124: @RequirePermissions(Resource.CONTENT_MEDIA, Action.UPDATE)
+src\modules\marketing\content\media.controller.ts:137: @RequirePermissions(Resource.CONTENT_MEDIA, Action.DELETE)
+src\modules\marketing\promotions\promotions.controller.ts:16: import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+src\modules\marketing\promotions\promotions.controller.ts:17: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\marketing\promotions\promotions.controller.ts:32: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\marketing\promotions\promotions.controller.ts:42: @RequirePermissions(Resource.PROMO_FLASH_SALES, Action.CREATE)
+src\modules\marketing\promotions\promotions.controller.ts:59: @RequirePermissions(Resource.PROMO_FLASH_SALES, Action.READ)
+src\modules\marketing\promotions\promotions.controller.ts:66: @RequirePermissions(Resource.PROMO_FLASH_SALES, Action.UPDATE)
+src\modules\marketing\promotions\promotions.controller.ts:89: @RequirePermissions(Resource.PROMO_FLASH_SALES, Action.DELETE)
+src\modules\marketing\promotions\promotions.controller.ts:104: @RequirePermissions(Resource.PROMO_COUPONS, Action.CREATE)
+src\modules\marketing\promotions\promotions.controller.ts:114: @RequirePermissions(Resource.PROMO_COUPONS, Action.READ)
+src\modules\marketing\promotions\promotions.controller.ts:128: @RequirePermissions(Resource.PROMO_COUPONS, Action.READ)
+src\modules\marketing\promotions\promotions.controller.ts:155: @RequirePermissions(Resource.PROMO_COUPONS, Action.UPDATE)
+src\modules\marketing\promotions\promotions.controller.ts:166: @RequirePermissions(Resource.PROMO_COUPONS, Action.DELETE)
+src\modules\marketing\promotions\promotions.controller.ts:177: @RequirePermissions(Resource.PROMO_COMBOS, Action.CREATE)
+src\modules\marketing\promotions\promotions.controller.ts:185: @RequirePermissions(Resource.PROMO_COMBOS, Action.READ)
+src\modules\marketing\promotions\promotions.controller.ts:197: @RequirePermissions(Resource.PROMO_COMBOS, Action.UPDATE)
+src\modules\marketing\promotions\promotions.controller.ts:208: @RequirePermissions(Resource.PROMO_COMBOS, Action.DELETE)
+src\modules\marketing\promotions\promotions.controller.ts:218: @RequirePermissions(Resource.PROMO_FLASH_SALES, Action.PUBLISH)
+src\modules\marketing\promotions\promotions.controller.ts:237: @RequirePermissions(Resource.PROMO_FLASH_SALES, Action.DELETE)
+src\modules\marketing\promotions\promotions.controller.ts:252: @RequirePermissions(Resource.PROMO_COMBOS, Action.PUBLISH)
+src\modules\marketing\promotions\promotions.controller.ts:271: @RequirePermissions(Resource.PROMO_COMBOS, Action.DELETE)
+src\modules\marketing\promotions\promotions.controller.ts:286: @RequirePermissions(Resource.PROMO_COUPONS, Action.PUBLISH)
+src\modules\marketing\promotions\promotions.controller.ts:305: @RequirePermissions(Resource.PROMO_COUPONS, Action.DELETE)
+src\modules\notifications\notifications.controller.ts:13: import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+src\modules\notifications\notifications.controller.ts:14: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\notifications\notifications.controller.ts:36: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\notifications\notifications.controller.ts:41: // [ĐÃ SỬA]: Xóa RequirePermissions để cho phép MỌI USER lấy thông báo cá nhân của mình
+src\modules\notifications\notifications.controller.ts:59: // [ĐÃ SỬA]: Xóa RequirePermissions để cho phép MỌI USER đánh dấu đọc thông báo cá nhân của mình
+src\modules\notifications\notifications.controller.ts:68: // [ĐÃ SỬA]: Xóa RequirePermissions
+src\modules\notifications\notifications.controller.ts:83: // [ĐÃ SỬA]: Xóa RequirePermissions (Đây là nguyên nhân chính gây spam log lỗi)
+src\modules\notifications\notifications.controller.ts:99: @RequirePermissions(Resource.SYSTEM_NOTIFICATIONS, Action.READ)
+src\modules\notifications\notifications.service.ts:284: if (roles.includes('SUPER_ADMIN')) {
+src\modules\notifications\notifications.service.ts:437: if (roles.includes('SUPER_ADMIN')) {
+src\modules\products\attributes\attributes.controller.ts:15: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\products\attributes\attributes.controller.ts:27: @RequirePermissions(Resource.CATALOG_ATTRIBUTES, Action.CREATE)
+src\modules\products\attributes\attributes.controller.ts:44: @RequirePermissions(Resource.CATALOG_ATTRIBUTES, Action.READ)
+src\modules\products\attributes\attributes.controller.ts:67: @RequirePermissions(Resource.CATALOG_ATTRIBUTES, Action.UPDATE)
+src\modules\products\attributes\attributes.controller.ts:86: @RequirePermissions(Resource.CATALOG_ATTRIBUTES, Action.DELETE)
+src\modules\products\catalog\products.controller.ts:27: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\products\catalog\products.controller.ts:110: @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.CREATE)
+src\modules\products\catalog\products.controller.ts:127: @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.READ)
+src\modules\products\catalog\products.controller.ts:133: @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.READ)
+src\modules\products\catalog\products.controller.ts:139: @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.UPDATE)
+src\modules\products\catalog\products.controller.ts:157: @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.DELETE)
+src\modules\products\catalog\products.controller.ts:173: @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.READ)
+src\modules\products\catalog\products.controller.ts:179: @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.UPDATE)
+src\modules\products\catalog\products.controller.ts:197: @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.UPDATE)
+src\modules\products\catalog\products.controller.ts:217: @RequirePermissions(Resource.CATALOG_PRICING, Action.SUBMIT_APPROVAL)
+src\modules\products\catalog\products.controller.ts:236: @RequirePermissions(Resource.CATALOG_PRICING, Action.APPROVE)
+src\modules\products\catalog\products.controller.ts:256: @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.DELETE)
+src\modules\products\catalog\products.controller.ts:267: @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.UPDATE)
+src\modules\products\catalog\products.controller.ts:309: @RequirePermissions(Resource.CATALOG_PRICING, Action.SUBMIT_APPROVAL)
+src\modules\products\catalog\products.controller.ts:328: @RequirePermissions(Resource.CATALOG_PRICING, Action.APPROVE)
+src\modules\products\catalog\products.controller.ts:392: @RequirePermissions(Resource.CONTENT_CONFIG, Action.UPDATE)
+src\modules\products\categories\categories.controller.ts:18: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\products\categories\categories.controller.ts:52: @RequirePermissions(Resource.CATALOG_CATEGORIES, Action.CREATE)
+src\modules\products\categories\categories.controller.ts:68: @RequirePermissions(Resource.CATALOG_CATEGORIES, Action.READ)
+src\modules\products\categories\categories.controller.ts:74: @RequirePermissions(Resource.CATALOG_CATEGORIES, Action.UPDATE)
+src\modules\products\categories\categories.controller.ts:90: @RequirePermissions(Resource.CATALOG_CATEGORIES, Action.UPDATE)
+src\modules\products\categories\categories.controller.ts:108: @RequirePermissions(Resource.CATALOG_CATEGORIES, Action.DELETE)
+src\modules\products\reviews\admin-reviews.controller.ts:17: import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+src\modules\products\reviews\admin-reviews.controller.ts:18: import { RequirePermissions } from '../../../common/decorators/permissions.decorator';
+src\modules\products\reviews\admin-reviews.controller.ts:25: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\products\reviews\admin-reviews.controller.ts:31: @RequirePermissions(Resource.CRM_REVIEWS, Action.READ)
+src\modules\products\reviews\admin-reviews.controller.ts:37: @RequirePermissions(Resource.CRM_REVIEWS, Action.UNPUBLISH)
+src\modules\products\reviews\admin-reviews.controller.ts:43: @RequirePermissions(Resource.CRM_REVIEWS, Action.PUBLISH)
+src\modules\products\reviews\admin-reviews.controller.ts:50: @RequirePermissions(Resource.CRM_REVIEWS, Action.UPDATE)
+src\modules\products\reviews\admin-reviews.controller.ts:57: @RequirePermissions(Resource.CRM_REVIEWS, Action.APPROVE)
+src\modules\products\reviews\admin-reviews.controller.ts:68: @RequirePermissions(Resource.CRM_REVIEWS, Action.UPDATE)
+src\modules\products\reviews\admin-reviews.controller.ts:75: @RequirePermissions(Resource.CRM_REVIEWS, Action.REPLY)
+src\modules\products\reviews\admin-reviews.controller.ts:82: @RequirePermissions(Resource.CRM_REVIEWS, Action.DELETE)
+src\modules\products\reviews\reviews.service.ts:3: ForbiddenException,
+src\modules\products\reviews\reviews.service.ts:154: throw new ForbiddenException(
+src\modules\products\reviews\reviews.service.ts:167: throw new ForbiddenException(
+src\modules\products\reviews\reviews.service.ts:552: throw new ForbiddenException('Tài khoản của bạn đã bị hạn chế.');
+src\modules\products\tags\tags.controller.ts:18: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\products\tags\tags.controller.ts:29: @RequirePermissions(Resource.CATALOG_TAGS, Action.CREATE)
+src\modules\products\tags\tags.controller.ts:41: @RequirePermissions(Resource.CATALOG_TAGS, Action.READ)
+src\modules\products\tags\tags.controller.ts:55: @RequirePermissions(Resource.CATALOG_TAGS, Action.UPDATE)
+src\modules\products\tags\tags.controller.ts:67: @RequirePermissions(Resource.CATALOG_TAGS, Action.DELETE)
+src\modules\products\tags\tags.controller.ts:78: @RequirePermissions(Resource.CATALOG_TAGS, Action.UPDATE)
+src\modules\recommendations\recommendations.controller.ts:44: import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+src\modules\recommendations\recommendations.controller.ts:45: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\recommendations\recommendations.controller.ts:280: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\recommendations\recommendations.controller.ts:281: @RequirePermissions(Resource.REPORT_MARKETING, Action.READ)
+src\modules\recommendations\tracking\tracking.controller.ts:22: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\recommendations\tracking\tracking.controller.ts:96: @RequirePermissions(
+src\modules\recommendations\tracking\tracking.controller.ts:106: @RequirePermissions(Resource.REPORT_MARKETING, Action.READ)
+src\modules\recommendations\tracking\tracking.controller.ts:113: @RequirePermissions(Resource.REPORT_MARKETING, Action.READ)
+src\modules\recommendations\tracking\tracking.controller.ts:125: @RequirePermissions(Resource.REPORT_MARKETING, Action.EXPORT)
+src\modules\recommendations\tracking\tracking.controller.ts:161: @RequirePermissions(Resource.REPORT_MARKETING, Action.READ)
+src\modules\recommendations\tracking\tracking.controller.ts:176: @RequirePermissions(Resource.REPORT_MARKETING, Action.UPDATE)
+src\modules\recommendations\tracking\tracking.controller.ts:188: @RequirePermissions(Resource.REPORT_MARKETING, Action.UPDATE)
+src\modules\recommendations\tracking\tracking.controller.ts:206: @RequirePermissions(Resource.REPORT_MARKETING, Action.READ)
+src\modules\recommendations\tracking\tracking.controller.ts:217: @RequirePermissions(Resource.REPORT_MARKETING, Action.READ)
+src\modules\reports\business\business-reports.controller.ts:9: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\reports\business\business-reports.controller.ts:13: // JwtAuthGuard, RolesGuard, PermissionsGuard đã đăng ký global trong app.module.ts
+src\modules\reports\business\business-reports.controller.ts:20: @RequirePermissions(Resource.REPORT_REVENUE, Action.READ)
+src\modules\reports\business\business-reports.controller.ts:29: @RequirePermissions(
+src\modules\reports\business\business-reports.controller.ts:45: @RequirePermissions(Resource.REPORT_REVENUE, Action.READ)
+src\modules\reports\business\business-reports.controller.ts:56: @RequirePermissions(
+src\modules\reports\business\business-reports.controller.ts:70: @RequirePermissions(
+src\modules\reports\business\business-reports.controller.ts:87: @RequirePermissions(Resource.REPORT_INVENTORY, Action.READ)
+src\modules\reports\business\business-reports.controller.ts:98: @RequirePermissions(Resource.REPORT_REVENUE, Action.READ)
+src\modules\reports\business\business-reports.controller.ts:110: @RequirePermissions(Resource.REPORT_REVENUE, Action.READ)
+src\modules\reports\business\business-reports.controller.ts:121: @RequirePermissions(
+src\modules\reports\dashboard\dashboard.controller.ts:3: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\reports\dashboard\dashboard.controller.ts:16: @RequirePermissions(Resource.DASHBOARD, Action.READ)
+src\modules\reports\dashboard\dashboard.controller.ts:23: @RequirePermissions(Resource.DASHBOARD, Action.READ)
+src\modules\reports\dashboard\dashboard.controller.ts:35: @RequirePermissions(
+src\modules\reports\dashboard\dashboard.controller.ts:46: @RequirePermissions(
+src\modules\reports\dashboard\dashboard.controller.ts:60: @RequirePermissions(
+src\modules\reports\dashboard\dashboard.controller.ts:74: @RequirePermissions(Resource.DASHBOARD, Action.READ)
+src\modules\reports\export\export.controller.ts:17: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\reports\export\export.controller.ts:61: @RequirePermissions(Resource.REPORT_REVENUE, Action.EXPORT)
+src\modules\reports\export\export.controller.ts:96: @RequirePermissions(
+src\modules\reports\inventory\inventory-reports.controller.ts:15: import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+src\modules\reports\inventory\inventory-reports.controller.ts:16: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\reports\inventory\inventory-reports.controller.ts:29: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\reports\inventory\inventory-reports.controller.ts:35: @RequirePermissions(Resource.REPORT_STOCK, Action.READ)
+src\modules\reports\inventory\inventory-reports.controller.ts:49: @RequirePermissions(Resource.REPORT_STOCK, Action.READ)
+src\modules\reports\inventory\inventory-reports.controller.ts:69: @RequirePermissions(Resource.REPORT_STOCK, Action.READ)
+src\modules\reports\inventory\inventory-reports.controller.ts:88: @RequirePermissions(Resource.REPORT_STOCK, Action.EXPORT)
+src\modules\reports\inventory\inventory-reports.controller.ts:101: @RequirePermissions(Resource.REPORT_STOCK, Action.EXPORT)
+src\modules\reports\inventory\inventory-reports.controller.ts:113: @RequirePermissions(Resource.REPORT_STOCK, Action.READ)
+src\modules\sales\orders\orders.controller.ts:34: import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+src\modules\sales\orders\orders.controller.ts:35: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\sales\orders\orders.controller.ts:94: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\sales\orders\orders.controller.ts:95: @RequirePermissions(Resource.SALES_ORDERS, Action.PRINT)
+src\modules\sales\orders\orders.controller.ts:111: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\sales\orders\orders.controller.ts:112: @RequirePermissions(Resource.SALES_ORDERS, Action.READ)
+src\modules\sales\orders\orders.controller.ts:119: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\sales\orders\orders.controller.ts:120: @RequirePermissions(Resource.SALES_ORDERS, Action.READ)
+src\modules\sales\orders\orders.controller.ts:135: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\sales\orders\orders.controller.ts:136: @RequirePermissions(Resource.SALES_ORDERS, Action.READ)
+src\modules\sales\orders\orders.controller.ts:144: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\sales\orders\orders.controller.ts:145: @RequirePermissions(Resource.SALES_ORDERS, Action.UPDATE)
+src\modules\sales\orders\orders.controller.ts:167: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\sales\orders\orders.controller.ts:168: @RequirePermissions(Resource.SALES_ORDERS, Action.PRINT)
+src\modules\sales\orders\orders.controller.ts:179: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\sales\orders\orders.controller.ts:180: @RequirePermissions(Resource.SALES_ORDERS, Action.READ)
+src\modules\sales\orders\orders.controller.ts:244: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\sales\orders\orders.controller.ts:245: @RequirePermissions(Resource.SALES_ORDERS, Action.PRINT)
+src\modules\sales\payment\payment.controller.ts:22: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\sales\payment\payment.controller.ts:23: import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+src\modules\sales\payment\payment.controller.ts:160: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\sales\payment\payment.controller.ts:161: @RequirePermissions(Resource.CONTENT_CONFIG, Action.UPDATE)
+src\modules\sales\payment\payment.controller.ts:176: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\sales\payment\payment.controller.ts:177: @RequirePermissions(Resource.SALES_ORDERS, Action.REFUND) // Quyền thao tác với đơn hàng
+src\modules\shipping\shipping.controller.ts:28: import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+src\modules\shipping\shipping.controller.ts:29: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\shipping\shipping.controller.ts:129: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\shipping\shipping.controller.ts:130: @RequirePermissions(Resource.SALES_ORDERS, Action.UPDATE)
+src\modules\support\chat\chat.controller.ts:13: import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+src\modules\support\chat\chat.controller.ts:14: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\support\chat\chat.controller.ts:33: @UseGuards(JwtAuthGuard, PermissionsGuard)
+src\modules\support\chat\chat.controller.ts:48: @RequirePermissions(Resource.CRM_CHAT, Action.READ)
+src\modules\support\chat\chat.controller.ts:54: @RequirePermissions(Resource.CRM_CHAT, Action.READ)
+src\modules\support\chat\chat.controller.ts:61: @RequirePermissions(Resource.CRM_CHAT, Action.ASSIGN)
+src\modules\support\chat\chat.controller.ts:119: @RequirePermissions(Resource.CRM_CHAT, Action.READ)
+src\modules\support\chat\chat.controller.ts:126: @RequirePermissions(Resource.CRM_CHAT, Action.UPDATE)
+src\modules\support\warranty\warranty.controller.ts:14: import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+src\modules\support\warranty\warranty.controller.ts:15: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\support\warranty\warranty.controller.ts:48: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\support\warranty\warranty.controller.ts:49: @RequirePermissions(Resource.CRM_WARRANTY, Action.UPDATE)
+src\modules\system\audit-logs\audit-logs.controller.ts:6: import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+src\modules\system\audit-logs\audit-logs.controller.ts:7: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\system\audit-logs\audit-logs.controller.ts:11: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\system\audit-logs\audit-logs.controller.ts:16: @RequirePermissions(Resource.SYSTEM_AUDIT, Action.READ)
+src\modules\system\monitoring\monitoring.controller.ts:12: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\system\monitoring\monitoring.controller.ts:38: @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
+src\modules\system\monitoring\monitoring.controller.ts:53: @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
+src\modules\system\monitoring\monitoring.controller.ts:62: @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
+src\modules\system\monitoring\monitoring.controller.ts:77: @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
+src\modules\system\monitoring\monitoring.controller.ts:92: @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
+src\modules\system\monitoring\monitoring.controller.ts:117: @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
+src\modules\system\monitoring\monitoring.controller.ts:126: @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
+src\modules\system\monitoring\monitoring.controller.ts:141: @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
+src\modules\trade-in\trade-in.controller.ts:18: import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+src\modules\trade-in\trade-in.controller.ts:19: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\trade-in\trade-in.controller.ts:72: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\trade-in\trade-in.controller.ts:73: @RequirePermissions(Resource.SALES_TRADE_IN, Action.READ)
+src\modules\trade-in\trade-in.controller.ts:79: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\trade-in\trade-in.controller.ts:80: @RequirePermissions(Resource.SALES_TRADE_IN, Action.UPDATE)
+src\modules\trade-in\trade-in.controller.ts:90: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\trade-in\trade-in.controller.ts:91: @RequirePermissions(Resource.SALES_TRADE_IN, Action.UPDATE)
+src\modules\trade-in\trade-in.controller.ts:101: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\trade-in\trade-in.controller.ts:102: @RequirePermissions(Resource.SALES_TRADE_IN, Action.UPDATE)
+src\modules\trade-in\trade-in.controller.ts:108: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\trade-in\trade-in.controller.ts:109: @RequirePermissions(Resource.SALES_TRADE_IN, Action.APPROVE)
+src\modules\trade-in\trade-in.controller.ts:120: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\trade-in\trade-in.controller.ts:121: @RequirePermissions(Resource.SALES_TRADE_IN, Action.READ)
+src\modules\trade-in\trade-in.controller.ts:128: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\trade-in\trade-in.controller.ts:129: @RequirePermissions(Resource.SALES_TRADE_IN, Action.EXPORT)
+src\modules\trade-in\trade-in.controller.ts:141: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\trade-in\trade-in.controller.ts:142: @RequirePermissions(Resource.SALES_TRADE_IN, Action.PRINT)
+src\modules\trade-in\trade-in.controller.ts:162: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\trade-in\trade-in.controller.ts:163: @RequirePermissions(Resource.SALES_TRADE_IN, Action.RECEIVE)
+src\modules\trade-in\trade-in.controller.ts:170: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\trade-in\trade-in.controller.ts:171: @RequirePermissions(Resource.SALES_TRADE_IN, Action.RECEIVE)
+src\modules\users\admin\admin-seeder.service.ts:35: is_system: true,
+src\modules\users\admin\admin-seeder.service.ts:36: permissions: [
+src\modules\users\admin\admin-seeder.service.ts:54: permissions: [
+src\modules\users\admin\admin-seeder.service.ts:67: permissions: [
+src\modules\users\admin\admin-seeder.service.ts:89: permissions: [
+src\modules\users\admin\admin-seeder.service.ts:117: permissions: [
+src\modules\users\admin\admin-seeder.service.ts:141: permissions: [
+src\modules\users\admin\admin.controller.ts:20: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\users\admin\admin.controller.ts:25: import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+src\modules\users\admin\admin.controller.ts:30: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\users\admin\admin.controller.ts:39: @RequirePermissions(Resource.SYSTEM_USERS, Action.CREATE)
+src\modules\users\admin\admin.controller.ts:57: @RequirePermissions(Resource.SYSTEM_USERS, Action.READ)
+src\modules\users\admin\admin.controller.ts:65: @RequirePermissions(Resource.SYSTEM_USERS, Action.READ)
+src\modules\users\admin\admin.controller.ts:74: @RequirePermissions(Resource.SYSTEM_USERS, Action.UPDATE)
+src\modules\users\admin\admin.controller.ts:92: @RequirePermissions(Resource.SYSTEM_USERS, Action.DELETE)
+src\modules\users\admin\admin.controller.ts:113: @RequirePermissions(Resource.SYSTEM_USERS, Action.UPDATE)
+src\modules\users\admin\admin.controller.ts:133: @RequirePermissions(Resource.SYSTEM_USERS, Action.DELETE)
+src\modules\users\admin\admin.controller.ts:152: @RequirePermissions(Resource.SYSTEM_USERS, Action.UPDATE)
+src\modules\users\admin\admin.controller.ts:173: @RequirePermissions(Resource.SYSTEM_USERS, Action.READ)
+src\modules\users\admin\admin.service.ts:4: ForbiddenException,
+src\modules\users\admin\admin.service.ts:53: // Vai trò đặc quyền = slug dành riêng (SUPER_ADMIN, ADMIN) + mọi Role có is_system = true.
+src\modules\users\admin\admin.service.ts:57: return roles.includes(RoleEnum.SUPER_ADMIN);
+src\modules\users\admin\admin.service.ts:62: .find({ is_system: true })
+src\modules\users\admin\admin.service.ts:88: .select('slug level is_system');
+src\modules\users\admin\admin.service.ts:98: (r) => r.is_system || isReservedRoleKey(r.slug),
+src\modules\users\admin\admin.service.ts:101: throw new ForbiddenException(
+src\modules\users\admin\admin.service.ts:339: throw new ForbiddenException(
+src\modules\users\admin\admin.service.ts:350: throw new ForbiddenException(
+src\modules\users\admin\admin.service.ts:358: throw new ForbiddenException('Không thể tự khóa chính mình.');
+src\modules\users\admin\admin.service.ts:473: throw new ForbiddenException(
+src\modules\users\admin\admin.service.ts:479: throw new ForbiddenException(
+src\modules\users\admin\admin.service.ts:651: throw new ForbiddenException(
+src\modules\users\admin\admin.service.ts:657: throw new ForbiddenException(
+src\modules\users\admin\admin.service.ts:704: throw new ForbiddenException(
+src\modules\users\admin\admin.service.ts:722: throw new ForbiddenException(
+src\modules\users\admin\admin.service.ts:779: throw new ForbiddenException(
+src\modules\users\customers\admin-customer.controller.ts:16: import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+src\modules\users\customers\admin-customer.controller.ts:17: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\users\customers\admin-customer.controller.ts:35: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\users\customers\admin-customer.controller.ts:40: @RequirePermissions(Resource.CRM_CUSTOMERS, Action.UPDATE)
+src\modules\users\customers\admin-customer.controller.ts:54: @RequirePermissions(Resource.CRM_CUSTOMERS, Action.DELETE)
+src\modules\users\customers\admin-customer.controller.ts:67: @RequirePermissions(Resource.CRM_CUSTOMERS, Action.READ)
+src\modules\users\customers\admin-customer.controller.ts:73: @RequirePermissions(Resource.CRM_CUSTOMERS, Action.EXPORT)
+src\modules\users\customers\admin-customer.controller.ts:82: @RequirePermissions(Resource.CRM_CUSTOMERS, Action.CREATE)
+src\modules\users\customers\admin-customer.controller.ts:91: @RequirePermissions(Resource.SYSTEM_AUDIT, Action.EXPORT)
+src\modules\users\customers\admin-customer.controller.ts:97: @RequirePermissions(Resource.SYSTEM_AUDIT, Action.READ)
+src\modules\users\customers\admin-customer.controller.ts:106: @RequirePermissions(Resource.CRM_CUSTOMERS, Action.READ)
+src\modules\users\customers\admin-customer.controller.ts:112: @RequirePermissions(Resource.CRM_CUSTOMERS, Action.UPDATE)
+src\modules\users\customers\admin-customer.controller.ts:126: @RequirePermissions(Resource.CRM_CUSTOMERS, Action.UPDATE)
+src\modules\users\customers\admin-customer.controller.ts:140: @RequirePermissions(Resource.CRM_CUSTOMERS, Action.UPDATE)
+src\modules\users\customers\admin-customer.controller.ts:160: @RequirePermissions(Resource.CRM_CUSTOMERS, Action.UPDATE)
+src\modules\users\customers\admin-customer.controller.ts:170: @RequirePermissions(Resource.CRM_CUSTOMERS, Action.DELETE)
+src\modules\users\customers\admin-customer.controller.ts:179: @RequirePermissions(Resource.CRM_CUSTOMERS, Action.DELETE)
+src\modules\users\customers\admin-customer.service.ts:7: ForbiddenException,
+src\modules\users\customers\admin-customer.service.ts:266: customer.roles.includes('ADMIN') ||
+src\modules\users\customers\admin-customer.service.ts:267: customer.roles.includes('SUPER_ADMIN')
+src\modules\users\customers\admin-customer.service.ts:269: throw new ForbiddenException(
+src\modules\users\customers\admin-customer.service.ts:277: !actor.roles.includes('SUPER_ADMIN') &&
+src\modules\users\customers\admin-customer.service.ts:278: !actor.roles.includes('ADMIN')
+src\modules\users\customers\admin-customer.service.ts:280: throw new ForbiddenException(
+src\modules\users\customers\admin-customer.service.ts:1048: !actor.roles.includes('SUPER_ADMIN') &&
+src\modules\users\customers\admin-customer.service.ts:1049: !actor.roles.includes('ADMIN')
+src\modules\users\customers\admin-customer.service.ts:1051: throw new ForbiddenException(
+src\modules\users\customers\customers.service.ts:5: ForbiddenException,
+src\modules\users\customers\customers.service.ts:198: throw new ForbiddenException(
+src\modules\users\customers\customers.service.ts:270: throw new ForbiddenException(
+src\modules\users\customers\customers.service.ts:319: throw new ForbiddenException(
+src\modules\users\customers\customers.service.ts:479: throw new ForbiddenException('Bạn không có quyền truy cập đơn hàng này');
+src\modules\users\roles\roles.controller.ts:16: import { PermissionsGuard } from 'src/common/guards/permissions.guard';
+src\modules\users\roles\roles.controller.ts:17: import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+src\modules\users\roles\roles.controller.ts:23: import { PERMISSION_METADATA } from 'src/common/constants/permissions-metadata.constant';
+src\modules\users\roles\roles.controller.ts:26: @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+src\modules\users\roles\roles.controller.ts:32: @RequirePermissions(Resource.SYSTEM_ROLES, Action.CREATE)
+src\modules\users\roles\roles.controller.ts:44: @RequirePermissions(Resource.SYSTEM_ROLES, Action.READ)
+src\modules\users\roles\roles.controller.ts:50: @Get('metadata/permissions')
+src\modules\users\roles\roles.controller.ts:51: @RequirePermissions(Resource.SYSTEM_ROLES, Action.READ)
+src\modules\users\roles\roles.controller.ts:60: @RequirePermissions(Resource.SYSTEM_USERS, Action.READ)
+src\modules\users\roles\roles.controller.ts:67: @RequirePermissions(Resource.SYSTEM_ROLES, Action.READ)
+src\modules\users\roles\roles.controller.ts:74: @RequirePermissions(Resource.SYSTEM_ROLES, Action.UPDATE)
+src\modules\users\roles\roles.controller.ts:87: @RequirePermissions(Resource.SYSTEM_ROLES, Action.DELETE)
+src\modules\users\roles\roles.service.ts:6: ForbiddenException,
+src\modules\users\roles\roles.service.ts:39: throw new ForbiddenException(
+src\modules\users\roles\roles.service.ts:50: is_system: false,
+src\modules\users\roles\roles.service.ts:65: permissions: savedRole.permissions,
+src\modules\users\roles\roles.service.ts:107: if (role.is_system) {
+src\modules\users\roles\roles.service.ts:108: if (dto.slug || dto.permissions) {
+src\modules\users\roles\roles.service.ts:109: throw new ForbiddenException(
+src\modules\users\roles\roles.service.ts:114: throw new ForbiddenException('Không thể vô hiệu hóa Role hệ thống.');
+src\modules\users\roles\roles.service.ts:119: if (dto.slug && !role.is_system && isReservedRoleKey(dto.slug)) {
+src\modules\users\roles\roles.service.ts:120: throw new ForbiddenException(
+src\modules\users\roles\roles.service.ts:137: if (dto.permissions) role.permissions = dto.permissions;
+src\modules\users\roles\roles.service.ts:165: if (role.is_system) {
+src\modules\users\roles\roles.service.ts:166: throw new ForbiddenException(

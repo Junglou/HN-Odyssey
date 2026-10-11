@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
+import { Action, Resource } from "../../../../types/permissions";
+import type { UserPayload } from "../../../../types/auth";
 
 export type CustomerStatus = "Active" | "Inactive" | "Locked" | "Deleted";
 export type CustomerType = "Bronze" | "Silver" | "Gold" | "Platinum";
@@ -95,6 +97,19 @@ const mapBEToType = (beTier?: string): CustomerType => {
   }
 };
 
+const useLocalAuth = () => {
+  const [user] = useState(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) return JSON.parse(stored) as UserPayload;
+    } catch (error) {
+      console.warn("Không thể parse dữ liệu user từ localStorage:", error);
+    }
+    return null;
+  });
+  return { user };
+};
+
 export function useCustomerManagement() {
   const [records, setRecords] = useState<CustomerRecord[]>([]);
   const [search, setSearch] = useState<string>("");
@@ -107,7 +122,24 @@ export function useCustomerManagement() {
 
   const [pagination, setPagination] = useState({ page: 1, limit: 10 });
   const [totalFiltered, setTotalFiltered] = useState<number>(0);
+  const { user } = useLocalAuth();
+  const hasPermission = useCallback(
+    (resourceCode: Resource, actionCode: Action): boolean => {
+      if (!user || !user.permissions) return false;
+      if (user.roles?.includes("SUPER_ADMIN")) return true;
+      return user.permissions.some(
+        (p) =>
+          p.resource === resourceCode &&
+          (p.actions.includes(actionCode) || p.actions.includes(Action.MANAGE)),
+      );
+    },
+    [user],
+  );
 
+  const canCreate = hasPermission(Resource.CRM_CUSTOMERS, Action.CREATE);
+  const canUpdate = hasPermission(Resource.CRM_CUSTOMERS, Action.UPDATE);
+  const canDelete = hasPermission(Resource.CRM_CUSTOMERS, Action.DELETE);
+  const canExport = hasPermission(Resource.CRM_CUSTOMERS, Action.EXPORT);
   const [reasonModal, setReasonModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -255,20 +287,26 @@ export function useCustomerManagement() {
     changePage: (page: number) => setPagination((p) => ({ ...p, page })),
     changeLimit: (limit: number) => setPagination({ page: 1, limit }),
 
-    openAddModal: () =>
+    openAddModal: () => {
+      if (!canCreate)
+        return toast.error("Bạn không có quyền tạo khách hàng mới.");
       setModalConfig({
         isOpen: true,
         mode: "add",
         editingRecord: null,
         isSubmitting: false,
-      }),
-    openEditModal: (record: CustomerRecord) =>
+      });
+    },
+    openEditModal: (record: CustomerRecord) => {
+      if (!canUpdate)
+        return toast.error("Bạn không có quyền sửa thông tin khách hàng.");
       setModalConfig({
         isOpen: true,
         mode: "edit",
         editingRecord: record,
         isSubmitting: false,
-      }),
+      });
+    },
     openViewModal: (record: CustomerRecord) =>
       setModalConfig({
         isOpen: true,
@@ -279,6 +317,7 @@ export function useCustomerManagement() {
 
     // GỌI THẲNG STATUS REASON MODAL CHO HÀNH ĐỘNG DELETE
     openDeleteModal: (record?: CustomerRecord) => {
+      if (!canDelete) return toast.error("Bạn không có quyền xóa khách hàng.");
       if (record) {
         setReasonModal({
           isOpen: true,
@@ -301,6 +340,8 @@ export function useCustomerManagement() {
     closeModal: () => setModalConfig((prev) => ({ ...prev, isOpen: false })),
 
     lockUnlockCustomer: (id: string, currentStatus: CustomerStatus) => {
+      if (!canUpdate)
+        return toast.error("Bạn không có quyền khóa/mở khóa tài khoản.");
       setReasonModal({
         isOpen: true,
         title:
@@ -316,6 +357,8 @@ export function useCustomerManagement() {
     },
 
     exportExcel: async () => {
+      if (!canExport)
+        return toast.error("Bạn không có quyền xuất dữ liệu Excel.");
       try {
         toast.info("Đang xử lý xuất dữ liệu, vui lòng đợi...");
 
@@ -358,6 +401,8 @@ export function useCustomerManagement() {
   };
 
   const toggleRowStatus = (id: string, currentStatus: CustomerStatus) => {
+    if (!canUpdate)
+      return toast.error("Bạn không có quyền cập nhật trạng thái.");
     if (currentStatus === "Locked") {
       toast.warning("Tài khoản đang bị khóa, hãy dùng chức năng Unlock.");
       return;
@@ -451,6 +496,8 @@ export function useCustomerManagement() {
 
   const bulkActions = {
     bulkActivate: () => {
+      if (!canUpdate)
+        return toast.error("Bạn không có quyền thao tác hàng loạt.");
       if (selectedIds.size === 0) return;
       setReasonModal({
         isOpen: true,
@@ -461,6 +508,8 @@ export function useCustomerManagement() {
       });
     },
     bulkDeactivate: () => {
+      if (!canUpdate)
+        return toast.error("Bạn không có quyền thao tác hàng loạt.");
       if (selectedIds.size === 0) return;
       setReasonModal({
         isOpen: true,
@@ -471,6 +520,7 @@ export function useCustomerManagement() {
       });
     },
     bulkDelete: () => {
+      if (!canDelete) return toast.error("Bạn không có quyền xóa hàng loạt.");
       if (selectedIds.size === 0) return;
       actions.openDeleteModal();
     },
@@ -575,5 +625,6 @@ export function useCustomerManagement() {
     handleReasonSubmit,
     closeReasonModal: () =>
       setReasonModal((prev) => ({ ...prev, isOpen: false })),
+    permissions: { canCreate, canUpdate, canDelete, canExport },
   };
 }

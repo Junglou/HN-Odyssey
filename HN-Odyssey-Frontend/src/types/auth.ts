@@ -1,3 +1,5 @@
+import type { Action, Resource } from "./permissions";
+
 // Login Response (snake_case từ Backend)
 export interface LoginResponse {
   access_token: string;
@@ -9,7 +11,7 @@ export interface LoginResponse {
     roles: string[];
     avatar?: string;
     status: string;
-    permissions?: string[];
+    permissions?: UserPermission[];
     is_portal_access?: boolean;
   };
 }
@@ -95,4 +97,20 @@ export interface ConfirmRecoveryPayload {
 export interface ConfirmRecoveryResponse {
   message: string;
   success: boolean;
+}
+
+export interface UserPermission {
+  resource: Resource;
+  actions: Action[];
+}
+
+export interface UserPayload {
+  _id: string;
+  email: string;
+  full_name?: string;
+  roles: string[];
+  avatar?: string;
+  status?: string;
+  permissions?: UserPermission[];
+  is_portal_access?: boolean;
 }

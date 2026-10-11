@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
+import type { UserPayload } from "../../../../types/auth";
+import { Action, Resource } from "../../../../types/permissions";
 
 export type PageType =
   | "homepage"
@@ -835,6 +837,19 @@ const getPredefinedSections = (page: PageType): SectionConfig[] => {
   ];
 };
 
+const useLocalAuth = () => {
+  const [user] = useState(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) return JSON.parse(stored) as UserPayload;
+    } catch (error) {
+      console.warn("Không thể parse dữ liệu user từ localStorage:", error);
+    }
+    return null;
+  });
+  return { user };
+};
+
 export function useContentConfig() {
   const [selectedPage, setSelectedPage] = useState<PageType>("homepage");
   const [selectedSectionId, setSelectedSectionId] = useState<string>("");
@@ -846,6 +861,23 @@ export function useContentConfig() {
   const [history, setHistory] = useState<SectionConfig[][]>([]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+
+  const { user } = useLocalAuth();
+
+  const hasPermission = useCallback(
+    (resourceCode: Resource, actionCode: Action): boolean => {
+      if (!user || !user.permissions) return false;
+      if (user.roles?.includes("SUPER_ADMIN")) return true;
+      return user.permissions.some(
+        (p) =>
+          p.resource === resourceCode &&
+          (p.actions.includes(actionCode) || p.actions.includes(Action.MANAGE)),
+      );
+    },
+    [user],
+  );
+
+  const canUpdateConfig = hasPermission(Resource.CONTENT_CONFIG, Action.UPDATE);
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -1207,6 +1239,8 @@ export function useContentConfig() {
     },
 
     saveConfig: async () => {
+      if (!canUpdateConfig)
+        return toast.error("Bạn không có quyền lưu cấu hình giao diện.");
       setIsSaving(true);
       try {
         await axiosClient.patch(
@@ -1233,5 +1267,6 @@ export function useContentConfig() {
     activeElementData,
     actions,
     isSaving,
+    permissions: { canUpdateConfig },
   };
 }

@@ -287,18 +287,22 @@ export function useBannerManagement() {
         toast.error("Không thể kích hoạt banner đã hết hạn. Vui lòng gia hạn!");
         return;
       }
+
       const newStatusBE = banner.status === "Active" ? "HIDDEN" : "ACTIVE";
       try {
-        await axiosClient.patch(`/marketing/content/banners/${id}`, {
+        // [FIX BẤT ĐỒNG BỘ]: Sử dụng API bulk cho chắc ăn, vừa đúng nghiệp vụ vừa nhanh
+        await axiosClient.patch(`/marketing/content/banners/bulk/status`, {
+          ids: [id], // Truyền 1 ID nhưng dạng mảng
           status: newStatusBE,
         });
         toast.success("Đã cập nhật trạng thái banner!");
         fetchBanners();
       } catch (error) {
-        console.error("Toggle status error:", error); // Xử lý lỗi dòng 210
+        console.error("Toggle status error:", error);
         toast.error("Cập nhật trạng thái thất bại!");
       }
     },
+
     bulkActivate: async () => {
       if (selectedIds.length === 0) return;
       try {

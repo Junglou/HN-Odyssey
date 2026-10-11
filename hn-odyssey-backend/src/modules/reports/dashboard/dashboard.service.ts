@@ -17,20 +17,20 @@ import {
   DashboardFilterDto,
   TopEntityFilterDto,
   SortBy,
-  TimeFilter,
   SortOrder,
+  TimeFilter,
 } from 'src/common/dtos/dashboard-filter.dto';
+import { getReportDateRange } from 'src/common/utils/date-range.util';
+import { NON_REVENUE_ORDER_STATUSES } from 'src/common/constants/order-status.constant';
 
 import {
   StockAlertItem,
-  RawAggregatedProduct,
   OverviewMetrics,
   TopCategory,
   TopProduct,
   VariantContribution,
   SystemStageStat,
 } from 'src/common/interfaces/dashboard.interface';
-import { Conversation } from 'twilio/lib/twiml/VoiceResponse';
 import {
   WarrantyClaim,
   WarrantyClaimDocument,
@@ -44,6 +44,7 @@ import {
   IntegrationLogDocument,
 } from 'src/modules/system/monitoring/schemas/integration-log.schema';
 import {
+  Conversation,
   ConversationDocument,
   ConversationStatus,
 } from 'src/modules/support/chat/schemas/conversation.schema';
@@ -51,6 +52,11 @@ import {
   StockTransaction,
   StockTransactionDocument,
 } from 'src/modules/inventory/transactions/schemas/stock-transaction.schema';
+import {
+  classifyStock,
+  resolveThresholds,
+  type StockAlertStatus,
+} from 'src/common/utils/stock-status.util';
 
 interface RawAggregationResult {
   total_revenue: number;
@@ -58,7 +64,7 @@ interface RawAggregationResult {
 }
 
 interface ChartRawData {
-  _id: string;
+  _id: string | number; // "YYYY-MM-DD" khi gom theo ngày, 0–23 khi gom theo giờ
   revenue: number;
   orders: number;
 }
@@ -123,190 +129,67 @@ export class DashboardService {
     private readonly stockTransactionModel: Model<StockTransactionDocument>,
   ) {}
 
-  // WIDGET CẢNH BÁO TỒN KHO
+  // WIDGET CẢNH BÁO TỒN KHO — dùng chung luật với trang Inventory Management
+  // (trước đây max_stock mặc định 0 → mọi SKU còn hàng bị coi là Overstock)
   async getStockAlertsWidget(): Promise<StockAlertItem[]> {
-    const products = await this.productModel.aggregate<RawAggregatedProduct>([
-      { $match: { is_deleted: false, status: 'ACTIVE' } },
-      {
-        $match: {
-          $expr: {
-            $or: [
-              {
-                $and: [
-                  { $eq: ['$has_variants', false] },
-                  {
-                    $or: [
-                      { $lte: ['$stock', '$min_stock'] },
-                      { $gt: ['$stock', '$max_stock'] },
-                    ],
-                  },
-                ],
-              },
-              {
-                $and: [
-                  { $eq: ['$has_variants', true] },
-                  {
-                    $gt: [
-                      {
-                        $size: {
-                          $filter: {
-                            input: '$variants',
-                            as: 'v',
-                            cond: {
-                              $or: [
-                                {
-                                  $lte: [
-                                    '$$v.stock',
-                                    {
-                                      $ifNull: ['$$v.min_stock', '$min_stock'],
-                                    },
-                                  ],
-                                },
-                                {
-                                  $gt: [
-                                    '$$v.stock',
-                                    {
-                                      $ifNull: ['$$v.max_stock', '$max_stock'],
-                                    },
-                                  ],
-                                },
-                              ],
-                            },
-                          },
-                        },
-                      },
-                      0,
-                    ],
-                  },
-                ],
-              },
-            ],
-          },
-        },
-      },
-    ]);
+    const products = await this.productModel
+      .find({ is_deleted: false })
+      .select(
+        'name sku thumbnail stock min_stock max_stock has_variants variants',
+      )
+      .lean();
 
+    const PRIORITY: Record<StockAlertStatus, number> = {
+      OUT_OF_STOCK: 1,
+      LOW_STOCK: 2,
+      OVER_STOCK: 3,
+    };
     const alerts: StockAlertItem[] = [];
 
     for (const product of products) {
-      if (!product.has_variants) {
-        let status: 'OUT_OF_STOCK' | 'LOW_STOCK' | 'OVER_STOCK' = 'LOW_STOCK';
-        let priority = 2;
+      // Gom về cùng một dạng: mỗi biến thể là 1 SKU, sản phẩm đơn là 1 SKU
+      const entries =
+        product.has_variants &&
+        Array.isArray(product.variants) &&
+        product.variants.length > 0
+          ? product.variants.map((v) => ({
+              sku: v.sku,
+              name: `${product.name} - ${v.sku}`,
+              stock: Number(v.stock) || 0,
+              ...resolveThresholds(v, product),
+            }))
+          : [
+              {
+                sku: product.sku,
+                name: product.name,
+                stock: Number(product.stock) || 0,
+                ...resolveThresholds(null, product),
+              },
+            ];
 
-        if (product.stock <= 0) {
-          status = 'OUT_OF_STOCK';
-          priority = 1;
-        } else if (product.stock > product.max_stock) {
-          status = 'OVER_STOCK';
-          priority = 3;
-        }
+      for (const e of entries) {
+        const status = classifyStock(e.stock, e.min, e.max);
+        if (!status) continue;
 
         alerts.push({
-          product_id: product._id.toString(),
-          sku: product.sku,
-          name: product.name,
+          product_id: String(product._id),
+          sku: e.sku,
+          name: e.name,
           thumbnail: product.thumbnail || '',
-          current_stock: product.stock,
-          min_stock: product.min_stock,
-          max_stock: product.max_stock,
+          current_stock: e.stock,
+          min_stock: e.min,
+          max_stock: e.max ?? 0, // 0 = không giới hạn tồn tối đa
           status,
-          priority,
+          priority: PRIORITY[status],
         });
-      } else {
-        for (const variant of product.variants) {
-          const vMin = variant.min_stock ?? product.min_stock ?? 0;
-          const vMax = variant.max_stock ?? product.max_stock ?? 999999;
-
-          if (variant.stock <= vMin || variant.stock > vMax) {
-            let status: 'OUT_OF_STOCK' | 'LOW_STOCK' | 'OVER_STOCK' =
-              'LOW_STOCK';
-            let priority = 2;
-
-            if (variant.stock <= 0) {
-              status = 'OUT_OF_STOCK';
-              priority = 1;
-            } else if (variant.stock > vMax) {
-              status = 'OVER_STOCK';
-              priority = 3;
-            }
-
-            alerts.push({
-              product_id: product._id.toString(),
-              sku: variant.sku,
-              name: `${product.name} - ${variant.sku}`,
-              thumbnail: product.thumbnail || '',
-              current_stock: variant.stock,
-              min_stock: vMin,
-              max_stock: vMax,
-              status,
-              priority,
-            });
-          }
-        }
       }
     }
 
-    alerts.sort((a, b) => a.priority - b.priority);
+    // Hết hàng → sắp hết (tồn thấp nhất trước) → tồn vượt
+    alerts.sort(
+      (a, b) => a.priority - b.priority || a.current_stock - b.current_stock,
+    );
     return alerts.slice(0, 20);
-  }
-
-  // XỬ LÝ NGÀY THÁNG
-  private getDateRanges(filter: DashboardFilterDto): {
-    start: Date;
-    end: Date;
-    prevStart: Date;
-    prevEnd: Date;
-  } {
-    let start = filter.start_date ? new Date(filter.start_date) : new Date();
-    const end = filter.end_date ? new Date(filter.end_date) : new Date();
-    let prevStart = new Date();
-    let prevEnd = new Date();
-
-    if (!filter.time_filter && !filter.start_date && !filter.end_date) {
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-      prevStart = new Date(start.getTime() - 24 * 60 * 60 * 1000);
-      prevEnd = new Date(end.getTime() - 24 * 60 * 60 * 1000);
-      return { start, end, prevStart, prevEnd };
-    }
-
-    if (filter.time_filter === TimeFilter.TODAY) {
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-      prevStart = new Date(start.getTime() - 24 * 60 * 60 * 1000);
-      prevEnd = new Date(end.getTime() - 24 * 60 * 60 * 1000);
-    } else if (filter.time_filter === TimeFilter.THIS_WEEK) {
-      const day = start.getDay();
-      const diff = start.getDate() - day + (day === 0 ? -6 : 1);
-      start.setDate(diff);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-
-      prevStart = new Date(start.getTime() - 7 * 24 * 60 * 60 * 1000);
-      prevEnd = new Date(start.getTime() - 1);
-    } else if (filter.time_filter === TimeFilter.THIS_MONTH) {
-      start = new Date(end.getFullYear(), end.getMonth(), 1);
-      prevStart = new Date(start.getFullYear(), start.getMonth() - 1, 1);
-      prevEnd = new Date(
-        start.getFullYear(),
-        start.getMonth(),
-        0,
-        23,
-        59,
-        59,
-        999,
-      );
-    } else if (filter.time_filter === TimeFilter.THIS_YEAR) {
-      start = new Date(end.getFullYear(), 0, 1);
-      prevStart = new Date(start.getFullYear() - 1, 0, 1);
-      prevEnd = new Date(start.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
-    } else if (filter.start_date && filter.end_date) {
-      const diffTime = Math.abs(end.getTime() - start.getTime());
-      prevEnd = new Date(start.getTime() - 1);
-      prevStart = new Date(prevEnd.getTime() - diffTime);
-    }
-
-    return { start, end, prevStart, prevEnd };
   }
 
   private calculateGrowth(current: number, previous: number): number {
@@ -316,10 +199,21 @@ export class DashboardService {
 
   // DOANH THU & ĐƠN HÀNG
   async getOverviewStats(filter: DashboardFilterDto): Promise<OverviewMetrics> {
-    const { start, end, prevStart, prevEnd } = this.getDateRanges(filter);
-    const validStatuses = {
-      $nin: ['CANCELLED', 'RETURNED', 'DELIVERY_FAILED', 'REFUNDED'],
-    };
+    const { start, end, prevStart, prevEnd } = getReportDateRange(filter);
+    const validStatuses = { $nin: NON_REVENUE_ORDER_STATUSES };
+
+    // US.87 AC1: Hôm nay → gom theo từng khung giờ; các kỳ khác → gom theo ngày (giờ VN)
+    const isHourlyChart =
+      (filter.time_filter ?? TimeFilter.TODAY) === TimeFilter.TODAY;
+    const chartGroupId = isHourlyChart
+      ? { $hour: { date: '$createdAt', timezone: 'Asia/Ho_Chi_Minh' } }
+      : {
+          $dateToString: {
+            format: '%Y-%m-%d',
+            date: '$createdAt',
+            timezone: 'Asia/Ho_Chi_Minh',
+          },
+        };
 
     // Thực thi toàn bộ truy vấn song song để tối ưu hiệu suất đọc
     const [
@@ -379,15 +273,21 @@ export class DashboardService {
         },
         {
           $group: {
-            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            _id: chartGroupId,
             revenue: { $sum: '$total_amount' },
             orders: { $sum: 1 },
           },
         },
         { $sort: { _id: 1 } },
       ]),
+      // Không tính đơn tạm (TEMPORARY = phiên giữ hàng, chưa phải đơn thật)
       this.orderModel.aggregate<{ _id: string; count: number }>([
-        { $match: { createdAt: { $gte: start, $lte: end } } },
+        {
+          $match: {
+            createdAt: { $gte: start, $lte: end },
+            status: { $ne: 'TEMPORARY' },
+          },
+        },
         { $group: { _id: '$status', count: { $sum: 1 } } },
       ]),
       // Lấy các yêu cầu bảo hành gần nhất để làm return_stats
@@ -404,9 +304,9 @@ export class DashboardService {
         .limit(5)
         .select('_id status')
         .lean<Array<{ _id: Types.ObjectId; status: string }>>(),
+      // Tồn đọng thực tế: mọi ticket đang mở, không chỉ ticket tạo trong kỳ
       this.conversationModel.countDocuments({
         status: ConversationStatus.OPEN,
-        createdAt: { $gte: start, $lte: end },
       }),
       // Kiểm tra sức khỏe hệ thống dựa vào lỗi 5xx
       this.systemMetricModel.countDocuments({
@@ -439,7 +339,10 @@ export class DashboardService {
     };
 
     const chart_data = chartRaw.map((item) => ({
-      label: String(item._id),
+      label:
+        typeof item._id === 'number'
+          ? `${String(item._id).padStart(2, '0')}:00`
+          : String(item._id),
       revenue: Number(item.revenue),
       orders: Number(item.orders),
     }));
@@ -516,10 +419,8 @@ export class DashboardService {
 
   // SẢN PHẨM BÁN CHẠY
   async getTopProducts(filter: TopEntityFilterDto): Promise<TopProduct[]> {
-    const { start, end, prevStart, prevEnd } = this.getDateRanges(filter);
-    const validStatuses = {
-      $nin: ['CANCELLED', 'RETURNED', 'DELIVERY_FAILED', 'REFUNDED'],
-    };
+    const { start, end, prevStart, prevEnd } = getReportDateRange(filter);
+    const validStatuses = { $nin: NON_REVENUE_ORDER_STATUSES };
 
     const sortDirection = filter.sort_order === SortOrder.ASC ? 1 : -1;
     const sortField =
@@ -652,7 +553,7 @@ export class DashboardService {
 
   // DANH MỤC BÁN CHẠY
   async getTopCategories(filter: TopEntityFilterDto): Promise<TopCategory[]> {
-    const { start, end, prevStart, prevEnd } = this.getDateRanges(filter);
+    const { start, end, prevStart, prevEnd } = getReportDateRange(filter);
 
     const sortDirection = filter.sort_order === SortOrder.ASC ? 1 : -1;
     const sortField =
@@ -712,12 +613,7 @@ export class DashboardService {
             total_revenue: {
               $sum: {
                 $cond: [
-                  {
-                    $in: [
-                      '$status',
-                      ['CANCELLED', 'RETURNED', 'DELIVERY_FAILED', 'REFUNDED'],
-                    ],
-                  },
+                  { $in: ['$status', NON_REVENUE_ORDER_STATUSES] },
                   0,
                   { $multiply: ['$items.price', '$items.quantity'] },
                 ],
@@ -726,17 +622,13 @@ export class DashboardService {
             total_quantity: {
               $sum: {
                 $cond: [
-                  {
-                    $in: [
-                      '$status',
-                      ['CANCELLED', 'RETURNED', 'DELIVERY_FAILED', 'REFUNDED'],
-                    ],
-                  },
+                  { $in: ['$status', NON_REVENUE_ORDER_STATUSES] },
                   0,
                   '$items.quantity',
                 ],
               },
             },
+            // Tỷ lệ hoàn trả: giữ nguyên danh sách riêng, khác mục đích với doanh thu
             returned_quantity: {
               $sum: {
                 $cond: [
@@ -791,12 +683,7 @@ export class DashboardService {
             total_revenue: {
               $sum: {
                 $cond: [
-                  {
-                    $in: [
-                      '$status',
-                      ['CANCELLED', 'RETURNED', 'DELIVERY_FAILED', 'REFUNDED'],
-                    ],
-                  },
+                  { $in: ['$status', NON_REVENUE_ORDER_STATUSES] },
                   0,
                   { $multiply: ['$items.price', '$items.quantity'] },
                 ],
@@ -805,12 +692,7 @@ export class DashboardService {
             total_quantity: {
               $sum: {
                 $cond: [
-                  {
-                    $in: [
-                      '$status',
-                      ['CANCELLED', 'RETURNED', 'DELIVERY_FAILED', 'REFUNDED'],
-                    ],
-                  },
+                  { $in: ['$status', NON_REVENUE_ORDER_STATUSES] },
                   0,
                   '$items.quantity',
                 ],
@@ -880,52 +762,65 @@ export class DashboardService {
     }));
   }
 
-  // LẤY INVENTORY KPIs
+  // LẤY INVENTORY KPIs — dùng chung luật Low Stock với trang Inventory Management
   async getInventoryKPIs(): Promise<InventoryKPI[]> {
+    // Tồn kho vật lý không phụ thuộc trạng thái mở bán → chỉ loại sản phẩm đã xóa
+    // (trước đây lọc status ACTIVE nên số liệu lệch với trang Inventory Management)
     const products = await this.productModel
-      .find({ is_deleted: false, status: 'ACTIVE' })
-      .select('stock has_variants variants min_stock base_price')
+      .find({ is_deleted: false })
+      .select('stock has_variants variants min_stock max_stock price')
       .lean();
 
     let totalValue = 0;
     let totalItems = 0;
     let lowStockCount = 0;
-    let totalSkus = 0; // Thêm biến đếm tổng số lượng SKU
+    let totalSkus = 0;
 
     for (const product of products) {
-      const productObj = product as unknown as { base_price?: number };
-      const basePrice = productObj.base_price || 50;
+      // Schema Product dùng field `price` (trước đây đọc `base_price` không tồn tại → luôn $50)
+      const productPrice = Number(product.price) || 0;
 
-      if (product.has_variants && Array.isArray(product.variants)) {
+      if (
+        product.has_variants &&
+        Array.isArray(product.variants) &&
+        product.variants.length > 0
+      ) {
         for (const variant of product.variants) {
-          totalSkus++; // Tăng đếm cho mỗi biến thể (1 SKU)
+          totalSkus++;
           const vStock = Number(variant.stock) || 0;
-          const vObj = variant as unknown as { price?: number };
-          const variantPrice = vObj.price || basePrice;
+          const variantPrice = Number(variant.price) || productPrice;
 
           totalItems += vStock;
           totalValue += vStock * variantPrice;
 
-          const vMin = variant.min_stock ?? product.min_stock ?? 0;
+          // Ngưỡng min: biến thể → sản phẩm cha → DEFAULT_MIN_STOCK (10)
+          const { min: vMin } = resolveThresholds(variant, product);
           if (vStock <= vMin) lowStockCount++;
         }
       } else {
-        totalSkus++; // Tăng đếm cho sản phẩm không có biến thể (1 SKU)
+        totalSkus++;
         const pStock = Number(product.stock) || 0;
         totalItems += pStock;
-        totalValue += pStock * basePrice;
+        totalValue += pStock * productPrice;
 
-        const pMin = product.min_stock ?? 0;
+        const { min: pMin } = resolveThresholds(null, product);
         if (pStock <= pMin) lowStockCount++;
       }
     }
 
-    const turnoverRatio = 4.2;
+    // "$14.2K", "$1.35M" thay vì "$0.01M" khi tổng giá trị nhỏ
+    const formatCompactUsd = (v: number) =>
+      new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        notation: 'compact',
+        maximumFractionDigits: 2,
+      }).format(v);
 
     return [
       {
         title: 'Total Stock Value',
-        value: `$${(totalValue / 1000000).toFixed(2)}M`,
+        value: formatCompactUsd(totalValue),
         subtext: 'Across all warehouses',
         iconType: 'dollar',
       },
@@ -941,13 +836,7 @@ export class DashboardService {
         subtext: 'Requires immediate attention',
         iconType: 'truck',
       },
-      {
-        title: 'Inventory Turnover',
-        value: turnoverRatio.toFixed(1),
-        subtext: 'Target: 5.0',
-        iconType: 'refresh',
-      },
-      // Object ngầm cung cấp dữ liệu tổng SKU cho Frontend tính toán tỷ lệ phần trăm
+      // Object ngầm cung cấp tổng SKU cho Overview tính tỷ lệ phần trăm
       {
         title: 'Total SKUs',
         value: totalSkus.toString(),

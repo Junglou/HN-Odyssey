@@ -3,6 +3,8 @@ import { toast } from "react-toastify";
 import { io, Socket } from "socket.io-client";
 import axiosClient from "../../../../api/axiosClient";
 import tokenStorage from "../../../../utils/tokenStorage";
+import { Action, Resource } from "../../../../types/permissions";
+import type { UserPayload } from "../../../../types/auth";
 
 export type ChatStatus = "Waitlist" | "Ongoing" | "Complete";
 export type MessageType = "text" | "image" | "product" | "file";
@@ -125,6 +127,19 @@ interface ClientToServerEvents {
   }) => void;
 }
 
+const useLocalAuth = () => {
+  const [user] = useState(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) return JSON.parse(stored) as UserPayload;
+    } catch (error) {
+      console.warn("Không thể parse dữ liệu user từ localStorage:", error);
+    }
+    return null;
+  });
+  return { user };
+};
+
 export function useLiveChatSupport() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeTab, setActiveTab] = useState<ChatStatus>("Waitlist");
@@ -136,6 +151,26 @@ export function useLiveChatSupport() {
     Ongoing: 0,
     Complete: 0,
   });
+
+  const { user } = useLocalAuth();
+
+  const hasPermission = useCallback(
+    (resourceCode: Resource, actionCode: Action): boolean => {
+      if (!user || !user.permissions) return false;
+      if (user.roles?.includes("SUPER_ADMIN")) return true;
+      return user.permissions.some(
+        (p) =>
+          p.resource === resourceCode &&
+          (p.actions.includes(actionCode) || p.actions.includes(Action.MANAGE)),
+      );
+    },
+    [user], // Chỉ phụ thuộc vào user
+  );
+
+  const canReadChat = hasPermission(Resource.CRM_CHAT, Action.READ);
+  const canAssignChat = hasPermission(Resource.CRM_CHAT, Action.ASSIGN);
+  const canReplyChat = hasPermission(Resource.CRM_CHAT, Action.REPLY);
+  const canUpdateChat = hasPermission(Resource.CRM_CHAT, Action.UPDATE);
 
   // STATE PHÂN TRANG VÀ TÌM KIẾM SERVER-SIDE
   const [page, setPage] = useState(1);
@@ -633,6 +668,8 @@ export function useLiveChatSupport() {
     selectSession: (sessionId: string) => setActiveSessionId(sessionId),
 
     acceptConsultant: async (sessionId: string) => {
+      if (!canAssignChat)
+        return toast.error("Bạn không có quyền nhận hội thoại.");
       try {
         const user = tokenStorage.getUser() as TokenUser | null;
         const agentId = user?.id || user?._id;
@@ -653,6 +690,8 @@ export function useLiveChatSupport() {
     },
 
     completeConsultant: async (sessionId: string) => {
+      if (!canUpdateChat)
+        return toast.error("Bạn không có quyền kết thúc hội thoại.");
       try {
         await axiosClient.patch(`/support/chats/${sessionId}/close`);
         toast.success("Đã hoàn thành phiên tư vấn.");
@@ -669,6 +708,7 @@ export function useLiveChatSupport() {
       type: "TEXT" | "IMAGE" | "FILE" = "TEXT",
       metadata?: Record<string, unknown>,
     ) => {
+      if (!canReplyChat) return toast.error("Bạn không có quyền gửi tin nhắn.");
       console.log(
         "[sendMessage] sessionId:",
         sessionId,
@@ -717,5 +757,6 @@ export function useLiveChatSupport() {
     tabCounts,
     typingUsers,
     actions,
+    permissions: { canReadChat, canAssignChat, canReplyChat, canUpdateChat },
   };
 }

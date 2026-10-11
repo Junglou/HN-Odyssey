@@ -151,7 +151,7 @@ export class NotificationsService {
       if (auditedTypes.includes(data.type)) {
         await this.auditLogsService.log({
           action: `${data.type}_NOTIFICATION_SENT`,
-          collection_name: Resource.NOTIFICATIONS,
+          collection_name: Resource.SYSTEM_NOTIFICATIONS,
           target_id: log._id,
           // Phân luồng Department chuẩn xác cho từng loại tin
           department:
@@ -258,7 +258,7 @@ export class NotificationsService {
 
       await this.auditLogsService.log({
         action: 'MARK_ALL_NOTIFICATIONS_READ',
-        collection_name: Resource.NOTIFICATIONS,
+        collection_name: Resource.SYSTEM_NOTIFICATIONS,
         actor_id: userId,
         department: Department.MANAGEMENT,
         detail: { count: result.modifiedCount },
@@ -351,7 +351,7 @@ export class NotificationsService {
     if (result.modifiedCount > 0) {
       await this.auditLogsService.log({
         action: 'STOCK_ALERT_RESOLVED',
-        collection_name: Resource.INVENTORY,
+        collection_name: Resource.INVENTORY_STOCK,
         department: Department.WAREHOUSE,
         detail: {
           sku,
@@ -406,7 +406,7 @@ export class NotificationsService {
       // Ghi Audit Log hành động khắc phục tự động
       await this.auditLogsService.log({
         action: 'SYSTEM_INCIDENT_RESOLVED',
-        collection_name: Resource.SYSTEM,
+        collection_name: Resource.SYSTEM_MONITORING,
         department: Department.MANAGEMENT,
         detail: {
           type,
@@ -563,7 +563,7 @@ export class NotificationsService {
     if (data.type === NotificationType.STOCK && logs.length > 0) {
       await this.auditLogsService.log({
         action: 'STOCK_ALERT_SENT',
-        collection_name: Resource.INVENTORY,
+        collection_name: Resource.INVENTORY_STOCK,
         target_id: logs[0]._id,
         department: Department.WAREHOUSE,
         detail: {

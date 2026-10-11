@@ -28,6 +28,10 @@ import { RoleLevel } from 'src/common/enums/role-level.enum';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
 import { BulkChangeStatusDto, BulkDeleteDto } from './dto/bulk-action.dto';
+import {
+  RESERVED_ROLE_SLUGS,
+  isReservedRoleKey,
+} from 'src/common/constants/system-roles.constant';
 
 interface MongoError extends Error {
   code?: number;
@@ -44,6 +48,74 @@ export class AdminService {
     @InjectModel(Role.name) private readonly roleModel: Model<RoleDocument>,
     private readonly eventEmitter: EventEmitter2,
   ) {}
+
+  // ===================== KIỂM SOÁT VAI TRÒ ĐẶC QUYỀN =====================
+  // Vai trò đặc quyền = slug dành riêng (SUPER_ADMIN, ADMIN) + mọi Role có is_system = true.
+  // Chỉ Super Admin mới được GÁN các vai trò này, hoặc SỬA / KHÓA / XÓA tài khoản đang giữ chúng.
+
+  private isSuperAdmin(roles: string[] = []): boolean {
+    return roles.includes(RoleEnum.SUPER_ADMIN);
+  }
+
+  private async getPrivilegedRoleSlugs(): Promise<string[]> {
+    const systemRoles = await this.roleModel
+      .find({ is_system: true })
+      .select('slug')
+      .lean<Array<{ slug: string }>>();
+    return Array.from(
+      new Set([...RESERVED_ROLE_SLUGS, ...systemRoles.map((r) => r.slug)]),
+    );
+  }
+
+  private async isPrivilegedAccount(roles: string[] = []): Promise<boolean> {
+    if (roles.some((r) => isReservedRoleKey(r))) return true;
+    const privilegedSlugs = await this.getPrivilegedRoleSlugs();
+    return roles.some((r) => privilegedSlugs.includes(r));
+  }
+
+  // Vai trò được gán phải tồn tại, đang hoạt động và không vượt quyền người thao tác
+  private async validateAssignableRoles(
+    roleSlugs: string[],
+    currentUserRoles: string[],
+  ): Promise<RoleDocument[]> {
+    const uniqueSlugs = Array.from(new Set(roleSlugs));
+    if (uniqueSlugs.length === 0) {
+      throw new BadRequestException('Phải chọn ít nhất một vai trò.');
+    }
+
+    const roles = await this.roleModel
+      .find({ slug: { $in: uniqueSlugs }, is_active: true })
+      .select('slug level is_system');
+
+    if (roles.length !== uniqueSlugs.length) {
+      throw new BadRequestException(
+        'Một hoặc nhiều vai trò không hợp lệ hoặc đã bị vô hiệu hóa.',
+      );
+    }
+
+    if (!this.isSuperAdmin(currentUserRoles)) {
+      const privileged = roles.filter(
+        (r) => r.is_system || isReservedRoleKey(r.slug),
+      );
+      if (privileged.length > 0) {
+        throw new ForbiddenException(
+          `Chỉ Super Admin mới được gán vai trò hệ thống: ${privileged
+            .map((r) => r.slug)
+            .join(', ')}.`,
+        );
+      }
+    }
+
+    return roles;
+  }
+
+  private hasSameRoles(current: string[] = [], next: string[] = []): boolean {
+    const a = new Set(current);
+    const b = new Set(next);
+    return a.size === b.size && [...a].every((r) => b.has(r));
+  }
+
+  // ===================== HELPER CŨ =====================
 
   private removeVietnameseTones(str: string): string {
     return str
@@ -114,7 +186,6 @@ export class AdminService {
   };
 
   // HELPER: Type-safe diff
-  // [FIX UNSAFE]: Dùng 'unknown' thay vì 'any' để Eslint không báo lỗi gán unsafe
   private getDiff(
     oldData: Record<string, unknown>,
     newData: Record<string, unknown>,
@@ -144,24 +215,12 @@ export class AdminService {
     userAgent: string,
     currentUserRoles: string[],
   ) {
-    if (!currentUserRoles.includes(RoleEnum.SUPER_ADMIN)) {
-      if (dto.roles.includes(RoleEnum.SUPER_ADMIN)) {
-        throw new ForbiddenException(
-          'Không có quyền tạo tài khoản Super Admin.',
-        );
-      }
-    }
-
-    const validRoles = await this.roleModel
-      .find({
-        slug: { $in: dto.roles },
-        is_active: true,
-      })
-      .select('level slug');
-
-    if (validRoles.length !== dto.roles.length) {
-      throw new BadRequestException('Một hoặc nhiều vai trò không hợp lệ.');
-    }
+    // Vai trò phải tồn tại, đang hoạt động; vai trò hệ thống chỉ Super Admin được gán
+    const validRoles = await this.validateAssignableRoles(
+      dto.roles,
+      currentUserRoles,
+    );
+    const roleSlugs = Array.from(new Set(dto.roles));
 
     const existUser = await this.userModel.findOne({ email: dto.email });
     if (existUser) throw new ConflictException('Email đã tồn tại.');
@@ -200,7 +259,7 @@ export class AdminService {
       first_Name: dto.firstName,
       last_Name: dto.lastName,
       password: hashedPassword,
-      roles: dto.roles,
+      roles: roleSlugs,
       type: 'Staff',
       department: dto.department,
       status: UserStatus.ACTIVE,
@@ -267,22 +326,41 @@ export class AdminService {
     const user = await this.staffModel.findById(id);
     if (!user) throw new NotFoundException('Nhân sự không tồn tại.');
 
-    if (dto.roles && !currentUserRoles.includes(RoleEnum.SUPER_ADMIN)) {
-      if (dto.roles.includes(RoleEnum.SUPER_ADMIN)) {
-        throw new ForbiddenException(
-          'Bạn không có quyền chỉ định vai trò Super Admin.',
-        );
-      }
+    const actorIsSuperAdmin = this.isSuperAdmin(currentUserRoles);
+    const isSelf = id === currentUserId.toString();
+
+    // Chỉ Super Admin mới được sửa tài khoản giữ vai trò hệ thống
+    // (chặn việc đổi mật khẩu / email của Super Admin để chiếm tài khoản)
+    if (
+      !actorIsSuperAdmin &&
+      !isSelf &&
+      (await this.isPrivilegedAccount(user.roles))
+    ) {
+      throw new ForbiddenException(
+        'Chỉ Super Admin mới được chỉnh sửa tài khoản quản trị hệ thống.',
+      );
     }
 
-    if (id === currentUserId.toString() && dto.is_active === false) {
+    const rolesChanged =
+      !!dto.roles && !this.hasSameRoles(user.roles, dto.roles);
+
+    if (rolesChanged && dto.roles) {
+      // Không ai được tự thay đổi vai trò của chính mình (chống tự nâng quyền)
+      if (isSelf) {
+        throw new ForbiddenException(
+          'Không thể tự thay đổi vai trò của chính mình.',
+        );
+      }
+      await this.validateAssignableRoles(dto.roles, currentUserRoles);
+    }
+
+    if (isSelf && dto.is_active === false) {
       throw new ForbiddenException('Không thể tự khóa chính mình.');
     }
 
-    // [FIX UNSAFE]: Cast to Record<string, unknown> để tương thích với getDiff mới
     const oldData = user.toObject() as unknown as Record<string, unknown>;
 
-    if (dto.roles) {
+    if (rolesChanged && dto.roles) {
       const currentLevelStr = user.employee_code.split('-')[2];
       const validRoles = await this.roleModel
         .find({ slug: { $in: dto.roles }, is_active: true })
@@ -301,9 +379,12 @@ export class AdminService {
       }
     }
 
+    // Đổi mật khẩu → buộc đăng nhập lại trên mọi thiết bị (JwtStrategy so token_version)
+    let revokeSessions = false;
     if (dto.password) {
       const salt = await bcrypt.genSalt(10);
       user.password = await bcrypt.hash(dto.password, salt);
+      revokeSessions = true;
     }
 
     if (typeof dto.is_active !== 'undefined') {
@@ -320,7 +401,12 @@ export class AdminService {
     if (dto.firstName) user.first_Name = dto.firstName;
     if (dto.lastName) user.last_Name = dto.lastName;
     if (dto.department) user.department = dto.department;
-    if (dto.roles) user.roles = dto.roles;
+    if (rolesChanged && dto.roles) user.roles = Array.from(new Set(dto.roles));
+
+    if (revokeSessions) {
+      const currentVersion = Number(user.get('token_version') ?? 0);
+      user.set('token_version', currentVersion + 1);
+    }
 
     try {
       await user.save();
@@ -331,19 +417,19 @@ export class AdminService {
       throw new InternalServerErrorException(error);
     }
 
-    // [FIX UNSAFE]: Cast dto to Record<string, unknown>
-    // Hàm getDiff đã trả về Record<string, any> nên biến diff không bị unsafe assignment
     const diff = this.getDiff(
       oldData,
       dto as unknown as Record<string, unknown>,
     );
 
-    // oldData giờ là unknown, nên khi so sánh cần ép kiểu hoặc check
     if ((oldData.employee_code as string) !== user.employee_code) {
       diff['employee_code'] = {
         old: oldData.employee_code,
         new: user.employee_code,
       };
+    }
+    if (dto.password) {
+      diff['password'] = { changed: true }; // Ghi vết có đổi mật khẩu, không lưu giá trị
     }
 
     await this.auditLogsService.log({
@@ -357,7 +443,7 @@ export class AdminService {
       user_agent: userAgent,
     });
 
-    if (diff['roles']) {
+    if (rolesChanged) {
       this.eventEmitter.emit(NOTIFY_EVENTS.SECURITY_ALERT, {
         severity: 'HIGH',
         message: `Hoạt động phân quyền: Tài khoản ${user.email} vừa được thay đổi quyền hạn thành [${user.roles.join(', ')}] bởi Admin ID: ${currentUserId}.`,
@@ -373,11 +459,21 @@ export class AdminService {
   async softDeleteStaff(
     id: string,
     currentUserId: string,
+    currentUserRoles: string[],
     ip: string,
     userAgent: string,
   ) {
     const user = await this.userModel.findById(id);
     if (!user) throw new NotFoundException('Nhân sự không tồn tại.');
+
+    if (
+      !this.isSuperAdmin(currentUserRoles) &&
+      (await this.isPrivilegedAccount(user.roles))
+    ) {
+      throw new ForbiddenException(
+        'Bạn không có quyền vô hiệu hóa tài khoản quản trị hệ thống.',
+      );
+    }
 
     if (id === currentUserId.toString()) {
       throw new ForbiddenException(
@@ -493,11 +589,11 @@ export class AdminService {
       if (isActiveBool) {
         filter.status = UserStatus.ACTIVE;
       } else {
-        // [FIXED] Chỉ lấy những tài khoản bị KHÓA, tuyệt đối KHÔNG lấy tài khoản đã XÓA
+        // Chỉ lấy những tài khoản bị KHÓA, tuyệt đối KHÔNG lấy tài khoản đã XÓA
         filter.status = UserStatus.SUSPENDED;
       }
     } else {
-      // [FIXED] BẮT BUỘC: Mặc định luôn ẩn các tài khoản đã bị xóa (Terminated)
+      // Mặc định luôn ẩn các tài khoản đã bị xóa (Terminated)
       filter.status = { $ne: UserStatus.TERMINATED };
     }
 
@@ -541,11 +637,21 @@ export class AdminService {
     id: string,
     dto: ChangeStatusDto,
     actorId: string,
+    currentUserRoles: string[],
     ip: string,
     userAgent: string,
   ) {
     const user = await this.userModel.findById(id);
     if (!user) throw new NotFoundException('Nhân sự không tồn tại.');
+
+    if (
+      !this.isSuperAdmin(currentUserRoles) &&
+      (await this.isPrivilegedAccount(user.roles))
+    ) {
+      throw new ForbiddenException(
+        'Bạn không có quyền thay đổi trạng thái của tài khoản quản trị hệ thống.',
+      );
+    }
 
     if (id === actorId.toString())
       throw new ForbiddenException(
@@ -582,10 +688,30 @@ export class AdminService {
     return { message: 'Cập nhật trạng thái thành công.' };
   }
 
+  // Danh sách thao tác hàng loạt có chứa tài khoản đặc quyền → chỉ Super Admin
+  private async assertNoPrivilegedTargets(
+    targetIds: string[],
+    currentUserRoles: string[],
+  ): Promise<void> {
+    if (this.isSuperAdmin(currentUserRoles)) return;
+
+    const privilegedSlugs = await this.getPrivilegedRoleSlugs();
+    const privilegedTargets = await this.userModel.countDocuments({
+      _id: { $in: targetIds },
+      roles: { $in: privilegedSlugs },
+    });
+    if (privilegedTargets > 0) {
+      throw new ForbiddenException(
+        'Trong danh sách chọn có tài khoản quản trị hệ thống. Bạn không có quyền thao tác!',
+      );
+    }
+  }
+
   // 6. CẬP NHẬT TRẠNG THÁI HÀNG LOẠT
   async bulkChangeStatus(
     dto: BulkChangeStatusDto,
     adminId: string,
+    currentUserRoles: string[],
     ip: string,
     userAgent: string,
   ) {
@@ -599,9 +725,10 @@ export class AdminService {
       }
     }
 
+    await this.assertNoPrivilegedTargets(targetIds, currentUserRoles);
+
     const newStatus = dto.is_active ? UserStatus.ACTIVE : UserStatus.SUSPENDED;
 
-    // Định nghĩa rõ type thay vì dùng 'any' để Eslint hết báo lỗi unsafe
     const updateData: {
       $set: { status: UserStatus };
       $inc?: { token_version: number };
@@ -615,11 +742,10 @@ export class AdminService {
     }
 
     const result = await this.staffModel.updateMany(
-      { _id: { $in: targetIds } }, // Chỉ update những ID đã được lọc
+      { _id: { $in: targetIds } },
       updateData,
     );
 
-    // 2. Ghi Audit Log chuẩn theo DTO của hệ thống
     await this.auditLogsService.log({
       action: 'BULK_CHANGE_STAFF_STATUS',
       collection_name: 'users',
@@ -643,17 +769,19 @@ export class AdminService {
   async bulkSoftDelete(
     dto: BulkDeleteDto,
     adminId: string,
+    currentUserRoles: string[],
     ip: string,
     userAgent: string,
   ) {
     const targetIds = dto.userIds.filter((id) => id !== adminId.toString());
 
-    // THÊM ĐOẠN NÀY ĐỂ CHẶN ADMIN TỰ SÁT:
     if (targetIds.length === 0) {
       throw new ForbiddenException(
         'Bạn không thể tự xóa tài khoản của chính mình.',
       );
     }
+
+    await this.assertNoPrivilegedTargets(targetIds, currentUserRoles);
 
     // Xóa mềm: Đổi status thành TERMINATED và force logout
     const result = await this.staffModel.updateMany(
@@ -664,7 +792,6 @@ export class AdminService {
       },
     );
 
-    // Ghi Audit Log chuẩn
     await this.auditLogsService.log({
       action: 'BULK_DELETE_STAFF',
       collection_name: 'users',

@@ -183,7 +183,7 @@ export class ContentService {
 
     await this.auditLogsService.log({
       action: 'CREATE',
-      collection_name: Resource.BLOG,
+      collection_name: Resource.CONTENT_POSTS,
       actor_id: userId,
       actor_email: email,
       target_id: savedPost._id,
@@ -254,7 +254,7 @@ export class ContentService {
 
     await this.auditLogsService.log({
       action: 'DELETE',
-      collection_name: Resource.BLOG,
+      collection_name: Resource.CONTENT_POSTS,
       actor_id: userId,
       actor_email: email,
       target_id: post._id,
@@ -314,7 +314,7 @@ export class ContentService {
 
     await this.auditLogsService.log({
       action: 'CREATE',
-      collection_name: Resource.BLOG,
+      collection_name: Resource.CONTENT_PAGES,
       actor_id: userId,
       actor_email: email,
       target_id: savedPage._id, // FIX: Bỏ ép kiểu
@@ -343,7 +343,7 @@ export class ContentService {
 
     await this.auditLogsService.log({
       action: 'DELETE',
-      collection_name: Resource.BLOG,
+      collection_name: Resource.CONTENT_PAGES,
       actor_id: userId,
       actor_email: email,
       target_id: page._id,
@@ -378,7 +378,7 @@ export class ContentService {
     // BỔ SUNG AUDIT LOG
     await this.auditLogsService.log({
       action: 'CREATE',
-      collection_name: 'banners',
+      collection_name: Resource.CONTENT_BANNERS,
       actor_id: userId,
       actor_email: email,
       target_id: savedBanner._id,
@@ -403,7 +403,7 @@ export class ContentService {
     // BỔ SUNG AUDIT LOG (AC6)
     await this.auditLogsService.log({
       action: 'DELETE',
-      collection_name: 'banners',
+      collection_name: Resource.CONTENT_BANNERS,
       actor_id: userId,
       actor_email: email,
       target_id: banner._id,
@@ -592,7 +592,7 @@ export class ContentService {
 
     await this.auditLogsService.log({
       action: 'UPDATE',
-      collection_name: Resource.BLOG,
+      collection_name: Resource.CONTENT_POSTS,
       actor_id: userId,
       actor_email: email,
       target_id: updatedPost._id,
@@ -627,7 +627,7 @@ export class ContentService {
 
     await this.auditLogsService.log({
       action: 'UPDATE',
-      collection_name: Resource.BLOG,
+      collection_name: Resource.CONTENT_PAGES,
       actor_id: userId,
       actor_email: email,
       target_id: updatedPage._id,
@@ -667,7 +667,7 @@ export class ContentService {
 
     await this.auditLogsService.log({
       action: 'CREATE',
-      collection_name: Resource.SYSTEM, // Menu thuộc cấu hình giao diện
+      collection_name: Resource.CONTENT_CONFIG, // Menu thuộc cấu hình giao diện
       actor_id: userId,
       actor_email: email,
       target_id: savedMenu._id,
@@ -778,7 +778,7 @@ export class ContentService {
     // Lưu Audit Log 1 lần cho cả cụm
     await this.auditLogsService.log({
       action: 'UPDATE',
-      collection_name: 'banners',
+      collection_name: Resource.CONTENT_BANNERS,
       actor_id: userId,
       actor_email: email,
       target_id: 'BULK_UPDATE',
@@ -811,7 +811,7 @@ export class ContentService {
 
     await this.auditLogsService.log({
       action: 'UPDATE',
-      collection_name: Resource.BLOG,
+      collection_name: Resource.CONTENT_POSTS,
       actor_id: userId,
       actor_email: email,
       target_id: 'BULK_UPDATE_POSTS',
@@ -843,7 +843,7 @@ export class ContentService {
 
     await this.auditLogsService.log({
       action: 'DELETE',
-      collection_name: Resource.BLOG,
+      collection_name: Resource.CONTENT_POSTS,
       actor_id: userId,
       actor_email: email,
       target_id: 'BULK_DELETE_POSTS',
@@ -883,7 +883,7 @@ export class ContentService {
     // Ghi Audit Log cho hệ thống
     await this.auditLogsService.log({
       action: 'UPDATE',
-      collection_name: Resource.SYSTEM,
+      collection_name: Resource.CONTENT_CONFIG,
       actor_id: userId,
       actor_email: email,
       target_id: updatedConfig._id,

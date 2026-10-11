@@ -1,62 +1,78 @@
 export enum Resource {
-  // 1. NHÓM QUẢN TRỊ & HỆ THỐNG (System)
-  SYSTEM = 'SYSTEM', // Cấu hình chung, Slider, Banner trang chủ
-  USERS = 'USERS', // Quản lý nhân viên
-  ROLES = 'ROLES', // Quản lý vai trò & phân quyền
-  AUDIT_LOGS = 'AUDIT_LOGS', // Xem nhật ký hoạt động
-
-  // 2. NHÓM KHÁCH HÀNG (Customers)
-  CUSTOMERS = 'CUSTOMERS', // Danh sách khách hàng
-  LOYALTY = 'LOYALTY', // Điểm thưởng, Hạng thành viên (US.35, 36)
-
-  // 3. NHÓM SẢN PHẨM (Catalog)
-  PRODUCTS = 'PRODUCTS', // Sản phẩm, Biến thể
-  CATEGORIES = 'CATEGORIES', // Danh mục
-  ATTRIBUTES = 'ATTRIBUTES', // Thuộc tính, Tag
-  REVIEWS = 'REVIEWS', // Đánh giá & Bình luận (US.34, 120)
-
-  // 4. NHÓM BÁN HÀNG (Sales)
-  ORDERS = 'ORDERS', // Đơn hàng (US.121-124)
-  RETURNS = 'RETURNS', // Yêu cầu trả hàng/hoàn tiền
-  TRADE_IN = 'TRADE_IN', // Thu cũ đổi mới (US.37)
-
-  // 5. NHÓM KHO VẬN (Inventory)
-  INVENTORY = 'INVENTORY', // Tồn kho, Cảnh báo (US.100-105)
-  TRANSFERS = 'TRANSFERS', // Nhập/Xuất kho (US.106-109)
-  SUPPLIERS = 'SUPPLIERS', // Nhà cung cấp
-
-  // 6. NHÓM MARKETING & NỘI DUNG
-  PROMOTIONS = 'PROMOTIONS', // Coupon, Flash Sale (US.81-83)
-  BLOG = 'BLOG', // Bài viết tin tức, Trang tĩnh (US.34)
-  NOTIFICATIONS = 'NOTIFICATIONS', // Gửi thông báo Push/Email (US.18)
-
-  // 7. NHÓM DỊCH VỤ & BÁO CÁO
-  SUPPORT = 'SUPPORT', // Chat hỗ trợ (US.40)
-  WARRANTY = 'WARRANTY', // Bảo hành điện tử (US.39)
-  REPORTS = 'REPORTS', // Báo cáo doanh thu/kho (US.93-99)
-
-  //Các nhóm khác
-  SHIPPING = 'SHIPPING',
-  PAYMENT = 'PAYMENT',
+  // 1. NHÓM TỔNG QUAN & BÁO CÁO
   DASHBOARD = 'DASHBOARD',
+  REPORT_REVENUE = 'REPORT_REVENUE',
+  REPORT_INVENTORY = 'REPORT_INVENTORY',
+  REPORT_MARKETING = 'REPORT_MARKETING',
+  REPORT_STOCK = 'REPORT_STOCK', // <-- FIX: Thêm mã quyền mới cho Báo Cáo Kho
+
+  // 2. NHÓM SẢN PHẨM & DANH MỤC
+  CATALOG_PRODUCTS = 'CATALOG_PRODUCTS',
+  CATALOG_CATEGORIES = 'CATALOG_CATEGORIES',
+  CATALOG_ATTRIBUTES = 'CATALOG_ATTRIBUTES',
+  CATALOG_TAGS = 'CATALOG_TAGS',
+  CATALOG_PRICING = 'CATALOG_PRICING',
+
+  // 3. NHÓM BÁN HÀNG & ĐƠN HÀNG
+  SALES_ORDERS = 'SALES_ORDERS',
+  SALES_TRADE_IN = 'SALES_TRADE_IN',
+
+  // 4. NHÓM KHO VẬN (WMS)
+  INVENTORY_STOCK = 'INVENTORY_STOCK',
+  INVENTORY_TRANSFERS = 'INVENTORY_TRANSFERS',
+
+  // 5. NHÓM MARKETING & KHUYẾN MÃI
+  PROMO_COUPONS = 'PROMO_COUPONS',
+  PROMO_FLASH_SALES = 'PROMO_FLASH_SALES',
+  PROMO_COMBOS = 'PROMO_COMBOS',
+
+  // 6. NHÓM NỘI DUNG & TRUYỀN THÔNG (COMMUNICATION)
+  CONTENT_POSTS = 'CONTENT_POSTS',
+  CONTENT_PAGES = 'CONTENT_PAGES',
+  CONTENT_BANNERS = 'CONTENT_BANNERS',
+  CONTENT_MEDIA = 'CONTENT_MEDIA',
+  CONTENT_CONFIG = 'CONTENT_CONFIG',
+
+  // 7. NHÓM CHĂM SÓC KHÁCH HÀNG (CRM)
+  CRM_CUSTOMERS = 'CRM_CUSTOMERS',
+  CRM_CHAT = 'CRM_CHAT',
+  CRM_REVIEWS = 'CRM_REVIEWS',
+  CRM_WARRANTY = 'CRM_WARRANTY',
+
+  // 8. NHÓM HỆ THỐNG
+  SYSTEM_USERS = 'SYSTEM_USERS',
+  SYSTEM_ROLES = 'SYSTEM_ROLES',
+  SYSTEM_AUDIT = 'SYSTEM_AUDIT',
+  SYSTEM_MONITORING = 'SYSTEM_MONITORING',
+  SYSTEM_NOTIFICATIONS = 'SYSTEM_NOTIFICATIONS',
 }
 
 export enum Action {
-  // Basic CRUD
+  // --- Basic CRUD ---
   READ = 'READ',
   CREATE = 'CREATE',
   UPDATE = 'UPDATE',
   DELETE = 'DELETE',
 
-  // Advanced Actions
-  IMPORT = 'IMPORT', // Nhập Excel
-  EXPORT = 'EXPORT', // Xuất báo cáo
-  APPROVE = 'APPROVE', // Duyệt (Đơn hàng, Trả hàng, Bài viết)
-  REJECT = 'REJECT', // Từ chối
-  CANCEL = 'CANCEL', // Hủy đơn
-  PUBLISH = 'PUBLISH', // Xuất bản (Bài viết, Khuyến mãi)
-  RESTORE = 'RESTORE', // Khôi phục dữ liệu đã xóa
+  // --- Workflow & Approval (Quy trình Duyệt) ---
+  SUBMIT_APPROVAL = 'SUBMIT_APPROVAL',
+  APPROVE = 'APPROVE',
+  REJECT = 'REJECT',
+  PUBLISH = 'PUBLISH',
+  UNPUBLISH = 'UNPUBLISH',
 
-  // Super Action
-  MANAGE = 'MANAGE', // Full quyền
+  // --- Data & Document ---
+  IMPORT = 'IMPORT',
+  EXPORT = 'EXPORT',
+  PRINT = 'PRINT',
+
+  // --- Specific Actions (Hành động đặc thù) ---
+  CANCEL = 'CANCEL',
+  REFUND = 'REFUND',
+  REPLY = 'REPLY',
+  ASSIGN = 'ASSIGN',
+  RECEIVE = 'RECEIVE',
+
+  // --- Super Action ---
+  MANAGE = 'MANAGE',
 }

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
+import type { UserPayload } from "../../../../types/auth";
+import { Action, Resource } from "../../../../types/permissions";
 
 // interfaces and types
 export type BlogNewsStatus = "Published" | "Draft" | "Hidden";
@@ -217,6 +219,19 @@ const flattenCategories = (
   return flatList;
 };
 
+const useLocalAuth = () => {
+  const [user] = useState(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) return JSON.parse(stored) as UserPayload;
+    } catch (error) {
+      console.warn("Không thể parse dữ liệu user từ localStorage:", error);
+    }
+    return null;
+  });
+  return { user };
+};
+
 // main hook
 export function useBlogNewsManagement() {
   const [records, setRecords] = useState<BlogNewsRecord[]>([]);
@@ -255,6 +270,26 @@ export function useBlogNewsManagement() {
     isOpen: false,
     isBulk: false,
   });
+
+  const { user } = useLocalAuth();
+
+  const hasPermission = useCallback(
+    (resourceCode: Resource, actionCode: Action): boolean => {
+      if (!user || !user.permissions) return false;
+      if (user.roles?.includes("SUPER_ADMIN")) return true;
+      return user.permissions.some(
+        (p) =>
+          p.resource === resourceCode &&
+          (p.actions.includes(actionCode) || p.actions.includes(Action.MANAGE)),
+      );
+    },
+    [user],
+  );
+
+  const canCreate = hasPermission(Resource.CONTENT_POSTS, Action.CREATE);
+  const canUpdate = hasPermission(Resource.CONTENT_POSTS, Action.UPDATE);
+  const canDelete = hasPermission(Resource.CONTENT_POSTS, Action.DELETE);
+  const canPublish = hasPermission(Resource.CONTENT_POSTS, Action.UPDATE);
 
   const fetchPosts = useCallback(async () => {
     try {
@@ -342,16 +377,20 @@ export function useBlogNewsManagement() {
     else setSelectedIds(new Set());
   };
 
-  const openAddDrawer = () =>
+  const openAddDrawer = () => {
+    if (!canCreate) return toast.error("Bạn không có quyền tạo Bài viết mới.");
     setDrawerConfig({
       isOpen: true,
       mode: "add",
       editingRecord: null,
       isSubmitting: false,
     });
+  };
 
   // gọi api lấy chi tiết bài viết để lấy đầy đủ trường content phục vụ việc edit
   const openEditDrawer = async (record: BlogNewsRecord) => {
+    if (!canUpdate)
+      return toast.error("Bạn không có quyền chỉnh sửa Bài viết.");
     try {
       const res = await axiosClient.get(
         `/marketing/content/posts/${record.id}/detail`,
@@ -446,6 +485,7 @@ export function useBlogNewsManagement() {
   };
 
   const openDeleteModal = (id?: string) => {
+    if (!canDelete) return toast.error("Bạn không có quyền xóa Bài viết.");
     if (id) setDeleteModalConfig({ isOpen: true, targetId: id, isBulk: false });
     else if (selectedIds.size > 0)
       setDeleteModalConfig({ isOpen: true, isBulk: true });
@@ -480,6 +520,8 @@ export function useBlogNewsManagement() {
   const executeBulkStatusChange = async (
     targetStatus: "PUBLISHED" | "HIDDEN",
   ) => {
+    if (!canPublish)
+      return toast.error("Bạn không có quyền thay đổi trạng thái Bài viết.");
     try {
       await axiosClient.patch("/marketing/content/posts/bulk/status", {
         ids: Array.from(selectedIds),
@@ -526,5 +568,6 @@ export function useBlogNewsManagement() {
       handleConfirmDelete,
     },
     bulkActions: { bulkPublish, bulkHide, bulkDelete },
+    permissions: { canCreate, canUpdate, canDelete, canPublish },
   };
 }

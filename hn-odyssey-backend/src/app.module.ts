@@ -34,6 +34,7 @@ import { RecommendationsModule } from './modules/recommendations/recommendations
 import { SystemModule } from './modules/system/system.module';
 import { TradeInModule } from './modules/trade-in/trade-in.module';
 import { SupportModule } from './modules/support/support.module';
+import { BullModule } from '@nestjs/bull/dist/bull.module';
 
 @Module({
   imports: [
@@ -60,6 +61,14 @@ import { SupportModule } from './modules/support/support.module';
 
     ConfigModule.forRoot({
       isGlobal: true,
+    }),
+
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        url: config.get<string>('REDIS_URL') || 'redis://localhost:6379',
+      }),
     }),
 
     ScheduleModule.forRoot(),

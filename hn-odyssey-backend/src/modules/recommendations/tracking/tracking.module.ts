@@ -29,6 +29,12 @@ import { LoyaltyFraudListener } from './listeners/loyalty-fraud.listener';
 import { NotificationsModule } from 'src/modules/notifications/notifications.module';
 import { UsersModule } from 'src/modules/users/users.module';
 import { TrackingSeederService } from './tracking-seeder.service';
+import { AuditLogsModule } from 'src/modules/system/audit-logs/audit-logs.module';
+import {
+  AdSpendEntry,
+  AdSpendEntrySchema,
+} from 'src/modules/marketing/campaigns/schemas/ad-spend-entry.schema';
+import { MigrateAdSpendCommand } from './migrate-ad-spend.command';
 
 @Module({
   imports: [
@@ -36,6 +42,7 @@ import { TrackingSeederService } from './tracking-seeder.service';
       { name: UserBehavior.name, schema: UserBehaviorSchema },
       { name: Cart.name, schema: CartSchema },
       { name: AdCampaign.name, schema: AdCampaignSchema },
+      { name: AdSpendEntry.name, schema: AdSpendEntrySchema },
       { name: Order.name, schema: OrderSchema },
       { name: Coupon.name, schema: CouponSchema },
       { name: LoyaltyHistory.name, schema: LoyaltyHistorySchema },
@@ -43,9 +50,15 @@ import { TrackingSeederService } from './tracking-seeder.service';
     ScheduleModule.forRoot(),
     forwardRef(() => UsersModule),
     NotificationsModule,
+    AuditLogsModule,
   ],
   controllers: [TrackingController],
-  providers: [TrackingService, LoyaltyFraudListener, TrackingSeederService],
+  providers: [
+    TrackingService,
+    LoyaltyFraudListener,
+    TrackingSeederService,
+    MigrateAdSpendCommand,
+  ],
   exports: [TrackingService],
 })
 export class TrackingModule {}

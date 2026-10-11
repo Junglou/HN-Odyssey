@@ -39,7 +39,7 @@ export class PromotionsController {
 
   // API FLASH SALE
   @Post('flash-sales')
-  @RequirePermissions(Resource.PROMOTIONS, Action.CREATE)
+  @RequirePermissions(Resource.PROMO_FLASH_SALES, Action.CREATE)
   async createFlashSale(
     @Body() dto: CreateFlashSaleDto,
     @Req() req: RequestWithUser,
@@ -56,14 +56,14 @@ export class PromotionsController {
   }
 
   @Get('flash-sales')
-  @RequirePermissions(Resource.PROMOTIONS, Action.READ)
+  @RequirePermissions(Resource.PROMO_FLASH_SALES, Action.READ)
   async getAllFlashSales(@Query() query: QueryFlashSaleDto) {
     const data = await this.flashSalesService.findAll(query);
     return new BaseResponse(true, 'Lấy danh sách Flash Sale thành công', data);
   }
 
   @Patch('flash-sales/:id')
-  @RequirePermissions(Resource.PROMOTIONS, Action.UPDATE)
+  @RequirePermissions(Resource.PROMO_FLASH_SALES, Action.UPDATE)
   async updateFlashSale(
     @Param('id') id: string,
     @Body() dto: Partial<CreateFlashSaleDto>,
@@ -86,7 +86,7 @@ export class PromotionsController {
   }
 
   @Delete('flash-sales/:id')
-  @RequirePermissions(Resource.PROMOTIONS, Action.DELETE)
+  @RequirePermissions(Resource.PROMO_FLASH_SALES, Action.DELETE)
   async hardDeleteFlashSale(
     @Param('id') id: string,
     @Req() req: RequestWithUser,
@@ -101,7 +101,7 @@ export class PromotionsController {
   // API MÃ GIẢM GIÁ (COUPONS)
 
   @Post('coupons')
-  @RequirePermissions(Resource.PROMOTIONS, Action.CREATE)
+  @RequirePermissions(Resource.PROMO_COUPONS, Action.CREATE)
   async createCoupon(
     @Body() dto: CreateCouponDto,
     @Req() req: RequestWithUser,
@@ -111,7 +111,7 @@ export class PromotionsController {
   }
 
   @Get('coupons')
-  @RequirePermissions(Resource.PROMOTIONS, Action.READ)
+  @RequirePermissions(Resource.PROMO_COUPONS, Action.READ)
   async getAllCoupons(@Query() query: QueryCouponDto) {
     const data = await this.couponsService.findAll(query);
     return new BaseResponse(true, 'Lấy danh sách mã giảm giá thành công', data);
@@ -125,7 +125,7 @@ export class PromotionsController {
   }
 
   @Get('coupons/:id')
-  @RequirePermissions(Resource.PROMOTIONS, Action.READ)
+  @RequirePermissions(Resource.PROMO_COUPONS, Action.READ)
   async getCouponDetail(@Param('id') id: string) {
     const data = await this.couponsService.findOne(id);
     return new BaseResponse(true, 'Lấy thông tin mã giảm giá thành công', data);
@@ -152,7 +152,7 @@ export class PromotionsController {
   }
 
   @Patch('coupons/:id')
-  @RequirePermissions(Resource.PROMOTIONS, Action.UPDATE)
+  @RequirePermissions(Resource.PROMO_COUPONS, Action.UPDATE)
   async updateCoupon(
     @Param('id') id: string,
     @Body() dto: UpdateCouponDto,
@@ -163,7 +163,7 @@ export class PromotionsController {
   }
 
   @Delete('coupons/:id')
-  @RequirePermissions(Resource.PROMOTIONS, Action.DELETE)
+  @RequirePermissions(Resource.PROMO_COUPONS, Action.DELETE)
   async deleteCoupon(@Param('id') id: string, @Req() req: RequestWithUser) {
     const result = await this.couponsService.softDeleteCoupon(
       id,
@@ -174,7 +174,7 @@ export class PromotionsController {
 
   // TẠO COMBO
   @Post('combos')
-  @RequirePermissions(Resource.PROMOTIONS, Action.CREATE)
+  @RequirePermissions(Resource.PROMO_COMBOS, Action.CREATE)
   async createCombo(@Body() dto: CreateComboDto) {
     const data = await this.promotionService.createCombo(dto);
     return new BaseResponse(true, 'Tạo Combo/Discount thành công', data);
@@ -182,7 +182,7 @@ export class PromotionsController {
 
   // LẤY DANH SÁCH
   @Get('combos')
-  @RequirePermissions(Resource.PROMOTIONS, Action.READ)
+  @RequirePermissions(Resource.PROMO_COMBOS, Action.READ)
   async getAllCombos() {
     const data = await this.promotionService.findAllCombos();
     return new BaseResponse(
@@ -194,7 +194,7 @@ export class PromotionsController {
 
   // CẬP NHẬT COMBO
   @Patch('combos/:id')
-  @RequirePermissions(Resource.PROMOTIONS, Action.UPDATE)
+  @RequirePermissions(Resource.PROMO_COMBOS, Action.UPDATE)
   async updateCombo(
     @Param('id') id: string,
     @Body() dto: Partial<CreateComboDto>,
@@ -205,69 +205,111 @@ export class PromotionsController {
 
   // XÓA COMBO
   @Delete('combos/:id')
-  @RequirePermissions(Resource.PROMOTIONS, Action.DELETE)
+  @RequirePermissions(Resource.PROMO_COMBOS, Action.DELETE)
   async deleteCombo(@Param('id') id: string) {
     const result = await this.promotionService.deleteCombo(id);
     return new BaseResponse(true, result.message);
   }
 
-  // API BULK ACTION CHUNG
-  @Patch('bulk/status')
-  @RequirePermissions(Resource.PROMOTIONS, Action.UPDATE)
-  async bulkUpdateStatus(
-    @Body()
-    body: {
-      flashSaleIds?: string[];
-      comboIds?: string[];
-      couponIds?: string[]; // Thêm line này
-      action: 'ACTIVATE' | 'DEACTIVATE';
-    },
+  // ------------------------------------
+  // BULK ACTIONS - FLASH SALES
+  // ------------------------------------
+  @Patch('flash-sales/bulk/status')
+  @RequirePermissions(Resource.PROMO_FLASH_SALES, Action.PUBLISH)
+  async bulkUpdateFlashSaleStatus(
+    @Body() body: { ids: string[]; action: 'ACTIVATE' | 'DEACTIVATE' },
     @Req() req: RequestWithUser,
   ) {
-    if (body.flashSaleIds && body.flashSaleIds.length > 0) {
+    if (body.ids && body.ids.length > 0) {
       await this.flashSalesService.bulkUpdateStatus(
-        body.flashSaleIds,
+        body.ids,
         body.action,
         req.user?._id,
       );
     }
-    if (body.comboIds && body.comboIds.length > 0) {
-      await this.promotionService.bulkUpdateStatus(
-        body.comboIds,
-        body.action,
-        req.user?._id,
-      );
-    }
-    if (body.couponIds && body.couponIds.length > 0) {
-      await this.couponsService.bulkUpdateStatus(
-        body.couponIds,
-        body.action,
-        req.user?._id,
-      );
-    }
-    return new BaseResponse(true, 'Cập nhật trạng thái hàng loạt thành công');
+    return new BaseResponse(
+      true,
+      'Cập nhật trạng thái Flash Sales hàng loạt thành công',
+    );
   }
 
-  @Post('bulk/delete')
-  @RequirePermissions(Resource.PROMOTIONS, Action.DELETE)
-  async bulkDelete(
-    @Body()
-    body: {
-      flashSaleIds?: string[];
-      comboIds?: string[];
-      couponIds?: string[];
-    },
+  @Post('flash-sales/bulk/delete')
+  @RequirePermissions(Resource.PROMO_FLASH_SALES, Action.DELETE)
+  async bulkDeleteFlashSales(
+    @Body() body: { ids: string[] },
     @Req() req: RequestWithUser,
   ) {
-    if (body.flashSaleIds && body.flashSaleIds.length > 0) {
-      await this.flashSalesService.bulkDelete(body.flashSaleIds, req.user?._id);
+    if (body.ids && body.ids.length > 0) {
+      await this.flashSalesService.bulkDelete(body.ids, req.user?._id);
     }
-    if (body.comboIds && body.comboIds.length > 0) {
-      await this.promotionService.bulkDelete(body.comboIds, req.user?._id);
+    return new BaseResponse(true, 'Xóa Flash Sales hàng loạt thành công');
+  }
+
+  // ------------------------------------
+  // BULK ACTIONS - COMBOS
+  // ------------------------------------
+  @Patch('combos/bulk/status')
+  @RequirePermissions(Resource.PROMO_COMBOS, Action.PUBLISH)
+  async bulkUpdateComboStatus(
+    @Body() body: { ids: string[]; action: 'ACTIVATE' | 'DEACTIVATE' },
+    @Req() req: RequestWithUser,
+  ) {
+    if (body.ids && body.ids.length > 0) {
+      await this.promotionService.bulkUpdateStatus(
+        body.ids,
+        body.action,
+        req.user?._id,
+      );
     }
-    if (body.couponIds && body.couponIds.length > 0) {
-      await this.couponsService.bulkDelete(body.couponIds, req.user?._id);
+    return new BaseResponse(
+      true,
+      'Cập nhật trạng thái Combos hàng loạt thành công',
+    );
+  }
+
+  @Post('combos/bulk/delete')
+  @RequirePermissions(Resource.PROMO_COMBOS, Action.DELETE)
+  async bulkDeleteCombos(
+    @Body() body: { ids: string[] },
+    @Req() req: RequestWithUser,
+  ) {
+    if (body.ids && body.ids.length > 0) {
+      await this.promotionService.bulkDelete(body.ids, req.user?._id);
     }
-    return new BaseResponse(true, 'Xóa hàng loạt thành công');
+    return new BaseResponse(true, 'Xóa Combos hàng loạt thành công');
+  }
+
+  // ------------------------------------
+  // BULK ACTIONS - COUPONS
+  // ------------------------------------
+  @Patch('coupons/bulk/status')
+  @RequirePermissions(Resource.PROMO_COUPONS, Action.PUBLISH)
+  async bulkUpdateCouponStatus(
+    @Body() body: { ids: string[]; action: 'ACTIVATE' | 'DEACTIVATE' },
+    @Req() req: RequestWithUser,
+  ) {
+    if (body.ids && body.ids.length > 0) {
+      await this.couponsService.bulkUpdateStatus(
+        body.ids,
+        body.action,
+        req.user?._id,
+      );
+    }
+    return new BaseResponse(
+      true,
+      'Cập nhật trạng thái Coupons hàng loạt thành công',
+    );
+  }
+
+  @Post('coupons/bulk/delete')
+  @RequirePermissions(Resource.PROMO_COUPONS, Action.DELETE)
+  async bulkDeleteCoupons(
+    @Body() body: { ids: string[] },
+    @Req() req: RequestWithUser,
+  ) {
+    if (body.ids && body.ids.length > 0) {
+      await this.couponsService.bulkDelete(body.ids, req.user?._id);
+    }
+    return new BaseResponse(true, 'Xóa Coupons hàng loạt thành công');
   }
 }

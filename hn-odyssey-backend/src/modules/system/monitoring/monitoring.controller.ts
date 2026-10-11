@@ -35,7 +35,7 @@ export class MonitoringController {
   // US2 - Hiệu năng Server
   @Get('performance-stats')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @RequirePermissions(Resource.SYSTEM, Action.READ)
+  @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
   async getPerformanceStats(
     @Query('timeframe') timeframe?: string,
     @Query('node') node?: string,
@@ -50,7 +50,7 @@ export class MonitoringController {
   // US5 - Trạng thái API đối tác
   @Get('third-party-status')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @RequirePermissions(Resource.SYSTEM, Action.READ)
+  @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
   async getThirdPartyStatus(@Query('timeframe') timeframe?: string) {
     const data = await this.monitoringService.getThirdPartyStatus(timeframe);
     return new BaseResponse(true, 'Lấy trạng thái đối tác thành công', data);
@@ -59,7 +59,7 @@ export class MonitoringController {
   // US1 - AC2: Đèn trạng thái tổng quan
   @Get('status-widget')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @RequirePermissions(Resource.SYSTEM, Action.READ)
+  @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
   async getSystemStatusWidget(
     @Query('timeframe') timeframe?: string,
     @Query('node') node?: string,
@@ -74,7 +74,7 @@ export class MonitoringController {
   // US1-AC6 & US2-AC6: Lịch sử hiệu năng vẽ biểu đồ
   @Get('performance-history-24h')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @RequirePermissions(Resource.SYSTEM, Action.READ)
+  @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
   async getPerformanceHistory(
     @Query('timeframe') timeframe?: string,
     @Query('node') node?: string,
@@ -89,7 +89,7 @@ export class MonitoringController {
   // US3 - AC6: Lấy lịch sử lỗi giao dịch thanh toán
   @Get('payment-errors')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @RequirePermissions(Resource.SYSTEM, Action.READ)
+  @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
   async getPaymentErrors(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -114,7 +114,7 @@ export class MonitoringController {
   // Cung cấp dữ liệu cho Gauge overview
   @Get('resources-current')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @RequirePermissions(Resource.SYSTEM, Action.READ)
+  @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
   async getCurrentResources(@Query('node') node?: string) {
     const data = await this.monitoringService.getCurrentResources(node);
     return new BaseResponse(true, 'Lấy tài nguyên hiện tại thành công', data);
@@ -123,7 +123,7 @@ export class MonitoringController {
   // Cung cấp dữ liệu cho biểu đồ LineChart CPU/RAM
   @Get('resources-history-24h')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @RequirePermissions(Resource.SYSTEM, Action.READ)
+  @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
   async getResourceHistory(
     @Query('timeframe') timeframe?: string,
     @Query('node') node?: string,
@@ -138,7 +138,7 @@ export class MonitoringController {
   // US4 - Lấy log bảo mật đã được gom nhóm số lần vi phạm
   @Get('security-logs-recent')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @RequirePermissions(Resource.SYSTEM, Action.READ)
+  @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
   async getSecurityLogsRecent(@Query('timeframe') timeframe?: string) {
     const data =
       await this.monitoringService.getAggregatedSecurityLogs(timeframe);

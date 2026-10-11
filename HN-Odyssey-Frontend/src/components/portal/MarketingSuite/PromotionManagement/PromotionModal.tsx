@@ -9,7 +9,6 @@ import type {
   PromotionFormData,
 } from "../../../../hooks/portal/MarketingSuite/PromotionManagement/usePromotionManagement";
 import axiosClient from "../../../../api/axiosClient";
-import { toast } from "react-toastify";
 
 interface PromotionModalProps {
   isOpen: boolean;
@@ -229,38 +228,41 @@ function PromotionModalContent({
 
   // Fetch real data from DB for Dropdown
   useEffect(() => {
-    if (mode === "add" || mode === "edit") {
-      const fetchScopeData = async () => {
-        setIsLoadingScopes(true);
-        try {
-          const [prodRes, catRes, tagRes] = await Promise.all([
-            axiosClient.get("/products?limit=1000"),
-            axiosClient.get("/categories/admin/tree-view"),
-            axiosClient.get("/tags?limit=1000"),
-          ]);
+    // Gọi API lấy dữ liệu Scope cho TẤT CẢ các mode (add, edit, view) để hiển thị tên thay vì ID
+    const fetchScopeData = async () => {
+      setIsLoadingScopes(true);
+      try {
+        // Nuốt lỗi âm thầm bằng catch nội bộ cho từng API
+        const [prodRes, catRes, tagRes] = await Promise.all([
+          axiosClient
+            .get("/products?limit=1000")
+            .catch(() => ({ data: { data: [] } })),
+          axiosClient
+            .get("/categories/admin/tree-view")
+            .catch(() => ({ data: { data: [] } })),
+          axiosClient
+            .get("/tags?limit=1000")
+            .catch(() => ({ data: { data: [] } })),
+        ]);
 
-          // Standard type casting to remove ESLint errors
-          const fetchedProducts: BEProduct[] =
-            prodRes.data?.data?.data || prodRes.data?.data || [];
-          const fetchedCategories: BECategory[] =
-            catRes.data?.data || catRes.data || [];
-          const fetchedTags: BETag[] = tagRes.data?.data || tagRes.data || [];
+        const fetchedProducts: BEProduct[] =
+          prodRes.data?.data?.data || prodRes.data?.data || [];
+        const fetchedCategories: BECategory[] =
+          catRes.data?.data || catRes.data || [];
+        const fetchedTags: BETag[] = tagRes.data?.data || tagRes.data || [];
 
-          setProducts(
-            fetchedProducts.map((p) => ({ id: p._id, name: p.name })),
-          );
-          setCategories(flattenCategories(fetchedCategories));
-          setTags(fetchedTags.map((t) => ({ id: t._id, name: t.name })));
-        } catch (error) {
-          console.error("Error loading Scope data:", error);
-          toast.error("Error loading Product / Category list.");
-        } finally {
-          setIsLoadingScopes(false);
-        }
-      };
+        setProducts(fetchedProducts.map((p) => ({ id: p._id, name: p.name })));
+        setCategories(flattenCategories(fetchedCategories));
+        setTags(fetchedTags.map((t) => ({ id: t._id, name: t.name })));
+      } catch (error) {
+        console.error("Error loading Scope data:", error);
+        // ĐÃ XÓA TOAST LỖI Ở ĐÂY
+      } finally {
+        setIsLoadingScopes(false);
+      }
+    };
 
-      fetchScopeData();
-    }
+    fetchScopeData();
   }, [mode]);
 
   const [formData, setFormData] = useState<PromotionFormData>(() => {

@@ -1,6 +1,14 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
+import { Resource } from "../../../../types/permissions";
+import { Action } from "../../../../types/permissions";
+import tokenStorage from "../../../../utils/tokenStorage";
+
+interface UserPayload {
+  roles?: string[];
+  permissions?: { resource: string; actions: string[] }[];
+}
 
 export interface AttributeValue {
   label: string;
@@ -27,9 +35,37 @@ export interface AttributeFormData {
   is_active: boolean;
 }
 
+// Định nghĩa interface an toàn cho Error từ API (Khắc phục lỗi no-explicit-any)
+interface ApiError {
+  response?: {
+    status?: number;
+    data?: {
+      message?: string | string[];
+    };
+  };
+  message?: string;
+}
+
 export function useVariantManagement() {
   const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [search, setSearch] = useState("");
+  const [accessError, setAccessError] = useState<boolean>(false);
+
+  const user = tokenStorage.getUser() as UserPayload | null;
+  const hasPermission = (resourceCode: Resource, actionCode: Action) => {
+    if (!user || !user.permissions) return false;
+    if (user.roles && user.roles.includes("Super Admin")) return true;
+    const perm = user.permissions.find((p) => p.resource === resourceCode);
+    if (!perm) return false;
+    return (
+      perm.actions.includes(actionCode) || perm.actions.includes(Action.MANAGE)
+    );
+  };
+
+  const canCreate = hasPermission(Resource.CATALOG_ATTRIBUTES, Action.CREATE);
+  const canUpdate = hasPermission(Resource.CATALOG_ATTRIBUTES, Action.UPDATE);
+  const canDelete = hasPermission(Resource.CATALOG_ATTRIBUTES, Action.DELETE);
+
   const [drawerConfig, setDrawerConfig] = useState<{
     isOpen: boolean;
     mode: "add" | "edit";
@@ -74,12 +110,23 @@ export function useVariantManagement() {
 
   const refreshData = useCallback(() => {
     fetchAttributesData()
-      .then((data) => setAttributes(data))
+      .then((data) => {
+        setAttributes(data);
+        // Chuyển setAccessError(false) vào luồng bất đồng bộ (Khắc phục lỗi set-state-in-effect)
+        setAccessError(false);
+      })
       .catch((error: unknown) => {
-        // Ép kiểu error để lấy message một cách an toàn
-        const err = error as { message?: string | string[] };
-        const msg = err?.message || "Lỗi tải danh sách thuộc tính";
-        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
+        const err = error as ApiError; // Ép kiểu an toàn (Khắc phục lỗi no-explicit-any)
+        if (err?.response?.status === 403) {
+          setAccessError(true);
+          toast.error("Bạn không có quyền xem danh sách thuộc tính!");
+        } else {
+          const msg =
+            err?.response?.data?.message ||
+            err?.message ||
+            "Lỗi tải danh sách thuộc tính";
+          toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
+        }
       });
   }, []);
 
@@ -148,9 +195,14 @@ export function useVariantManagement() {
       refreshData();
       actions.closeDrawer();
     } catch (error: unknown) {
-      const err = error as { message?: string | string[] };
-      const msg = err?.message || "Lỗi lưu dữ liệu";
-      toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
+      const err = error as ApiError; // Ép kiểu an toàn (Khắc phục lỗi no-explicit-any)
+      if (err?.response?.status === 403) {
+        toast.error("Bạn không có quyền thực hiện thao tác này!");
+      } else {
+        const msg =
+          err?.response?.data?.message || err?.message || "Lỗi lưu dữ liệu";
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
+      }
       setDrawerConfig((prev) => ({ ...prev, isSubmitting: false }));
     }
   };
@@ -164,9 +216,14 @@ export function useVariantManagement() {
       refreshData();
       actions.closeDeleteModal();
     } catch (error: unknown) {
-      const err = error as { message?: string | string[] };
-      const msg = err?.message || "Lỗi xóa dữ liệu";
-      toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
+      const err = error as ApiError; // Ép kiểu an toàn (Khắc phục lỗi no-explicit-any)
+      if (err?.response?.status === 403) {
+        toast.error("Bạn không có quyền xóa thuộc tính này!");
+      } else {
+        const msg =
+          err?.response?.data?.message || err?.message || "Lỗi xóa dữ liệu";
+        toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
+      }
       setDeleteConfig((prev) => ({ ...prev, isDeleting: false }));
     }
   };
@@ -176,8 +233,14 @@ export function useVariantManagement() {
     search,
     drawerConfig,
     deleteConfig,
+    accessError, // Trả về trạng thái lỗi
     actions,
     handleSaveAttribute,
     executeDelete,
+    permissions: {
+      canCreate,
+      canUpdate,
+      canDelete,
+    },
   };
 }

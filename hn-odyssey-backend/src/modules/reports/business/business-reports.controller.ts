@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { BusinessReportsService } from './business-reports.service';
 import { DashboardFilterDto } from 'src/common/dtos/dashboard-filter.dto';
 import { BaseResponse } from 'src/common/dtos/base-response.dto';
@@ -6,20 +6,18 @@ import {
   IRevenueReport,
   IRetentionReport,
 } from 'src/common/interfaces/business-report.interface';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
-import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
 import { ReportFilterDto } from 'src/common/dtos/report-filter.dto';
 
+// JwtAuthGuard, RolesGuard, PermissionsGuard đã đăng ký global trong app.module.ts
 @Controller('admin/reports/business')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class BusinessReportsController {
   constructor(private readonly reportsService: BusinessReportsService) {}
 
+  // US.87: dùng cho biểu đồ thanh toán & thực thu trên trang Revenue (AC6, AC7)
   @Get('revenue')
-  @RequirePermissions(Resource.REPORTS, Action.READ)
+  @RequirePermissions(Resource.REPORT_REVENUE, Action.READ)
   async getRevenueReport(
     @Query() filter: DashboardFilterDto,
   ): Promise<BaseResponse<IRevenueReport>> {
@@ -28,7 +26,10 @@ export class BusinessReportsController {
   }
 
   @Get('retention')
-  @RequirePermissions(Resource.REPORTS, Action.READ)
+  @RequirePermissions(
+    [Resource.REPORT_REVENUE, Resource.REPORT_INVENTORY],
+    Action.READ,
+  )
   async getRetentionReport(
     @Query() filter: DashboardFilterDto,
   ): Promise<BaseResponse<IRetentionReport>> {
@@ -41,7 +42,7 @@ export class BusinessReportsController {
   }
 
   @Get('abandoned-carts')
-  @RequirePermissions(Resource.REPORTS, Action.READ)
+  @RequirePermissions(Resource.REPORT_REVENUE, Action.READ)
   async getAbandonedCarts(@Query() filter: DashboardFilterDto) {
     const data = await this.reportsService.getAbandonedProducts(filter);
     return new BaseResponse(
@@ -52,7 +53,10 @@ export class BusinessReportsController {
   }
 
   @Get('conversion')
-  @RequirePermissions(Resource.REPORTS, Action.READ)
+  @RequirePermissions(
+    [Resource.REPORT_REVENUE, Resource.REPORT_INVENTORY],
+    Action.READ,
+  )
   async getConversionReport(@Query() filter: DashboardFilterDto) {
     const data = await this.reportsService.getConversionReport(filter);
     return new BaseResponse(
@@ -63,7 +67,10 @@ export class BusinessReportsController {
   }
 
   @Get('behavior-abandonment')
-  @RequirePermissions(Resource.REPORTS, Action.READ)
+  @RequirePermissions(
+    [Resource.REPORT_REVENUE, Resource.REPORT_INVENTORY, Resource.SYSTEM_USERS],
+    Action.READ,
+  )
   async getBehaviorAndAbandonmentReport(@Query() filter: DashboardFilterDto) {
     const data =
       await this.reportsService.getBounceAndAbandonmentReport(filter);
@@ -77,7 +84,7 @@ export class BusinessReportsController {
   //  CÁC ROUTE NÂNG CAO (BI ADVANCED)
 
   @Get('inventory-correlation')
-  @RequirePermissions(Resource.REPORTS, Action.READ)
+  @RequirePermissions(Resource.REPORT_INVENTORY, Action.READ)
   async getInventoryCorrelation(@Query() filter: ReportFilterDto) {
     const data = await this.reportsService.getInventorySalesCorrelation(filter);
     return new BaseResponse(
@@ -88,7 +95,7 @@ export class BusinessReportsController {
   }
 
   @Get('yoy-comparison')
-  @RequirePermissions(Resource.REPORTS, Action.READ)
+  @RequirePermissions(Resource.REPORT_REVENUE, Action.READ)
   async getYoYComparison(@Query('year') year: string) {
     const targetYear = year || new Date().getFullYear().toString();
     const data = await this.reportsService.getYoYComparison(targetYear);
@@ -100,7 +107,7 @@ export class BusinessReportsController {
   }
 
   @Get('forecast')
-  @RequirePermissions(Resource.REPORTS, Action.READ)
+  @RequirePermissions(Resource.REPORT_REVENUE, Action.READ)
   async getRevenueForecast() {
     const data = await this.reportsService.getRevenueForecast();
     return new BaseResponse(
@@ -111,7 +118,10 @@ export class BusinessReportsController {
   }
 
   @Get('behavior-filters')
-  @RequirePermissions(Resource.REPORTS, Action.READ)
+  @RequirePermissions(
+    [Resource.REPORT_MARKETING, Resource.SYSTEM_USERS],
+    Action.READ,
+  )
   async getBehaviorFilters() {
     const data = await this.reportsService.getBehaviorFilters();
     return new BaseResponse(

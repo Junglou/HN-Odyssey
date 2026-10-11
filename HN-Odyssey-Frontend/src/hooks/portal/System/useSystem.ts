@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import axiosClient from "../../../api/axiosClient";
+import type { UserPayload } from "../../../types/auth";
+import { Action, Resource } from "../../../types/permissions";
+import { toast } from "react-toastify";
 
 // 1. CÁC INTERFACE GIAO TIẾP VỚI COMPONENT UI
 
@@ -115,6 +118,19 @@ const INITIAL_GAUGE = {
   disk: { percent: 0, text: "N/A" },
 };
 
+const useLocalAuth = () => {
+  const [user] = useState(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) return JSON.parse(stored) as UserPayload;
+    } catch (error) {
+      console.warn("Không thể parse dữ liệu user từ localStorage:", error);
+    }
+    return null;
+  });
+  return { user };
+};
+
 export function useSystem() {
   // State điều khiển UI giao diện
   const [visibleSections, setVisibleSections] = useState<VisibleSections>({
@@ -130,6 +146,24 @@ export function useSystem() {
   const [refreshRate, setRefreshRate] = useState("30s");
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const { user } = useLocalAuth();
+
+  const hasPermission = useCallback(
+    (resourceCode: Resource, actionCode: Action): boolean => {
+      if (!user || !user.permissions) return false;
+      if (user.roles?.includes("SUPER_ADMIN")) return true;
+      return user.permissions.some(
+        (p) =>
+          p.resource === resourceCode &&
+          (p.actions.includes(actionCode) || p.actions.includes(Action.MANAGE)),
+      );
+    },
+    [user],
+  );
+
+  // Màn hình này chỉ cần xem dữ liệu
+  const canViewSystem = hasPermission(Resource.SYSTEM_MONITORING, Action.READ);
 
   const [thresholds, setThresholds] = useState<Thresholds>({
     cpu: 90,
@@ -154,6 +188,7 @@ export function useSystem() {
 
   // Hàm gọi tổng hợp các API
   const fetchSystemData = useCallback(async () => {
+    if (!canViewSystem) return;
     try {
       const params = {
         node: serverNode,
@@ -338,7 +373,7 @@ export function useSystem() {
     } catch (error) {
       console.error("Lỗi khi tải dữ liệu giám sát hệ thống", error);
     }
-  }, [serverNode, timeframe]);
+  }, [serverNode, timeframe, canViewSystem]);
 
   // Xử lý chu kỳ làm mới dữ liệu
   useEffect(() => {
@@ -371,13 +406,15 @@ export function useSystem() {
   };
 
   const runHealthCheck = async () => {
+    if (!canViewSystem) {
+      return toast.error("Bạn không có quyền thực thi hệ thống.");
+    }
     setToastMessage("Đang kiểm tra toàn diện hệ thống...");
     try {
       await axiosClient.get("/admin/system-monitoring/health");
       await fetchSystemData();
       setToastMessage("Hoàn tất kiểm tra. Hệ thống hoạt động ổn định.");
     } catch {
-      // Đã loại bỏ biến error không sử dụng để tránh lỗi eslint no-unused-vars
       setToastMessage(
         "Hoàn tất kiểm tra. Phát hiện một số dịch vụ phản hồi chậm.",
       );
@@ -423,5 +460,6 @@ export function useSystem() {
       updateThreshold,
       runHealthCheck,
     },
+    permissions: { canViewSystem },
   };
 }

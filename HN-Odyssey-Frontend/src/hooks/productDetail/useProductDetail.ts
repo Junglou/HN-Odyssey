@@ -126,9 +126,12 @@ export function useProductDetail() {
       try {
         if (!slug) return;
 
+        // PATCH: Đổi API lấy Attribute thành Public Endpoint
         const [productRes, attrRes] = await Promise.all([
           axiosClient.get(`/products/store/details/${slug}`),
-          axiosClient.get(`/attributes`).catch(() => ({ data: [] })),
+          axiosClient
+            .get(`/attributes/public/active`)
+            .catch(() => ({ data: [] })),
         ]);
 
         const beData: BeProduct = productRes.data;
@@ -289,7 +292,6 @@ export function useProductDetail() {
           image: uiImages[0] || "",
         });
 
-        // TÍCH HỢP AI TRACKING NGAY TẠI ĐÂY
         if (trackedProductRef.current !== beData._id) {
           trackEvent({
             action: BehaviorAction.VIEW_PRODUCT,
@@ -299,7 +301,7 @@ export function useProductDetail() {
               price: beSalePrice > 0 ? beSalePrice : bePrice,
             },
           });
-          trackedProductRef.current = beData._id; // Đánh dấu là đã bắn
+          trackedProductRef.current = beData._id;
         }
 
         let defaultVariant = null;
@@ -364,7 +366,7 @@ export function useProductDetail() {
       }
     };
     fetchProductDetail();
-  }, [slug, trackEvent]); // trackEvent được bọc bằng useCallback nên an toàn, không cần bỏ vào deps array
+  }, [slug, trackEvent]);
 
   const derivedProduct = useMemo(() => {
     if (!product) return null;

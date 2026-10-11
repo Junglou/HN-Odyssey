@@ -1,15 +1,15 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Query,
-  Param,
-  UseGuards,
+  Controller,
   Delete,
-  Res,
+  Get,
+  Param,
   Patch,
+  Post,
+  Query,
+  UseGuards,
   BadRequestException,
+  Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
@@ -29,85 +29,72 @@ import {
   BulkUpdateStatusDto,
 } from './dto/admin-bulk-customer.dto';
 import { AdminUpdatePasswordDto } from './dto/admin-update-password.dto';
-
-interface IAdminUser {
-  _id: string;
-  email: string;
-  roles: string[];
-}
+import type { IUser } from 'src/common/interfaces/user.interface'; // Dùng IUser chuẩn
 
 @Controller('admin/customers')
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class CustomersAdminController {
   constructor(private readonly customersService: CustomersAdminService) {}
 
-  // US.120 - Bulk Action: Cập nhật trạng thái hàng loạt
   @Patch('bulk/status')
-  @RequirePermissions(Resource.CUSTOMERS, Action.MANAGE)
+  @RequirePermissions(Resource.CRM_CUSTOMERS, Action.UPDATE)
   async bulkUpdateStatus(
     @Body() dto: BulkUpdateStatusDto,
-    @CurrentUser() user: IAdminUser,
+    @CurrentUser() user: IUser, // Dùng IUser chuẩn
   ) {
     return this.customersService.bulkUpdateStatus(
       dto.customerIds,
       dto.status,
       dto.reason || 'Cập nhật trạng thái hàng loạt',
-      { id: user._id, email: user.email, roles: user.roles },
+      { id: String(user._id), email: user.email, roles: user.roles }, // Ép kiểu string an toàn
     );
   }
 
-  // US.117 - Bulk Action: Vô hiệu hóa/Xóa mềm hàng loạt
   @Delete('bulk/delete')
-  @RequirePermissions(Resource.CUSTOMERS, Action.DELETE)
+  @RequirePermissions(Resource.CRM_CUSTOMERS, Action.DELETE)
   async bulkSoftDelete(
     @Body() dto: BulkDeleteDto,
-    @CurrentUser() user: IAdminUser,
+    @CurrentUser() user: IUser, // Dùng IUser chuẩn
   ) {
     return this.customersService.bulkSoftDelete(
       dto.customerIds,
-      user._id,
+      String(user._id),
       dto.reason || 'Xóa mềm hàng loạt',
     );
   }
 
-  // AC1 -> AC7: Lấy danh sách khách hàng (Phân trang, Tìm kiếm, Lọc)
   @Get()
-  @RequirePermissions(Resource.CUSTOMERS, Action.READ)
+  @RequirePermissions(Resource.CRM_CUSTOMERS, Action.READ)
   async findAll(@Query() query: AdminCustomerQueryDto) {
     return this.customersService.findAll(query);
   }
 
-  // AC9: Xuất danh sách khách hàng ra Excel
   @Get('export/excel')
-  @RequirePermissions(Resource.CUSTOMERS, Action.EXPORT)
+  @RequirePermissions(Resource.CRM_CUSTOMERS, Action.EXPORT)
   async exportExcel(
-    @Query() query: AdminCustomerQueryDto, // Bổ sung nhận query
+    @Query() query: AdminCustomerQueryDto,
     @Res() res: Response,
   ) {
-    // Truyền query xuống service
     return this.customersService.exportToExcel(query, res);
   }
 
-  // US.117 - AC1: Thêm mới hồ sơ khách hàng thủ công
   @Post()
-  @RequirePermissions(Resource.CUSTOMERS, Action.CREATE)
+  @RequirePermissions(Resource.CRM_CUSTOMERS, Action.CREATE)
   async create(
     @Body() dto: AdminCreateCustomerDto,
-    @CurrentUser() user: IAdminUser,
+    @CurrentUser() user: IUser, // Dùng IUser chuẩn
   ) {
-    return this.customersService.createCustomer(dto, user._id);
+    return this.customersService.createCustomer(dto, String(user._id));
   }
 
-  // US.119 - AC6: Xuất lịch sử hoạt động của 1 khách hàng ra Excel
   @Get(':id/activities/export')
-  @RequirePermissions(Resource.AUDIT_LOGS, Action.EXPORT)
+  @RequirePermissions(Resource.SYSTEM_AUDIT, Action.EXPORT)
   async exportActivities(@Param('id') id: string, @Res() res: Response) {
     return this.customersService.exportActivitiesToExcel(id, res);
   }
 
-  // US.119 - AC1: Xem lịch sử hoạt động/đăng nhập
   @Get(':id/activities')
-  @RequirePermissions(Resource.AUDIT_LOGS, Action.READ)
+  @RequirePermissions(Resource.SYSTEM_AUDIT, Action.READ)
   async getActivities(
     @Param('id') id: string,
     @Query() query: PaginationQueryDto,
@@ -115,51 +102,47 @@ export class CustomersAdminController {
     return this.customersService.getCustomerActivities(id, query);
   }
 
-  // US.114: Xem chi tiết hồ sơ khách hàng
   @Get(':id')
-  @RequirePermissions(Resource.CUSTOMERS, Action.READ)
+  @RequirePermissions(Resource.CRM_CUSTOMERS, Action.READ)
   async getDetail(@Param('id') id: string) {
     return this.customersService.getCustomerDetail(id);
   }
 
-  // US.117 - AC7: Đặt lại mật khẩu thủ công bởi Staff
   @Patch(':id/password')
-  @RequirePermissions(Resource.CUSTOMERS, Action.MANAGE)
+  @RequirePermissions(Resource.CRM_CUSTOMERS, Action.UPDATE)
   async updatePassword(
     @Param('id') id: string,
-    @Body() dto: AdminUpdatePasswordDto, // Sử dụng DTO ở đây
-    @CurrentUser() user: IAdminUser,
+    @Body() dto: AdminUpdatePasswordDto,
+    @CurrentUser() user: IUser, // Dùng IUser chuẩn
   ) {
     return this.customersService.updatePasswordByAdmin(
       id,
       dto.newPassword.trim(),
-      { id: user._id, email: user.email },
+      { id: String(user._id), email: user.email },
     );
   }
 
-  // US.120 - AC1, AC2, AC3: Cập nhật trạng thái (Khóa/Mở/Ban)
   @Patch(':id/status')
-  @RequirePermissions(Resource.CUSTOMERS, Action.MANAGE)
+  @RequirePermissions(Resource.CRM_CUSTOMERS, Action.UPDATE)
   async updateAccountStatus(
     @Param('id') id: string,
     @Body() body: UpdateCustomerStatusDto,
-    @CurrentUser() user: IAdminUser,
+    @CurrentUser() user: IUser, // Dùng IUser chuẩn
   ) {
     return this.customersService.updateStatus(id, body.status, body.reason, {
-      id: user._id,
+      id: String(user._id),
       email: user.email,
       roles: user.roles,
     });
   }
 
-  // US.120 - AC4, AC5: Quản lý quyền đánh giá
   @Patch(':id/review-access')
-  @RequirePermissions(Resource.CUSTOMERS, Action.MANAGE)
+  @RequirePermissions(Resource.CRM_CUSTOMERS, Action.UPDATE)
   async updateReviewAccess(
     @Param('id') id: string,
     @Body('access') access: 'ALLOWED' | 'RESTRICTED',
     @Body('reason') reason: string,
-    @CurrentUser() user: IAdminUser,
+    @CurrentUser() user: IUser, // Dùng IUser chuẩn
   ) {
     if (!reason || reason.trim() === '') {
       throw new BadRequestException(
@@ -168,40 +151,37 @@ export class CustomersAdminController {
     }
 
     return this.customersService.toggleReviewAccess(id, access, reason, {
-      id: user._id,
+      id: String(user._id),
       email: user.email,
     });
   }
 
-  // US.117 - AC2: Chỉnh sửa thông tin hồ sơ
   @Patch(':id')
-  @RequirePermissions(Resource.CUSTOMERS, Action.MANAGE)
+  @RequirePermissions(Resource.CRM_CUSTOMERS, Action.UPDATE)
   async update(
     @Param('id') id: string,
     @Body() dto: AdminUpdateCustomerDto,
-    @CurrentUser() user: IAdminUser,
+    @CurrentUser() user: IUser, // Dùng IUser chuẩn
   ) {
-    return this.customersService.updateCustomer(id, dto, user._id);
+    return this.customersService.updateCustomer(id, dto, String(user._id));
   }
 
-  // US.117 - AC6: Xóa vĩnh viễn tài khoản (Hard delete)
   @Delete(':id/permanent')
-  @RequirePermissions(Resource.CUSTOMERS, Action.DELETE)
+  @RequirePermissions(Resource.CRM_CUSTOMERS, Action.DELETE)
   async deletePermanent(
     @Param('id') id: string,
-    @CurrentUser() user: IAdminUser,
+    @CurrentUser() user: IUser, // Dùng IUser chuẩn
   ) {
-    return this.customersService.hardDelete(id, user._id);
+    return this.customersService.hardDelete(id, String(user._id));
   }
 
-  // US.117: Vô hiệu hóa tài khoản (Soft delete)
   @Delete(':id')
-  @RequirePermissions(Resource.CUSTOMERS, Action.DELETE)
+  @RequirePermissions(Resource.CRM_CUSTOMERS, Action.DELETE)
   async softDelete(
     @Param('id') id: string,
-    @CurrentUser() user: IAdminUser,
+    @CurrentUser() user: IUser, // Dùng IUser chuẩn
     @Body('reason') reason: string,
   ) {
-    return this.customersService.softDelete(id, reason, user._id);
+    return this.customersService.softDelete(id, reason, String(user._id));
   }
 }

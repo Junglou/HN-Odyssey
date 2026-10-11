@@ -53,6 +53,10 @@ axiosClient.interceptors.response.use(
             if (res.data.refresh_token) {
               tokenStorage.setRefreshToken(res.data.refresh_token);
             }
+            // [FIX KIẾN TRÚC]: Cập nhật lại User Object kèm theo Permissions mới nhất
+            if (res.data.user) {
+              tokenStorage.setUser(res.data.user);
+            }
             originalRequest.headers.Authorization = `Bearer ${res.data.access_token}`;
             return axiosClient(originalRequest);
           }

@@ -1,0 +1,87 @@
+.mkc-wrapper {
+  background-color: #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mkc-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mkc-section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.mkc-select-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.mkc-select {
+  height: 36px;
+  max-width: 320px;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background-color: #ffffff;
+  color: #1e293b;
+}
+
+.mkc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.mkc-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  background-color: #ffffff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* Chú giải màu ROI (US.82 AC3) */
+.mkc-roi-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.mkc-roi-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mkc-roi-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+@media screen and (max-width: 1100px) {
+  .mkc-grid {
+    grid-template-columns: 1fr;
+  }
+}

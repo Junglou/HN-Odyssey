@@ -1,3 +1,4 @@
+import { NO_SPEND_TOOLTIP } from "../../../../hooks/portal/Dashboard/MarketingAndPromotion/useMarketingAndPromotion";
 import "./CampaignROIAnalysis.css";
 
 // Kiểu dữ liệu
@@ -41,7 +42,7 @@ export default function CampaignROIAnalysis({
             </svg>
           </div>
           <div className="croi-info">
-            <span className="croi-label">Total Spend</span>
+            <span className="croi-label">Total Spend (selected period)</span>
             <span className="croi-value">{data.totalSpend}</span>
           </div>
         </div>
@@ -87,7 +88,12 @@ export default function CampaignROIAnalysis({
           </div>
           <div className="croi-info">
             <span className="croi-label">Overall ROI</span>
-            <span className="croi-value">{data.overallROI}</span>
+            <span
+              className="croi-value"
+              title={data.overallROI === "—" ? NO_SPEND_TOOLTIP : undefined}
+            >
+              {data.overallROI}
+            </span>
           </div>
         </div>
       </div>

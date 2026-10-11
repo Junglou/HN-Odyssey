@@ -1,15 +1,18 @@
 import "./RevenueReport.css";
 import { CalendarIcon } from "../../../../assets/icons/RevenueIcons";
 import type {
+  CashFlow,
+  PaymentShare,
   RevenueMetric,
   TrendDataPoint,
+  TrendGranularity,
   TopProduct,
 } from "../../../../hooks/portal/Dashboard/RevenueReport/useRevenueReport";
 
-// import 3 component con
 import KeyRevenueMetrics from "./KeyRevenueMetrics";
 import RevenueTrendAnalysis from "./RevenueTrendAnalysis";
 import BestSellingProducts from "./BestSellingProducts";
+import PaymentAnalysis from "./PaymentAnalysis";
 
 interface RevenueReportProps {
   activeFilter: string;
@@ -17,10 +20,16 @@ interface RevenueReportProps {
   endDate: string;
   metrics: Record<string, RevenueMetric>;
   trendData: TrendDataPoint[];
+  trendGranularity: TrendGranularity;
+  period: string;
+  comparisonLabel: string;
+  paymentShares: PaymentShare[];
+  cashFlow: CashFlow;
   paginatedProducts: TopProduct[];
   currentPage: number;
   totalPages: number;
   isLoading: boolean;
+  isExporting?: boolean;
   dateError: string | null;
   sortKey: keyof TopProduct | null;
   sortDirection: "asc" | "desc";
@@ -30,6 +39,8 @@ interface RevenueReportProps {
   onEndDateChange: (_date: string) => void;
   onApply: () => void;
   onPageChange: (page: number) => void;
+  handleExportExcel?: () => void;
+  permissions?: { canExport: boolean };
 }
 
 export default function RevenueReport({
@@ -38,10 +49,16 @@ export default function RevenueReport({
   endDate,
   metrics,
   trendData,
+  trendGranularity,
+  period,
+  comparisonLabel,
+  paymentShares,
+  cashFlow,
   paginatedProducts,
   currentPage,
   totalPages,
   isLoading,
+  isExporting = false,
   dateError,
   sortKey,
   sortDirection,
@@ -51,8 +68,12 @@ export default function RevenueReport({
   onEndDateChange,
   onApply,
   onPageChange,
+  handleExportExcel,
+  permissions,
 }: RevenueReportProps) {
   const filterOptions = ["Today", "This Week", "This Month", "Custom Range"];
+  const canExport = permissions?.canExport ?? false;
+  const exportDisabled = isLoading || isExporting || !canExport;
 
   return (
     <div className="rr-wrapper">
@@ -103,13 +124,39 @@ export default function RevenueReport({
               />
             </div>
 
-            <button
-              className="rr-apply-btn"
-              onClick={onApply}
-              disabled={isLoading || !!dateError}
-            >
-              {isLoading ? "Loading..." : "Apply"}
-            </button>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <button
+                className="rr-apply-btn"
+                onClick={onApply}
+                disabled={isLoading || !!dateError}
+              >
+                {isLoading ? "Loading..." : "Apply"}
+              </button>
+
+              {/* US.95 AC1: Xuất Excel dữ liệu bảng */}
+              <button
+                className="rr-export-btn"
+                onClick={handleExportExcel}
+                disabled={exportDisabled}
+                style={{
+                  backgroundColor: canExport ? "#10b981" : "#94a3b8",
+                  color: "white",
+                  padding: "0 16px",
+                  borderRadius: "6px",
+                  cursor: exportDisabled ? "not-allowed" : "pointer",
+                  border: "none",
+                  height: "36px",
+                  fontWeight: 500,
+                }}
+                title={
+                  !canExport
+                    ? "Your account does not have Export permission"
+                    : "Export report to Excel"
+                }
+              >
+                {isExporting ? "Exporting..." : "Export Excel"}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -117,9 +164,25 @@ export default function RevenueReport({
       </div>
 
       <div className={`rr-content-wrapper ${isLoading ? "rr-is-loading" : ""}`}>
-        {/* render 3 component con */}
-        <KeyRevenueMetrics metrics={metrics} />
-        <RevenueTrendAnalysis trendData={trendData} />
+        {/* US.87 AC4: nhãn so sánh đúng theo kỳ đang xem */}
+        <KeyRevenueMetrics
+          metrics={metrics}
+          comparisonLabel={comparisonLabel}
+        />
+        {/* US.95 AC2: nút Xuất PDF nằm ngay tại biểu đồ */}
+        <RevenueTrendAnalysis
+          trendData={trendData}
+          granularity={trendGranularity}
+          period={period}
+          canExport={canExport}
+        />
+        {/* US.87 AC6, AC7: thanh toán & thực thu */}
+        <PaymentAnalysis
+          paymentShares={paymentShares}
+          cashFlow={cashFlow}
+          period={period}
+          canExport={canExport}
+        />
         <BestSellingProducts
           products={paginatedProducts}
           currentPage={currentPage}

@@ -7,9 +7,13 @@ import type { RevenueMetric } from "../../../../hooks/portal/Dashboard/RevenueRe
 
 interface KeyRevenueMetricsProps {
   metrics: Record<string, RevenueMetric>;
+  comparisonLabel: string; // US.87 AC4: "vs yesterday" / "vs last week" / ...
 }
 
-export default function KeyRevenueMetrics({ metrics }: KeyRevenueMetricsProps) {
+export default function KeyRevenueMetrics({
+  metrics,
+  comparisonLabel,
+}: KeyRevenueMetricsProps) {
   // mảng config để map giao diện
   const cards = [
     { key: "totalRevenue", title: "Total Revenue" },
@@ -42,7 +46,7 @@ export default function KeyRevenueMetrics({ metrics }: KeyRevenueMetricsProps) {
                   {data.isUp && <TrendingUpIcon color="#16a34a" />}
                   {data.trend}
                 </span>
-                <span className="krm-trend-text-vs">vs last month</span>
+                <span className="krm-trend-text-vs">{comparisonLabel}</span>
               </div>
             </div>
           );

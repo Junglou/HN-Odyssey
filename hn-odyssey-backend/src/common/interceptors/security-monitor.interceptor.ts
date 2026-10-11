@@ -143,7 +143,7 @@ export class SecurityMonitorInterceptor implements NestInterceptor {
 
             await this.auditLogsService.log({
               action: 'IMPOSSIBLE_TRAVEL_DETECTED',
-              collection_name: Resource.SYSTEM,
+              collection_name: Resource.SYSTEM_MONITORING,
               actor_id: user.userId,
               department: Department.MANAGEMENT,
               detail: {
@@ -171,7 +171,7 @@ export class SecurityMonitorInterceptor implements NestInterceptor {
 
           await this.auditLogsService.log({
             action: 'NEW_DEVICE_LOGIN',
-            collection_name: Resource.SYSTEM,
+            collection_name: Resource.SYSTEM_MONITORING,
             actor_id: user.userId,
             department: Department.MANAGEMENT,
             detail: { ip, user_agent: userAgent, previous_ip: lastData.lastIp },

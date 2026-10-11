@@ -102,6 +102,15 @@ interface BEInventoryKPI {
   iconType: string;
 }
 
+// US.84 AC6 + US.92 AC6: đủ các khung giờ từ 00:00 đến giờ hiện tại, giờ chưa có đơn = 0
+const buildTodayHistory = (chart: BERevenueChart[]): RevenueHistory[] => {
+  const byLabel = new Map(chart.map((c) => [c.label, c.revenue]));
+  const currentHour = new Date().getHours();
+  return Array.from({ length: currentHour + 1 }, (_, h) => {
+    const time = `${String(h).padStart(2, "0")}:00`;
+    return { time, value: Number(byLabel.get(time) ?? 0) };
+  });
+};
 // khởi tạo state tĩnh để block component không lỗi khi đang đợi fetch dữ liệu
 const initialState: OverviewState = {
   revenue: { total: "$0", trendValue: 0, history: [] },
@@ -121,13 +130,26 @@ export function useOverview(): OverviewState {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [overviewRes, kpisRes] = await Promise.all([
+        const [overviewRes, kpisRes] = await Promise.allSettled([
           axiosClient.get("/reports/dashboard/overview?time_filter=TODAY"),
           axiosClient.get("/reports/dashboard/inventory-kpis"),
         ]);
 
-        const overviewData = overviewRes.data.data as BEOverviewMetrics;
-        const kpisData = kpisRes.data.data as BEInventoryKPI[];
+        if (overviewRes.status === "rejected")
+          console.warn("overview request failed:", overviewRes.reason);
+        if (kpisRes.status === "rejected")
+          console.warn("inventory-kpis request failed:", kpisRes.reason);
+
+        // Role không có quyền kho vẫn xem được doanh thu, pipeline...
+        const overviewData: Partial<BEOverviewMetrics> =
+          (overviewRes.status === "fulfilled" &&
+            overviewRes.value.data?.data) ||
+          {};
+        const rawKpis =
+          kpisRes.status === "fulfilled" ? kpisRes.value.data?.data : null;
+        const kpisData: BEInventoryKPI[] = Array.isArray(rawKpis)
+          ? rawKpis
+          : [];
 
         const revenue = {
           total: new Intl.NumberFormat("en-US", {
@@ -136,11 +158,7 @@ export function useOverview(): OverviewState {
             maximumFractionDigits: 0,
           }).format(overviewData.net_revenue || 0),
           trendValue: overviewData.revenue_growth_percent || 0,
-          history:
-            overviewData.chart_data?.map((c) => ({
-              time: c.label,
-              value: c.revenue,
-            })) || [],
+          history: buildTodayHistory(overviewData.chart_data ?? []),
         };
 
         const pipelineMap: Record<string, number> = {};
@@ -152,9 +170,11 @@ export function useOverview(): OverviewState {
         const pipeline: PipelineItem[] = [
           {
             label: "Pending",
+            // Đơn chờ xử lý thật: bỏ TEMPORARY, thêm PRIORITY & TRADE_IN_REVIEW (cùng cấp chờ duyệt)
             value:
-              (pipelineMap["TEMPORARY"] || 0) +
               (pipelineMap["PENDING"] || 0) +
+              (pipelineMap["PRIORITY"] || 0) +
+              (pipelineMap["TRADE_IN_REVIEW"] || 0) +
               (pipelineMap["ON_HOLD"] || 0),
             color: "#d4c5b6",
           },
@@ -182,19 +202,18 @@ export function useOverview(): OverviewState {
           (k) => k.title === "Low Stock Items",
         );
 
-        // Mặc định là 1 để tránh lỗi chia cho 0 nếu kho chưa có dữ liệu
-        const totalSkusCount = parseInt(
-          totalSkusItem?.value?.replace(/,/g, "") || "1",
-          10,
-        );
-        const lowStockCount = parseInt(lowStockItem?.value || "0", 10);
+        const parseKpi = (v?: string) =>
+          Number(String(v ?? "").replace(/[^0-9.-]/g, "")) || 0;
 
-        // Tính % theo số lượng SKU
+        const totalSkusCount = parseKpi(totalSkusItem?.value);
+        const lowStockCount = parseKpi(lowStockItem?.value);
+
+        // Không có tổng SKU thì không tính %, và luôn giữ trong khoảng 0–100
         const lowStockPercent =
           totalSkusCount > 0
-            ? Math.round((lowStockCount / totalSkusCount) * 100)
+            ? Math.min(100, Math.round((lowStockCount / totalSkusCount) * 100))
             : 0;
-        const inStockPercent = 100 - lowStockPercent;
+        const inStockPercent = totalSkusCount > 0 ? 100 - lowStockPercent : 0;
 
         const inventoryHealth: InventoryHealthItem[] = [
           { name: "In stock", value: inStockPercent, fill: "#d4c5b6" },
@@ -213,7 +232,7 @@ export function useOverview(): OverviewState {
           if (ticket.status === "CLOSED") uiStatus = "Closed";
           if (ticket.status === "BOT") uiStatus = "Bot";
           return {
-            id: `#TK-${ticket.id.toUpperCase()}`,
+            id: `#TK-${String(ticket.id ?? "").toUpperCase()}`,
             status: uiStatus,
           };
         });

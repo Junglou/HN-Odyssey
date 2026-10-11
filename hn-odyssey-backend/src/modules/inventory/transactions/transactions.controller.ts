@@ -46,7 +46,7 @@ export class TransactionsController {
   // Quy tắc thứ tự: static routes trước, dynamic (:id) sau cùng
 
   @Post('import')
-  @RequirePermissions(Resource.TRANSFERS, Action.CREATE)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.CREATE)
   async createImportNote(
     @Body() dto: CreateImportNoteDto,
     @Req() req: RequestWithUser,
@@ -77,7 +77,7 @@ export class TransactionsController {
 
   // import/history
   @Get('import/history')
-  @RequirePermissions(Resource.TRANSFERS, Action.READ)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.READ)
   async getImportHistory(@Query() query: GetTransactionsDto) {
     const result = await this.transactionsService.getImportHistory(query);
     return new BaseResponse(
@@ -96,7 +96,7 @@ export class TransactionsController {
 
   // import/history/export/excel
   @Get('import/history/export/excel')
-  @RequirePermissions(Resource.TRANSFERS, Action.EXPORT)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.EXPORT)
   async exportHistoryExcel(
     @Query() query: GetTransactionsDto,
     @Res() res: Response,
@@ -106,14 +106,14 @@ export class TransactionsController {
 
   //  import/history/export/excel/:id
   @Get('import/history/export/excel/:id')
-  @RequirePermissions(Resource.TRANSFERS, Action.EXPORT)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.EXPORT)
   async exportDetailExcel(@Param('id') id: string, @Res() res: Response) {
     await this.transactionsService.exportDetailExcel(id, res);
   }
 
   // import/excel/preview
   @Post('import/excel/preview')
-  @RequirePermissions(Resource.TRANSFERS, Action.CREATE)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.CREATE)
   @UseInterceptors(
     FileInterceptor('file', {
       fileFilter: (req, file, cb) => {
@@ -140,21 +140,21 @@ export class TransactionsController {
 
   // import/excel/template
   @Get('import/excel/template')
-  @RequirePermissions(Resource.TRANSFERS, Action.READ)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.CREATE)
   async downloadImportTemplate(@Res() res: Response) {
     await this.transactionsService.downloadImportTemplate(res);
   }
 
   //  import/history/pdf/:id
   @Get('import/history/pdf/:id')
-  @RequirePermissions(Resource.TRANSFERS, Action.READ)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.READ)
   async exportImportDetailPdf(@Param('id') id: string, @Res() res: Response) {
     await this.transactionsService.exportImportDetailPdf(id, res);
   }
 
   //  import/history/:id — phải đứng SAU tất cả static của prefix này
   @Get('import/history/:id')
-  @RequirePermissions(Resource.TRANSFERS, Action.READ)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.READ)
   async getImportDetail(@Param('id') id: string) {
     const data = await this.transactionsService.getImportDetail(id);
     return new BaseResponse(true, 'Lấy chi tiết phiếu nhập thành công', data);
@@ -164,7 +164,7 @@ export class TransactionsController {
   // Quy tắc thứ tự: static routes trước, dynamic (:id) sau cùng
 
   @Post('export')
-  @RequirePermissions(Resource.TRANSFERS, Action.CREATE)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.CREATE)
   async createExportNote(
     @Body() dto: CreateExportNoteDto,
     @Req() req: RequestWithUser,
@@ -191,7 +191,7 @@ export class TransactionsController {
 
   // export/history
   @Get('export/history')
-  @RequirePermissions(Resource.TRANSFERS, Action.READ)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.READ)
   async getExportHistory(@Query() query: GetTransactionsDto) {
     const result = await this.transactionsService.getExportHistory(query);
     return new BaseResponse(
@@ -210,7 +210,7 @@ export class TransactionsController {
 
   // export/history/export/excel
   @Get('export/history/export/excel')
-  @RequirePermissions(Resource.TRANSFERS, Action.EXPORT)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.EXPORT)
   async exportHistoryExcelReport(
     @Query() query: GetTransactionsDto,
     @Res() res: Response,
@@ -220,21 +220,21 @@ export class TransactionsController {
 
   //  export/history/export/excel/:id
   @Get('export/history/export/excel/:id')
-  @RequirePermissions(Resource.TRANSFERS, Action.EXPORT)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.EXPORT)
   async exportDetailExcelReport(@Param('id') id: string, @Res() res: Response) {
     await this.transactionsService.exportDetailExcelReport(id, res);
   }
 
   //  export/history/pdf/:id  ← FIX: đứng trước export/history/:id
   @Get('export/history/pdf/:id')
-  @RequirePermissions(Resource.TRANSFERS, Action.READ)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.READ)
   async exportDetailPdf(@Param('id') id: string, @Res() res: Response) {
     await this.transactionsService.exportDetailPdf(id, res);
   }
 
   // export/excel/preview
   @Post('export/excel/preview')
-  @RequirePermissions(Resource.TRANSFERS, Action.CREATE)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.CREATE)
   @UseInterceptors(
     FileInterceptor('file', {
       fileFilter: (req, file, cb) => {
@@ -257,14 +257,14 @@ export class TransactionsController {
 
   // export/excel/template
   @Get('export/excel/template')
-  @RequirePermissions(Resource.TRANSFERS, Action.READ)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.CREATE)
   async downloadExportTemplate(@Res() res: Response) {
     await this.transactionsService.downloadExportTemplate(res);
   }
 
   //  export/history/:id — phải đứng SAU tất cả static của prefix này
   @Get('export/history/:id')
-  @RequirePermissions(Resource.TRANSFERS, Action.READ)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.READ)
   async getExportDetail(@Param('id') id: string) {
     const data = await this.transactionsService.getExportDetail(id);
     return new BaseResponse(true, 'Lấy chi tiết phiếu xuất thành công', data);
@@ -274,7 +274,7 @@ export class TransactionsController {
 
   // history/all
   @Get('history/all')
-  @RequirePermissions(Resource.TRANSFERS, Action.READ)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.READ)
   async getAllHistory(@Query() query: GetTransactionsDto) {
     const result = await this.transactionsService.getAllHistory(query);
     return new BaseResponse(
@@ -293,7 +293,7 @@ export class TransactionsController {
 
   //  :id/complete
   @Patch(':id/complete')
-  @RequirePermissions(Resource.TRANSFERS, Action.UPDATE)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.UPDATE)
   async completeTicket(@Param('id') id: string, @Req() req: RequestWithUser) {
     const actorId = req.user?._id;
     if (!actorId)
@@ -314,7 +314,7 @@ export class TransactionsController {
 
   //  :id/cancel
   @Patch(':id/cancel')
-  @RequirePermissions(Resource.TRANSFERS, Action.CANCEL)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.CANCEL)
   async cancelTicket(
     @Param('id') id: string,
     @Body('reason') reason: string,

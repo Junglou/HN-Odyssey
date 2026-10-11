@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
+import tokenStorage from "../../../../utils/tokenStorage";
+import { Resource, Action } from "../../../../types/permissions";
 
 export interface ProductData {
   sku: string;
@@ -30,6 +32,7 @@ export interface VariantAttribute {
   id: string;
   name: string;
   values: string[];
+  rawValues?: ApiAttributeValue[];
 }
 
 export interface ApiTag {
@@ -38,6 +41,8 @@ export interface ApiTag {
 
 export interface ApiAttributeValue {
   value: string;
+  // PATCH (ESLint): Thay any bằng Record<string, unknown> để lưu trữ linh hoạt (vd: { color: "#FFFFFF" })
+  meta?: Record<string, unknown>;
 }
 
 export interface ApiAttribute {
@@ -50,6 +55,8 @@ export interface ApiAttribute {
 export interface ApiVariantAttribute {
   code: string;
   value: string;
+  // PATCH (ESLint): Tương tự ApiAttributeValue
+  meta?: Record<string, unknown>;
 }
 
 export interface ApiVariant {
@@ -58,19 +65,21 @@ export interface ApiVariant {
   attributes: ApiVariantAttribute[];
 }
 
+export interface VariantPayload {
+  sku: string;
+  price: number;
+  stock?: number;
+  attributes: ApiVariantAttribute[];
+}
+
 export interface ProductPayload {
   name: string;
   sku: string;
   description: string;
   category_ids: string[];
-  tags: string[];
+  tags?: string[];
   price?: number;
-  variants?: {
-    sku: string;
-    stock: number;
-    price: number;
-    attributes: { code: string; value: string }[];
-  }[];
+  variants?: VariantPayload[];
 }
 
 export interface ApiCategoryNode {
@@ -80,7 +89,6 @@ export interface ApiCategoryNode {
   children?: ApiCategoryNode[];
 }
 
-// Interface chuẩn hóa lỗi từ Backend/Axios
 export interface ApiError {
   response?: {
     data?: {
@@ -88,6 +96,12 @@ export interface ApiError {
     };
   };
   message?: string;
+}
+
+// Cấu trúc User để TypeScript nhận diện quyền
+interface UserPayload {
+  roles?: string[];
+  permissions?: { resource: string; actions: string[] }[];
 }
 
 const generatePricingVariants = (
@@ -117,27 +131,24 @@ const generatePricingVariants = (
     }));
   }
 
-  // THÊM HÀM LÀM SẠCH SKU Ở ĐÂY
   const sanitizeSkuPart = (str: string) => {
     return str
       .toUpperCase()
-      .replace(/\s+/g, "-") // Biến khoảng trắng thành dấu gạch ngang
-      .replace(/[^A-Z0-9_-]/g, "") // Loại bỏ mọi ký tự không phải chữ, số, gạch ngang, gạch dưới (VD: xóa dấu %)
-      .replace(/-+/g, "-") // Rút gọn nhiều dấu gạch ngang liên tiếp thành 1 dấu
-      .replace(/^-|-$/g, ""); // Xóa dấu gạch ngang ở đầu hoặc cuối chuỗi nếu có
+      .replace(/\s+/g, "-")
+      .replace(/[^A-Z0-9_-]/g, "")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
   };
 
   return variantConfigs.map((config, index) => {
     const existing = currentPricing.find((p) => p.variantName === config.name);
     if (existing) return existing;
 
-    // ÁP DỤNG HÀM LÀM SẠCH VÀO SUFFIX
     const suffix =
       config.combination.length > 0
         ? `-${config.combination.map(sanitizeSkuPart).join("-")}`
         : "";
 
-    // Dọn dẹp lại một lần cuối để tránh trường hợp baseSku có kết thúc bằng gạch ngang nối với suffix
     const finalSku = `${baseSku || "NEW"}${suffix}`.replace(/-+/g, "-");
 
     return {
@@ -160,6 +171,46 @@ export function useProductForm() {
     : location.pathname.endsWith("/add") || id === "add"
       ? "add"
       : "view";
+
+  // --- LOGIC PHÂN QUYỀN (CHUYỂN TỪ PAGE VÀO HOOK) ---
+  const user = tokenStorage.getUser() as UserPayload | null;
+  const hasPermission = (resourceCode: Resource, actionCode: Action) => {
+    if (!user || !user.permissions) return false;
+    if (user.roles && user.roles.includes("Super Admin")) return true;
+    const perm = user.permissions.find((p) => p.resource === resourceCode);
+    if (!perm) return false;
+    return (
+      perm.actions.includes(actionCode) || perm.actions.includes(Action.MANAGE)
+    );
+  };
+
+  const isAddMode = mode === "add";
+  const isEditMode = mode === "edit";
+  const canCreate = hasPermission(Resource.CATALOG_PRODUCTS, Action.CREATE);
+  const canUpdate = hasPermission(Resource.CATALOG_PRODUCTS, Action.UPDATE);
+
+  // [THÊM MỚI]: Kiểm tra quyền Gửi yêu cầu duyệt giá
+  const canSubmitPrice = hasPermission(
+    Resource.CATALOG_PRICING,
+    Action.SUBMIT_APPROVAL,
+  );
+
+  // Biến cờ: Bằng false nếu người dùng đang ở sai chế độ (vd: add mà không có quyền create)
+  const isAuthorized =
+    !(isAddMode && !canCreate) && !(isEditMode && !canUpdate);
+
+  useEffect(() => {
+    if (isAddMode && !canCreate) {
+      toast.error("Truy cập bị từ chối: Bạn không có quyền thêm mới sản phẩm!");
+      navigate("/portal/products", { replace: true });
+    } else if (isEditMode && !canUpdate) {
+      toast.error(
+        "Truy cập bị từ chối: Bạn không có quyền chỉnh sửa sản phẩm này!",
+      );
+      navigate("/portal/products", { replace: true });
+    }
+  }, [isAddMode, isEditMode, canCreate, canUpdate, navigate]);
+  // --- KẾT THÚC LOGIC PHÂN QUYỀN ---
 
   const [formData, setFormData] = useState<ProductData>({
     sku: "",
@@ -186,7 +237,7 @@ export function useProductForm() {
   const [productVariants, setProductVariants] = useState<VariantAttribute[]>(
     [],
   );
-  const [categoryError, setCategoryError] = useState<string>("");
+  const [categoryError, setCategoryError] = useState("");
 
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [availableAttributes, setAvailableAttributes] = useState<
@@ -197,12 +248,19 @@ export function useProductForm() {
   >([]);
 
   useEffect(() => {
+    // Chặn gọi API nếu không được phép truy cập
+    if (!isAuthorized) return;
+
     const fetchDependencies = async () => {
       try {
         const [tagsRes, attrRes, catRes] = await Promise.all([
-          axiosClient.get("/tags"),
-          axiosClient.get("/attributes"),
-          axiosClient.get("/categories/admin/tree-view"),
+          axiosClient.get("/tags/public/active").catch(() => ({ data: [] })),
+          axiosClient
+            .get("/attributes/public/active")
+            .catch(() => ({ data: [] })),
+          axiosClient
+            .get("/categories/tree-view")
+            .catch(() => ({ data: { data: [] } })),
         ]);
 
         setAvailableTags(tagsRes.data.map((t: ApiTag) => t.name));
@@ -210,6 +268,7 @@ export function useProductForm() {
         const mappedAttrs = attrRes.data.map((a: ApiAttribute) => ({
           id: a.code || a._id || "",
           name: a.name,
+          rawValues: a.values || [],
           values: a.values
             ? a.values.map((v: ApiAttributeValue) => v.value.toUpperCase())
             : [],
@@ -241,9 +300,12 @@ export function useProductForm() {
       }
     };
     fetchDependencies();
-  }, []);
+  }, [isAuthorized]);
 
   useEffect(() => {
+    // Chặn gọi API nếu không được phép truy cập
+    if (!isAuthorized) return;
+
     if ((mode === "edit" || mode === "view") && id) {
       const loadProductData = async () => {
         try {
@@ -377,12 +439,12 @@ export function useProductForm() {
       };
       loadProductData();
     }
-  }, [mode, id, navigate]);
+  }, [mode, id, navigate, isAuthorized]);
 
   const actions = {
     changeInput: (name: keyof ProductData, value: string) => {
       setFormData((prev) => {
-        const newData = { ...prev, [name]: value };
+        const newData = { ...prev, [name]: value } as ProductData;
         if (name === "sku") {
           setPricingList((curr) =>
             generatePricingVariants(productVariants, curr, value),
@@ -396,7 +458,7 @@ export function useProductForm() {
       setFormData((prev) => {
         const isSelected = prev.categoryIds.includes(categoryId);
         const newCategoryIds = isSelected
-          ? prev.categoryIds.filter((id) => id !== categoryId)
+          ? prev.categoryIds.filter((cid) => cid !== categoryId)
           : [...prev.categoryIds, categoryId];
         return { ...prev, categoryIds: newCategoryIds };
       });
@@ -443,6 +505,10 @@ export function useProductForm() {
     },
 
     submitSinglePrice: async (pricingItemId: string) => {
+      if (!canSubmitPrice) {
+        toast.error("Bạn không có quyền gửi yêu cầu duyệt giá!");
+        return;
+      }
       if (mode === "add" || id === "add" || !id) {
         toast.warning(
           "Vui lòng 'Save Product' trước khi gửi yêu cầu duyệt giá!",
@@ -591,7 +657,6 @@ export function useProductForm() {
         sku: formData.sku,
         description: formData.description,
         category_ids: formData.categoryIds,
-        tags: tags,
       };
 
       if (isSimpleProduct) {
@@ -600,24 +665,39 @@ export function useProductForm() {
         payload.variants = pricingList.map((p) => {
           const valArray = p.variantName.split(" / ");
           const attributes = productVariants
-            .map((attr, i) => ({
-              code: attr.id,
-              value: valArray[i] || "",
-            }))
+            .map((attr, i) => {
+              const val = valArray[i] || "";
+              const rawMatch = attr.rawValues?.find(
+                (rv) => rv.value.toUpperCase() === val.toUpperCase(),
+              );
+              return {
+                code: attr.id,
+                value: val,
+                ...(rawMatch?.meta ? { meta: rawMatch.meta } : {}),
+              };
+            })
             .filter((a) => a.value !== "");
 
-          return {
+          const variantPayload: VariantPayload = {
             sku: p.sku || `${formData.sku}-V`,
-            stock: 0,
             price: p.price,
             attributes: attributes,
           };
+
+          if (mode === "add") {
+            variantPayload.stock = 0;
+          }
+
+          return variantPayload;
         });
       }
 
       try {
+        let productId = id;
+
         if (mode === "add") {
-          await axiosClient.post("/products", payload);
+          const res = await axiosClient.post("/products", payload);
+          productId = res.data?._id || res.data?.id || res.data?.data?._id;
           toast.success("Thêm sản phẩm thành công!");
         } else {
           await axiosClient.patch(`/products/${id}`, payload);
@@ -640,6 +720,18 @@ export function useProductForm() {
             toast.warning(errorMsg);
           }
         }
+
+        if (productId) {
+          try {
+            await axiosClient.patch(`/products/${productId}/tags`, { tags });
+          } catch (tagError) {
+            console.error("Lỗi cập nhật tags:", tagError);
+            toast.warning(
+              "Lưu sản phẩm thành công nhưng cập nhật Tags thất bại.",
+            );
+          }
+        }
+
         navigate("/portal/products");
         return true;
       } catch (error: unknown) {
@@ -669,5 +761,7 @@ export function useProductForm() {
     AVAILABLE_TAGS: availableTags,
     MOCK_AVAILABLE_ATTRIBUTES: availableAttributes,
     AVAILABLE_CATEGORIES: availableCategories,
+    isAuthorized,
+    canSubmitPrice,
   };
 }

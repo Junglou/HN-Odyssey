@@ -17,7 +17,9 @@ export class AdCampaign {
   @Prop()
   utm_medium?: string;
 
-  // Tiền chi phí quảng cáo (Ad Spend) nhập tay (US: ROI - AC1)
+  // CACHE tổng chi phí toàn thời gian (USD) = Σ amount các dòng ad_spend_entries CHƯA hủy.
+  // Chỉ được thay đổi bằng $inc trong cùng transaction khi thêm/hủy dòng (TrackingService).
+  // KHÔNG ghi trực tiếp field này ở bất kỳ chỗ nào khác.
   @Prop({ required: true, default: 0, min: 0 })
   ad_spend: number;
 

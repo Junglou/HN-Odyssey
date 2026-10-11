@@ -45,20 +45,20 @@ export class ChatController {
   }
 
   @Get()
-  @RequirePermissions(Resource.SUPPORT, Action.READ)
+  @RequirePermissions(Resource.CRM_CHAT, Action.READ)
   async getConversations(@Query() query: FilterConversationDto) {
     return this.chatService.findAllConversations(query);
   }
 
   @Get('analytics')
-  @RequirePermissions(Resource.SUPPORT, Action.READ)
+  @RequirePermissions(Resource.CRM_CHAT, Action.READ)
   async getAnalytics() {
     // AC14: Trả về các chỉ số AHT, CSAT, Handoff Rate
     return this.chatService.getChatStatistics();
   }
 
   @Patch(':id/assign')
-  @RequirePermissions(Resource.SUPPORT, Action.UPDATE)
+  @RequirePermissions(Resource.CRM_CHAT, Action.ASSIGN)
   async assignAgent(
     @Param('id') id: string,
     @Query('agentId') agentId: string,
@@ -116,14 +116,14 @@ export class ChatController {
 
   // Lấy tin nhắn theo ID của hội thoại (Admin CRM gọi)
   @Get(':id/messages')
-  @RequirePermissions(Resource.SUPPORT, Action.READ)
+  @RequirePermissions(Resource.CRM_CHAT, Action.READ)
   async getMessagesByConvId(@Param('id') id: string) {
     return this.chatService.getMessagesByConvId(id);
   }
 
   // Nhân viên xác nhận hoàn thành phiên tư vấn
   @Patch(':id/close')
-  @RequirePermissions(Resource.SUPPORT, Action.UPDATE)
+  @RequirePermissions(Resource.CRM_CHAT, Action.UPDATE)
   async closeConversation(@Param('id') id: string) {
     return this.chatService.closeConversation(id);
   }

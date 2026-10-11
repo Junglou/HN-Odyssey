@@ -39,6 +39,9 @@ import {
   TimeInterval,
 } from 'src/common/dtos/report-filter.dto';
 import { ConfigService } from '@nestjs/config';
+import { NON_REVENUE_ORDER_STATUSES } from 'src/common/constants/order-status.constant';
+import { getReportDateRange } from 'src/common/utils/date-range.util';
+import { DEFAULT_TIER_CODE } from 'src/common/constants/loyalty.constant';
 
 interface IRevenueFacetResult {
   timeline: IRevenueTimelineAgg[];
@@ -76,13 +79,7 @@ interface ITimeToPurchaseAgg {
 
 @Injectable()
 export class BusinessReportsService {
-  private readonly EXCLUDED_STATUSES = [
-    'CANCELLED',
-    'REFUNDED',
-    'REFUND_PENDING',
-    'REFUND_NEEDED',
-    'DELIVERY_FAILED',
-  ];
+  private readonly EXCLUDED_STATUSES = NON_REVENUE_ORDER_STATUSES;
   private readonly logger = new Logger(BusinessReportsService.name);
 
   constructor(
@@ -95,61 +92,10 @@ export class BusinessReportsService {
     private readonly configService: ConfigService,
   ) {}
 
-  private getDateRange(filter: DashboardFilterDto): {
-    start: Date;
-    end: Date;
-    prevStart: Date;
-    prevEnd: Date;
-  } {
-    const end = new Date();
-    let start = new Date();
-    let prevStart = new Date();
-    let prevEnd = new Date();
-
-    if (filter.time_filter === TimeFilter.TODAY) {
-      start.setHours(0, 0, 0, 0);
-      prevStart = new Date(start);
-      prevStart.setDate(prevStart.getDate() - 1);
-      prevEnd = new Date(start);
-      prevEnd.setMilliseconds(-1);
-    } else if (filter.time_filter === TimeFilter.THIS_WEEK) {
-      const day = start.getDay();
-      const diff = start.getDate() - day + (day === 0 ? -6 : 1);
-      start = new Date(start.setDate(diff));
-      start.setHours(0, 0, 0, 0);
-
-      prevEnd = new Date(start);
-      prevEnd.setMilliseconds(-1);
-      prevStart = new Date(prevEnd);
-      prevStart.setDate(prevStart.getDate() - 6);
-      prevStart.setHours(0, 0, 0, 0);
-    } else if (
-      filter.time_filter === TimeFilter.CUSTOM &&
-      filter.start_date &&
-      filter.end_date
-    ) {
-      start = new Date(filter.start_date);
-      start.setHours(0, 0, 0, 0);
-      const e = new Date(filter.end_date);
-      e.setHours(23, 59, 59, 999);
-      end.setTime(e.getTime());
-
-      const diffTime = Math.abs(end.getTime() - start.getTime());
-      prevEnd = new Date(start.getTime() - 1);
-      prevStart = new Date(prevEnd.getTime() - diffTime);
-    } else {
-      start = new Date(start.getFullYear(), start.getMonth(), 1);
-      prevEnd = new Date(start.getTime() - 1);
-      prevStart = new Date(prevEnd.getFullYear(), prevEnd.getMonth(), 1);
-    }
-
-    return { start, end, prevStart, prevEnd };
-  }
-
   // US1: REVENUE & CASH FLOW
 
   async getRevenueReport(filter: DashboardFilterDto): Promise<IRevenueReport> {
-    const dates = this.getDateRange(filter);
+    const dates = getReportDateRange(filter);
     const isToday = filter.time_filter === TimeFilter.TODAY;
 
     const baseMatch: PipelineStage.Match = {
@@ -272,7 +218,7 @@ export class BusinessReportsService {
         : 0;
 
     const paymentShares = paymentShareData.map((p) => ({
-      method: String(p._id),
+      method: p._id ? String(p._id) : 'UNKNOWN',
       revenue: p.revenue,
       percentage:
         currentTotalRevenue > 0
@@ -286,7 +232,7 @@ export class BusinessReportsService {
       growthPercentage: Number(growthPercentage.toFixed(2)),
       aov,
       timeline: timelineData.map((t) => ({
-        label: isToday ? `${t._id}:00` : String(t._id),
+        label: isToday ? `${String(t._id).padStart(2, '0')}:00` : String(t._id),
         revenue: t.revenue,
         orders: t.orders,
       })),
@@ -303,7 +249,7 @@ export class BusinessReportsService {
   async getAbandonedProducts(
     filter: DashboardFilterDto,
   ): Promise<IAbandonedProductAgg[]> {
-    const dates = this.getDateRange(filter); // Lấy range thời gian từ filter
+    const dates = getReportDateRange(filter); // Lấy range thời gian từ filter
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
     const categoryMatch = filter.category_id
@@ -449,7 +395,7 @@ export class BusinessReportsService {
   async getRetentionReport(
     filter: DashboardFilterDto,
   ): Promise<IRetentionReport> {
-    const dates = this.getDateRange(filter);
+    const dates = getReportDateRange(filter);
 
     interface IRawOrderUser {
       _id: string;
@@ -578,7 +524,7 @@ export class BusinessReportsService {
 
     const tierStats: Record<string, { total: number; ret: number }> = {};
     usersWithTier.forEach((u) => {
-      const tier = u.loyalty?.tier || 'MEMBER';
+      const tier = u.loyalty?.tier || DEFAULT_TIER_CODE;
       if (!tierStats[tier]) tierStats[tier] = { total: 0, ret: 0 };
 
       const orderData = orderAgg.find((o) => String(o._id) === String(u._id));
@@ -714,7 +660,7 @@ export class BusinessReportsService {
   async getConversionReport(
     filter: DashboardFilterDto,
   ): Promise<IConversionReport> {
-    const dates = this.getDateRange(filter);
+    const dates = getReportDateRange(filter);
     const targetKpi =
       filter.target_kpi ||
       this.configService.get<number>('TARGET_CONVERSION_RATE', 2.5);
@@ -1042,7 +988,7 @@ export class BusinessReportsService {
       avg_duration_seconds: number;
     }
   > {
-    const dates = this.getDateRange(filter);
+    const dates = getReportDateRange(filter);
 
     // 1. KHỞI TẠO MATCH STAGE ĐỘNG (Ép kiểu FilterQuery để an toàn)
     const matchStage: FilterQuery<UserBehavior> = {
@@ -1559,7 +1505,7 @@ export class BusinessReportsService {
   }
 
   async getTimeToPurchaseStats(filter: DashboardFilterDto) {
-    const dates = this.getDateRange(filter);
+    const dates = getReportDateRange(filter);
 
     // Tiêm Type ITimeToPurchaseAgg vào hàm aggregate
     const agg = await this.behaviorModel.aggregate<ITimeToPurchaseAgg>([

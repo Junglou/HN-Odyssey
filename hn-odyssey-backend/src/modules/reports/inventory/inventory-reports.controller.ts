@@ -31,7 +31,8 @@ export class InventoryReportsController {
   constructor(private readonly reportsService: InventoryReportsService) {}
 
   @Get('trend')
-  @RequirePermissions(Resource.REPORTS, Action.READ)
+  // [SỬA]: Sử dụng REPORT_STOCK vì đây là báo cáo Inventory Management
+  @RequirePermissions(Resource.REPORT_STOCK, Action.READ)
   async getInventoryTrend(@Query() query: GetXntReportDto) {
     const data = await this.reportsService.getInventoryTrend(query);
     return new BaseResponse(
@@ -43,7 +44,9 @@ export class InventoryReportsController {
 
   // F.112 & F.113: Xem và Lọc báo cáo XNT
   @Get('xnt')
-  @RequirePermissions(Resource.REPORTS, Action.READ)
+  // [SỬA]: Sử dụng REPORT_STOCK vì đây là báo cáo Inventory Management
+  // [SỬA]: Thay đổi Action.EXPORT thành Action.READ (Quyền xem bảng báo cáo)
+  @RequirePermissions(Resource.REPORT_STOCK, Action.READ)
   async getXntReport(@Query() query: GetXntReportDto) {
     const result = await this.reportsService.getXntReport(query);
     return new BaseResponse(
@@ -62,7 +65,8 @@ export class InventoryReportsController {
 
   // Drill-down: Xem chi tiết dòng chảy hàng hóa của 1 SKU
   @Get('xnt/:sku/drill-down')
-  @RequirePermissions(Resource.REPORTS, Action.READ)
+  // [SỬA]: Sử dụng REPORT_STOCK
+  @RequirePermissions(Resource.REPORT_STOCK, Action.READ)
   async getDrillDown(
     @Param('sku') sku: string,
     @Query() query: DrillDownQueryDto,
@@ -80,7 +84,8 @@ export class InventoryReportsController {
 
   // F.114: Xuất Excel
   @Get('xnt/export/excel')
-  @RequirePermissions(Resource.REPORTS, Action.EXPORT) // AC6: Ngăn chặn truy cập trái phép
+  // [SỬA]: Sử dụng REPORT_STOCK và giữ quyền EXPORT
+  @RequirePermissions(Resource.REPORT_STOCK, Action.EXPORT)
   async exportExcel(
     @Query() query: GetXntReportDto,
     @Req() req: RequestWithUser,
@@ -92,7 +97,8 @@ export class InventoryReportsController {
 
   // F.114: Xuất PDF
   @Get('xnt/export/pdf')
-  @RequirePermissions(Resource.REPORTS, Action.EXPORT) // AC6
+  // [SỬA]: Sử dụng REPORT_STOCK và giữ quyền EXPORT
+  @RequirePermissions(Resource.REPORT_STOCK, Action.EXPORT)
   async exportPdf(
     @Query() query: GetXntReportDto,
     @Req() req: RequestWithUser,
@@ -100,5 +106,17 @@ export class InventoryReportsController {
   ) {
     const actorId = req.user._id;
     await this.reportsService.exportXntPdf(query, actorId, res);
+  }
+
+  // F.xxx: Lấy dữ liệu tổng quan KPI cho Dashboard Báo Cáo
+  @Get('kpi-summary')
+  @RequirePermissions(Resource.REPORT_STOCK, Action.READ)
+  async getKpiSummary(@Query() query: GetXntReportDto) {
+    const data = await this.reportsService.getKpiSummary(query);
+    return new BaseResponse(
+      true,
+      'Fetch inventory KPI summary successfully',
+      data,
+    );
   }
 }

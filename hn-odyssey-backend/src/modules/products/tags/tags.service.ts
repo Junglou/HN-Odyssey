@@ -74,6 +74,19 @@ export class TagsService {
     return tag;
   }
 
+  async findActiveTags(scope?: TagScope) {
+    // Ép kiểu rõ ràng là FilterQuery của TagDocument
+    const filter: import('mongoose').FilterQuery<TagDocument> = {
+      is_active: true,
+    };
+
+    if (scope) {
+      filter.scope = scope;
+    }
+
+    return this.tagModel.find(filter).exec();
+  }
+
   async create(
     createTagDto: CreateTagDto,
     actorId: string,

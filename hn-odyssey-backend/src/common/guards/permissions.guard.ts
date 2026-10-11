@@ -3,118 +3,108 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
-  Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { Request } from 'express';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Request } from 'express';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
+import { Action, Resource } from 'src/common/enums/resource.enum';
+import { isReservedRoleKey } from 'src/common/constants/system-roles.constant';
 import {
   Role,
   RoleDocument,
 } from 'src/modules/users/roles/schemas/role.schema';
-import { Role as RoleEnum } from 'src/common/enums/role.enum';
-import { Action } from 'src/common/enums/resource.enum';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
-// 2. Định nghĩa Interface cho User
-interface RequestUser {
+export interface RequestUser {
+  _id: string;
   email: string;
-  roles: string[];
-  userId: string;
+  roles?: string[];
 }
 
-// 3. Định nghĩa Request có chứa User
-interface RequestWithUser extends Request {
-  user: RequestUser;
+export interface RequestWithUser extends Request {
+  user?: RequestUser;
 }
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
-  private readonly logger = new Logger(PermissionsGuard.name);
-
   constructor(
     private reflector: Reflector,
-    @InjectModel(Role.name) private roleModel: Model<RoleDocument>,
+    @InjectModel(Role.name) private readonly roleModel: Model<RoleDocument>,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-
-    if (isPublic) {
-      return true;
-    }
     const requiredPermission = this.reflector.getAllAndOverride<{
-      resource: string;
-      action: string;
+      resource: Resource | Resource[];
+      action: Action | Action[];
     }>(PERMISSIONS_KEY, [context.getHandler(), context.getClass()]);
 
-    if (!requiredPermission) {
-      return true;
-    }
+    if (!requiredPermission) return true;
 
-    // Thay vì: const { user } = context.switchToHttp().getRequest();
-    // Ta dùng Generics để báo cho TS biết kiểu trả về chính xác
     const request = context.switchToHttp().getRequest<RequestWithUser>();
     const user = request.user;
 
-    // Lúc này user đã có kiểu RequestUser, truy cập .roles hay .email đều an toàn
-    if (!user || !user.roles || !Array.isArray(user.roles)) {
-      throw new ForbiddenException('User không hợp lệ hoặc không có vai trò.');
+    if (!user) {
+      throw new ForbiddenException('Vui lòng đăng nhập để tiếp tục.');
     }
 
-    // Ép kiểu Enum về string để so sánh với mảng string (user.roles)
-    const superAdminRole = RoleEnum.SUPER_ADMIN as unknown as string;
-    if (user.roles.includes(superAdminRole)) {
-      return true;
-    }
+    const userRoleSlugs = Array.isArray(user.roles) ? user.roles : [];
 
-    const userRoles = await this.roleModel
-      .find({
-        slug: { $in: user.roles },
-        is_active: true,
-      })
-      .select('permissions slug')
+    // 1. Slug dành riêng (chỉ seeder tạo được, API tạo/sửa Role đã chặn)
+    if (userRoleSlugs.some((r) => isReservedRoleKey(String(r)))) return true;
+
+    // 2. Lấy chi tiết Role từ DB
+    const userRolesDb = await this.roleModel
+      .find({ slug: { $in: userRoleSlugs }, is_active: true })
+      .select('is_system permissions')
       .exec();
 
-    if (!userRoles || userRoles.length === 0) {
+    // 3. Role hệ thống: CHỈ tin cờ is_system, KHÔNG BAO GIỜ tin tên role
+    if (userRolesDb.some((r) => r.is_system)) return true;
+
+    // 4. Gộp tất cả quyền của user
+    const userPermissions: { resource: string; actions: string[] }[] = [];
+    userRolesDb.forEach((role) => {
+      if (role.permissions && Array.isArray(role.permissions)) {
+        role.permissions.forEach((p: unknown) => {
+          if (p && typeof p === 'object') {
+            const pObj = p as Record<string, unknown>;
+            userPermissions.push({
+              resource: String(pObj.resource),
+              actions: Array.isArray(pObj.actions)
+                ? pObj.actions.map(String)
+                : [],
+            });
+          }
+        });
+      }
+    });
+
+    if (userPermissions.length === 0) {
       throw new ForbiddenException(
-        'Vai trò của bạn không tồn tại hoặc đã bị khóa.',
+        'Tài khoản của bạn chưa được cấp quyền truy cập (Rỗng quyền).',
       );
     }
 
-    const hasPermission = userRoles.some((role) => {
-      const permission = role.permissions.find(
-        (p) =>
-          (p.resource as unknown as string) ===
-          (requiredPermission.resource as unknown as string),
-      );
-      if (!permission) return false;
+    // 5. Kiểm tra quyền (OR giữa các resource, OR giữa các action)
+    const requiredResources = Array.isArray(requiredPermission.resource)
+      ? requiredPermission.resource
+      : [requiredPermission.resource];
 
-      // Ép kiểu mảng Enum từ DB về mảng string để so sánh an toàn
-      const allowedActions = permission.actions as unknown as string[];
-      const manageAction = Action.MANAGE as unknown as string;
-      const currentAction = requiredPermission.action;
+    const requiredActions = Array.isArray(requiredPermission.action)
+      ? requiredPermission.action
+      : [requiredPermission.action];
 
-      // So sánh string với string -> Hợp lệ 100%
-      return (
-        allowedActions.includes(currentAction) ||
-        allowedActions.includes(manageAction)
-      );
-    });
+    const hasPermission = userPermissions.some(
+      (p) =>
+        requiredResources.includes(p.resource as Resource) &&
+        (requiredActions.some((reqAct) => p.actions.includes(reqAct)) ||
+          p.actions.includes(Action.MANAGE)),
+    );
 
     if (!hasPermission) {
-      this.logger.warn(
-        `User [${user.email}] - Roles [${user.roles.join(', ')}] tried to [${
-          requiredPermission.action
-        }] on [${requiredPermission.resource}] -> DENIED`,
-      );
       throw new ForbiddenException(
-        `Bạn không có quyền thực hiện thao tác này.`,
+        'Bạn không có quyền thực hiện thao tác này.',
       );
     }
 

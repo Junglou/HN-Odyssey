@@ -9,7 +9,6 @@ export interface BackendPermission {
   actions: string[];
 }
 
-// Đồng bộ chuẩn schema trả về từ server, sử dụng is_active để xác định trạng thái
 export interface BackendRole {
   _id: string;
   name: string;
@@ -227,6 +226,9 @@ export function useRoleManagement() {
 
           let granted: string[] = [];
           if (bePerm) {
+            // [CẬP NHẬT]: Nếu backend lỡ trả về MANAGE do dữ liệu cũ,
+            // ta sẽ check và chuyển nó lại thành full quyền có sẵn của Resource đó
+            // để UI có thể hiện tick xanh.
             if (bePerm.actions.includes("MANAGE")) {
               granted = [...sub.availableActions];
             } else {
@@ -276,17 +278,10 @@ export function useRoleManagement() {
         permissions.forEach((mod) => {
           mod.subModules.forEach((sub) => {
             if (sub.grantedActions.length > 0) {
-              let actionsToSave = sub.grantedActions;
-              if (
-                sub.availableActions.length > 0 &&
-                sub.grantedActions.length === sub.availableActions.length
-              ) {
-                actionsToSave = ["MANAGE"];
-              }
-
+              // [ĐÃ SỬA]: Gửi ĐÚNG NHỮNG QUYỀN ĐƯỢC TICK. Không tự ý gom thành MANAGE nữa.
               bePermissionsPayload.push({
                 resource: sub.subId,
-                actions: actionsToSave,
+                actions: sub.grantedActions,
               });
             }
           });

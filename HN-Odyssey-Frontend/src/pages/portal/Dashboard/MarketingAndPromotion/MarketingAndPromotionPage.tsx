@@ -8,11 +8,19 @@ export default function MarketingAndPromotionPage() {
     startDate,
     endDate,
     isLoading,
+    isExporting,
     dateError,
     adMetrics,
     campaigns,
     couponMetrics,
     coupons,
+    period,
+    channelStats,
+    campaignOptions,
+    selectedCampaignId,
+    setSelectedCampaignId,
+    campaignTrend,
+    isTrendLoading,
     handleFilterChange,
     setStartDate,
     setEndDate,
@@ -23,6 +31,9 @@ export default function MarketingAndPromotionPage() {
     couponPage,
     totalCouponPages,
     setCouponPage,
+    handleExportExcel,
+    adSpendLedger,
+    permissions,
   } = useMarketingAndPromotion();
 
   return (
@@ -32,11 +43,19 @@ export default function MarketingAndPromotionPage() {
         startDate={startDate}
         endDate={endDate}
         isLoading={isLoading}
+        isExporting={isExporting}
         dateError={dateError}
         adMetrics={adMetrics}
         campaigns={campaigns}
         couponMetrics={couponMetrics}
         coupons={coupons}
+        period={period}
+        channelStats={channelStats}
+        campaignOptions={campaignOptions}
+        selectedCampaignId={selectedCampaignId}
+        onSelectCampaign={setSelectedCampaignId}
+        campaignTrend={campaignTrend}
+        isTrendLoading={isTrendLoading}
         onFilterChange={handleFilterChange}
         onStartDateChange={setStartDate}
         onEndDateChange={setEndDate}
@@ -47,6 +66,9 @@ export default function MarketingAndPromotionPage() {
         couponPage={couponPage}
         totalCouponPages={totalCouponPages}
         onCouponPageChange={setCouponPage}
+        handleExportExcel={handleExportExcel}
+        adSpendLedger={adSpendLedger}
+        permissions={permissions}
       />
     </div>
   );

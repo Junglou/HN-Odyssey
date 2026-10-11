@@ -1,5 +1,7 @@
 import { useState } from "react";
 import "./CampaignPerformanceTable.css";
+import { getPageItems } from "../../../../utils/pagination";
+import { NO_SPEND_TOOLTIP } from "../../../../hooks/portal/Dashboard/MarketingAndPromotion/useMarketingAndPromotion";
 
 export interface CampaignData {
   id: string;
@@ -15,6 +17,16 @@ interface CampaignPerformanceTableProps {
   data: CampaignData[];
 }
 
+// Đồng bộ quy ước 3 màu với trang Marketing (US.82 AC3): lãi / hòa vốn / lỗ.
+// Trước đây dùng roi.startsWith("+") → ROI 0% (hòa vốn) bị tô đỏ như lỗ.
+const roiClass = (roi: string) => {
+  if (roi === "—") return "cpt-roi-nospend";
+  const v = parseFloat(roi);
+  if (v > 0) return "cpt-roi-positive";
+  if (v < 0) return "cpt-roi-negative";
+  return "cpt-roi-breakeven";
+};
+
 export default function CampaignPerformanceTable({
   data,
 }: CampaignPerformanceTableProps) {
@@ -25,7 +37,9 @@ export default function CampaignPerformanceTable({
   const safeData = data || [];
 
   const totalPages = Math.ceil(safeData.length / itemsPerPage) || 1;
-  const startIndex = (currentPage - 1) * itemsPerPage;
+  // Dữ liệu ít đi (đổi filter) thì không để trang hiện tại vượt quá tổng số trang
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * itemsPerPage;
   const currentData = safeData.slice(startIndex, startIndex + itemsPerPage);
 
   return (
@@ -39,7 +53,7 @@ export default function CampaignPerformanceTable({
               <tr>
                 <th className="cpt-th">Campaign Name</th>
                 <th className="cpt-th">Budget</th>
-                <th className="cpt-th">Spend</th>
+                <th className="cpt-th">Spend (period)</th>
                 <th className="cpt-th">Revenue</th>
                 <th className="cpt-th">ROI %</th>
               </tr>
@@ -56,8 +70,7 @@ export default function CampaignPerformanceTable({
                       color: "#64748b",
                     }}
                   >
-                    Không có chiến dịch quảng cáo nào phát sinh dữ liệu trong
-                    thời gian này
+                    No campaigns with activity in this period
                   </td>
                 </tr>
               ) : (
@@ -71,11 +84,8 @@ export default function CampaignPerformanceTable({
                     <td className="cpt-td">{row.revenue}</td>
                     <td className="cpt-td">
                       <span
-                        className={`cpt-roi-badge ${
-                          row.roi.startsWith("+")
-                            ? "cpt-roi-positive"
-                            : "cpt-roi-negative"
-                        }`}
+                        className={`cpt-roi-badge ${roiClass(row.roi)}`}
+                        title={row.roi === "—" ? NO_SPEND_TOOLTIP : undefined}
                       >
                         {row.roi}
                       </span>
@@ -87,35 +97,43 @@ export default function CampaignPerformanceTable({
           </table>
         </div>
 
-        <div className="cpt-pagination-container">
-          <button
-            className="cpt-page-nav-btn"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((prev) => prev - 1)}
-          >
-            Previous
-          </button>
+        {totalPages > 1 && (
+          <div className="cpt-pagination-container">
+            <button
+              className="cpt-page-nav-btn"
+              disabled={safePage <= 1}
+              onClick={() => setCurrentPage(safePage - 1)}
+            >
+              Previous
+            </button>
 
-          <div className="cpt-page-numbers">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <button
-                key={page}
-                className={`cpt-page-num-btn ${currentPage === page ? "cpt-active" : ""}`}
-                onClick={() => setCurrentPage(page)}
-              >
-                {page}
-              </button>
-            ))}
+            <div className="cpt-page-numbers">
+              {getPageItems(safePage, totalPages).map((item, idx) =>
+                item === "..." ? (
+                  <span key={`dots-${idx}`} className="cpt-page-ellipsis">
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={item}
+                    className={`cpt-page-num-btn ${safePage === item ? "cpt-active" : ""}`}
+                    onClick={() => setCurrentPage(item)}
+                  >
+                    {item}
+                  </button>
+                ),
+              )}
+            </div>
+
+            <button
+              className="cpt-page-nav-btn"
+              disabled={safePage >= totalPages}
+              onClick={() => setCurrentPage(safePage + 1)}
+            >
+              Next
+            </button>
           </div>
-
-          <button
-            className="cpt-page-nav-btn"
-            disabled={currentPage === totalPages || safeData.length === 0}
-            onClick={() => setCurrentPage((prev) => prev + 1)}
-          >
-            Next
-          </button>
-        </div>
+        )}
       </div>
     </div>
   );

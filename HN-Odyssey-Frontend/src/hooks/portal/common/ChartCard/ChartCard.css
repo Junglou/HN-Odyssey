@@ -1,0 +1,71 @@
+.cc-card {
+  position: relative;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 16px 20px 20px;
+  min-width: 0; /* cho phép biểu đồ co lại trong grid */
+}
+
+/* Nút Xuất PDF — nằm ngoài vùng chụp */
+.cc-pdf-btn {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  z-index: 5;
+  height: 30px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 6px;
+  background-color: #ef4444;
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cc-pdf-btn:hover:not(:disabled) {
+  background-color: #dc2626;
+}
+
+.cc-pdf-btn:disabled {
+  background-color: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* Vùng được chụp vào PDF */
+.cc-capture {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background-color: #ffffff;
+}
+
+.cc-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-right: 110px; /* chừa chỗ cho nút Xuất PDF */
+}
+
+.cc-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.cc-period {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.cc-subtitle {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: #64748b;
+}
+
+.cc-body {
+  width: 100%;
+  min-width: 0;
+}

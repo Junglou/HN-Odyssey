@@ -18,6 +18,27 @@ import type { Response } from 'express';
 import PDFDocument from 'pdfkit';
 import * as path from 'path';
 import * as fs from 'fs';
+import {
+  DEFAULT_MIN_STOCK,
+  StockAlertStatus,
+  classifyStock,
+  pickPositive,
+} from 'src/common/utils/stock-status.util';
+import {
+  toVnDayRange,
+  toVnParts,
+  vnStartOfDay,
+} from 'src/common/utils/date-range.util';
+
+export interface KpiAlertItem {
+  _id: string;
+  sku: string;
+  name: string;
+  stock: number;
+  min_stock: number;
+  max_stock: number | null;
+  status: StockAlertStatus;
+}
 
 export interface XntRecord {
   sku: string;
@@ -216,8 +237,8 @@ export class InventoryReportsService {
           currentStockMap.set(String(v.sku), {
             name: `${p.name} - ${v.sku}`,
             stock: Number(v.stock) || 0,
-            min: Number(v.min_stock) || Number(p.min_stock) || 0,
-            max: Number(v.max_stock) || Number(p.max_stock) || 999999,
+            min: pickPositive(v.min_stock, p.min_stock) ?? DEFAULT_MIN_STOCK,
+            max: pickPositive(v.max_stock, p.max_stock) ?? Infinity,
           });
         });
       } else {
@@ -240,8 +261,8 @@ export class InventoryReportsService {
         currentStockMap.set(String(p.sku), {
           name: String(p.name),
           stock: Number(p.stock) || 0,
-          min: Number(p.min_stock) || 0,
-          max: Number(p.max_stock) || 999999,
+          min: pickPositive(p.min_stock) ?? DEFAULT_MIN_STOCK,
+          max: pickPositive(p.max_stock) ?? Infinity,
         });
       }
     });
@@ -251,9 +272,13 @@ export class InventoryReportsService {
       return { data: [], total: 0, page: Number(page), limit: Number(limit) };
     }
 
-    const filterStart = start_date ? new Date(start_date) : new Date(0);
-    const filterEnd = end_date ? new Date(end_date) : new Date();
-    filterEnd.setHours(23, 59, 59, 999);
+    // Khoảng ngày theo giờ VN (cùng chuẩn với mọi báo cáo khác)
+    const filterStart = start_date
+      ? (toVnDayRange(start_date, start_date)?.start ?? new Date(0))
+      : new Date(0);
+    const filterEnd = end_date
+      ? (toVnDayRange(end_date, end_date)?.end ?? new Date())
+      : new Date();
 
     // 3. TÍNH TOÁN ROLLBACK
     const transactions = await this.transactionModel
@@ -306,10 +331,19 @@ export class InventoryReportsService {
 
       const endingStock = pInfo.stock - inFuture + outFuture - adjFuture;
 
-      let status: 'Safe' | 'Low Stock' | 'Out of Stock' | 'Overstock' = 'Safe';
-      if (endingStock <= 0) status = 'Out of Stock';
-      else if (endingStock <= pInfo.min) status = 'Low Stock';
-      else if (endingStock > pInfo.max) status = 'Overstock';
+      const cls = classifyStock(
+        endingStock,
+        pInfo.min,
+        Number.isFinite(pInfo.max) ? pInfo.max : null,
+      );
+      const status: XntRecord['status'] =
+        cls === 'OUT_OF_STOCK'
+          ? 'Out of Stock'
+          : cls === 'LOW_STOCK'
+            ? 'Low Stock'
+            : cls === 'OVER_STOCK'
+              ? 'Overstock'
+              : 'Safe';
 
       reportData.push({
         sku,
@@ -346,16 +380,26 @@ export class InventoryReportsService {
       $or: [{ 'items.sku': sku }, { sku: sku }],
     };
 
+    // Khoảng ngày theo giờ VN — cùng chuẩn với getXntReport
     if (queryDto.start_date || queryDto.end_date) {
       const dateFilter: Record<string, Date> = {};
-      if (queryDto.start_date)
-        dateFilter['$gte'] = new Date(queryDto.start_date);
-      if (queryDto.end_date) {
-        const end = new Date(queryDto.end_date);
-        end.setHours(23, 59, 59, 999);
-        dateFilter['$lte'] = end;
+
+      if (queryDto.start_date) {
+        const start = toVnDayRange(
+          queryDto.start_date,
+          queryDto.start_date,
+        )?.start;
+        if (start) dateFilter['$gte'] = start; // 00:00 giờ VN ngày bắt đầu
       }
-      filter.created_at = dateFilter;
+
+      if (queryDto.end_date) {
+        const end = toVnDayRange(queryDto.end_date, queryDto.end_date)?.end;
+        if (end) dateFilter['$lte'] = end; // 23:59:59.999 giờ VN ngày kết thúc
+      }
+
+      if (Object.keys(dateFilter).length > 0) {
+        filter.created_at = dateFilter;
+      }
     }
 
     const skip =
@@ -499,7 +543,7 @@ export class InventoryReportsService {
     // AC8 (US3): Ghi Audit Log
     await this.auditLogsService.log({
       action: 'EXPORT_REPORT',
-      collection_name: Resource.REPORTS,
+      collection_name: Resource.REPORT_INVENTORY,
       actor_id: actorId,
       department: Department.WAREHOUSE,
       detail: {
@@ -786,7 +830,7 @@ export class InventoryReportsService {
     // Ghi Audit Log
     await this.auditLogsService.log({
       action: 'EXPORT_REPORT',
-      collection_name: Resource.REPORTS,
+      collection_name: Resource.REPORT_INVENTORY,
       actor_id: actorId,
       department: Department.WAREHOUSE,
       detail: {
@@ -802,11 +846,15 @@ export class InventoryReportsService {
   async getInventoryTrend(
     queryDto: GetXntReportDto,
   ): Promise<StockTrendData[]> {
-    const start = queryDto.start_date
-      ? new Date(queryDto.start_date)
-      : new Date(new Date().setDate(new Date().getDate() - 14));
-    const end = queryDto.end_date ? new Date(queryDto.end_date) : new Date();
-    end.setHours(23, 59, 59, 999);
+    const now = new Date();
+    const today = toVnParts(now);
+    const range =
+      queryDto.start_date && queryDto.end_date
+        ? toVnDayRange(queryDto.start_date, queryDto.end_date)
+        : null;
+    // Mặc định 14 ngày gần nhất (giờ VN)
+    const start = range?.start ?? vnStartOfDay(today.y, today.m, today.d - 14);
+    const end = range?.end ?? now;
 
     const transactions = await this.transactionModel
       .find({
@@ -818,39 +866,134 @@ export class InventoryReportsService {
     const trendMap = new Map<string, { inward: number; outward: number }>();
 
     transactions.forEach((tx) => {
-      const changes = this.parseTransactionData(
+      const p = toVnParts(new Date(tx.created_at));
+      // Khóa YYYY-MM-DD theo giờ VN → sort đúng kể cả khi kỳ vắt qua năm mới
+      const key = `${p.y}-${String(p.m + 1).padStart(2, '0')}-${String(p.d).padStart(2, '0')}`;
+      const day = trendMap.get(key) ?? { inward: 0, outward: 0 };
+
+      this.parseTransactionData(
         tx as unknown as StockTransactionDocument,
-      );
-      const txDate = new Date(tx.created_at);
-      // Format tiếng anh: Sep 25, Oct 04...
-      const dateStr = txDate.toLocaleDateString('en-US', {
-        month: 'short',
-        day: '2-digit',
+      ).forEach((c) => {
+        if (c.action_type === 'MANUAL_ADJUST') return; // Điều chỉnh không tính vào In/Out
+        if (c.is_in) day.inward += c.qty;
+        else day.outward += c.qty;
       });
 
-      if (!trendMap.has(dateStr)) {
-        trendMap.set(dateStr, { inward: 0, outward: 0 });
+      trendMap.set(key, day);
+    });
+
+    return Array.from(trendMap.keys())
+      .sort()
+      .map((key) => {
+        const [y, m, d] = key.split('-').map(Number);
+        // Nhãn hiển thị "Oct 05" — giữ định dạng FE đang dùng
+        const label = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(
+          'en-US',
+          { month: 'short', day: '2-digit', timeZone: 'UTC' },
+        );
+        return { date: label, ...trendMap.get(key)! };
+      });
+  }
+
+  // Tính KPI tổng quan + danh sách cảnh báo tồn kho cho Dashboard Báo cáo
+  async getKpiSummary(queryDto: GetXntReportDto) {
+    const productFilter: FilterQuery<ProductDocument> = { is_deleted: false };
+
+    if (
+      queryDto.category_id &&
+      typeof queryDto.category_id === 'string' &&
+      Types.ObjectId.isValid(queryDto.category_id)
+    ) {
+      productFilter.categories = new Types.ObjectId(queryDto.category_id);
+    }
+
+    const products = await this.productModel
+      .find(productFilter)
+      .select('name sku stock min_stock max_stock has_variants variants')
+      .lean();
+
+    // Gom tất cả SKU (biến thể hoặc sản phẩm đơn) về cùng một dạng
+    const entries: Array<{
+      id: string;
+      sku: string;
+      name: string;
+      stock: number;
+      min: number;
+      max: number | null;
+    }> = [];
+
+    products.forEach((p) => {
+      if (
+        p.has_variants &&
+        Array.isArray(p.variants) &&
+        p.variants.length > 0
+      ) {
+        p.variants.forEach((v) => {
+          const vId = (v as unknown as { _id?: Types.ObjectId })._id;
+          entries.push({
+            id: String(vId ?? p._id),
+            sku: String(v.sku),
+            name: `${p.name} - ${v.sku}`,
+            stock: Number(v.stock) || 0,
+            min: pickPositive(v.min_stock, p.min_stock) ?? DEFAULT_MIN_STOCK,
+            max: pickPositive(v.max_stock, p.max_stock),
+          });
+        });
+      } else {
+        entries.push({
+          id: String(p._id),
+          sku: String(p.sku),
+          name: String(p.name),
+          stock: Number(p.stock) || 0,
+          min: pickPositive(p.min_stock) ?? DEFAULT_MIN_STOCK,
+          max: pickPositive(p.max_stock),
+        });
       }
+    });
 
-      const dayData = trendMap.get(dateStr)!;
+    let totalItems = 0;
+    let outOfStockCount = 0;
+    let lowStockCount = 0;
+    let overStockCount = 0;
+    const alerts: KpiAlertItem[] = [];
 
-      changes.forEach((c) => {
-        if (c.action_type === 'MANUAL_ADJUST') return; // Không tính adjustment vào cột In/Out
-        if (c.is_in) dayData.inward += c.qty;
-        else dayData.outward += c.qty;
+    for (const e of entries) {
+      totalItems += e.stock;
+
+      const status = classifyStock(e.stock, e.min, e.max);
+      if (!status) continue;
+
+      if (status === 'OUT_OF_STOCK') outOfStockCount++;
+      else if (status === 'LOW_STOCK') lowStockCount++;
+      else overStockCount++;
+
+      alerts.push({
+        _id: e.id,
+        sku: e.sku,
+        name: e.name,
+        stock: e.stock,
+        min_stock: e.min,
+        max_stock: e.max,
+        status,
       });
-    });
+    }
 
-    const sortedDates = Array.from(trendMap.keys()).sort((a, b) => {
-      const dateA = new Date(`${a} ${new Date().getFullYear()}`).getTime();
-      const dateB = new Date(`${b} ${new Date().getFullYear()}`).getTime();
-      return dateA - dateB;
-    });
+    // Thứ tự ưu tiên: Hết hàng -> Sắp hết (tồn thấp nhất lên trước) -> Tồn vượt
+    const priority: Record<StockAlertStatus, number> = {
+      OUT_OF_STOCK: 0,
+      LOW_STOCK: 1,
+      OVER_STOCK: 2,
+    };
+    alerts.sort(
+      (a, b) => priority[a.status] - priority[b.status] || a.stock - b.stock,
+    );
 
-    return sortedDates.map((date) => ({
-      date,
-      inward: trendMap.get(date)!.inward,
-      outward: trendMap.get(date)!.outward,
-    }));
+    return {
+      totalItems,
+      lowStockCount: outOfStockCount + lowStockCount, // KPI "cần chú ý ngay"
+      outOfStockCount,
+      overStockCount,
+      alerts,
+    };
   }
 }

@@ -12,11 +12,17 @@ export default function ProductFormPage() {
     productVariants,
     categoryError,
     actions,
-    AVAILABLE_TAGS, // Lấy mảng tag đã fetch từ backend trong Hook
-    MOCK_AVAILABLE_ATTRIBUTES, // Lấy mảng attribute đã fetch từ backend trong Hook
+    AVAILABLE_TAGS,
+    MOCK_AVAILABLE_ATTRIBUTES,
     AVAILABLE_CATEGORIES,
+    isAuthorized, // Nhận kết quả check quyền từ Hook
   } = useProductForm();
 
+  // CHẶN CHỚP MÀN HÌNH: Trả về một block rỗng lập tức nếu Hook báo không có quyền
+  // Hook sẽ tự động bung Toast và Navigate, UI không render gì cả.
+  if (!isAuthorized) {
+    return null;
+  }
   return (
     <div className="pf-page-container">
       <ProductForm

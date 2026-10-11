@@ -2,6 +2,8 @@ import { useState, useCallback, useEffect } from "react";
 import { toast } from "react-toastify";
 import { isAxiosError } from "axios";
 import axiosClient from "../../../../api/axiosClient";
+import type { UserPayload } from "../../../../types/auth";
+import { Action, Resource } from "../../../../types/permissions";
 
 // --- ĐỊNH NGHĨA CÁC INTERFACE NGHIÊM NGẶT ---
 export type MediaStatus = "Published" | "Draft" | "Hidden";
@@ -98,6 +100,19 @@ export interface CategoryTreeNode {
   children?: CategoryTreeNode[];
 }
 
+const useLocalAuth = () => {
+  const [user] = useState(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) return JSON.parse(stored) as UserPayload;
+    } catch (error) {
+      console.warn("Không thể parse dữ liệu user từ localStorage:", error);
+    }
+    return null;
+  });
+  return { user };
+};
+
 export function useMediaManagement() {
   const [records, setRecords] = useState<MediaRecord[]>([]);
   const [totalFiltered, setTotalFiltered] = useState<number>(0);
@@ -136,6 +151,25 @@ export function useMediaManagement() {
     isOpen: false,
     mediaRecord: null,
   });
+
+  const { user } = useLocalAuth();
+
+  const hasPermission = useCallback(
+    (resourceCode: Resource, actionCode: Action): boolean => {
+      if (!user || !user.permissions) return false;
+      if (user.roles?.includes("SUPER_ADMIN")) return true;
+      return user.permissions.some(
+        (p) =>
+          p.resource === resourceCode &&
+          (p.actions.includes(actionCode) || p.actions.includes(Action.MANAGE)),
+      );
+    },
+    [user],
+  );
+
+  const canCreate = hasPermission(Resource.CONTENT_MEDIA, Action.CREATE);
+  const canUpdate = hasPermission(Resource.CONTENT_MEDIA, Action.UPDATE);
+  const canDelete = hasPermission(Resource.CONTENT_MEDIA, Action.DELETE);
 
   const fetchMedia = useCallback(async () => {
     try {
@@ -379,6 +413,9 @@ export function useMediaManagement() {
 
     openUploadDrawer: useCallback(
       (files: File | FileList | File[]) => {
+        if (!canCreate)
+          return toast.error("Bạn không có quyền tải lên phương tiện mới.");
+
         const fileArray = files instanceof File ? [files] : Array.from(files);
 
         if (fileArray.length > 50) {
@@ -391,8 +428,8 @@ export function useMediaManagement() {
         const validFiles = fileArray.filter(validateFile);
 
         if (validFiles.length > 0) {
-          const drafts: UploadDraft[] = validFiles.map((file, index) => ({
-            id: `draft-${Date.now()}-${index}`,
+          const drafts: UploadDraft[] = validFiles.map((file) => ({
+            id: `draft-${Date.now()}-${file.name}`,
             file: file,
             previewUrl: URL.createObjectURL(file),
           }));
@@ -407,10 +444,12 @@ export function useMediaManagement() {
           });
         }
       },
-      [validateFile],
+      [validateFile, canCreate], // <--- CHỈ CẦN SỬA Ở DÒNG NÀY: Thêm canCreate vào mảng
     ),
 
     openEditDrawer: (record: MediaRecord) => {
+      if (!canUpdate)
+        return toast.error("Bạn không có quyền sửa thông tin phương tiện.");
       setDrawerConfig({
         isOpen: true,
         mode: "edit",
@@ -452,6 +491,8 @@ export function useMediaManagement() {
     },
 
     setPrimaryMedia: async (id: string) => {
+      if (!canUpdate)
+        return toast.error("Bạn không có quyền đặt ảnh đại diện.");
       try {
         await axiosClient.patch(`/marketing/media/${id}/primary`);
         toast.success("Đã cập nhật ảnh chính thức!");
@@ -462,6 +503,7 @@ export function useMediaManagement() {
     },
 
     deleteMedia: (id: string) => {
+      if (!canDelete) return toast.error("Bạn không có quyền xóa phương tiện.");
       setDeleteModalConfig({ isOpen: true, mediaId: id });
     },
 
@@ -485,6 +527,10 @@ export function useMediaManagement() {
     },
 
     replaceMedia: async (id: string, newFile: File) => {
+      if (!canUpdate)
+        return toast.error("Bạn không có quyền chỉnh sửa/cắt ảnh.");
+      if (!canUpdate)
+        return toast.error("Bạn không có quyền thay thế tệp tin.");
       if (validateFile(newFile)) {
         try {
           const formData = new FormData();
@@ -636,5 +682,6 @@ export function useMediaManagement() {
     handleDrawerSubmit,
     searchTargets,
     resolveTargetName,
+    permissions: { canCreate, canUpdate, canDelete },
   };
 }

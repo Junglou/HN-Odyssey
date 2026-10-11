@@ -127,7 +127,7 @@ export class ShippingController {
 
   @Get('sync/:orderId')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.ORDERS, Action.UPDATE)
+  @RequirePermissions(Resource.SALES_ORDERS, Action.UPDATE)
   @ApiOperation({ summary: 'Đồng bộ trạng thái thủ công từ ĐVVC' })
   async manualSync(@Param('orderId') orderId: string, @Req() req: Request) {
     const orderRaw = await this.ordersService.findOne(orderId);

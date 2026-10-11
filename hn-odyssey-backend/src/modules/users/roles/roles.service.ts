@@ -13,6 +13,7 @@ import { UpdateRoleDto } from './dto/update-role.dto';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { AuditLogsService } from '../../system/audit-logs/audit-logs.service';
 import { Department } from 'src/common/enums/department.enum';
+import { isReservedRoleKey } from 'src/common/constants/system-roles.constant';
 
 @Injectable()
 export class RolesService {
@@ -33,6 +34,12 @@ export class RolesService {
     const slug = dto.slug
       ? dto.slug.toUpperCase()
       : dto.name.toUpperCase().replace(/\s+/g, '_');
+
+    if (isReservedRoleKey(slug)) {
+      throw new ForbiddenException(
+        `Slug '${slug}' được dành riêng cho hệ thống.`,
+      );
+    }
 
     const exist = await this.roleModel.findOne({ slug });
     if (exist) throw new ConflictException(`Vai trò '${slug}' đã tồn tại.`);
@@ -103,6 +110,16 @@ export class RolesService {
           'Không thể thay đổi Slug hoặc Quyền hạn của Role Hệ thống.',
         );
       }
+      if (dto.is_active === false) {
+        throw new ForbiddenException('Không thể vô hiệu hóa Role hệ thống.');
+      }
+    }
+
+    // Không cho đổi slug sang slug dành riêng
+    if (dto.slug && !role.is_system && isReservedRoleKey(dto.slug)) {
+      throw new ForbiddenException(
+        `Slug '${dto.slug}' được dành riêng cho hệ thống.`,
+      );
     }
 
     // Check trùng Slug
@@ -173,5 +190,14 @@ export class RolesService {
     });
 
     return { message: 'Đã xóa vai trò thành công' };
+  }
+
+  // 6. LẤY DROPDOWN CHO QUẢN LÝ USER (Chỉ lấy Name và Slug)
+  async getDropdownOptions() {
+    return this.roleModel
+      .find({ is_active: true })
+      .select('_id name slug')
+      .sort({ createdAt: -1 })
+      .lean();
   }
 }

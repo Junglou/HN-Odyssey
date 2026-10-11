@@ -21,7 +21,8 @@ export class LoyaltyFraudListener {
   private readonly logger = new Logger(LoyaltyFraudListener.name);
 
   // Ngưỡng gian lận cấu hình
-  private readonly FRAUD_THRESHOLD_AMOUNT = 500000; // Nhận > 500k điểm / lần
+  // Hệ USD (1$ = 1 điểm): 1 lần ≥ 5.000 điểm ≈ đơn ≥ $3.300 ở hạng Platinum (x1.5)
+  private readonly FRAUD_THRESHOLD_AMOUNT = 5000;
   private readonly FRAUD_FREQUENCY_LIMIT = 5; // > 5 lần tích điểm trong 1 giờ
 
   constructor(
@@ -31,14 +32,18 @@ export class LoyaltyFraudListener {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  // Payload khớp với LoyaltyService.confirmPendingPoints: { userId, orderId, pointsAmount }
   @OnEvent('loyalty.points_earned')
   async handleEarnFraudDetection(data: {
-    customer_id: string;
-    amount: number;
-    transaction_id: string;
+    userId: string;
+    orderId: string;
+    pointsAmount: number;
   }) {
     try {
-      const { customer_id, amount } = data;
+      const customer_id = data?.userId;
+      const amount = Number(data?.pointsAmount) || 0;
+      if (!customer_id || !Types.ObjectId.isValid(customer_id)) return;
+
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
       // 1. Kiểm tra tích điểm đột biến (Huge Amount)

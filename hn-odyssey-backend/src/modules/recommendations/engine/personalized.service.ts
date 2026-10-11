@@ -352,7 +352,7 @@ export class PersonalizedService {
 
         // Tạo object mới thay vì gán đè để tránh mutate
         const productWithQueryId = {
-          ...p.toObject(), // Nếu p là mongoose document
+          ...p, // Nếu p là mongoose document
           query_id: queryID,
         } as unknown as ProductDocument;
 

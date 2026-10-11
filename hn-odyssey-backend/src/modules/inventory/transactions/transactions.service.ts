@@ -340,7 +340,7 @@ export class TransactionsService {
 
     await this.auditLogsService.log({
       action: 'CREATE_IMPORT_TICKET',
-      collection_name: Resource.TRANSFERS,
+      collection_name: Resource.INVENTORY_TRANSFERS,
       actor_id: actorId,
       target_id: newTransaction._id?.toString() ?? '',
       department: Department.WAREHOUSE,
@@ -803,7 +803,7 @@ export class TransactionsService {
 
     await this.auditLogsService.log({
       action: 'CREATE_EXPORT_TICKET',
-      collection_name: Resource.TRANSFERS,
+      collection_name: Resource.INVENTORY_TRANSFERS,
       actor_id: actorId,
       target_id: newTransaction._id?.toString() ?? '',
       department: Department.WAREHOUSE,
@@ -1954,7 +1954,7 @@ export class TransactionsService {
 
       await this.auditLogsService.log({
         action: 'COMPLETE_TICKET',
-        collection_name: Resource.TRANSFERS,
+        collection_name: Resource.INVENTORY_TRANSFERS,
         actor_id: actorId,
         target_id: transaction._id?.toString() ?? '',
         department: Department.WAREHOUSE,
@@ -2001,7 +2001,7 @@ export class TransactionsService {
 
     await this.auditLogsService.log({
       action: 'CANCEL_TICKET',
-      collection_name: Resource.TRANSFERS,
+      collection_name: Resource.INVENTORY_TRANSFERS,
       actor_id: actorId,
       target_id: transaction._id?.toString() ?? '',
       department: Department.WAREHOUSE,

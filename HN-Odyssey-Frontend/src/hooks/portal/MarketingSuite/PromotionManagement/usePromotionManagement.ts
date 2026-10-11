@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
+import { Action, Resource } from "../../../../types/permissions";
+import type { UserPayload } from "../../../../types/auth";
 
 export type PromotionStatus =
   | "Active"
@@ -141,9 +143,22 @@ const flattenCategories = (
   return result;
 };
 
+const useLocalAuth = () => {
+  const [user] = useState<UserPayload | null>(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) return JSON.parse(stored) as UserPayload;
+    } catch {
+      // Bỏ qua lỗi parse
+    }
+    return null;
+  });
+  return { user };
+};
+
 export function usePromotionManagement() {
   const [records, setRecords] = useState<PromotionRecord[]>([]);
-  const [search, setSearch] = useState<string>("");
+  const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<PromotionStatus | "All">(
     "All",
   );
@@ -158,14 +173,65 @@ export function usePromotionManagement() {
     isSubmitting: boolean;
   }>({ isOpen: false, mode: "add", editingRecord: null, isSubmitting: false });
 
+  // --- FIX: THÊM LOGIC RBAC CHUẨN KHÔNG DÙNG ANY ---
+  const { user } = useLocalAuth();
+
+  const hasPermission = useCallback(
+    (resourceCode: Resource, actionCode: Action): boolean => {
+      if (!user || !user.permissions) return false;
+      if (user.roles?.includes("SUPER_ADMIN")) return true;
+      return user.permissions.some(
+        (p) =>
+          p.resource === resourceCode &&
+          (p.actions.includes(actionCode) || p.actions.includes(Action.MANAGE)),
+      );
+    },
+    [user],
+  );
+
+  const canCreateFlashSale = hasPermission(
+    Resource.PROMO_FLASH_SALES,
+    Action.CREATE,
+  );
+  const canUpdateFlashSale = hasPermission(
+    Resource.PROMO_FLASH_SALES,
+    Action.UPDATE,
+  );
+  const canDeleteFlashSale = hasPermission(
+    Resource.PROMO_FLASH_SALES,
+    Action.DELETE,
+  );
+  const canPublishFlashSale = hasPermission(
+    Resource.PROMO_FLASH_SALES,
+    Action.PUBLISH,
+  );
+
+  const canCreateCombo = hasPermission(Resource.PROMO_COMBOS, Action.CREATE);
+  const canUpdateCombo = hasPermission(Resource.PROMO_COMBOS, Action.UPDATE);
+  const canDeleteCombo = hasPermission(Resource.PROMO_COMBOS, Action.DELETE);
+  const canPublishCombo = hasPermission(Resource.PROMO_COMBOS, Action.PUBLISH);
+
   const fetchPromotions = useCallback(async () => {
     try {
-      const [fsRes, cbRes, prodRes, catRes, tagRes] = await Promise.all([
+      // 1. CORE API (Bắt buộc): Lấy danh sách Flash Sale & Combo
+      // Nếu user không có quyền xem 2 cái này, nó sẽ văng thẳng xuống block catch bự ở dưới cùng.
+      const [fsRes, cbRes] = await Promise.all([
         axiosClient.get("/promotions/flash-sales?limit=1000"),
         axiosClient.get("/promotions/combos"),
-        axiosClient.get("/products?limit=1000"),
-        axiosClient.get("/categories/admin/tree-view"),
-        axiosClient.get("/tags?limit=1000"),
+      ]);
+
+      // 2. AUXILIARY API (API Phụ): Nuốt lỗi âm thầm
+      // Chỉ cần trả về cấu trúc Object rỗng ({ data: { data: [] } }), TUYỆT ĐỐI KHÔNG DÙNG toast.error() ở đây.
+      const [prodRes, catRes, tagRes] = await Promise.all([
+        axiosClient
+          .get("/products?limit=1000")
+          .catch(() => ({ data: { data: [] } })),
+        axiosClient
+          .get("/categories/admin/tree-view")
+          .catch(() => ({ data: { data: [] } })),
+        axiosClient
+          .get("/tags?limit=1000")
+          .catch(() => ({ data: { data: [] } })),
       ]);
 
       const productsList: BEProduct[] =
@@ -251,6 +317,7 @@ export function usePromotionManagement() {
       );
     } catch (error) {
       console.error("Fetch Promotions Error:", error);
+      // Nơi này chỉ nổ Toast nếu API Flash Sale / Combo thất bại (ví dụ lỗi 403 do quyền)
       toast.error(
         extractErrorMessage(error, "Không thể tải danh sách khuyến mãi!"),
       );
@@ -327,20 +394,35 @@ export function usePromotionManagement() {
       setPagination((p) => ({ ...p, page: safePage }));
     },
     changeLimit: (limit: number) => setPagination({ page: 1, limit }),
-    openAddModal: () =>
+
+    // --- FIX: ÁP DỤNG CỜ QUYỀN VÀO ACTIONS MODAL ---
+    openAddModal: () => {
+      if (!canCreateFlashSale && !canCreateCombo) {
+        return toast.error(
+          "Bạn không có quyền tạo chương trình khuyến mãi nào.",
+        );
+      }
       setModalConfig({
         isOpen: true,
         mode: "add",
         editingRecord: null,
         isSubmitting: false,
-      }),
-    openEditModal: (record: PromotionRecord) =>
+      });
+    },
+    openEditModal: (record: PromotionRecord) => {
+      if (record.type === "Flash Sale" && !canUpdateFlashSale) {
+        return toast.error("Bạn không có quyền sửa Flash Sale.");
+      }
+      if (record.type === "Discount" && !canUpdateCombo) {
+        return toast.error("Bạn không có quyền sửa Combo Deals.");
+      }
       setModalConfig({
         isOpen: true,
         mode: "edit",
         editingRecord: record,
         isSubmitting: false,
-      }),
+      });
+    },
     openViewModal: (record: PromotionRecord) =>
       setModalConfig({
         isOpen: true,
@@ -348,13 +430,24 @@ export function usePromotionManagement() {
         editingRecord: record,
         isSubmitting: false,
       }),
-    openDeleteModal: (record?: PromotionRecord) =>
+    openDeleteModal: (record?: PromotionRecord) => {
+      if (record) {
+        if (record.type === "Flash Sale" && !canDeleteFlashSale) {
+          return toast.error("Bạn không có quyền xóa Flash Sale.");
+        }
+        if (record.type === "Discount" && !canDeleteCombo) {
+          return toast.error("Bạn không có quyền xóa Combo Deals.");
+        }
+      } else {
+        // Nếu mở xóa bulk, sẽ check quyền trong handleConfirmDelete hoặc bulkDelete function
+      }
       setModalConfig({
         isOpen: true,
         mode: "delete",
         editingRecord: record || null,
         isSubmitting: false,
-      }),
+      });
+    },
     closeModal: () =>
       setModalConfig({
         isOpen: false,
@@ -380,17 +473,25 @@ export function usePromotionManagement() {
           const cbIds = Array.from(selectedIds).filter(
             (id) => records.find((r) => r.id === id)?.type === "Discount",
           );
-          const res = await axiosClient.post("/promotions/bulk/delete", {
-            flashSaleIds: fsIds,
-            comboIds: cbIds,
-          });
 
-          const msg = res.data?.message || `Đã xóa thành công!`;
-          if (msg.includes("bị bỏ qua")) {
-            toast.warning(msg);
-          } else {
-            toast.success(msg);
+          const requests = [];
+          if (fsIds.length > 0) {
+            requests.push(
+              axiosClient.post("/promotions/flash-sales/bulk/delete", {
+                ids: fsIds,
+              }),
+            );
           }
+          if (cbIds.length > 0) {
+            requests.push(
+              axiosClient.post("/promotions/combos/bulk/delete", {
+                ids: cbIds,
+              }),
+            );
+          }
+
+          await Promise.all(requests);
+          toast.success("Xóa hàng loạt thành công!");
         }
         setSelectedIds(new Set());
         fetchPromotions();
@@ -412,6 +513,13 @@ export function usePromotionManagement() {
     }
     const record = records.find((r) => r.id === id);
     if (!record) return;
+
+    if (record.type === "Flash Sale" && !canPublishFlashSale) {
+      return toast.error("Bạn không có quyền bật/tắt Flash Sale.");
+    }
+    if (record.type === "Discount" && !canPublishCombo) {
+      return toast.error("Bạn không có quyền bật/tắt Combo Deals.");
+    }
 
     const newStatusFE = currentStatus === "Active" ? "Inactive" : "Active";
     const beStatus = mapStatusToBE(newStatusFE);
@@ -444,11 +552,6 @@ export function usePromotionManagement() {
     if (data.discountType === "%" && Number(data.discountValueNum) > 100)
       return toast.error("Phần trăm không được vượt 100%.");
 
-    // ==========================================
-    // BẢN FIX CUỐI CÙNG Ở ĐÂY:
-    // Nếu trạng thái muốn lưu KHÔNG PHẢI là Draft và Inactive,
-    // thì bắt buộc phải có Sản phẩm/Danh mục. Còn lại thì cho lưu rỗng thoải mái!
-    // ==========================================
     if (
       data.status !== "Draft" &&
       data.status !== "Inactive" &&
@@ -555,15 +658,37 @@ export function usePromotionManagement() {
           (id) => records.find((r) => r.id === id)?.type === "Discount",
         );
 
-        const res = await axiosClient.patch("/promotions/bulk/status", {
-          flashSaleIds: fsIds,
-          comboIds: cbIds,
-          action: "ACTIVATE",
-        });
-        toast.success(
-          res.data?.message || `Đã kích hoạt các khuyến mãi được chọn!`,
-        );
+        if (fsIds.length === 0 && cbIds.length === 0) return;
 
+        // --- FIX: CHẶN TỪNG LOẠI TRONG BULK ACTIONS ---
+        if (fsIds.length > 0 && !canPublishFlashSale) {
+          return toast.error("Bạn không có quyền kích hoạt Flash Sale.");
+        }
+        if (cbIds.length > 0 && !canPublishCombo) {
+          return toast.error("Bạn không có quyền kích hoạt Combo Deals.");
+        }
+
+        const requests = [];
+        if (fsIds.length > 0) {
+          requests.push(
+            axiosClient.patch("/promotions/flash-sales/bulk/status", {
+              ids: fsIds,
+              action: "ACTIVATE",
+            }),
+          );
+        }
+        if (cbIds.length > 0) {
+          requests.push(
+            axiosClient.patch("/promotions/combos/bulk/status", {
+              ids: cbIds,
+              action: "ACTIVATE",
+            }),
+          );
+        }
+
+        await Promise.all(requests);
+
+        toast.success(`Đã kích hoạt các khuyến mãi được chọn!`);
         setSelectedIds(new Set());
         fetchPromotions();
       } catch (error: unknown) {
@@ -582,15 +707,37 @@ export function usePromotionManagement() {
           (id) => records.find((r) => r.id === id)?.type === "Discount",
         );
 
-        const res = await axiosClient.patch("/promotions/bulk/status", {
-          flashSaleIds: fsIds,
-          comboIds: cbIds,
-          action: "DEACTIVATE",
-        });
-        toast.success(
-          res.data?.message || `Đã vô hiệu hóa khuyến mãi được chọn!`,
-        );
+        if (fsIds.length === 0 && cbIds.length === 0) return;
 
+        // --- FIX: CHẶN TỪNG LOẠI TRONG BULK ACTIONS ---
+        if (fsIds.length > 0 && !canPublishFlashSale) {
+          return toast.error("Bạn không có quyền vô hiệu hóa Flash Sale.");
+        }
+        if (cbIds.length > 0 && !canPublishCombo) {
+          return toast.error("Bạn không có quyền vô hiệu hóa Combo Deals.");
+        }
+
+        const requests = [];
+        if (fsIds.length > 0) {
+          requests.push(
+            axiosClient.patch("/promotions/flash-sales/bulk/status", {
+              ids: fsIds,
+              action: "DEACTIVATE",
+            }),
+          );
+        }
+        if (cbIds.length > 0) {
+          requests.push(
+            axiosClient.patch("/promotions/combos/bulk/status", {
+              ids: cbIds,
+              action: "DEACTIVATE",
+            }),
+          );
+        }
+
+        await Promise.all(requests);
+
+        toast.success(`Đã vô hiệu hóa khuyến mãi được chọn!`);
         setSelectedIds(new Set());
         fetchPromotions();
       } catch (error: unknown) {
@@ -602,6 +749,21 @@ export function usePromotionManagement() {
     },
     bulkDelete: () => {
       if (selectedIds.size === 0) return;
+      const fsIds = Array.from(selectedIds).filter(
+        (id) => records.find((r) => r.id === id)?.type === "Flash Sale",
+      );
+      const cbIds = Array.from(selectedIds).filter(
+        (id) => records.find((r) => r.id === id)?.type === "Discount",
+      );
+
+      // --- FIX: CHẶN TỪNG LOẠI TRONG BULK ACTIONS ---
+      if (fsIds.length > 0 && !canDeleteFlashSale) {
+        return toast.error("Bạn không có quyền xóa hàng loạt Flash Sale.");
+      }
+      if (cbIds.length > 0 && !canDeleteCombo) {
+        return toast.error("Bạn không có quyền xóa hàng loạt Combo Deals.");
+      }
+
       actions.openDeleteModal();
     },
   };
@@ -623,5 +785,16 @@ export function usePromotionManagement() {
     toggleRowStatus,
     handleModalSubmit,
     bulkActions,
+    // Trả về cờ để Frontend Component dùng ẩn/hiện nút bấm
+    permissions: {
+      canCreateFlashSale,
+      canUpdateFlashSale,
+      canDeleteFlashSale,
+      canPublishFlashSale,
+      canCreateCombo,
+      canUpdateCombo,
+      canDeleteCombo,
+      canPublishCombo,
+    },
   };
 }

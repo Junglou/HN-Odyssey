@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 import { toast } from "react-toastify";
 import axiosClient from "../../../api/axiosClient";
+import tokenStorage from "../../../utils/tokenStorage";
+import { Action, Resource } from "../../../types/permissions";
+import type { UserPayload } from "../../../types/auth";
 
 export type StockStatusColor = "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK";
 
@@ -75,6 +78,19 @@ export function useStockOverview() {
   >([{ value: "all", label: "All Categories" }]);
   const [loading, setLoading] = useState(false);
   const [refetchTrigger, setRefetchTrigger] = useState(0);
+
+  const user = tokenStorage.getUser<UserPayload>();
+  const hasPermission = (resourceCode: Resource, actionCode: Action) => {
+    if (!user || !user.permissions) return false;
+    if (user.roles && user.roles.includes("Super Admin")) return true;
+    const perm = user.permissions.find((p) => p.resource === resourceCode);
+    if (!perm) return false;
+    return (
+      perm.actions.includes(actionCode) || perm.actions.includes(Action.MANAGE)
+    );
+  };
+
+  const canAdjustStock = hasPermission(Resource.INVENTORY_STOCK, Action.UPDATE);
 
   const [filters, setFilters] = useState({
     search: "",
@@ -269,6 +285,10 @@ export function useStockOverview() {
       });
     },
     submitAdjustment: async (payload: AdjustPayload) => {
+      if (!canAdjustStock) {
+        toast.error("Bạn không có quyền điều chỉnh tồn kho");
+        return;
+      }
       try {
         const adjustmentValue =
           payload.type === "add" ? payload.quantity : -payload.quantity;
@@ -306,6 +326,10 @@ export function useStockOverview() {
       }
     },
     submitThresholds: async (payload: ThresholdPayload) => {
+      if (!canAdjustStock) {
+        toast.error("Bạn không có quyền cấu hình ngưỡng kho");
+        return;
+      }
       try {
         await axiosClient.post("/inventory/stock/thresholds", {
           product_id: adjustModal.productId,
@@ -349,5 +373,8 @@ export function useStockOverview() {
     adjustModal,
     categoriesOptions: categories,
     actions,
+    permissions: {
+      canAdjustStock,
+    },
   };
 }

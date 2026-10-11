@@ -1,81 +1,53 @@
-import { Resource, Action } from '../enums/resource.enum';
+import { Action, Resource } from '../enums/resource.enum';
 
-export const PERMISSION_METADATA = [
+export interface IPermissionResourceMeta {
+  code: Resource;
+  name: string;
+  availableActions: Action[];
+}
+
+export interface IPermissionGroupMeta {
+  group: string;
+  resources: IPermissionResourceMeta[];
+}
+
+export const PERMISSION_METADATA: IPermissionGroupMeta[] = [
   {
-    group: 'PHÂN HỆ KHO VẬN',
-    resources: [
-      {
-        code: Resource.ORDERS,
-        name: 'Quản lý đơn hàng',
-        // Gộp toàn bộ quyền của Kho (export) và CSKH (approve, cancel) vào chung một màn hình UI
-        availableActions: [
-          Action.READ,
-          Action.UPDATE,
-          Action.APPROVE,
-          Action.CANCEL,
-          Action.EXPORT,
-        ],
-      },
-      // Tách bạch 3 tab của WMS thành 3 UI riêng biệt trên frontend
-      {
-        code: Resource.TRANSFERS,
-        name: 'Hàng chờ yêu cầu (Request Queue)',
-        availableActions: [Action.READ, Action.APPROVE, Action.REJECT],
-      },
-      {
-        code: Resource.INVENTORY,
-        name: 'Tổng quan tồn kho (Total Stock Overview)',
-        availableActions: [Action.READ, Action.UPDATE],
-      },
-      {
-        code: Resource.TRANSFERS,
-        name: 'Lịch sử phiếu kho (Ticket History)',
-        availableActions: [
-          Action.READ,
-          Action.CREATE,
-          Action.UPDATE,
-          Action.EXPORT,
-        ],
-      },
-    ],
-  },
-  {
-    group: 'PHÂN HỆ QUẢN LÝ',
+    group: 'DASHBOARD & REPORTS',
     resources: [
       {
         code: Resource.DASHBOARD,
-        name: 'Tổng quan (Overview)',
+        name: 'Overview',
         availableActions: [Action.READ],
       },
       {
-        code: Resource.REPORTS,
-        name: 'Báo cáo doanh thu',
+        code: Resource.REPORT_REVENUE,
+        name: 'Revenue Report',
+        availableActions: [Action.READ, Action.EXPORT],
+      },
+      {
+        code: Resource.REPORT_MARKETING,
+        name: 'Marketing & Promotion',
+        availableActions: [Action.READ, Action.EXPORT, Action.UPDATE],
+      },
+      {
+        code: Resource.REPORT_INVENTORY,
+        name: 'Business Intelligence (BI)',
         availableActions: [Action.READ],
       },
       {
-        code: Resource.REPORTS,
-        name: 'Thống kê tiếp thị và khuyến mãi',
-        availableActions: [Action.READ],
-      },
-      {
-        code: Resource.REPORTS,
-        name: 'Phân tích dữ liệu kinh doanh',
-        availableActions: [Action.READ],
-      },
-      {
-        code: Resource.REPORTS,
-        name: 'Thống kê quản lý kho hàng',
-        // Vẫn giữ export vì giao diện có nút xuất PDF và Excel
+        code: Resource.REPORT_STOCK, // <-- FIX: Tách thành quyền Báo cáo kho
+        name: 'Inventory Management',
         availableActions: [Action.READ, Action.EXPORT],
       },
     ],
   },
   {
-    group: 'PHÂN HỆ SALE & MARKETING',
+    group: 'PRODUCT CATALOG',
     resources: [
       {
-        code: Resource.CATEGORIES,
-        name: 'Quản lý danh mục',
+        code: Resource.CATALOG_PRODUCTS,
+        name: 'Product Management',
         availableActions: [
           Action.READ,
           Action.CREATE,
@@ -84,8 +56,8 @@ export const PERMISSION_METADATA = [
         ],
       },
       {
-        code: Resource.ATTRIBUTES,
-        name: 'Quản lý nhãn (Tags)',
+        code: Resource.CATALOG_CATEGORIES,
+        name: 'Category Management',
         availableActions: [
           Action.READ,
           Action.CREATE,
@@ -94,8 +66,8 @@ export const PERMISSION_METADATA = [
         ],
       },
       {
-        code: Resource.ATTRIBUTES,
-        name: 'Quản lý biến thể',
+        code: Resource.CATALOG_ATTRIBUTES,
+        name: 'Variant Management',
         availableActions: [
           Action.READ,
           Action.CREATE,
@@ -104,48 +76,21 @@ export const PERMISSION_METADATA = [
         ],
       },
       {
-        code: Resource.PRODUCTS,
-        name: 'Quản lý sản phẩm',
+        code: Resource.CATALOG_PRICING,
+        name: 'Price Management',
         availableActions: [
           Action.READ,
-          Action.CREATE,
-          Action.UPDATE,
-          Action.DELETE,
-        ],
-      },
-      {
-        code: Resource.PRODUCTS,
-        name: 'Quản lý giá',
-        availableActions: [Action.READ, Action.UPDATE, Action.APPROVE],
-      },
-      {
-        code: Resource.PROMOTIONS,
-        name: 'Quản lý mã giảm giá',
-        availableActions: [
-          Action.READ,
-          Action.CREATE,
-          Action.UPDATE,
-          Action.DELETE,
-          Action.PUBLISH,
-        ],
-      },
-      {
-        code: Resource.PROMOTIONS,
-        name: 'Quản lý khuyến mãi',
-        availableActions: [
-          Action.READ,
-          Action.CREATE,
-          Action.UPDATE,
-          Action.DELETE,
-          Action.PUBLISH,
-        ],
-      },
-      {
-        code: Resource.REVIEWS,
-        name: 'Quản lý đánh giá',
-        availableActions: [
-          Action.READ,
+          Action.SUBMIT_APPROVAL,
           Action.APPROVE,
+          Action.REJECT,
+        ],
+      },
+      {
+        code: Resource.CATALOG_TAGS,
+        name: 'Tag Management',
+        availableActions: [
+          Action.READ,
+          Action.CREATE,
           Action.UPDATE,
           Action.DELETE,
         ],
@@ -153,11 +98,145 @@ export const PERMISSION_METADATA = [
     ],
   },
   {
-    group: 'PHÂN HỆ VẬN HÀNH VÀ BẢO TRÌ',
+    group: 'ORDER MANAGEMENT',
     resources: [
       {
-        code: Resource.USERS,
-        name: 'Quản lý người dùng',
+        code: Resource.SALES_ORDERS,
+        name: 'Order Management',
+        availableActions: [
+          Action.READ,
+          Action.UPDATE,
+          Action.CANCEL,
+          Action.REFUND,
+          Action.PRINT,
+          Action.EXPORT,
+        ],
+      },
+      {
+        code: Resource.SALES_TRADE_IN,
+        name: 'Trade-in Management',
+        availableActions: [
+          Action.READ,
+          Action.UPDATE,
+          Action.RECEIVE,
+          Action.APPROVE,
+          Action.REJECT,
+          Action.PRINT,
+          Action.EXPORT,
+        ],
+      },
+    ],
+  },
+  {
+    group: 'WAREHOUSE (WMS)',
+    resources: [
+      {
+        code: Resource.INVENTORY_STOCK, // <-- Giữ nguyên cho việc quản lý kho thực tế
+        name: 'Stock Management',
+        availableActions: [Action.READ, Action.UPDATE],
+      },
+      {
+        code: Resource.INVENTORY_TRANSFERS,
+        name: 'Stock Tickets & Transfers',
+        availableActions: [
+          Action.READ,
+          Action.CREATE,
+          Action.UPDATE,
+          Action.APPROVE,
+          Action.REJECT,
+          Action.CANCEL,
+          Action.EXPORT,
+          Action.PRINT,
+        ],
+      },
+    ],
+  },
+  {
+    group: 'CUSTOMER CRM',
+    resources: [
+      {
+        code: Resource.CRM_CUSTOMERS,
+        name: 'Customer Management',
+        availableActions: [
+          Action.READ,
+          Action.CREATE,
+          Action.UPDATE,
+          Action.DELETE,
+          Action.EXPORT,
+        ],
+      },
+      {
+        code: Resource.CRM_CHAT,
+        name: 'Live Chat Support',
+        availableActions: [
+          Action.READ,
+          Action.REPLY,
+          Action.UPDATE,
+          Action.ASSIGN,
+        ],
+      },
+    ],
+  },
+  {
+    group: 'MARKETING SUITE',
+    resources: [
+      {
+        code: Resource.PROMO_FLASH_SALES,
+        name: 'Promotion Management',
+        availableActions: [
+          Action.READ,
+          Action.CREATE,
+          Action.UPDATE,
+          Action.DELETE,
+          Action.UNPUBLISH,
+          Action.PUBLISH,
+        ],
+      },
+      {
+        code: Resource.CRM_REVIEWS,
+        name: 'Review & Rating Management',
+        availableActions: [
+          Action.READ,
+          Action.REPLY,
+          Action.APPROVE,
+          Action.PUBLISH,
+          Action.UNPUBLISH,
+          Action.UPDATE,
+          Action.DELETE,
+        ],
+      },
+      {
+        code: Resource.PROMO_COUPONS,
+        name: 'Coupon Management',
+        availableActions: [
+          Action.READ,
+          Action.CREATE,
+          Action.UPDATE,
+          Action.DELETE,
+          Action.UNPUBLISH,
+          Action.PUBLISH,
+        ],
+      },
+      {
+        code: Resource.PROMO_COMBOS,
+        name: 'Combo Deals',
+        availableActions: [
+          Action.READ,
+          Action.CREATE,
+          Action.UPDATE,
+          Action.DELETE,
+          Action.UNPUBLISH,
+          Action.PUBLISH,
+        ],
+      },
+    ],
+  },
+  {
+    group: 'USERS & ROLES',
+    resources: [
+      {
+        code: Resource.SYSTEM_USERS,
+        name: 'User Management',
         availableActions: [
           Action.READ,
           Action.CREATE,
@@ -166,8 +245,35 @@ export const PERMISSION_METADATA = [
         ],
       },
       {
-        code: Resource.ROLES,
-        name: 'Quản lý vai trò và phân quyền',
+        code: Resource.SYSTEM_ROLES,
+        name: 'Role Management',
+        availableActions: [
+          Action.READ,
+          Action.CREATE,
+          Action.UPDATE,
+          Action.DELETE,
+        ],
+      },
+    ],
+  },
+  {
+    group: 'COMMUNICATION',
+    resources: [
+      {
+        code: Resource.CONTENT_PAGES,
+        name: 'Static Page Management',
+        availableActions: [
+          Action.READ,
+          Action.CREATE,
+          Action.UPDATE,
+          Action.DELETE,
+          Action.PUBLISH,
+          Action.UNPUBLISH,
+        ],
+      },
+      {
+        code: Resource.CONTENT_MEDIA,
+        name: 'Media Management',
         availableActions: [
           Action.READ,
           Action.CREATE,
@@ -176,98 +282,55 @@ export const PERMISSION_METADATA = [
         ],
       },
       {
-        code: Resource.SYSTEM,
-        name: 'Phân tích hành vi người dùng',
+        code: Resource.CONTENT_BANNERS,
+        name: 'Banner Management',
+        availableActions: [
+          Action.READ,
+          Action.CREATE,
+          Action.UPDATE,
+          Action.DELETE,
+          Action.UNPUBLISH,
+          Action.PUBLISH,
+        ],
+      },
+      {
+        code: Resource.CONTENT_POSTS,
+        name: 'Blog & News Management',
+        availableActions: [
+          Action.READ,
+          Action.CREATE,
+          Action.UPDATE,
+          Action.DELETE,
+          Action.SUBMIT_APPROVAL,
+          Action.APPROVE,
+          Action.PUBLISH,
+          Action.UNPUBLISH,
+        ],
+      },
+      {
+        code: Resource.CONTENT_CONFIG,
+        name: 'Content Config',
+        availableActions: [Action.READ, Action.UPDATE],
+      },
+    ],
+  },
+  {
+    group: 'SYSTEM',
+    resources: [
+      {
+        code: Resource.SYSTEM_MONITORING,
+        name: 'System Overview & Security',
         availableActions: [Action.READ],
       },
       {
-        code: Resource.SYSTEM,
-        name: 'Giám sát hệ thống',
-        availableActions: [Action.READ, Action.UPDATE],
-      },
-    ],
-  },
-  {
-    group: 'PHÂN HỆ CHĂM SÓC KHÁCH HÀNG',
-    resources: [
-      {
-        code: Resource.CUSTOMERS,
-        name: 'Quản lý tài khoản khách hàng',
-        availableActions: [
-          Action.READ,
-          Action.CREATE,
-          Action.UPDATE,
-          Action.DELETE,
-          Action.EXPORT,
-        ],
+        code: Resource.SYSTEM_AUDIT,
+        name: 'Audit Logs',
+        availableActions: [Action.READ, Action.EXPORT],
       },
       {
-        code: Resource.SUPPORT,
-        name: 'Danh sách hội thoại (Live Chat)',
-        availableActions: [Action.READ, Action.UPDATE],
-      },
-      {
-        code: Resource.TRADE_IN,
-        name: 'Tiếp nhận yêu cầu thu cũ',
-        availableActions: [
-          Action.READ,
-          Action.UPDATE,
-          Action.APPROVE,
-          Action.EXPORT,
-        ],
-      },
-    ],
-  },
-  {
-    group: 'PHÂN HỆ CHIẾN DỊCH TRUYỀN THÔNG',
-    resources: [
-      {
-        code: Resource.SYSTEM,
-        name: 'Quản lý trang Landing Page',
-        availableActions: [Action.READ, Action.UPDATE],
-      },
-      {
-        code: Resource.BLOG,
-        name: 'Quản lý trang tĩnh',
-        availableActions: [
-          Action.READ,
-          Action.CREATE,
-          Action.UPDATE,
-          Action.DELETE,
-          Action.PUBLISH,
-        ],
-      },
-      {
-        code: Resource.BLOG,
-        name: 'Quản lý video và hình ảnh',
-        availableActions: [
-          Action.READ,
-          Action.CREATE,
-          Action.UPDATE,
-          Action.DELETE,
-        ],
-      },
-      {
-        code: Resource.BLOG,
-        name: 'Quản lý banner',
-        availableActions: [
-          Action.READ,
-          Action.CREATE,
-          Action.UPDATE,
-          Action.DELETE,
-          Action.PUBLISH,
-        ],
-      },
-      {
-        code: Resource.BLOG,
-        name: 'Quản lý bài viết và tin tức',
-        availableActions: [
-          Action.READ,
-          Action.CREATE,
-          Action.UPDATE,
-          Action.DELETE,
-          Action.PUBLISH,
-        ],
+        code: Resource.SYSTEM_NOTIFICATIONS,
+        name: 'Notification Management',
+        availableActions: [Action.READ],
       },
     ],
   },
