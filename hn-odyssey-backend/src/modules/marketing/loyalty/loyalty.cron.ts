@@ -68,6 +68,7 @@ export class LoyaltyCronService {
         usage_limit: 1,
         user_usage_limit: 1,
         status: CouponStatus.ACTIVE,
+        owner_id: customer._id,
       }));
 
       if (couponsToInsert.length > 0) {
@@ -86,29 +87,39 @@ export class LoyaltyCronService {
   async processAnnualDowngrades() {
     this.logger.log('[CRON] Bắt đầu xét duyệt giáng hạng thường niên');
     try {
-      const tiers = await this.tierModel
+      const tiersAsc = await this.tierModel
         .find()
-        .sort({ min_spent: -1 })
-        .lean()
-        .exec();
-
-      const lowestTier = await this.tierModel
-        .findOne()
         .sort({ min_spent: 1 })
         .lean()
         .exec();
-      const defaultTierCode = lowestTier ? lowestTier.code : 'SILVER'; // Fallback an toàn
+      if (tiersAsc.length === 0) return;
 
-      for (const tier of tiers) {
-        await this.customerModel.updateMany(
+      // Mỗi khách về ĐÚNG hạng theo chi tiêu kỳ vừa qua (chỉ hạ, không nâng ở bước này).
+      // Trước đây: mọi khách không đạt hạng hiện tại đều rơi thẳng về hạng thấp nhất.
+      for (let i = 0; i < tiersAsc.length - 1; i++) {
+        const target = tiersAsc[i];
+        const nextMin = tiersAsc[i + 1].min_spent;
+        const higherCodes = tiersAsc.slice(i + 1).map((t) => t.code);
+
+        // Hạng thấp nhất không có cận dưới → gom cả trường hợp chi tiêu âm do hoàn tiền
+        const spentRange =
+          i === 0 ? { $lt: nextMin } : { $gte: target.min_spent, $lt: nextMin };
+
+        const result = await this.customerModel.updateMany(
           {
-            'loyalty.tier': tier.code,
-            'loyalty.total_spent': { $lt: tier.min_spent },
+            'loyalty.tier': { $in: higherCodes },
+            'loyalty.total_spent': spentRange,
           },
-          { $set: { 'loyalty.tier': defaultTierCode } }, // Sử dụng biến động thay vì Hardcode
+          { $set: { 'loyalty.tier': target.code } },
         );
+        if (result.modifiedCount > 0) {
+          this.logger.log(
+            `[CRON] Giáng ${result.modifiedCount} khách về hạng ${target.code}`,
+          );
+        }
       }
 
+      // Bắt đầu chu kỳ mới
       await this.customerModel.updateMany(
         {},
         { $set: { 'loyalty.total_spent': 0 } },
@@ -193,13 +204,13 @@ export class LoyaltyCronService {
             end_date: endDate,
             usage_limit: 1,
             user_usage_limit: 1,
-            customer_id: customer._id,
+            owner_id: customer._id,
             status: CouponStatus.ACTIVE,
           });
 
           const descriptionDetail = hasPhysicalGift
-            ? `Nhận Voucher ${voucherValue}đ và 1 phần quà hiện vật.`
-            : `Nhận Voucher sinh nhật ${voucherValue}đ.`;
+            ? `Nhận Voucher $${voucherValue} và 1 phần quà hiện vật.`
+            : `Nhận Voucher sinh nhật $${voucherValue}.`;
 
           await this.historyModel.create({
             customer_id: customer._id,

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../api/axiosClient";
+import tokenStorage from "../../../utils/tokenStorage";
+import { Action, Resource } from "../../../types/permissions";
 
 // 1. FE TYPES
 export type TicketType = "import" | "export";
@@ -65,6 +67,12 @@ interface ErrorResponse {
   message?: string;
 }
 
+// [THÊM MỚI]: Giao diện User cho việc kiểm tra quyền
+interface UserPayload {
+  roles?: string[];
+  permissions?: { resource: string; actions: string[] }[];
+}
+
 // 3. MAIN HOOK
 export function useStockTickets() {
   // states
@@ -86,6 +94,35 @@ export function useStockTickets() {
 
   const [loading, setLoading] = useState(false);
   const [refetchTrigger, setRefetchTrigger] = useState(0);
+
+  // --- LOGIC PHÂN QUYỀN ---
+  const user = tokenStorage.getUser() as UserPayload | null;
+  const hasPermission = (resourceCode: Resource, actionCode: Action) => {
+    if (!user || !user.permissions) return false;
+    if (user.roles && user.roles.includes("Super Admin")) return true;
+    const perm = user.permissions.find((p) => p.resource === resourceCode);
+    if (!perm) return false;
+    return (
+      perm.actions.includes(actionCode) || perm.actions.includes(Action.MANAGE)
+    );
+  };
+
+  const canCreateTicket = hasPermission(
+    Resource.INVENTORY_TRANSFERS,
+    Action.CREATE,
+  );
+  const canUpdateTicket = hasPermission(
+    Resource.INVENTORY_TRANSFERS,
+    Action.UPDATE,
+  );
+  const canCancelTicket = hasPermission(
+    Resource.INVENTORY_TRANSFERS,
+    Action.CANCEL,
+  );
+  const canExportFile = hasPermission(
+    Resource.INVENTORY_TRANSFERS,
+    Action.READ,
+  );
 
   // fetch data
   const fetchTickets = useCallback(async () => {
@@ -186,6 +223,12 @@ export function useStockTickets() {
         "id" | "ticketCode" | "createdDate" | "createdBy"
       >,
     ) => {
+      // [CHẶN QUYỀN]
+      if (!canCreateTicket) {
+        toast.error("Bạn không có quyền tạo phiếu kho!");
+        return;
+      }
+
       try {
         let endpoint = "";
         let requestBody = {};
@@ -229,6 +272,12 @@ export function useStockTickets() {
       }
     },
     completeTicket: async (ticketId: string) => {
+      // [CHẶN QUYỀN]
+      if (!canUpdateTicket) {
+        toast.error("Bạn không có quyền hoàn tất phiếu kho!");
+        return;
+      }
+
       try {
         await axiosClient.patch(`/inventory/transactions/${ticketId}/complete`);
         toast.success("Đã hoàn tất phiếu và cập nhật tồn kho!");
@@ -240,6 +289,12 @@ export function useStockTickets() {
       }
     },
     cancelTicket: async (ticketId: string, reason: string) => {
+      // [CHẶN QUYỀN]
+      if (!canCancelTicket) {
+        toast.error("Bạn không có quyền hủy phiếu kho!");
+        return;
+      }
+
       try {
         await axiosClient.patch(`/inventory/transactions/${ticketId}/cancel`, {
           reason,
@@ -257,6 +312,12 @@ export function useStockTickets() {
       type: TicketType,
       ticketCode: string,
     ) => {
+      // [CHẶN QUYỀN]
+      if (!canExportFile) {
+        toast.error("Bạn không có quyền in/xuất báo cáo phiếu kho!");
+        return;
+      }
+
       try {
         toast.info("Đang xử lý xuất file PDF, vui lòng đợi...");
         const endpoint =
@@ -297,5 +358,11 @@ export function useStockTickets() {
     pagination,
     createDrawer,
     actions,
+    permissions: {
+      canCreateTicket,
+      canUpdateTicket,
+      canCancelTicket,
+      canExportFile,
+    },
   };
 }

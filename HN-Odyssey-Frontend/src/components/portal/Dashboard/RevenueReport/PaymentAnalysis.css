@@ -1,0 +1,108 @@
+.pa-wrapper {
+  background-color: #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pa-section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.pa-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* Biểu đồ bên trái, chú giải bên phải */
+.pa-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+}
+
+.pa-chart {
+  min-width: 0;
+}
+
+.pa-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 240px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #64748b;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.pa-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pa-legend-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+.pa-legend-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pa-legend-name i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.pa-legend-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.pa-legend-value em {
+  font-style: normal;
+  color: #64748b;
+  min-width: 48px;
+  text-align: right;
+}
+
+.pa-legend-total {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 10px;
+  font-weight: 600;
+}
+
+@media screen and (max-width: 1280px) {
+  .pa-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media screen and (max-width: 640px) {
+  .pa-body {
+    grid-template-columns: 1fr;
+  }
+}

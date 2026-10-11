@@ -11,12 +11,10 @@ import { Public } from 'src/common/decorators/public.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { Request } from 'express';
 
-// Interface an toàn cho Request
+// Chuẩn hóa Interface
 interface RequestWithOptionalUser extends Request {
   user?: {
-    _id?: string; // Cho phép optional
-    id?: string; // Thêm id (do Passport JWT thường map 'sub' sang 'id')
-    sub?: string; // Thêm sub (phòng hờ JwtStrategy trả thẳng payload)
+    _id: string; // Chỉ lấy _id như cấu trúc của JwtStrategy trả về
     email: string;
     roles: string[];
   };
@@ -31,15 +29,13 @@ export class PersonalizationController {
     private readonly personalizedMarketingService: PersonalizedMarketingService,
   ) {}
 
-  // API: Lấy danh sách Voucher gợi ý (Có tiến trình Upsell giỏ hàng)
-
   @Public()
   @Get('vouchers')
   async getRecommendedVouchers(
     @Req() req: RequestWithOptionalUser,
     @Query() dto: GetContextualVouchersDto,
   ) {
-    const userId = req.user?._id;
+    const userId = req.user?._id; // Gọn gàng hơn
     const cartContext =
       dto.cart_total !== undefined
         ? {
@@ -63,10 +59,9 @@ export class PersonalizationController {
     );
   }
 
-  //@Public()
   @Get('new-arrivals')
   async getNewArrivals(@Req() req: RequestWithOptionalUser) {
-    const userId = req.user?._id || req.user?.id || req.user?.sub;
+    const userId = req.user?._id; // Gọn gàng hơn
     const data =
       await this.newArrivalsService.getPersonalizedNewArrivals(userId);
 
@@ -77,9 +72,6 @@ export class PersonalizationController {
     );
   }
 
-  // API: Lấy Banner Trang chủ (Dynamic Banner & A/B Testing)
-
-  //@Public()
   @Get('home-banners')
   async getHomeBanners(
     @Req() req: RequestWithOptionalUser,
@@ -99,8 +91,6 @@ export class PersonalizationController {
     );
   }
 
-  // BỔ SUNG US3 - AC3: CHECK GIỎ HÀNG BỎ QUÊN (Để hiển thị Web Popup)
-
   @Public()
   @Get('abandoned-cart-popup')
   async checkAbandonedCart(@Req() req: RequestWithOptionalUser) {
@@ -116,8 +106,6 @@ export class PersonalizationController {
     return new BaseResponse(true, 'Thành công', data);
   }
 
-  // BỔ SUNG US2 - AC10: GHI NHẬN NÚT "X" (Dismiss Recommendation)
-
   @Public()
   @Post('new-arrivals/dismiss')
   async dismissNewArrival(
@@ -127,7 +115,6 @@ export class PersonalizationController {
   ) {
     if (!productId) return new BaseResponse(false, 'Thiếu product_id');
 
-    // Nếu khách đã đăng nhập dùng User ID, nếu chưa dùng Session ID làm fallback
     const identifier = req.user?._id || sessionId;
     await this.newArrivalsService.dismissRecommendation(
       identifier,

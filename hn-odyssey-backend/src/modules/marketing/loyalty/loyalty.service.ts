@@ -26,6 +26,11 @@ import {
 import { randomBytes } from 'crypto';
 import { Product } from 'src/modules/products/catalog/schemas/product.schema';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import {
+  DEFAULT_TIER_CODE,
+  POINT_EXPIRY_DAYS,
+} from 'src/common/constants/loyalty.constant';
+import { pointsToUsd } from 'src/common/constants/money.constant';
 
 interface AggregateSumResult {
   _id: null;
@@ -48,7 +53,6 @@ interface UserDocument {
 @Injectable()
 export class LoyaltyService {
   private readonly logger = new Logger(LoyaltyService.name);
-  private readonly POINT_EXPIRY_DAYS = 365;
   private readonly CONVERSION_RATE = 1; // Hệ USD: 1$ = 1 điểm
 
   constructor(
@@ -76,7 +80,7 @@ export class LoyaltyService {
 
     if (!customer) throw new BadRequestException('Khách hàng không tồn tại');
 
-    const tierCode = customer.loyalty?.tier || 'BRONZE';
+    const tierCode = customer.loyalty?.tier || DEFAULT_TIER_CODE;
     const totalSpent = customer.loyalty?.total_spent || 0;
     const currentPoints = customer.loyalty?.point || 0;
 
@@ -123,7 +127,7 @@ export class LoyaltyService {
       tier: tierCode,
       total_spent: totalSpent,
       progress: {
-        current_tier: currentTier?.name || 'SILVER',
+        current_tier: currentTier?.name || tierCode,
         next_tier: nextTier?.name || null,
         amount_needed: amountToNextTier > 0 ? amountToNextTier : 0,
       },
@@ -140,15 +144,16 @@ export class LoyaltyService {
       .collection('users')
       .findOne({ _id: new Types.ObjectId(customerId) })) as UserDocument | null;
 
-    const tierCode = customer?.loyalty?.tier || 'SILVER';
+    const tierCode = customer?.loyalty?.tier || DEFAULT_TIER_CODE;
     const tierInfo = await this.tierModel
       .findOne({ code: tierCode })
       .lean()
       .exec();
     const multiplier = tierInfo?.point_multiplier || 1;
 
-    const earnedPoints =
-      Math.floor(orderAmount / this.CONVERSION_RATE) * multiplier;
+    const earnedPoints = Math.floor(
+      (orderAmount / this.CONVERSION_RATE) * multiplier,
+    );
     return new BaseResponse(true, 'Ước tính thành công', { earnedPoints });
   }
 
@@ -175,12 +180,13 @@ export class LoyaltyService {
         return;
       }
 
-      const tierCode = customer?.loyalty?.tier || 'BRONZE';
+      const tierCode = customer?.loyalty?.tier || DEFAULT_TIER_CODE;
       const tierInfo = await this.tierModel.findOne({ code: tierCode }).exec();
       const multiplier = tierInfo?.point_multiplier || 1;
 
-      const earnedPoints =
-        Math.floor(orderTotal / this.CONVERSION_RATE) * multiplier;
+      const earnedPoints = Math.floor(
+        (orderTotal / this.CONVERSION_RATE) * multiplier,
+      );
 
       if (earnedPoints <= 0) {
         this.logger.warn(`[Loyalty] Số điểm nhận được là 0. Bỏ qua ghi nhận.`);
@@ -256,8 +262,7 @@ export class LoyaltyService {
       );
 
       // Cập nhật bản ghi lịch sử sang AVAILABLE
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + this.POINT_EXPIRY_DAYS);
+      const expiresAt = this.newExpiryDate();
 
       pendingRecord.status = PointStatus.AVAILABLE;
       pendingRecord.remaining_amount = pendingRecord.amount;
@@ -295,57 +300,95 @@ export class LoyaltyService {
     }
   }
 
-  // thu hồi điểm khi trả hàng với chốt chặn an toàn không vượt quá điểm khả dụng của khách
+  // Thu hồi điểm khi trả hàng: theo đúng số điểm đơn đó đã mang lại,
+  // tỷ lệ với số tiền hoàn, trừ vào lô điểm (FIFO), không vượt số dư hiện có.
   async revokePointsForRefund(
     customerId: string,
     orderId: string,
     refundValue: number,
+    session?: ClientSession,
   ): Promise<void> {
     try {
-      const customer = (await this.connection.collection('users').findOne({
-        _id: new Types.ObjectId(customerId),
-      })) as UserDocument | null;
+      const customerObjId = new Types.ObjectId(customerId);
+      const orderObjId = new Types.ObjectId(orderId);
 
+      const earnRecord = await this.historyModel
+        .findOne({
+          customer_id: customerObjId,
+          order_id: orderObjId,
+          type: PointTransactionType.EARN,
+        })
+        .session(session ?? null);
+
+      // Đơn không sinh điểm (hoặc điểm đã bị hủy) → không có gì để thu hồi
+      if (!earnRecord || earnRecord.status === PointStatus.CANCELED) return;
+
+      // Điểm còn chờ duyệt (chưa cộng vào tài khoản) → chỉ cần hủy,
+      // không đụng số dư và tổng chi tiêu
+      if (earnRecord.status === PointStatus.PENDING) {
+        earnRecord.status = PointStatus.CANCELED;
+        earnRecord.description = 'Đơn hàng trả lại, điểm chờ duyệt bị hủy';
+        await earnRecord.save({ session });
+        return;
+      }
+
+      // base_order_amount = số tiền đã dùng để tích điểm (không gồm phí ship)
+      const base = earnRecord.base_order_amount || refundValue;
+      const ratio = base > 0 ? Math.min(refundValue / base, 1) : 1;
+      const pointsToRevoke = Math.floor(earnRecord.amount * ratio);
+      const spentToRevert = Math.min(refundValue, base);
+
+      const customer = (await this.connection
+        .collection('users')
+        .findOne(
+          { _id: customerObjId },
+          { session, projection: { 'loyalty.point': 1 } },
+        )) as UserDocument | null;
       if (!customer) return;
 
-      const tierCode = customer?.loyalty?.tier || 'BRONZE';
-      const multiplier = await this.getMultiplier(tierCode);
-      const calculatedRevoke =
-        Math.floor(refundValue / this.CONVERSION_RATE) * multiplier;
-
-      const currentPoints = customer.loyalty?.point || 0;
-      const actualRevoke = Math.min(calculatedRevoke, currentPoints);
+      // Khách đã tiêu bớt điểm → chỉ thu hồi phần còn lại;
+      // tổng chi tiêu vẫn bị trừ để xét hạng chính xác
+      const actualRevoke = Math.min(
+        pointsToRevoke,
+        customer.loyalty?.point || 0,
+      );
 
       if (actualRevoke > 0) {
-        await this.connection.collection('users').updateOne(
-          { _id: new Types.ObjectId(customerId) },
-          {
-            $inc: {
-              'loyalty.point': -actualRevoke,
-              'loyalty.total_spent': -refundValue,
-            },
-          },
-        );
+        await this.consumePointsFifo(customerId, actualRevoke, session);
+      }
 
-        await this.historyModel.create({
-          customer_id: new Types.ObjectId(customerId),
-          type: PointTransactionType.REFUND,
-          status: PointStatus.AVAILABLE,
-          amount: -actualRevoke,
-          order_id: new Types.ObjectId(orderId),
-          description: 'Thu hồi điểm từ đơn trả hàng theo mức thực tế khả dụng',
-        });
-      } else {
-        // khách hàng đã hết điểm để thu hồi, tiến hành trừ tổng chi tiêu để giáng hạng ở kỳ sau
-        await this.connection
-          .collection('users')
-          .updateOne(
-            { _id: new Types.ObjectId(customerId) },
-            { $inc: { 'loyalty.total_spent': -refundValue } },
-          );
+      await this.connection.collection('users').updateOne(
+        { _id: customerObjId },
+        {
+          $inc: {
+            'loyalty.point': -actualRevoke,
+            'loyalty.total_spent': -spentToRevert,
+          },
+        },
+        { session },
+      );
+
+      if (actualRevoke > 0) {
+        await this.historyModel.create(
+          [
+            {
+              customer_id: customerObjId,
+              order_id: orderObjId,
+              type: PointTransactionType.REFUND,
+              status: PointStatus.AVAILABLE,
+              amount: -actualRevoke,
+              description: `Thu hồi ${actualRevoke} điểm từ đơn trả hàng`,
+            },
+          ],
+          { session },
+        );
       }
     } catch (error) {
-      this.logger.error(`[Loyalty] Lỗi thu hồi điểm: ${error}`);
+      this.logger.error(
+        `[Loyalty] Lỗi thu hồi điểm: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      // Đang chạy trong transaction của đơn hàng → ném lỗi để rollback cùng
+      if (session) throw error;
     }
   }
 
@@ -359,7 +402,7 @@ export class LoyaltyService {
     session.startTransaction();
 
     try {
-      await this.processLazyExpiration(customerId);
+      await this.processLazyExpiration(customerId, session);
 
       const customer = (await this.connection
         .collection('users')
@@ -392,28 +435,7 @@ export class LoyaltyService {
         }
       }
 
-      let pointsToDeduct = dto.points_to_redeem;
-      const availableRecords = await this.historyModel
-        .find({
-          customer_id: new Types.ObjectId(customerId),
-          status: PointStatus.AVAILABLE,
-          remaining_amount: { $gt: 0 },
-        })
-        .sort({ createdAt: 1 })
-        .session(session);
-
-      for (const record of availableRecords) {
-        if (pointsToDeduct <= 0) break;
-        const remaining = record.remaining_amount ?? 0;
-        if (remaining >= pointsToDeduct) {
-          record.remaining_amount = remaining - pointsToDeduct;
-          pointsToDeduct = 0;
-        } else {
-          pointsToDeduct -= remaining;
-          record.remaining_amount = 0;
-        }
-        await record.save({ session });
-      }
+      await this.consumePointsFifo(customerId, dto.points_to_redeem, session);
 
       await this.connection
         .collection('users')
@@ -426,17 +448,22 @@ export class LoyaltyService {
       let resultData: Record<string, unknown> = {};
 
       if (dto.reward_category === RewardCategory.VOUCHER) {
-        // chuyển đổi linh hoạt tỷ lệ điểm ra phần trăm, giới hạn biên độ để đảm bảo vận hành tài chính an toàn
-        const value =
-          dto.discount_type === DiscountType.PERCENTAGE
-            ? Math.min(Math.max(1, Math.floor(dto.points_to_redeem / 100)), 50)
-            : dto.points_to_redeem / 100;
+        const isPercent = dto.discount_type === DiscountType.PERCENTAGE;
+        const pointsValueUsd = pointsToUsd(dto.points_to_redeem);
+
+        // % = floor(điểm / 100), trong khoảng 1–50%; FIXED = giá trị thật của số điểm
+        const value = isPercent
+          ? Math.min(Math.max(1, Math.floor(dto.points_to_redeem / 100)), 50)
+          : pointsValueUsd;
+
         const coupon = await this.generateRewardCoupon(
           customerId,
           dto.discount_type || DiscountType.FIXED_AMOUNT,
           value,
           'Voucher đổi từ điểm',
           session,
+          // Voucher % không bao giờ giảm quá giá trị thật của số điểm đã đổi
+          isPercent ? pointsValueUsd : null,
         );
         resultData = { coupon_code: coupon.code };
       } else {
@@ -461,7 +488,7 @@ export class LoyaltyService {
       try {
         await this.auditLogsService.log({
           action: Action.UPDATE,
-          collection_name: Resource.LOYALTY,
+          collection_name: Resource.REPORT_MARKETING,
           actor_id: customerId,
           department: Department.MARKETING,
           target_id: customerId,
@@ -492,9 +519,40 @@ export class LoyaltyService {
 
   // HELPERS
 
-  private async getMultiplier(tierCode: string): Promise<number> {
-    const tier = await this.tierModel.findOne({ code: tierCode }).lean().exec();
-    return tier?.point_multiplier || 1;
+  // Hạn dùng của điểm mới cộng / mới hoàn
+  private newExpiryDate(): Date {
+    const d = new Date();
+    d.setDate(d.getDate() + POINT_EXPIRY_DAYS);
+    return d;
+  }
+
+  // Trừ điểm vào các lô còn hạn — lô hết hạn sớm nhất bị trừ trước.
+  // Dùng chung cho: thanh toán bằng điểm, đổi thưởng, thu hồi khi trả hàng.
+  private async consumePointsFifo(
+    customerId: string,
+    points: number,
+    session?: ClientSession,
+  ): Promise<void> {
+    let remaining = points;
+    if (remaining <= 0) return;
+
+    const records = await this.historyModel
+      .find({
+        customer_id: new Types.ObjectId(customerId),
+        status: PointStatus.AVAILABLE,
+        remaining_amount: { $gt: 0 },
+      })
+      .sort({ expires_at: 1, createdAt: 1 })
+      .session(session ?? null);
+
+    for (const record of records) {
+      if (remaining <= 0) break;
+      const available = record.remaining_amount ?? 0;
+      const used = Math.min(available, remaining);
+      record.remaining_amount = available - used;
+      remaining -= used;
+      await record.save({ session });
+    }
   }
 
   private async checkAndUpgradeTier(
@@ -503,7 +561,7 @@ export class LoyaltyService {
     session: ClientSession,
   ): Promise<void> {
     const totalSpent = customerInfo.loyalty?.total_spent || 0;
-    const currentTierCode = customerInfo.loyalty?.tier || 'SILVER';
+    const currentTierCode = customerInfo.loyalty?.tier || DEFAULT_TIER_CODE;
 
     const eligibleTiers = await this.tierModel
       .find({ min_spent: { $lte: totalSpent } })
@@ -541,16 +599,19 @@ export class LoyaltyService {
     }
   }
 
-  private async processLazyExpiration(customerId: string): Promise<void> {
-    const now = new Date();
+  // Hết hạn điểm "lười": chạy khi khách xem điểm, đổi thưởng hoặc thanh toán bằng điểm
+  private async processLazyExpiration(
+    customerId: string,
+    session?: ClientSession,
+  ): Promise<void> {
     const expiredRecords = await this.historyModel
       .find({
         customer_id: new Types.ObjectId(customerId),
         status: PointStatus.AVAILABLE,
         remaining_amount: { $gt: 0 },
-        expires_at: { $lt: now },
+        expires_at: { $lt: new Date() },
       })
-      .exec();
+      .session(session ?? null);
 
     if (expiredRecords.length === 0) return;
 
@@ -558,23 +619,42 @@ export class LoyaltyService {
     for (const record of expiredRecords) {
       totalExpired += record.remaining_amount ?? 0;
       record.remaining_amount = 0;
-      await record.save();
+      await record.save({ session });
     }
+    if (totalExpired <= 0) return;
 
-    await this.connection
-      .collection('users')
-      .updateOne(
-        { _id: new Types.ObjectId(customerId) },
-        { $inc: { 'loyalty.point': -totalExpired } },
-      );
+    // Không để số dư âm nếu dữ liệu cũ đã lệch
+    await this.connection.collection('users').updateOne(
+      { _id: new Types.ObjectId(customerId) },
+      [
+        {
+          $set: {
+            'loyalty.point': {
+              $max: [
+                0,
+                {
+                  $subtract: [{ $ifNull: ['$loyalty.point', 0] }, totalExpired],
+                },
+              ],
+            },
+          },
+        },
+      ],
+      { session },
+    );
 
-    await this.historyModel.create({
-      customer_id: new Types.ObjectId(customerId),
-      type: PointTransactionType.EXPIRE,
-      status: PointStatus.AVAILABLE,
-      amount: -totalExpired,
-      description: `Điểm hết hạn hệ thống tự động trừ (${totalExpired})`,
-    });
+    await this.historyModel.create(
+      [
+        {
+          customer_id: new Types.ObjectId(customerId),
+          type: PointTransactionType.EXPIRE,
+          status: PointStatus.AVAILABLE,
+          amount: -totalExpired,
+          description: `Điểm hết hạn hệ thống tự động trừ (${totalExpired})`,
+        },
+      ],
+      { session },
+    );
   }
 
   private async generateRewardCoupon(
@@ -583,6 +663,7 @@ export class LoyaltyService {
     value: number,
     desc: string,
     session?: ClientSession,
+    maxDiscount: number | null = null,
   ): Promise<Coupon> {
     const suffix = randomBytes(4).toString('hex').toUpperCase();
     const code = `RW-${suffix}`;
@@ -596,11 +677,13 @@ export class LoyaltyService {
           description: desc,
           discount_type: type,
           discount_value: value,
+          max_discount_amount: maxDiscount,
           start_date: new Date(),
           end_date: endDate,
           usage_limit: 1,
           user_usage_limit: 1,
-          customer_id: new Types.ObjectId(customerId),
+          // Schema Coupon dùng owner_id (customer_id cũ bị Mongoose bỏ qua → mã thành công khai)
+          owner_id: new Types.ObjectId(customerId),
           status: CouponStatus.ACTIVE,
         },
       ],
@@ -654,37 +737,33 @@ export class LoyaltyService {
     );
   }
 
-  // cấn trừ điểm vào từng bản ghi lịch sử để tránh bị hệ thống quét hết hạn lặp lại đối với điểm đã dùng
+  // Thanh toán bằng điểm: xử lý điểm hết hạn → kiểm tra số dư → trừ lô (FIFO) → trừ số dư
   async deductPointsForOrder(
     customerId: string,
     pointsToDeduct: number,
     orderId: string,
     session: ClientSession,
   ): Promise<void> {
-    const availableRecords = await this.historyModel
-      .find({
-        customer_id: new Types.ObjectId(customerId),
-        status: PointStatus.AVAILABLE,
-        remaining_amount: { $gt: 0 },
-      })
-      .sort({ createdAt: 1 })
-      .session(session);
+    if (pointsToDeduct <= 0) return;
 
-    let remainingToDeduct = pointsToDeduct;
+    // Không cho tiêu điểm đã quá hạn
+    await this.processLazyExpiration(customerId, session);
 
-    for (const record of availableRecords) {
-      if (remainingToDeduct <= 0) break;
-      const available = record.remaining_amount ?? 0;
+    const user = (await this.connection
+      .collection('users')
+      .findOne(
+        { _id: new Types.ObjectId(customerId) },
+        { session, projection: { 'loyalty.point': 1 } },
+      )) as UserDocument | null;
 
-      if (available >= remainingToDeduct) {
-        record.remaining_amount = available - remainingToDeduct;
-        remainingToDeduct = 0;
-      } else {
-        remainingToDeduct -= available;
-        record.remaining_amount = 0;
-      }
-      await record.save({ session });
+    const balance = user?.loyalty?.point || 0;
+    if (pointsToDeduct > balance) {
+      throw new BadRequestException(
+        `Số điểm khả dụng không đủ (hiện có ${balance} điểm).`,
+      );
     }
+
+    await this.consumePointsFifo(customerId, pointsToDeduct, session);
 
     await this.connection
       .collection('users')
@@ -703,6 +782,58 @@ export class LoyaltyService {
           amount: -pointsToDeduct,
           order_id: new Types.ObjectId(orderId),
           description: 'Sử dụng điểm để thanh toán đơn hàng',
+        },
+      ],
+      { session },
+    );
+  }
+
+  // Hoàn điểm khách đã dùng khi hủy đơn.
+  // Tạo lô điểm mới có hạn dùng → FIFO & hết hạn nhìn thấy được.
+  // Mỗi đơn chỉ hoàn 1 lần (chặn hủy → khôi phục → hủy lại để nhân điểm).
+  async refundUsedPoints(
+    customerId: string,
+    orderId: string,
+    points: number,
+    session?: ClientSession,
+  ): Promise<void> {
+    if (points <= 0) return;
+
+    const alreadyRefunded = await this.historyModel
+      .exists({
+        customer_id: new Types.ObjectId(customerId),
+        order_id: new Types.ObjectId(orderId),
+        type: PointTransactionType.REFUND,
+        amount: { $gt: 0 },
+      })
+      .session(session ?? null);
+
+    if (alreadyRefunded) {
+      this.logger.warn(
+        `[Loyalty] Đơn ${orderId} đã được hoàn điểm trước đó — bỏ qua.`,
+      );
+      return;
+    }
+
+    await this.connection
+      .collection('users')
+      .updateOne(
+        { _id: new Types.ObjectId(customerId) },
+        { $inc: { 'loyalty.point': points } },
+        { session },
+      );
+
+    await this.historyModel.create(
+      [
+        {
+          customer_id: new Types.ObjectId(customerId),
+          order_id: new Types.ObjectId(orderId),
+          type: PointTransactionType.REFUND,
+          status: PointStatus.AVAILABLE,
+          amount: points,
+          remaining_amount: points,
+          expires_at: this.newExpiryDate(),
+          description: 'Hoàn trả điểm đã dùng do hủy đơn hàng',
         },
       ],
       { session },

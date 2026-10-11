@@ -1,8 +1,15 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
+import { Action, Resource } from "../../../../types/permissions";
+import tokenStorage from "../../../../utils/tokenStorage";
 
 export type PriceStatus = "APPROVED" | "PENDING" | "REJECTED" | "DRAFT";
+
+interface UserPayload {
+  roles?: string[];
+  permissions?: { resource: string; actions: string[] }[];
+}
 
 export interface PriceRecord {
   id: string;
@@ -65,6 +72,23 @@ export function usePriceManagement() {
     editingRecord: PriceRecord | null;
     isSubmitting: boolean;
   }>({ isOpen: false, editingRecord: null, isSubmitting: false });
+
+  const user = tokenStorage.getUser() as UserPayload | null;
+  const hasPermission = (resourceCode: Resource, actionCode: Action) => {
+    if (!user || !user.permissions) return false;
+    if (user.roles && user.roles.includes("Super Admin")) return true;
+    const perm = user.permissions.find((p) => p.resource === resourceCode);
+    if (!perm) return false;
+    return (
+      perm.actions.includes(actionCode) || perm.actions.includes(Action.MANAGE)
+    );
+  };
+
+  const canApprove = hasPermission(Resource.CATALOG_PRICING, Action.APPROVE);
+  const canSubmit = hasPermission(
+    Resource.CATALOG_PRICING,
+    Action.SUBMIT_APPROVAL,
+  );
 
   const fetchProductsData = async () => {
     const res = await axiosClient.get("/products");
@@ -242,6 +266,10 @@ export function usePriceManagement() {
   };
 
   const handleSavePrice = async (data: PriceFormData) => {
+    if (!canSubmit) {
+      toast.error("Bạn không có quyền thay đổi cấu hình giá!");
+      return;
+    }
     const targetRecord = modalConfig.editingRecord;
     if (!targetRecord) return;
 
@@ -298,6 +326,10 @@ export function usePriceManagement() {
 
   const bulkActions = {
     bulkApprove: async () => {
+      if (!canApprove) {
+        toast.error("Bạn không có quyền duyệt yêu cầu giá!");
+        return;
+      }
       const targets = getSelectedItems();
       if (targets.length === 0) return;
       try {
@@ -317,6 +349,10 @@ export function usePriceManagement() {
       }
     },
     bulkReject: async () => {
+      if (!canApprove) {
+        toast.error("Bạn không có quyền từ chối yêu cầu giá!");
+        return;
+      }
       const targets = getSelectedItems();
       if (targets.length === 0) return;
       try {
@@ -339,6 +375,10 @@ export function usePriceManagement() {
 
   const rowActions = {
     submitPrice: async (productId: string, sku: string) => {
+      if (!canSubmit) {
+        toast.error("Bạn không có quyền gửi yêu cầu giá!");
+        return;
+      }
       const targetRecord = records.find(
         (r) =>
           r.sku === sku ||
@@ -367,6 +407,10 @@ export function usePriceManagement() {
       }
     },
     approvePrice: async (productId: string, sku: string) => {
+      if (!canApprove) {
+        toast.error("Bạn không có quyền duyệt giá!");
+        return;
+      }
       try {
         await axiosClient.patch(`/products/${productId}/price-approval`, {
           action: "approve",
@@ -383,6 +427,10 @@ export function usePriceManagement() {
       }
     },
     rejectPrice: async (productId: string, sku: string) => {
+      if (!canApprove) {
+        toast.error("Bạn không có quyền từ chối giá!");
+        return;
+      }
       try {
         await axiosClient.patch(`/products/${productId}/price-approval`, {
           action: "reject",
@@ -418,5 +466,9 @@ export function usePriceManagement() {
     rowActions,
     bulkActions,
     handleSavePrice,
+    permissions: {
+      canApprove,
+      canSubmit,
+    },
   };
 }

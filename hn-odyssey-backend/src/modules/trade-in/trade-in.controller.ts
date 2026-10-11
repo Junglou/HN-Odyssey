@@ -70,14 +70,14 @@ export class TradeInController {
   // --- API CỦA ADMIN (Khớp 1:1 với FE) ---
   @Get('admin/requests')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.TRADE_IN, Action.READ)
+  @RequirePermissions(Resource.SALES_TRADE_IN, Action.READ)
   async getAdminRequests(@Query() query: QueryAdminTradeInDto) {
     return this.tradeInService.getAdminRequests(query);
   }
 
   @Patch('admin/request/:id/approve')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.TRADE_IN, Action.UPDATE)
+  @RequirePermissions(Resource.SALES_TRADE_IN, Action.UPDATE)
   async approveTradeIn(
     @Req() req: RequestWithUser,
     @Param('id') id: string,
@@ -88,7 +88,7 @@ export class TradeInController {
 
   @Patch('admin/request/:id/reject')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.TRADE_IN, Action.UPDATE)
+  @RequirePermissions(Resource.SALES_TRADE_IN, Action.UPDATE)
   async rejectTradeIn(
     @Req() req: RequestWithUser,
     @Param('id') id: string,
@@ -99,14 +99,14 @@ export class TradeInController {
 
   @Patch('admin/request/:id/create-order')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.TRADE_IN, Action.UPDATE)
+  @RequirePermissions(Resource.SALES_TRADE_IN, Action.UPDATE)
   async createOrder(@Req() req: RequestWithUser, @Param('id') id: string) {
     return this.tradeInService.createOrder(req.user._id, id);
   }
 
   @Patch('admin/request/:id/finalize')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.TRADE_IN, Action.APPROVE)
+  @RequirePermissions(Resource.SALES_TRADE_IN, Action.APPROVE)
   async finalizeValue(
     @Req() req: RequestWithUser,
     @Param('id') id: string,
@@ -118,7 +118,7 @@ export class TradeInController {
   // 1. API Lấy chi tiết đơn Trade-In cho Admin
   @Get('admin/request/:id')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.TRADE_IN, Action.READ)
+  @RequirePermissions(Resource.SALES_TRADE_IN, Action.READ)
   async getAdminRequestDetail(@Param('id') id: string) {
     return this.tradeInService.getAdminRequestDetail(id);
   }
@@ -126,7 +126,7 @@ export class TradeInController {
   // 2. API Xuất Excel
   @Get('admin/export/excel')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.TRADE_IN, Action.EXPORT)
+  @RequirePermissions(Resource.SALES_TRADE_IN, Action.EXPORT)
   async exportExcel(
     @Req() req: RequestWithUser,
     @Query() query: QueryAdminTradeInDto,
@@ -139,7 +139,7 @@ export class TradeInController {
   // 3. API In ấn hàng loạt (Hóa đơn / Phiếu kiểm định)
   @Post('admin/print-bulk')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.TRADE_IN, Action.READ)
+  @RequirePermissions(Resource.SALES_TRADE_IN, Action.PRINT)
   async printBulk(
     @Body('ids') ids: string[],
     @Query('type') type: 'INVOICE' | 'PACKING_SLIP',
@@ -160,7 +160,7 @@ export class TradeInController {
 
   @Patch('admin/request/:id/receive')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.TRADE_IN, Action.UPDATE)
+  @RequirePermissions(Resource.SALES_TRADE_IN, Action.RECEIVE)
   async receiveItem(@Req() req: RequestWithUser, @Param('id') id: string) {
     return this.tradeInService.receiveItem(req.user._id, id);
   }
@@ -168,7 +168,7 @@ export class TradeInController {
   // ĐÃ FIX: Đồng bộ Guard và Type an toàn cho Sandbox
   @Patch('admin/request/:id/sandbox-receive')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.TRADE_IN, Action.UPDATE)
+  @RequirePermissions(Resource.SALES_TRADE_IN, Action.RECEIVE)
   async sandboxReceive(@Req() req: RequestWithUser, @Param('id') id: string) {
     const adminId = String(req.user._id);
     return this.tradeInService.sandboxReceiveItem(adminId, id);

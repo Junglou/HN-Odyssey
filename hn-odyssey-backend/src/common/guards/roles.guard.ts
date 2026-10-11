@@ -2,6 +2,7 @@ import {
   Injectable,
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -26,48 +27,36 @@ export class RolesGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-
-    if (isPublic) {
-      return true;
-    }
+    if (isPublic) return true;
 
     const requiredRoles = this.reflector.getAllAndOverride<string[]>(
       ROLES_KEY,
       [context.getHandler(), context.getClass()],
     );
-
-    if (!requiredRoles || requiredRoles.length === 0) {
-      return true;
-    }
+    if (!requiredRoles || requiredRoles.length === 0) return true;
 
     const request = context.switchToHttp().getRequest<RequestWithUser>();
     const user = request.user;
 
+    // Chưa đăng nhập → 401 là đúng
     if (!user || !user.roles) {
       throw new UnauthorizedException('User không tồn tại hoặc không có roles');
     }
 
-    // VẪN GIỮ ĐẶC QUYỀN SUPER_ADMIN NHƯ BẠN YÊU CẦU
+    // Đặc quyền SUPER_ADMIN
     const superAdminRole = Role.SUPER_ADMIN as unknown as string;
-    if (user.roles.includes(superAdminRole)) {
-      return true;
-    }
+    if (user.roles.includes(superAdminRole)) return true;
 
     const hasRole = requiredRoles.some((role) => {
       const roleStr = role as unknown as string;
-
-      // LOGIC CHỐT CHẶN:
-      // Nếu API (như Wishlist, Profile) đang yêu cầu quyền CUSTOMER
-      // Thì cho phép TOÀN BỘ user đã vượt qua được bước check Token truy cập (Bao gồm Staff, Admin, TEST).
-      if (roleStr === 'CUSTOMER') {
-        return true;
-      }
-
+      // API yêu cầu CUSTOMER → cho mọi user đã đăng nhập (Staff, Admin...)
+      if (roleStr === 'CUSTOMER') return true;
       return user.roles.includes(roleStr);
     });
 
+    // Đã đăng nhập nhưng thiếu role → 403 (KHÔNG dùng 401)
     if (!hasRole) {
-      throw new UnauthorizedException(
+      throw new ForbiddenException(
         'Tài khoản của bạn không có quyền thực hiện. Vui lòng liên hệ Admin.',
       );
     }

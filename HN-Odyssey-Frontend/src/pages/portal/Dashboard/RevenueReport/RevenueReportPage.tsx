@@ -9,10 +9,16 @@ export default function RevenueReportPage() {
     endDate,
     metrics,
     trendData,
+    trendGranularity,
+    period,
+    comparisonLabel,
+    paymentShares,
+    cashFlow,
     paginatedProducts,
     currentPage,
     totalPages,
     isLoading,
+    isExporting,
     dateError,
     handleFilterChange,
     setStartDate,
@@ -22,6 +28,8 @@ export default function RevenueReportPage() {
     sortKey,
     sortDirection,
     handleSort,
+    handleExportExcel,
+    permissions,
   } = useRevenueReport();
 
   return (
@@ -32,10 +40,16 @@ export default function RevenueReportPage() {
         endDate={endDate}
         metrics={metrics}
         trendData={trendData}
+        trendGranularity={trendGranularity}
+        period={period}
+        comparisonLabel={comparisonLabel}
+        paymentShares={paymentShares}
+        cashFlow={cashFlow}
         paginatedProducts={paginatedProducts}
         currentPage={currentPage}
         totalPages={totalPages}
         isLoading={isLoading}
+        isExporting={isExporting}
         dateError={dateError}
         onFilterChange={handleFilterChange}
         onStartDateChange={setStartDate}
@@ -45,6 +59,8 @@ export default function RevenueReportPage() {
         sortKey={sortKey}
         sortDirection={sortDirection}
         onSort={handleSort}
+        handleExportExcel={handleExportExcel}
+        permissions={permissions}
       />
     </div>
   );

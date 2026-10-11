@@ -1,5 +1,13 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import axiosClient from "../../../../api/axiosClient";
+import { Action, Resource } from "../../../../types/permissions";
+import { toast } from "react-toastify";
+import {
+  getExportErrorMessage,
+  saveBlobResponse,
+} from "../../../../utils/exportFile";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { formatPeriod, listDatesBetween } from "../../../../utils/reportFormat";
 
 export interface RevenueMetric {
   value: string;
@@ -8,8 +16,25 @@ export interface RevenueMetric {
 }
 
 export interface TrendDataPoint {
-  date: string;
+  date: string; // "YYYY-MM-DD" (theo ngày) hoặc "HH:00" (theo giờ)
   revenue: number;
+  orders: number;
+}
+
+export type TrendGranularity = "hour" | "day";
+
+// US.87 AC6: tỷ trọng doanh thu theo phương thức thanh toán
+export interface PaymentShare {
+  method: string;
+  label: string;
+  revenue: number;
+  percentage: number;
+}
+
+// US.87 AC7: tình trạng thực thu
+export interface CashFlow {
+  paid: number;
+  pending: number;
 }
 
 export interface TopProduct {
@@ -56,28 +81,122 @@ interface TopProductResponse {
   variants: TopProductVariant[];
 }
 
+// GET /admin/reports/business/revenue — chỉ lấy phần dùng cho US.87 AC6, AC7
+interface BusinessRevenueResponse {
+  paymentShares: { method: string; revenue: number; percentage: number }[];
+  cashFlow: { paidAmount: number; pendingAmount: number };
+}
+
 interface BaseResponse<T> {
   success: boolean;
   message: string;
   data: T;
 }
 
-const formatDate = (date: Date): string => {
-  const d = String(date.getDate()).padStart(2, "0");
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const y = date.getFullYear();
-  return `${y}-${m}-${d}`;
+// Bộ lọc đã áp dụng thành công — màn hình, Excel, PDF đều theo bộ lọc này
+interface AppliedFilter {
+  filterName: string;
+  start: string;
+  end: string;
+}
+
+const formatDateStr = (date: Date): string => {
+  const offset = date.getTimezoneOffset();
+  const localDate = new Date(date.getTime() - offset * 60 * 1000);
+  return localDate.toISOString().split("T")[0];
+};
+
+const getApiFilter = (uiFilter: string): string => {
+  switch (uiFilter) {
+    case "Today":
+      return "TODAY";
+    case "This Week":
+      return "THIS_WEEK";
+    case "This Month":
+      return "THIS_MONTH";
+    case "Custom Range":
+      return "CUSTOM";
+    default:
+      return "THIS_MONTH";
+  }
+};
+
+// Hàm thuần, nằm ngoài hook → dùng trong useCallback không cần khai báo dependency.
+// So sánh chuỗi YYYY-MM-DD vì new Date("YYYY-MM-DD") là 7h sáng giờ VN.
+const getDateRangeError = (start: string, end: string): string | null => {
+  if (!start || !end) return "Vui lòng chọn đầy đủ ngày bắt đầu và kết thúc";
+  if (start > end) return "Ngày bắt đầu không được lớn hơn ngày kết thúc";
+  if (end > formatDateStr(new Date()))
+    return "Không thể xem báo cáo cho ngày ở tương lai";
+  return null;
+};
+
+const PAYMENT_LABELS: Record<string, string> = {
+  COD: "COD (Cash on Delivery)",
+  VNPAY: "VNPAY",
+  MOMO: "MoMo",
+};
+
+const toPaymentLabel = (method: string): string => {
+  const key = (method || "").toUpperCase();
+  if (PAYMENT_LABELS[key]) return PAYMENT_LABELS[key];
+  return key && key !== "UNKNOWN" && key !== "NULL" ? method : "Other";
+};
+
+// US.87 AC4: so với "kỳ liền kề trước đó" → nhãn phải đúng theo bộ lọc
+const getComparisonLabel = (filterName: string): string => {
+  switch (filterName) {
+    case "Today":
+      return "vs yesterday";
+    case "This Week":
+      return "vs last week";
+    case "This Month":
+      return "vs last month";
+    default:
+      return "vs previous period";
+  }
+};
+
+// US.87 AC1 + AC8: Hôm nay → đủ 24 khung giờ; kỳ khác → đủ từng ngày; không có đơn = 0
+const buildTrendSeries = (
+  raw: ChartDataPoint[],
+  filterName: string,
+  start: string,
+  end: string,
+): TrendDataPoint[] => {
+  const byLabel = new Map(raw.map((c) => [c.label, c]));
+  const labels =
+    filterName === "Today"
+      ? Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, "0")}:00`)
+      : listDatesBetween(start, end);
+
+  return labels.map((label) => {
+    const hit = byLabel.get(label);
+    return {
+      date: label,
+      revenue: Number(hit?.revenue ?? 0),
+      orders: Number(hit?.orders ?? 0),
+    };
+  });
 };
 
 export function useRevenueReport() {
   const today = new Date();
-  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
   const [activeFilter, setActiveFilter] = useState<string>("This Month");
-  const [startDate, setStartDate] = useState<string>(formatDate(firstDay));
-  const [endDate, setEndDate] = useState<string>(formatDate(today));
+  const [startDate, setStartDate] = useState<string>(
+    formatDateStr(firstDayOfMonth),
+  );
+  const [endDate, setEndDate] = useState<string>(formatDateStr(today));
+  const [appliedFilter, setAppliedFilter] = useState<AppliedFilter>({
+    filterName: "This Month",
+    start: formatDateStr(firstDayOfMonth),
+    end: formatDateStr(today),
+  });
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
   const [dateError, setDateError] = useState<string | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
 
@@ -96,59 +215,74 @@ export function useRevenueReport() {
 
   const [trendData, setTrendData] = useState<TrendDataPoint[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+  const [paymentShares, setPaymentShares] = useState<PaymentShare[]>([]);
+  const [cashFlow, setCashFlow] = useState<CashFlow>({ paid: 0, pending: 0 });
 
-  const getApiFilter = (uiFilter: string): string => {
-    switch (uiFilter) {
-      case "Today":
-        return "TODAY";
-      case "This Week":
-        return "THIS_WEEK";
-      case "This Month":
-        return "THIS_MONTH";
-      case "Custom Range":
-        return "CUSTOM";
-      default:
-        return "THIS_MONTH";
+  // Quyền chỉ dùng để ẩn/hiện nút — Backend vẫn kiểm tra lại
+  const user = getCurrentUser();
+  const canExport = hasPermission(user, Resource.REPORT_REVENUE, Action.EXPORT);
+
+  // -------------------------------------------------------------
+  // EXPORT EXCEL — theo bộ lọc ĐÃ ÁP DỤNG (US.95 AC3)
+  // -------------------------------------------------------------
+  const handleExportExcel = async () => {
+    if (!canExport) {
+      toast.error("Bạn không có quyền xuất dữ liệu Excel Báo cáo Doanh thu.");
+      return;
+    }
+    try {
+      setIsExporting(true);
+      const response = await axiosClient.get<Blob>(
+        "/admin/reports/export/revenue/excel",
+        {
+          params: {
+            time_filter: getApiFilter(appliedFilter.filterName),
+            start_date: `${appliedFilter.start}T00:00:00.000Z`,
+            end_date: `${appliedFilter.end}T23:59:59.999Z`,
+          },
+          responseType: "blob",
+        },
+      );
+      const dateStr = formatDateStr(new Date()).replace(/-/g, "");
+      const result = await saveBlobResponse(
+        response,
+        `RevenueReport_${dateStr}.xlsx`,
+      );
+      if (result.kind === "queued") toast.info(result.message);
+      else toast.success("Đã tải báo cáo Excel.");
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        await getExportErrorMessage(err, "Lỗi khi xuất báo cáo Excel."),
+      );
+    } finally {
+      setIsExporting(false);
     }
   };
 
   const validateDates = (start: string, end: string): boolean => {
-    if (!start || !end) {
-      setDateError("Vui lòng chọn đầy đủ ngày bắt đầu và kết thúc");
-      return false;
-    }
-    const startObj = new Date(start);
-    const endObj = new Date(end);
-    const todayObj = new Date();
-
-    if (startObj > endObj) {
-      setDateError("Ngày bắt đầu không được lớn hơn ngày kết thúc");
-      return false;
-    }
-    if (endObj > todayObj) {
-      setDateError("Không thể xem báo cáo cho ngày ở tương lai");
-      return false;
-    }
-    setDateError(null);
-    return true;
+    const error = getDateRangeError(start, end);
+    setDateError(error);
+    return error === null;
   };
 
   const fetchReportData = useCallback(
     async (filterName: string, start: string, end: string) => {
-      if (!validateDates(start, end)) return;
+      const rangeError = getDateRangeError(start, end);
+      setDateError(rangeError);
+      if (rangeError) return;
+
       setIsLoading(true);
       setCurrentPage(1);
 
       try {
-        const filterParam = getApiFilter(filterName);
-
         const params: Record<string, string> = {
-          time_filter: filterParam,
-          start_date: start,
-          end_date: end,
+          time_filter: getApiFilter(filterName),
+          start_date: `${start}T00:00:00.000Z`,
+          end_date: `${end}T23:59:59.999Z`,
         };
 
-        const [overviewRes, topProductsRes] = await Promise.all([
+        const [overviewRes, topProductsRes, businessRes] = await Promise.all([
           axiosClient.get<BaseResponse<OverviewResponse>>(
             "/reports/dashboard/overview",
             { params },
@@ -159,6 +293,15 @@ export function useRevenueReport() {
               params: { ...params, sort_by: "REVENUE", sort_order: "DESC" },
             },
           ),
+          // US.87 AC6, AC7 — lỗi ở API này không được làm hỏng cả trang
+          axiosClient
+            .get<
+              BaseResponse<BusinessRevenueResponse>
+            >("/admin/reports/business/revenue", { params })
+            .catch((error: unknown) => {
+              console.error("Lỗi khi tải phân tích thanh toán:", error);
+              return null;
+            }),
         ]);
 
         const overview =
@@ -212,14 +355,10 @@ export function useRevenueReport() {
           },
         });
 
-        if (overview.chart_data) {
-          setTrendData(
-            overview.chart_data.map((c) => ({
-              date: c.label,
-              revenue: c.revenue,
-            })),
-          );
-        }
+        // US.87 AC1, AC8: luôn đủ khung giờ/ngày, không có đơn = 0
+        setTrendData(
+          buildTrendSeries(overview.chart_data ?? [], filterName, start, end),
+        );
 
         const formattedProducts: TopProduct[] = products.map((p, index) => ({
           rank: index + 1,
@@ -230,6 +369,23 @@ export function useRevenueReport() {
         }));
 
         setTopProducts(formattedProducts);
+
+        // US.87 AC6, AC7: thanh toán & thực thu (không có dữ liệu → 0, AC8)
+        const business = businessRes?.data?.data;
+        setPaymentShares(
+          (business?.paymentShares ?? []).map((p) => ({
+            method: p.method,
+            label: toPaymentLabel(p.method),
+            revenue: Number(p.revenue) || 0,
+            percentage: Number(p.percentage) || 0,
+          })),
+        );
+        setCashFlow({
+          paid: Number(business?.cashFlow?.paidAmount ?? 0),
+          pending: Number(business?.cashFlow?.pendingAmount ?? 0),
+        });
+
+        setAppliedFilter({ filterName, start, end });
       } catch (error) {
         console.error("Lỗi khi fetch báo cáo doanh thu:", error);
         setDateError("Có lỗi xảy ra khi tải dữ liệu từ máy chủ");
@@ -255,22 +411,22 @@ export function useRevenueReport() {
     let newEnd = endDate;
 
     if (filter === "Today") {
-      newStart = formatDate(todayDate);
-      newEnd = formatDate(todayDate);
+      newStart = formatDateStr(todayDate);
+      newEnd = formatDateStr(todayDate);
     } else if (filter === "This Week") {
       const day = todayDate.getDay();
       const diff = todayDate.getDate() - day + (day === 0 ? -6 : 1);
       const firstDayOfWeek = new Date(todayDate.setDate(diff));
-      newStart = formatDate(firstDayOfWeek);
-      newEnd = formatDate(new Date());
+      newStart = formatDateStr(firstDayOfWeek);
+      newEnd = formatDateStr(new Date());
     } else if (filter === "This Month") {
-      const firstDayOfMonth = new Date(
+      const firstDay = new Date(
         todayDate.getFullYear(),
         todayDate.getMonth(),
         1,
       );
-      newStart = formatDate(firstDayOfMonth);
-      newEnd = formatDate(new Date());
+      newStart = formatDateStr(firstDay);
+      newEnd = formatDateStr(new Date());
     }
 
     setStartDate(newStart);
@@ -328,10 +484,18 @@ export function useRevenueReport() {
     endDate,
     metrics,
     trendData,
+    trendGranularity: (appliedFilter.filterName === "Today"
+      ? "hour"
+      : "day") as TrendGranularity,
+    period: formatPeriod(appliedFilter.start, appliedFilter.end),
+    comparisonLabel: getComparisonLabel(appliedFilter.filterName),
+    paymentShares,
+    cashFlow,
     paginatedProducts,
     totalPages,
     currentPage,
     isLoading,
+    isExporting,
     dateError,
     sortKey,
     sortDirection,
@@ -349,5 +513,7 @@ export function useRevenueReport() {
     handleApply,
     handlePageChange: (page: number) => setCurrentPage(page),
     handleSort,
+    handleExportExcel,
+    permissions: { canExport },
   };
 }

@@ -23,6 +23,9 @@ interface IJwtUser {
   roles: string[];
   email: string;
   token_version?: number;
+  fullName?: string;
+  first_Name?: string;
+  last_Name?: string;
 }
 
 @Injectable()
@@ -45,7 +48,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: JwtPayload) {
     const user = await this.userModel
       .findById(payload.sub)
-      .select('status is_active lock_until roles email token_version')
+      .select(
+        'status is_active lock_until roles email token_version fullName first_Name last_Name',
+      )
       .lean<IJwtUser>()
       .exec();
 
@@ -72,10 +77,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       );
     }
 
+    // US.95 AC7: kèm tên người dùng để ghi vào file báo cáo xuất ra
+    const fullName =
+      user.fullName?.trim() ||
+      [user.last_Name, user.first_Name].filter(Boolean).join(' ').trim() ||
+      undefined;
+
     return {
       _id: payload.sub,
       email: payload.email,
       roles: user.roles,
+      fullName,
     };
   }
 }

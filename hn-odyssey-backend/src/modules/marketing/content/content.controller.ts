@@ -56,7 +56,7 @@ export class ContentController {
 
   @Post('posts')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.BLOG, Action.CREATE)
+  @RequirePermissions(Resource.CONTENT_POSTS, Action.CREATE)
   async createPost(@Body() dto: CreatePostDto, @Req() req: RequestWithUser) {
     const data = await this.contentService.createPost(
       dto,
@@ -68,7 +68,7 @@ export class ContentController {
 
   @Get('posts')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.BLOG, Action.READ)
+  @RequirePermissions(Resource.CONTENT_POSTS, Action.READ)
   async getAllPosts(@Query() query: QueryPostDto) {
     const data = await this.contentService.findAllPosts(query);
     return new BaseResponse(true, 'Lấy danh sách bài viết thành công', data);
@@ -87,7 +87,7 @@ export class ContentController {
 
   @Delete('posts/:id')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.BLOG, Action.DELETE)
+  @RequirePermissions(Resource.CONTENT_POSTS, Action.DELETE)
   async deletePost(@Param('id') id: string, @Req() req: RequestWithUser) {
     const result = await this.contentService.softDeletePost(
       id,
@@ -101,7 +101,7 @@ export class ContentController {
 
   @Post('pages')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.BLOG, Action.CREATE) // Dùng chung quyền quản lý Nội dung
+  @RequirePermissions(Resource.CONTENT_PAGES, Action.CREATE) // Dùng chung quyền quản lý Nội dung
   async createPage(
     @Body() dto: CreateStaticPageDto,
     @Req() req: RequestWithUser,
@@ -116,7 +116,7 @@ export class ContentController {
 
   @Get('pages')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.BLOG, Action.READ)
+  @RequirePermissions(Resource.CONTENT_PAGES, Action.READ)
   async getAllPages(@Query() query: QueryPageDto) {
     // Đã sửa 'any' thành 'QueryPageDto'
     const data = await this.contentService.findAllPages(query);
@@ -125,7 +125,7 @@ export class ContentController {
 
   @Delete('pages/:id')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.BLOG, Action.DELETE)
+  @RequirePermissions(Resource.CONTENT_PAGES, Action.DELETE)
   async deletePage(@Param('id') id: string, @Req() req: RequestWithUser) {
     const result = await this.contentService.softDeletePage(
       id,
@@ -149,7 +149,7 @@ export class ContentController {
   // API UPDATE POST & PAGE (Dành cho Admin)
   @Patch('posts/:id')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.BLOG, Action.UPDATE)
+  @RequirePermissions(Resource.CONTENT_POSTS, Action.UPDATE)
   async updatePost(
     @Param('id') id: string,
     @Body() dto: UpdatePostDto,
@@ -166,7 +166,7 @@ export class ContentController {
 
   @Patch('pages/:id')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.BLOG, Action.UPDATE)
+  @RequirePermissions(Resource.CONTENT_PAGES, Action.UPDATE)
   async updatePage(
     @Param('id') id: string,
     @Body() dto: UpdateStaticPageDto,
@@ -184,7 +184,7 @@ export class ContentController {
   // API MENU CONFIG (US.126 - AC5)
   @Post('menus')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.SYSTEM, Action.UPDATE) // Quyền cấu hình hệ thống/giao diện
+  @RequirePermissions(Resource.CONTENT_CONFIG, Action.UPDATE) // Quyền cấu hình hệ thống/giao diện
   async createMenu(@Body() dto: CreateMenuDto, @Req() req: RequestWithUser) {
     const data = await this.contentService.createMenu(
       dto,
@@ -220,7 +220,7 @@ export class ContentController {
 
   @Post('banners')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.BLOG, Action.CREATE)
+  @RequirePermissions(Resource.CONTENT_BANNERS, Action.CREATE)
   async createBanner(
     @Body() dto: CreateBannerDto,
     @Req() req: RequestWithUser,
@@ -235,7 +235,7 @@ export class ContentController {
 
   @Get('banners')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.BLOG, Action.READ)
+  @RequirePermissions(Resource.CONTENT_BANNERS, Action.READ)
   async getAllBanners(@Query() query: QueryBannerDto) {
     const data = await this.contentService.findAll(query);
     return new BaseResponse(true, 'Lấy danh sách banner thành công', data);
@@ -243,7 +243,7 @@ export class ContentController {
 
   @Get('banners/:id')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.BLOG, Action.READ)
+  @RequirePermissions(Resource.CONTENT_BANNERS, Action.READ)
   async getBannerDetail(@Param('id') id: string) {
     const data = await this.contentService.findOne(id);
     return new BaseResponse(true, 'Thành công', data);
@@ -251,7 +251,7 @@ export class ContentController {
 
   @Patch('banners/reorder')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.BLOG, Action.UPDATE)
+  @RequirePermissions(Resource.CONTENT_BANNERS, Action.UPDATE)
   async reorderBanners(@Body() dto: ReorderBannersDto) {
     const result = await this.contentService.reorderBanners(dto);
     return new BaseResponse(true, result.message);
@@ -259,7 +259,7 @@ export class ContentController {
 
   @Patch('banners/:id')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.BLOG, Action.UPDATE)
+  @RequirePermissions(Resource.CONTENT_BANNERS, Action.UPDATE)
   async updateBanner(@Param('id') id: string, @Body() dto: UpdateBannerDto) {
     const data = await this.contentService.updateBanner(id, dto);
     return new BaseResponse(true, 'Cập nhật banner thành công', data);
@@ -267,7 +267,7 @@ export class ContentController {
 
   @Delete('banners/:id')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.BLOG, Action.DELETE)
+  @RequirePermissions(Resource.CONTENT_BANNERS, Action.DELETE)
   async softDeleteBanner(@Param('id') id: string, @Req() req: RequestWithUser) {
     const result = await this.contentService.softDeleteBanner(
       id,
@@ -300,7 +300,7 @@ export class ContentController {
 
   @Patch('banners/bulk/status')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.BLOG, Action.UPDATE)
+  @RequirePermissions(Resource.CONTENT_BANNERS, Action.UPDATE)
   async bulkUpdateBannersStatus(
     @Body() dto: { ids: string[]; status: BannerStatus },
     @Req() req: RequestWithUser,
@@ -317,7 +317,7 @@ export class ContentController {
   // BỔ SUNG: API BULK ACTION CHO POSTS
   @Patch('posts/bulk/status')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.BLOG, Action.UPDATE)
+  @RequirePermissions(Resource.CONTENT_POSTS, Action.UPDATE)
   async bulkUpdatePostsStatus(
     @Body() dto: { ids: string[]; status: PostStatus },
     @Req() req: RequestWithUser,
@@ -333,7 +333,7 @@ export class ContentController {
 
   @Patch('posts/bulk/delete')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.BLOG, Action.DELETE)
+  @RequirePermissions(Resource.CONTENT_POSTS, Action.DELETE)
   async bulkDeletePosts(
     @Body() dto: { ids: string[] },
     @Req() req: RequestWithUser,
@@ -357,7 +357,7 @@ export class ContentController {
   // Cập nhật cấu hình trang (Chỉ Admin)
   @Patch('page-configs/:pageId')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.SYSTEM, Action.UPDATE)
+  @RequirePermissions(Resource.CONTENT_CONFIG, Action.UPDATE)
   async updatePageConfig(
     @Param('pageId') pageId: string,
     @Body() dto: UpdatePageConfigDto,
@@ -379,7 +379,7 @@ export class ContentController {
   // Upload Media riêng cho Page Builder
   @Post('page-configs/upload')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.SYSTEM, Action.UPDATE)
+  @RequirePermissions(Resource.CONTENT_CONFIG, Action.UPDATE)
   @UseInterceptors(FileInterceptor('file')) // Nhận 1 file từ form-data field 'file'
   async uploadBuilderMedia(@UploadedFile() file: Express.Multer.File) {
     // Tận dụng hàm processAndSaveFiles đã viết sẵn trong ContentService
@@ -399,7 +399,7 @@ export class ContentController {
   // BỔ SUNG: API Lấy chi tiết bài viết cho Admin (để Edit có data)
   @Get('posts/:id/detail') // Dùng /detail để tránh đụng route public
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.BLOG, Action.READ)
+  @RequirePermissions(Resource.CONTENT_POSTS, Action.READ)
   async getPostDetailForAdmin(@Param('id') id: string) {
     const data = await this.contentService.findPostById(id);
     return new BaseResponse(true, 'Lấy chi tiết thành công', data);

@@ -49,14 +49,13 @@ export function usePortalNotifications() {
         const newItems = res.data.data;
         setNotifications((prev) => [...prev, ...newItems]);
         setPage(nextPage);
-
-        // khóa trạng thái tải thêm nếu dữ liệu trả về không đủ limit
         if (newItems.length < 20) {
           setHasMore(false);
         }
       }
     } catch (error) {
-      console.error("lỗi khi tải thêm thông báo:", error);
+      console.error("Lỗi khi tải thêm thông báo:", error);
+      // KHÔNG toast.error ở đây để tránh làm phiền UX
     } finally {
       setIsLoading(false);
     }
@@ -73,13 +72,13 @@ export function usePortalNotifications() {
         );
         setUnreadCount((prev) => Math.max(0, prev - 1));
 
-        // thực thi chuyển trang nếu dữ liệu metadata có định tuyến
         if (targetUrl) {
           navigate(targetUrl);
         }
       }
     } catch (error) {
-      console.error("lỗi khi cập nhật trạng thái đã đọc:", error);
+      console.error("Lỗi khi cập nhật trạng thái đã đọc:", error);
+      toast.error("Không thể đánh dấu đã đọc.");
     }
   };
 
@@ -89,18 +88,20 @@ export function usePortalNotifications() {
     const loadInitialData = async () => {
       try {
         const [res, countRes] = await Promise.all([
-          axiosClient.get("/notifications/my-notifications?page=1&limit=20"),
-          axiosClient.get("/notifications/unread-count"),
+          axiosClient
+            .get("/notifications/my-notifications?page=1&limit=20")
+            .catch(() => null),
+          axiosClient.get("/notifications/unread-count").catch(() => null),
         ]);
 
         if (isMounted) {
-          if (res.data && res.data.success) {
+          if (res?.data && res.data.success) {
             setNotifications(res.data.data);
             if (res.data.data.length < 20) {
               setHasMore(false);
             }
           }
-          if (countRes.data && countRes.data.success) {
+          if (countRes?.data && countRes.data.success) {
             setUnreadCount(countRes.data.data.count);
           }
         }

@@ -128,6 +128,10 @@ export class AttributesService {
       .lean();
   }
 
+  async findAllActive() {
+    return this.attributeModel.find({ is_active: true }).exec();
+  }
+
   async findOne(id: string) {
     const attr = await this.attributeModel.findById(id).lean();
     if (!attr) throw new NotFoundException('Không tìm thấy thuộc tính');

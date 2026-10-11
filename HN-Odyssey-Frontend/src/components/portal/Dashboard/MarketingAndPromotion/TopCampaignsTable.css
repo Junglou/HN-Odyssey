@@ -25,7 +25,7 @@
 
 .tct-table {
   width: 100%;
-  min-width: 800px;
+  min-width: 960px;
   border-collapse: collapse;
   font-size: 0.9rem;
   text-align: left;
@@ -73,9 +73,17 @@
   color: #854d0e;
 }
 
-/* màu roi (tăng độ ưu tiên để không bị đè màu) */
-.tct-table td.tct-roi-positive {
-  color: #22c55e;
+.tct-status-completed {
+  background-color: #e2e8f0;
+  color: #475569;
+}
+
+/* dấu … trong phân trang */
+.tct-page-ellipsis {
+  padding: 0 4px;
+  color: #94a3b8;
+  font-weight: 600;
+  user-select: none;
 }
 
 /* căn phải */
@@ -135,4 +143,77 @@
 .tct-page-nav-btn:not(:disabled):hover,
 .tct-page-num-btn:not(.tct-active):hover {
   background-color: #f1f5f9;
+}
+
+/* US.82 AC3: màu trạng thái ROI */
+.tct-roi {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tct-roi-profit {
+  color: #16a34a;
+}
+
+.tct-roi-breakeven {
+  color: #ca8a04;
+}
+
+.tct-roi-loss {
+  color: #dc2626;
+}
+
+.tct-roi-warning {
+  margin-right: 4px;
+}
+/* cột thao tác */
+.tct-col-actions {
+  text-align: right;
+  width: 1%;
+  white-space: nowrap;
+}
+
+.tct-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background-color: #ffffff;
+  color: #1e293b;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.tct-action-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.tct-action-btn:hover {
+  background-color: #1e293b;
+  border-color: #1e293b;
+  color: #ffffff;
+}
+.tct-action-btn:focus-visible {
+  outline: 2px solid #94a3b8;
+  outline-offset: 2px;
+}
+/* Ad Spend Ledger: kỳ lọc không có chi phí → ROI "—" */
+.tct-roi-nospend {
+  color: #94a3b8;
+  cursor: help;
+}
+
+/* dòng phụ "Lifetime" dưới chi phí trong kỳ */
+.tct-subvalue {
+  margin-top: 2px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #94a3b8;
+  white-space: nowrap;
 }

@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
+import type { UserPayload } from "../../../../types/auth";
+import { Action, Resource } from "../../../../types/permissions";
 
 export type CouponStatus = "ACTIVE" | "INACTIVE" | "CANCELLED" | "DRAFT";
 export type DiscountType = "PERCENTAGE" | "FIXED_AMOUNT";
@@ -58,19 +60,6 @@ interface BeCouponResponse {
   applicable_scope?: ApplicableScopeObj;
 }
 
-interface BePaginatedResponse {
-  data: {
-    data: BeCouponResponse[];
-    meta: {
-      totalItems: number;
-      itemCount: number;
-      itemsPerPage: number;
-      totalPages: number;
-      currentPage: number;
-    };
-  };
-}
-
 interface APIErrorResponse {
   response?: {
     data?: {
@@ -95,11 +84,26 @@ const extractErrorMessage = (error: unknown, defaultMsg: string): string => {
   }
 };
 
-export function useCouponManagement() {
-  const [records, setRecords] = useState<CouponRecord[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+// Khắc phục lỗi React Hook useEffect setState bằng cách khởi tạo Lazy Initial State
+const useLocalAuth = () => {
+  const [user] = useState(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) return JSON.parse(stored) as UserPayload;
+    } catch {
+      // Bỏ qua lỗi parse
+    }
+    return null;
+  });
+  return { user };
+};
 
-  const [search, setSearch] = useState<string>("");
+export function useCouponManagement() {
+  // Loại bỏ hoàn toàn cú pháp useState để tránh lỗi Parser toán tử trong file .ts
+  const [records, setRecords] = useState<CouponRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<CouponStatus | "All">("All");
   const [discountTypeFilter, setDiscountTypeFilter] = useState<
     DiscountType | "All"
@@ -112,16 +116,39 @@ export function useCouponManagement() {
     totalFiltered: 0,
   });
 
-  const [modalConfig, setModalConfig] = useState<{
-    isOpen: boolean;
-    mode: "add" | "edit" | "view" | "delete";
-    editingRecord: CouponRecord | null;
-    isSubmitting: boolean;
-  }>({ isOpen: false, mode: "add", editingRecord: null, isSubmitting: false });
+  const [modalConfig, setModalConfig] = useState({
+    isOpen: false,
+    mode: "add" as "add" | "edit" | "view" | "delete",
+    editingRecord: null as CouponRecord | null,
+    isSubmitting: false,
+  });
+
+  const { user } = useLocalAuth();
+
+  const hasPermission = useCallback(
+    (resourceCode: Resource, actionCode: Action): boolean => {
+      if (!user || !user.permissions) return false;
+      if (user.roles?.includes("SUPER_ADMIN")) return true;
+
+      return user.permissions.some(
+        (p) =>
+          p.resource === resourceCode &&
+          (p.actions.includes(actionCode) || p.actions.includes(Action.MANAGE)),
+      );
+    },
+    [user],
+  );
+
+  const canCreate = hasPermission(Resource.PROMO_COUPONS, Action.CREATE);
+  const canUpdate = hasPermission(Resource.PROMO_COUPONS, Action.UPDATE);
+  const canDelete = hasPermission(Resource.PROMO_COUPONS, Action.DELETE);
+  const canPublish = hasPermission(Resource.PROMO_COUPONS, Action.PUBLISH);
 
   const formatDate = (isoString: string) => {
     const d = new Date(isoString);
-    return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()}`;
+    const day = d.getDate().toString().padStart(2, "0");
+    const month = (d.getMonth() + 1).toString().padStart(2, "0");
+    return `${day}/${month}/${d.getFullYear()}`;
   };
 
   const formatDiscount = (type: DiscountType, value: number) => {
@@ -131,44 +158,53 @@ export function useCouponManagement() {
   const fetchCoupons = useCallback(async () => {
     setIsLoading(true);
     try {
-      const params: Record<string, string | number> = {
+      // Thay thế Record bằng định nghĩa object tường minh để tránh lỗi Generic
+      const params: { [key: string]: string | number } = {
         page: pagination.page,
         limit: pagination.limit,
       };
       if (search) params.search = search;
       if (statusFilter !== "All") params.status = statusFilter;
 
-      const res = await axiosClient.get<BePaginatedResponse>(
-        "/promotions/coupons",
-        { params },
+      const res = await axiosClient.get("/promotions/coupons", { params });
+
+      const rawData = res.data?.data?.data || [];
+      const meta = res.data?.data?.meta || {
+        totalPages: 1,
+        totalItems: rawData.length,
+      };
+
+      const mappedData: CouponRecord[] = rawData.map(
+        (item: BeCouponResponse) => ({
+          id: item._id,
+          code: item.code,
+          discountType: item.discount_type,
+          discountValue: formatDiscount(
+            item.discount_type,
+            item.discount_value,
+          ),
+          usedCount: item.usage_count,
+          totalUses: item.usage_limit,
+          perCustomerLimit: item.user_usage_limit,
+          status: item.status,
+          startDate: formatDate(item.start_date),
+          endDate: formatDate(item.end_date),
+          minimumOrderValue: item.min_order_value,
+          maximumDiscountAmount: item.max_discount_amount,
+          applicableScope: item.applicable_scope || {
+            isAllProducts: true,
+            categories: [],
+            tags: [],
+            products: [],
+          },
+        }),
       );
 
-      const mappedData: CouponRecord[] = res.data.data.data.map((item) => ({
-        id: item._id,
-        code: item.code,
-        discountType: item.discount_type,
-        discountValue: formatDiscount(item.discount_type, item.discount_value),
-        usedCount: item.usage_count,
-        totalUses: item.usage_limit,
-        perCustomerLimit: item.user_usage_limit,
-        status: item.status,
-        startDate: formatDate(item.start_date),
-        endDate: formatDate(item.end_date),
-        minimumOrderValue: item.min_order_value,
-        maximumDiscountAmount: item.max_discount_amount,
-        applicableScope: item.applicable_scope || {
-          isAllProducts: true,
-          categories: [],
-          tags: [],
-          products: [],
-        },
-      }));
-
       setRecords(mappedData);
-      setPagination((p) => ({
+      setPagination((p: typeof pagination) => ({
         ...p,
-        totalPages: res.data.data.meta.totalPages,
-        totalFiltered: res.data.data.meta.totalItems,
+        totalPages: meta.totalPages,
+        totalFiltered: meta.totalItems,
       }));
     } catch (error: unknown) {
       toast.error(
@@ -191,21 +227,21 @@ export function useCouponManagement() {
   const actions = {
     changeSearch: (val: string) => {
       setSearch(val);
-      setPagination((p) => ({ ...p, page: 1 }));
+      setPagination((p: typeof pagination) => ({ ...p, page: 1 }));
     },
     changeStatusFilter: (status: CouponStatus | "All") => {
       setStatusFilter(status);
-      setPagination((p) => ({ ...p, page: 1 }));
+      setPagination((p: typeof pagination) => ({ ...p, page: 1 }));
     },
     changeDiscountTypeFilter: (type: DiscountType | "All") => {
       setDiscountTypeFilter(type);
-      setPagination((p) => ({ ...p, page: 1 }));
+      setPagination((p: typeof pagination) => ({ ...p, page: 1 }));
     },
     clearFilters: () => {
       setSearch("");
       setStatusFilter("All");
       setDiscountTypeFilter("All");
-      setPagination((p) => ({ ...p, page: 1 }));
+      setPagination((p: typeof pagination) => ({ ...p, page: 1 }));
     },
     toggleSelection: (id: string) => {
       setSelectedIds((prev) => {
@@ -223,23 +259,29 @@ export function useCouponManagement() {
         isSelectAll ? new Set(displayRecords.map((r) => r.id)) : new Set(),
       );
     },
-    changePage: (page: number) => setPagination((p) => ({ ...p, page })),
+    changePage: (page: number) =>
+      setPagination((p: typeof pagination) => ({ ...p, page })),
     changeLimit: (limit: number) =>
-      setPagination((p) => ({ ...p, page: 1, limit })),
-    openAddModal: () =>
+      setPagination((p: typeof pagination) => ({ ...p, page: 1, limit })),
+
+    openAddModal: () => {
+      if (!canCreate) return toast.error("Bạn không có quyền tạo mã giảm giá.");
       setModalConfig({
         isOpen: true,
         mode: "add",
         editingRecord: null,
         isSubmitting: false,
-      }),
-    openEditModal: (record: CouponRecord) =>
+      });
+    },
+    openEditModal: (record: CouponRecord) => {
+      if (!canUpdate) return toast.error("Bạn không có quyền sửa mã giảm giá.");
       setModalConfig({
         isOpen: true,
         mode: "edit",
         editingRecord: record,
         isSubmitting: false,
-      }),
+      });
+    },
     openViewModal: (record: CouponRecord) =>
       setModalConfig({
         isOpen: true,
@@ -247,13 +289,15 @@ export function useCouponManagement() {
         editingRecord: record,
         isSubmitting: false,
       }),
-    openDeleteModal: (record?: CouponRecord) =>
+    openDeleteModal: (record?: CouponRecord) => {
+      if (!canDelete) return toast.error("Bạn không có quyền xóa mã giảm giá.");
       setModalConfig({
         isOpen: true,
         mode: "delete",
         editingRecord: record || null,
         isSubmitting: false,
-      }),
+      });
+    },
     closeModal: () =>
       setModalConfig({
         isOpen: false,
@@ -270,9 +314,12 @@ export function useCouponManagement() {
           );
           toast.success("Xóa mã giảm giá thành công!");
         } else {
-          const res = await axiosClient.post("/promotions/bulk/delete", {
-            couponIds: Array.from(selectedIds),
-          });
+          const res = await axiosClient.post(
+            "/promotions/coupons/bulk/delete",
+            {
+              ids: Array.from(selectedIds),
+            },
+          );
 
           const msg = res.data?.message || "Xóa hàng loạt thành công!";
           if (msg.includes("chặn xóa") || msg.includes("bỏ qua")) {
@@ -292,9 +339,13 @@ export function useCouponManagement() {
 
   const handleModalSubmit = async (data: CouponFormData) => {
     try {
-      setModalConfig((prev) => ({ ...prev, isSubmitting: true }));
+      setModalConfig((prev: typeof modalConfig) => ({
+        ...prev,
+        isSubmitting: true,
+      }));
 
-      const payload = {
+      // Sửa lỗi Generic Record và xóa escape vô ích
+      const payload: { [key: string]: unknown } = {
         code: data.code,
         description: `Mã giảm giá ${data.code}`,
         discount_type: data.discountType,
@@ -319,7 +370,7 @@ export function useCouponManagement() {
         await axiosClient.post("/promotions/coupons", payload);
         toast.success("Tạo mã giảm giá thành công!");
       } else if (modalConfig.mode === "edit" && modalConfig.editingRecord) {
-        const updatePayload: Partial<typeof payload> = { ...payload };
+        const updatePayload = { ...payload };
         delete updatePayload.code;
 
         await axiosClient.patch(
@@ -334,16 +385,21 @@ export function useCouponManagement() {
     } catch (error: unknown) {
       toast.error(extractErrorMessage(error, "Có lỗi xảy ra khi lưu dữ liệu"));
     } finally {
-      setModalConfig((prev) => ({ ...prev, isSubmitting: false }));
+      setModalConfig((prev: typeof modalConfig) => ({
+        ...prev,
+        isSubmitting: false,
+      }));
     }
   };
 
   const bulkActions = {
     bulkActivate: async () => {
+      if (!canPublish)
+        return toast.error("Bạn không có quyền xuất bản mã giảm giá.");
       if (selectedIds.size === 0) return;
       try {
-        await axiosClient.patch("/promotions/bulk/status", {
-          couponIds: Array.from(selectedIds),
+        await axiosClient.patch("/promotions/coupons/bulk/status", {
+          ids: Array.from(selectedIds),
           action: "ACTIVATE",
         });
         toast.success("Kích hoạt hàng loạt thành công!");
@@ -354,10 +410,12 @@ export function useCouponManagement() {
       }
     },
     bulkDeactivate: async () => {
+      if (!canPublish)
+        return toast.error("Bạn không có quyền thu hồi mã giảm giá.");
       if (selectedIds.size === 0) return;
       try {
-        await axiosClient.patch("/promotions/bulk/status", {
-          couponIds: Array.from(selectedIds),
+        await axiosClient.patch("/promotions/coupons/bulk/status", {
+          ids: Array.from(selectedIds),
           action: "DEACTIVATE",
         });
         toast.success("Vô hiệu hóa hàng loạt thành công!");
@@ -369,7 +427,11 @@ export function useCouponManagement() {
         );
       }
     },
-    bulkDelete: () => actions.openDeleteModal(),
+    bulkDelete: () => {
+      if (!canDelete) return toast.error("Bạn không có quyền xóa mã giảm giá.");
+      if (selectedIds.size === 0) return;
+      actions.openDeleteModal();
+    },
   };
 
   return {
@@ -387,5 +449,11 @@ export function useCouponManagement() {
     handleModalSubmit,
     bulkActions,
     isLoading,
+    permissions: {
+      canCreate,
+      canUpdate,
+      canDelete,
+      canPublish,
+    },
   };
 }

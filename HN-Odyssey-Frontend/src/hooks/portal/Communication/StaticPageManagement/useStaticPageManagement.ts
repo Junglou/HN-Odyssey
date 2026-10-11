@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
+import type { UserPayload } from "../../../../types/auth";
+import { Action, Resource } from "../../../../types/permissions";
 
 export type PageStatus = "Published" | "Draft" | "Hidden";
 
@@ -52,6 +54,19 @@ interface PageApiResponse {
   is_system: boolean;
 }
 
+const useLocalAuth = () => {
+  const [user] = useState(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) return JSON.parse(stored) as UserPayload;
+    } catch (error) {
+      console.warn("Không thể parse dữ liệu user từ localStorage:", error);
+    }
+    return null;
+  });
+  return { user };
+};
+
 export function useStaticPageManagement() {
   const [records, setRecords] = useState<StaticPageRecord[]>([]);
   const [totalFiltered, setTotalFiltered] = useState<number>(0);
@@ -70,6 +85,26 @@ export function useStaticPageManagement() {
     editingRecord: StaticPageRecord | null;
     isSubmitting: boolean;
   }>({ isOpen: false, mode: "add", editingRecord: null, isSubmitting: false });
+
+  const { user } = useLocalAuth();
+
+  const hasPermission = useCallback(
+    (resourceCode: Resource, actionCode: Action): boolean => {
+      if (!user || !user.permissions) return false;
+      if (user.roles?.includes("SUPER_ADMIN")) return true;
+      return user.permissions.some(
+        (p) =>
+          p.resource === resourceCode &&
+          (p.actions.includes(actionCode) || p.actions.includes(Action.MANAGE)),
+      );
+    },
+    [user],
+  );
+
+  const canCreate = hasPermission(Resource.CONTENT_PAGES, Action.CREATE);
+  const canUpdate = hasPermission(Resource.CONTENT_PAGES, Action.UPDATE);
+  const canDelete = hasPermission(Resource.CONTENT_PAGES, Action.DELETE);
+  const canPublish = hasPermission(Resource.CONTENT_PAGES, Action.UPDATE);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -181,21 +216,26 @@ export function useStaticPageManagement() {
     },
     changeLimit: (limit: number) => setPagination({ page: 1, limit }),
 
-    openAddModal: () =>
+    openAddModal: () => {
+      if (!canCreate) return toast.error("Bạn không có quyền tạo trang tĩnh."); // Thêm dòng này
       setModalConfig({
         isOpen: true,
         mode: "add",
         editingRecord: null,
         isSubmitting: false,
-      }),
-    openEditModal: (record: StaticPageRecord) =>
+      });
+    },
+    openEditModal: (record: StaticPageRecord) => {
+      if (!canUpdate) return toast.error("Bạn không có quyền sửa trang tĩnh."); // Thêm dòng này
       setModalConfig({
         isOpen: true,
         mode: "edit",
         editingRecord: record,
         isSubmitting: false,
-      }),
+      });
+    },
     openViewModal: (record: StaticPageRecord) =>
+      // View không cần chặn vì ai cũng xem được detail nếu có quyền READ list
       setModalConfig({
         isOpen: true,
         mode: "view",
@@ -203,6 +243,7 @@ export function useStaticPageManagement() {
         isSubmitting: false,
       }),
     openDeleteModal: (record?: StaticPageRecord) => {
+      if (!canDelete) return toast.error("Bạn không có quyền xóa trang tĩnh."); // Thêm dòng này
       if (record && record.isSystem) {
         toast.error("Không thể xóa trang hệ thống mặc định.");
         return;
@@ -223,6 +264,8 @@ export function useStaticPageManagement() {
       }),
 
     toggleHiddenStatus: async (id: string) => {
+      if (!canPublish)
+        return toast.error("Bạn không có quyền cập nhật trạng thái trang.");
       const record = records.find((r) => r.id === id);
       if (!record) return;
 
@@ -316,6 +359,8 @@ export function useStaticPageManagement() {
 
   const bulkActions = {
     bulkActivate: async () => {
+      if (!canPublish)
+        return toast.error("Bạn không có quyền xuất bản trang tĩnh.");
       const targets = records.filter(
         (r) => selectedIds.has(r.id) && r.status !== "Published",
       );
@@ -337,6 +382,7 @@ export function useStaticPageManagement() {
       }
     },
     bulkDelete: () => {
+      if (!canDelete) return toast.error("Bạn không có quyền xóa trang tĩnh.");
       if (selectedIds.size === 0) return;
       const targets = records.filter(
         (r) => selectedIds.has(r.id) && !r.isSystem,
@@ -368,5 +414,6 @@ export function useStaticPageManagement() {
     actions,
     handleModalSubmit,
     bulkActions,
+    permissions: { canCreate, canUpdate, canDelete, canPublish },
   };
 }

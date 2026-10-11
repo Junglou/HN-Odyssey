@@ -36,7 +36,7 @@ export class AdminController {
 
   // 1. TẠO MỚI
   @Post()
-  @RequirePermissions(Resource.USERS, Action.CREATE)
+  @RequirePermissions(Resource.SYSTEM_USERS, Action.CREATE)
   async createStaff(
     @Body() dto: CreateStaffDto,
     @CurrentUser() user: IUser,
@@ -54,7 +54,7 @@ export class AdminController {
 
   // 2. DANH SÁCH
   @Get()
-  @RequirePermissions(Resource.USERS, Action.READ)
+  @RequirePermissions(Resource.SYSTEM_USERS, Action.READ)
   async getStaffList(@Query() query: QueryStaffDto) {
     return this.adminService.findAllStaff(query);
   }
@@ -62,7 +62,7 @@ export class AdminController {
   // --- [SỬA LỖI] ĐƯA CÁC API TĨNH (METADATA, BULK) LÊN TRÊN CÙNG ---
 
   @Get('metadata/departments')
-  @RequirePermissions(Resource.USERS, Action.READ)
+  @RequirePermissions(Resource.SYSTEM_USERS, Action.READ)
   getDepartments() {
     return {
       message: 'Lấy danh sách phòng ban thành công',
@@ -71,32 +71,46 @@ export class AdminController {
   }
 
   @Patch('bulk/status')
-  @RequirePermissions(Resource.USERS, Action.UPDATE)
+  @RequirePermissions(Resource.SYSTEM_USERS, Action.UPDATE)
   async bulkChangeStatus(
     @Body() dto: BulkChangeStatusDto,
     @CurrentUser() user: IUser,
     @Ip() ip: string,
     @HttpHeaders('user-agent') userAgent: string,
   ) {
-    return this.adminService.bulkChangeStatus(dto, user._id, ip, userAgent);
+    // Sửa ở đây: thêm user.roles
+    return this.adminService.bulkChangeStatus(
+      dto,
+      user._id,
+      user.roles,
+      ip,
+      userAgent,
+    );
   }
 
   @Post('bulk/delete')
-  @RequirePermissions(Resource.USERS, Action.DELETE)
+  @RequirePermissions(Resource.SYSTEM_USERS, Action.DELETE)
   async bulkDeleteStaff(
     @Body() dto: BulkDeleteDto,
     @CurrentUser() user: IUser,
     @Ip() ip: string,
     @HttpHeaders('user-agent') userAgent: string,
   ) {
-    return this.adminService.bulkSoftDelete(dto, user._id, ip, userAgent);
+    // Sửa ở đây: thêm user.roles
+    return this.adminService.bulkSoftDelete(
+      dto,
+      user._id,
+      user.roles,
+      ip,
+      userAgent,
+    );
   }
 
   // --- BẮT ĐẦU CÁC API ĐỘNG CÓ CHỨA PARAM (:id) Ở DƯỚI CÙNG ---
 
   // 3. CẬP NHẬT
   @Patch(':id')
-  @RequirePermissions(Resource.USERS, Action.UPDATE)
+  @RequirePermissions(Resource.SYSTEM_USERS, Action.UPDATE)
   async updateStaff(
     @Param('id') id: string,
     @Body() dto: UpdateStaffDto,
@@ -116,19 +130,26 @@ export class AdminController {
 
   // 4. XÓA MỀM (SINGLE)
   @Delete(':id')
-  @RequirePermissions(Resource.USERS, Action.DELETE)
+  @RequirePermissions(Resource.SYSTEM_USERS, Action.DELETE)
   async deleteStaff(
     @Param('id') id: string,
     @CurrentUser() user: IUser,
     @Ip() ip: string,
     @HttpHeaders('user-agent') userAgent: string,
   ) {
-    return this.adminService.softDeleteStaff(id, user._id, ip, userAgent);
+    // Sửa ở đây: thêm user.roles
+    return this.adminService.softDeleteStaff(
+      id,
+      user._id,
+      user.roles,
+      ip,
+      userAgent,
+    );
   }
 
   // 5. ĐỔI TRẠNG THÁI (SINGLE)
   @Patch(':id/status')
-  @RequirePermissions(Resource.USERS, Action.UPDATE)
+  @RequirePermissions(Resource.SYSTEM_USERS, Action.UPDATE)
   async changeStatus(
     @Param('id') id: string,
     @Body() dto: ChangeStatusDto,
@@ -136,12 +157,20 @@ export class AdminController {
     @Ip() ip: string,
     @HttpHeaders('user-agent') userAgent: string,
   ) {
-    return this.adminService.changeStatus(id, dto, user._id, ip, userAgent);
+    // Sửa ở đây: thêm user.roles
+    return this.adminService.changeStatus(
+      id,
+      dto,
+      user._id,
+      user.roles,
+      ip,
+      userAgent,
+    );
   }
 
   // 6. LẤY CHI TIẾT
   @Get(':id')
-  @RequirePermissions(Resource.USERS, Action.READ)
+  @RequirePermissions(Resource.SYSTEM_USERS, Action.READ)
   async getStaffDetail(@Param('id') id: string) {
     return this.adminService.findOneStaff(id);
   }

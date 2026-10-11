@@ -70,6 +70,7 @@ import StaticPageView from "../pages/staticPage/StaticPageView";
 
 import AuthGuard from "../guards/AuthGuard";
 import GuestGuard from "../guards/GuestGuard";
+import { Resource } from "../types/permissions";
 
 export const router = createBrowserRouter([
   // route auth
@@ -218,123 +219,249 @@ export const router = createBrowserRouter([
     children: [
       {
         path: "users",
-        element: <UserManagementPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.SYSTEM_USERS]}>
+            <UserManagementPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "roles",
-        element: <RoleManagementPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.SYSTEM_ROLES]}>
+            <RoleManagementPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "heatmap",
-        element: <UserBehaviorHeatmapPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.SYSTEM_USERS]}>
+            <UserBehaviorHeatmapPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "products",
-        element: <ProductManagementPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.CATALOG_PRODUCTS]}>
+            <ProductManagementPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "products/new",
-        element: <ProductFormPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.CATALOG_PRODUCTS]}>
+            <ProductFormPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "products/:id",
-        element: <ProductFormPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.CATALOG_PRODUCTS]}>
+            <ProductFormPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "products/:id/edit",
-        element: <ProductFormPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.CATALOG_PRODUCTS]}>
+            <ProductFormPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "categories",
-        element: <CategoryManagementPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.CATALOG_CATEGORIES]}>
+            <CategoryManagementPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "variants",
-        element: <VariantManagementPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.CATALOG_ATTRIBUTES]}>
+            <VariantManagementPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "tags",
-        element: <TagManagementPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.CATALOG_TAGS]}>
+            <TagManagementPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "prices",
-        element: <PriceManagementPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.CATALOG_PRICING]}>
+            <PriceManagementPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "customers",
-        element: <CustomerManagementPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.CRM_CUSTOMERS]}>
+            <CustomerManagementPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "live-chat",
-        element: <LiveChatSupportPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.CRM_CHAT]}>
+            <LiveChatSupportPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "promotion",
-        element: <PromotionManagementPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.PROMO_FLASH_SALES]}>
+            <PromotionManagementPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "review-rating",
-        element: <ReviewAndRatingManagementPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.CRM_REVIEWS]}>
+            <ReviewAndRatingManagementPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "coupon",
-        element: <CouponManagementPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.PROMO_COUPONS]}>
+            <CouponManagementPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "static-pages",
-        element: <StaticPageManagementPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.CONTENT_PAGES]}>
+            <StaticPageManagementPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "media-management",
-        element: <MediaManagementPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.CONTENT_MEDIA]}>
+            <MediaManagementPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "banner-management",
-        element: <BannerManagementPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.CONTENT_BANNERS]}>
+            <BannerManagementPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "blog-news",
-        element: <BlogNewsManagementPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.CONTENT_POSTS]}>
+            <BlogNewsManagementPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "content-config",
-        element: <ContentConfigPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.CONTENT_CONFIG]}>
+            <ContentConfigPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "system",
-        element: <SystemPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.SYSTEM_MONITORING]}>
+            <SystemPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "overview",
-        element: <OverviewPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.DASHBOARD]}>
+            <OverviewPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "revenue-report",
-        element: <RevenueReportPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.REPORT_REVENUE]}>
+            <RevenueReportPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "marketing-promotion",
-        element: <MarketingAndPromotionPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.REPORT_MARKETING]}>
+            <MarketingAndPromotionPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "bi",
-        element: <BusinessIntelligencePage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.REPORT_INVENTORY]}>
+            <BusinessIntelligencePage />
+          </AuthGuard>
+        ),
       },
       {
         path: "inventory",
-        element: <InventoryManagementPage />,
+        element: (
+          // FIX: Dùng đúng mã quyền REPORT_STOCK cho Báo Cáo Kho
+          <AuthGuard requirePermissions={[Resource.REPORT_STOCK]}>
+            <InventoryManagementPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "warehouse",
-        element: <StockManagementPage />,
+        element: (
+          <AuthGuard
+            requirePermissions={[
+              Resource.INVENTORY_STOCK, // Vẫn là INVENTORY_STOCK cho WMS
+              Resource.INVENTORY_TRANSFERS,
+            ]}
+          >
+            <StockManagementPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "orders",
-        element: <OrderManagementPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.SALES_ORDERS]}>
+            <OrderManagementPage />
+          </AuthGuard>
+        ),
       },
       {
         path: "trade-in",
-        element: <TradeInManagementPage />,
+        element: (
+          <AuthGuard requirePermissions={[Resource.SALES_TRADE_IN]}>
+            <TradeInManagementPage />
+          </AuthGuard>
+        ),
       },
     ],
   },

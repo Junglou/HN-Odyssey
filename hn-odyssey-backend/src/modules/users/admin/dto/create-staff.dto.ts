@@ -6,10 +6,38 @@ import {
   Matches,
   IsEnum,
   IsArray,
+  registerDecorator,
+  ValidationOptions,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Role } from '../../../../common/enums/role.enum';
 import { Department } from 'src/common/enums/department.enum';
+
+// --- CUSTOM VALIDATOR: Chặn mảng có chứa SUPER_ADMIN ---
+export function NotContainsSuperAdmin(validationOptions?: ValidationOptions) {
+  // Đã sửa 'Object' thành 'object'
+  return function (object: object, propertyName: string) {
+    registerDecorator({
+      name: 'notContainsSuperAdmin',
+      target: object.constructor,
+      propertyName: propertyName,
+      options: validationOptions,
+      validator: {
+        // Đã xóa tham số 'args' thừa và đổi 'any' thành 'unknown'
+        validate(value: unknown) {
+          if (!Array.isArray(value)) return false;
+          // Trả về false nếu trong mảng có Role.SUPER_ADMIN ('SUPER_ADMIN')
+          return !value.includes(Role.SUPER_ADMIN);
+        },
+        // Đã xóa tham số 'args' thừa
+        defaultMessage() {
+          return 'Tuyệt đối không được phép cấp quyền SUPER_ADMIN thông qua API này.';
+        },
+      },
+    });
+  };
+}
+// -------------------------------------------------------
 
 export class CreateStaffDto {
   @ApiProperty({
@@ -55,7 +83,7 @@ export class CreateStaffDto {
   @ApiProperty({
     description:
       'Vai trò của nhân viên trong hệ thống (ADMIN/STAFF/KHO). Phải là mảng.',
-    example: ['SALES_STAFF', 'WAREHOUSE_MANAGER', Role.SUPER_ADMIN],
+    example: ['SALES_STAFF', 'WAREHOUSE_MANAGER'],
   })
   @IsArray()
   @IsString({ each: true })

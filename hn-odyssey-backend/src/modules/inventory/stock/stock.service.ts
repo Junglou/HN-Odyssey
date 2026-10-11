@@ -437,7 +437,7 @@ export class StockService {
     // LOG AUDIT VỚI ID HỢP LỆ
     await this.auditLogsService.log({
       action: 'MANUAL_ADJUST_STOCK',
-      collection_name: Resource.INVENTORY,
+      collection_name: Resource.INVENTORY_STOCK,
       actor_id: validActorIdStr,
       target_id: product._id.toString(),
       department: Department.WAREHOUSE,
@@ -529,7 +529,7 @@ export class StockService {
 
           await this.auditLogsService.log({
             action: 'ACCEPT_TRADE_IN_IMPORT',
-            collection_name: Resource.TRANSFERS,
+            collection_name: Resource.INVENTORY_TRANSFERS,
             actor_id: validActorIdStr,
             target_id: order._id.toString(),
             department: Department.WAREHOUSE,
@@ -681,7 +681,7 @@ export class StockService {
         // Ghi Audit Log
         await this.auditLogsService.log({
           action: isExport ? 'ACCEPT_ORDER_EXPORT' : 'ACCEPT_ORDER_IMPORT',
-          collection_name: Resource.TRANSFERS,
+          collection_name: Resource.INVENTORY_TRANSFERS,
           actor_id: validActorIdStr,
           target_id: order._id.toString(),
           department: Department.WAREHOUSE,
@@ -1058,7 +1058,7 @@ export class StockService {
 
     await this.auditLogsService.log({
       action: 'UPDATE_STOCK_THRESHOLDS',
-      collection_name: Resource.INVENTORY,
+      collection_name: Resource.INVENTORY_STOCK,
       actor_id: validActorIdStr, // Dùng biến ID chuẩn
       target_id: product._id,
       department: Department.WAREHOUSE,
@@ -1124,7 +1124,7 @@ export class StockService {
 
     await this.auditLogsService.log({
       action: 'REPORT_ORDER_ISSUE',
-      collection_name: Resource.TRANSFERS,
+      collection_name: Resource.INVENTORY_TRANSFERS,
       actor_id: validActorIdStr, // Dùng biến ID chuẩn
       target_id: order._id,
       department: Department.WAREHOUSE,

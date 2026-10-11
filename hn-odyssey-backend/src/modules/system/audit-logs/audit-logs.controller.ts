@@ -13,7 +13,7 @@ export class AuditLogsController {
   constructor(private readonly auditLogsService: AuditLogsService) {}
 
   @Get()
-  @RequirePermissions(Resource.AUDIT_LOGS, Action.READ)
+  @RequirePermissions(Resource.SYSTEM_AUDIT, Action.READ)
   async getAuditLogs(@Query() query: QueryAuditLogDto) {
     return this.auditLogsService.findAll(query);
   }

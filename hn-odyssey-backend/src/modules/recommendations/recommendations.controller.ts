@@ -278,7 +278,7 @@ export class RecommendationsController {
 
   // API dành riêng cho Admin báo cáo
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.REPORTS, Action.READ)
+  @RequirePermissions(Resource.REPORT_MARKETING, Action.READ)
   @Get('admin/replenishment-list')
   async getAdminReplenishment(@Req() req: RequestWithUser) {
     try {
@@ -286,7 +286,7 @@ export class RecommendationsController {
 
       await this.auditLogsService.log({
         action: 'EXPORT_REPLENISHMENT_LIST',
-        collection_name: Resource.REPORTS,
+        collection_name: Resource.REPORT_MARKETING,
         actor_id: req.user?._id,
         actor_email: req.user?.email,
         department: 'ACCOUNTING',
@@ -307,7 +307,7 @@ export class RecommendationsController {
 
       await this.auditLogsService.log({
         action: 'EXPORT_REPLENISHMENT_LIST',
-        collection_name: Resource.REPORTS,
+        collection_name: Resource.REPORT_MARKETING,
         actor_id: req.user?._id,
         is_success: false,
         error_reason: errorMessage,

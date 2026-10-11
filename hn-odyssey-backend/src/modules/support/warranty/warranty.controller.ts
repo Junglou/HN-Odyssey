@@ -46,7 +46,7 @@ export class WarrantyController {
   //  AC8 & AC10: ADMIN CẬP NHẬT TRẠNG THÁI
   @Patch('admin/claim/:id/status')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.WARRANTY, Action.UPDATE)
+  @RequirePermissions(Resource.CRM_WARRANTY, Action.UPDATE)
   async updateClaimStatus(
     @Param('id') claimId: string,
     // FIX: Sửa kiểu dữ liệu từ string thành ClaimStatus

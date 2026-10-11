@@ -240,14 +240,14 @@ export class AuthController {
 
   //8. ADMIN: LẤY DANH SÁCH YÊU CẦU (AC3)
   @Get('admin/recovery-requests')
-  @RequirePermissions(Resource.USERS, Action.READ)
+  @RequirePermissions(Resource.SYSTEM_USERS, Action.READ)
   async getPendingRecoveries() {
     return this.authService.getPendingRecoveries();
   }
 
   //9. ADMIN: DUYỆT/TỪ CHỐI (AC4, AC5)
   @Post('admin/recovery-requests/process/:id')
-  @RequirePermissions(Resource.USERS, Action.UPDATE)
+  @RequirePermissions(Resource.SYSTEM_USERS, Action.UPDATE)
   async processRecovery(
     @Param('id') id: string,
     @Body() dto: ProcessRecoveryDto,

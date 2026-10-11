@@ -49,7 +49,7 @@ export class CategoriesController {
   //ADMIN API
 
   @Post('create')
-  @RequirePermissions(Resource.CATEGORIES, Action.CREATE)
+  @RequirePermissions(Resource.CATALOG_CATEGORIES, Action.CREATE)
   create(
     @Body() createCategoryDto: CreateCategoryDto,
     @CurrentUser() user: IUser,
@@ -65,13 +65,13 @@ export class CategoriesController {
   }
 
   @Get('admin/tree-view')
-  @RequirePermissions(Resource.CATEGORIES, Action.READ)
+  @RequirePermissions(Resource.CATALOG_CATEGORIES, Action.READ)
   async getAdminTree(): Promise<CategoryTree[]> {
     return this.categoriesService.getTree(true);
   }
 
   @Patch('reorder')
-  @RequirePermissions(Resource.CATEGORIES, Action.UPDATE)
+  @RequirePermissions(Resource.CATALOG_CATEGORIES, Action.UPDATE)
   updateOrder(
     @Body() updateOrderDto: UpdateCategoryOrderDto,
     @CurrentUser() user: IUser,
@@ -87,7 +87,7 @@ export class CategoriesController {
   }
 
   @Patch('update/:id')
-  @RequirePermissions(Resource.CATEGORIES, Action.UPDATE)
+  @RequirePermissions(Resource.CATALOG_CATEGORIES, Action.UPDATE)
   update(
     @Param('id') id: string,
     @Body() updateCategoryDto: UpdateCategoryDto,
@@ -105,7 +105,7 @@ export class CategoriesController {
   }
 
   @Delete('delete/:id')
-  @RequirePermissions(Resource.CATEGORIES, Action.DELETE)
+  @RequirePermissions(Resource.CATALOG_CATEGORIES, Action.DELETE)
   remove(
     @Param('id') id: string,
     @CurrentUser() user: IUser,

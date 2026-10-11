@@ -11,10 +11,30 @@ export default function VariantManagementPage() {
     search,
     drawerConfig,
     deleteConfig,
+    accessError, // Lấy biến accessError
     actions,
     handleSaveAttribute,
     executeDelete,
   } = useVariantManagement();
+
+  // Nếu API báo lỗi 403, không render component VariantManagement
+  if (accessError) {
+    return (
+      <div
+        className="vm-page-container"
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100%",
+        }}
+      >
+        <h2 style={{ color: "#ff4d4f" }}>
+          Bạn không có quyền truy cập dữ liệu này.
+        </h2>
+      </div>
+    );
+  }
 
   return (
     <div className="vm-page-container">

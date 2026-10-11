@@ -534,7 +534,7 @@ export class CustomersAdminService {
 
     await this.auditLogsService.log({
       action: Action.UPDATE,
-      collection_name: Resource.CUSTOMERS,
+      collection_name: Resource.CRM_CUSTOMERS,
       actor_id: actorId,
       target_id: customerId,
       department: Department.SUPPORT,
@@ -559,7 +559,7 @@ export class CustomersAdminService {
 
     await this.auditLogsService.log({
       action: 'UPDATE_REVIEW_STATUS',
-      collection_name: Resource.REVIEWS,
+      collection_name: Resource.CRM_REVIEWS,
       actor_id: adminId,
       target_id: reviewId,
       department: Department.SUPPORT,

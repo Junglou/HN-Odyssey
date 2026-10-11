@@ -42,7 +42,7 @@ export class StockController {
 
   // [US1] Lấy danh sách tồn kho (AC1)
   @Get()
-  @RequirePermissions(Resource.INVENTORY, Action.READ)
+  @RequirePermissions(Resource.INVENTORY_STOCK, Action.READ)
   async getStockList(@Query() query: GetStockDto) {
     const data = await this.stockService.getStockList(query);
     return new BaseResponse(true, 'Lấy danh sách tồn kho thành công', data);
@@ -50,7 +50,7 @@ export class StockController {
 
   // [US2] Điều chỉnh thủ công (AC1, AC2, AC5)
   @Post('adjust-manual')
-  @RequirePermissions(Resource.INVENTORY, Action.UPDATE)
+  @RequirePermissions(Resource.INVENTORY_STOCK, Action.UPDATE)
   async manualAdjust(
     @Body() dto: ManualAdjustDto,
     @Req() req: RequestWithUser,
@@ -64,7 +64,7 @@ export class StockController {
 
   // [US4] Tiếp nhận đơn hàng (AC1, AC6, AC8)
   @Post('accept-orders')
-  @RequirePermissions(Resource.TRANSFERS, Action.APPROVE)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.APPROVE)
   async acceptOrders(@Body() dto: AcceptOrderDto, @Req() req: RequestWithUser) {
     const userId = req.user?.userId || 'SYSTEM';
     const ip = req.ip;
@@ -75,7 +75,7 @@ export class StockController {
 
   // [US3 - AC4] Thiết lập ngưỡng tồn kho Min/Max
   @Post('thresholds')
-  @RequirePermissions(Resource.INVENTORY, Action.UPDATE)
+  @RequirePermissions(Resource.INVENTORY_STOCK, Action.UPDATE)
   async updateThresholds(
     @Body() dto: UpdateThresholdsDto,
     @Req() req: RequestWithUser,
@@ -86,7 +86,7 @@ export class StockController {
 
   // [US4 - AC2] Báo cáo vấn đề đơn hàng
   @Post('report-issue')
-  @RequirePermissions(Resource.TRANSFERS, Action.CANCEL)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.CANCEL)
   async reportOrderIssue(
     @Body() dto: ReportIssueDto,
     @Req() req: RequestWithUser,
@@ -116,7 +116,7 @@ export class StockController {
 
   // Lấy danh sách yêu cầu chờ duyệt (API dành riêng cho RequestTab ở FE)
   @Get('requests')
-  @RequirePermissions(Resource.TRANSFERS, Action.READ)
+  @RequirePermissions(Resource.INVENTORY_TRANSFERS, Action.READ)
   async getPendingRequests(@Query() query: GetPendingRequestsDto) {
     const result = await this.stockService.getPendingRequests(query);
 

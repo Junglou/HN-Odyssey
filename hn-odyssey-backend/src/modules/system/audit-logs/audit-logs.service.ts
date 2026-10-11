@@ -45,10 +45,8 @@ export class AuditLogsService {
 
     // 1. NHÓM KHO VẬN (WAREHOUSE)
     const warehouseResources = [
-      Resource.INVENTORY,
-      Resource.TRANSFERS,
-      Resource.SUPPLIERS,
-      Resource.SHIPPING,
+      Resource.INVENTORY_STOCK,
+      Resource.INVENTORY_TRANSFERS,
     ].map((x) => x.toString());
 
     if (warehouseResources.includes(r)) {
@@ -57,13 +55,19 @@ export class AuditLogsService {
 
     // 2. NHÓM MARKETING & CATALOG
     const marketingResources = [
-      Resource.PRODUCTS,
-      Resource.CATEGORIES,
-      Resource.ATTRIBUTES,
-      Resource.PROMOTIONS,
-      Resource.BLOG,
-      Resource.NOTIFICATIONS,
-      Resource.LOYALTY,
+      Resource.CATALOG_PRODUCTS,
+      Resource.CATALOG_CATEGORIES,
+      Resource.CATALOG_ATTRIBUTES,
+      Resource.CATALOG_TAGS,
+      Resource.CATALOG_PRICING,
+      Resource.PROMO_COUPONS,
+      Resource.PROMO_FLASH_SALES,
+      Resource.PROMO_COMBOS,
+      Resource.CONTENT_POSTS,
+      Resource.CONTENT_PAGES,
+      Resource.CONTENT_BANNERS,
+      Resource.CONTENT_MEDIA,
+      Resource.CONTENT_CONFIG,
     ].map((x) => x.toString());
 
     if (marketingResources.includes(r)) {
@@ -71,36 +75,39 @@ export class AuditLogsService {
     }
 
     // 3. NHÓM KINH DOANH (SALES)
-    const salesResources = [
-      Resource.ORDERS,
-      Resource.RETURNS,
-      Resource.TRADE_IN,
-      Resource.CUSTOMERS,
-    ].map((x) => x.toString());
+    const salesResources = [Resource.SALES_ORDERS, Resource.SALES_TRADE_IN].map(
+      (x) => x.toString(),
+    );
 
     if (salesResources.includes(r)) {
       return Department.SALES;
     }
 
-    // 4. NHÓM DỊCH VỤ KHÁCH HÀNG (SUPPORT)
+    // 4. NHÓM DỊCH VỤ KHÁCH HÀNG (SUPPORT & CRM)
     const supportResources = [
-      Resource.SUPPORT,
-      Resource.WARRANTY,
-      Resource.REVIEWS,
+      Resource.CRM_CUSTOMERS,
+      Resource.CRM_CHAT,
+      Resource.CRM_WARRANTY,
+      Resource.CRM_REVIEWS,
     ].map((x) => x.toString());
 
     if (supportResources.includes(r)) {
       return Department.SUPPORT;
     }
 
-    // 5. NHÓM KẾ TOÁN (ACCOUNTING)
-    const accountingResources = [Resource.REPORTS, Resource.PAYMENT].map((x) =>
-      x.toString(),
-    );
-    if (accountingResources.includes(resource.toUpperCase())) {
+    // 5. NHÓM KẾ TOÁN & BÁO CÁO (ACCOUNTING)
+    const accountingResources = [
+      Resource.REPORT_REVENUE,
+      Resource.REPORT_INVENTORY,
+      Resource.REPORT_MARKETING,
+    ].map((x) => x.toString());
+
+    if (accountingResources.includes(r)) {
       return Department.ACCOUNTING;
     }
 
+    // Mặc định các resource còn lại (SYSTEM_USERS, SYSTEM_ROLES, SYSTEM_AUDIT, SYSTEM_MONITORING, SYSTEM_NOTIFICATIONS)
+    // sẽ được đẩy về nhóm Quản lý (MANAGEMENT)
     return Department.MANAGEMENT;
   }
 

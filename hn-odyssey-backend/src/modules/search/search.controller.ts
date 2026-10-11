@@ -5,12 +5,14 @@ import { SearchSuggestionDto } from './dto/search-query.dto';
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import { AlgoliaService } from './algolia.service';
 import { Public } from 'src/common/decorators/public.decorator';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from 'src/common/guards/optional-auth.guard'; // Thay thế import
 
-// Định nghĩa Interface an toàn thay thế cho kiểu "any"
+// Interface đã chuẩn hóa theo JwtStrategy
 interface RequestWithUser extends ExpressRequest {
   user?: {
-    id?: string;
+    _id: string;
+    email: string;
+    roles: string[];
   };
 }
 
@@ -23,11 +25,10 @@ export class SearchController {
   ) {}
 
   @Public()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard) // Dùng Optional Guard thay vì Guard cứng
   @Get('credentials')
   getAlgoliaCredentials(@Request() req: RequestWithUser) {
-    // req.user.id giờ đã được TypeScript hiểu là kiểu string | undefined
-    const userId = req.user?.id;
+    const userId = req.user?._id; // Lấy đúng trường _id
     const token = this.algoliaService.generateSecuredApiKey(userId);
 
     return {
@@ -42,9 +43,9 @@ export class SearchController {
   @Throttle({ default: { limit: 10, ttl: 1000 } })
   async getSuggestions(
     @Query() query: SearchSuggestionDto,
-    @Request() req: RequestWithUser, // Đồng bộ sử dụng Interface an toàn
+    @Request() req: RequestWithUser,
   ) {
-    const userId = req.user?.id;
+    const userId = req.user?._id; // Lấy đúng trường _id
 
     // Client cần gửi device-id (ví dụ UUID lưu ở LocalStorage) nếu chưa login
     const deviceId =

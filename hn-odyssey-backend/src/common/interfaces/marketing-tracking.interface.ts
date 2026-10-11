@@ -6,6 +6,9 @@ export interface IUtmTag {
   utm_content?: string;
 }
 
+// US.82 AC3 + quyết định mục 7 #3: NO_SPEND = kỳ lọc không có chi phí → ROI hiển thị "—"
+export type ProfitStatus = 'PROFIT' | 'BREAK_EVEN' | 'LOSS' | 'NO_SPEND';
+
 export interface ICampaignReport {
   campaign_id: string;
   campaign_name: string;
@@ -16,10 +19,11 @@ export interface ICampaignReport {
   orders: number;
   conversion_rate: number;
   allocated_revenue: number; // Đã loại bỏ hoàn/hủy
-  ad_spend: number;
-  roi_percent: number; // (Revenue - Spend) / Spend * 100
+  ad_spend: number; // Chi phí phân bổ TRONG KỲ lọc (USD)
+  ad_spend_total: number; // Tổng chi phí toàn thời gian (cache trên AdCampaign)
+  roi_percent: number | null; // (Revenue − Spend) ÷ Spend × 100; null khi Spend = 0
   net_profit: number;
-  profit_status: 'PROFIT' | 'BREAK_EVEN' | 'LOSS';
+  profit_status: ProfitStatus;
 }
 
 export interface ICouponReport {
@@ -58,12 +62,46 @@ export interface ILoyaltyHealthReport {
   cost_of_loyalty: number; // Cost / Revenue
 }
 
-// Bổ sung cho US1-AC8 và US4-AC5 (Biểu đồ xu hướng)
 export interface ICampaignTrend {
   date: string;
   sessions: number;
   orders: number;
   revenue: number;
+  spend: number; // Chi phí phân bổ cho ngày này (US.82 AC5)
+}
+
+export interface IAdSpendActor {
+  _id: string;
+  name: string;
+  email?: string;
+}
+
+export interface IAdSpendEntryView {
+  entry_id: string;
+  campaign_id: string;
+  amount: number;
+  period_start: string; // "YYYY-MM-DD" giờ VN
+  period_end: string;
+  note?: string;
+  created_by: IAdSpendActor | null; // null = hệ thống (migration)
+  created_at: Date;
+  is_voided: boolean;
+  voided_by: IAdSpendActor | null;
+  voided_at: Date | null;
+  void_reason: string | null;
+}
+
+export interface IAdSpendEntryList {
+  campaign_id: string;
+  lifetime_total: number;
+  period_total: number | null; // null khi không truyền start_date/end_date
+  entries: IAdSpendEntryView[];
+  meta: { total: number; page: number; limit: number; total_pages: number };
+}
+
+export interface IAdSpendMutationResult {
+  entry_id: string;
+  lifetime_total: number;
 }
 
 // Bổ sung cho US2-AC2 (Chi tiết đơn hàng dùng mã)

@@ -41,7 +41,7 @@ export class MediaController {
 
   // 1. Lấy danh sách Media (Có search, filter, pagination)
   @Get()
-  @RequirePermissions(Resource.BLOG, Action.READ) // Có thể thay bằng Resource.MEDIA nếu bạn tạo Enum mới
+  @RequirePermissions(Resource.CONTENT_MEDIA, Action.READ) // Có thể thay bằng Resource.MEDIA nếu bạn tạo Enum mới
   async getMediaList(@Query() query: QueryMediaInterface) {
     const data = await this.mediaService.getMediaList(query);
     return new BaseResponse(true, 'Lấy danh sách Media thành công', data);
@@ -49,7 +49,7 @@ export class MediaController {
 
   // 2. Upload Bulk Files (AC1, AC2)
   @Post('upload')
-  @RequirePermissions(Resource.BLOG, Action.CREATE)
+  @RequirePermissions(Resource.CONTENT_MEDIA, Action.CREATE)
   @UseInterceptors(FilesInterceptor('files', 50)) // Multer chặn > 50 file ở lớp đầu tiên
   async uploadBulkMedia(
     @UploadedFiles(MediaValidationPipe) files: Express.Multer.File[], // Pass qua Pipe để check Size (AC1)
@@ -85,7 +85,7 @@ export class MediaController {
 
   // 3. Cập nhật thông tin (Alt Text, Status, Type, TargetId) (AC4)
   @Patch(':id')
-  @RequirePermissions(Resource.BLOG, Action.UPDATE)
+  @RequirePermissions(Resource.CONTENT_MEDIA, Action.UPDATE)
   async updateMediaInfo(
     @Param('id') id: string,
     @Body() dto: UpdateMediaInfoDto,
@@ -100,7 +100,7 @@ export class MediaController {
 
   // 4. Đặt làm ảnh đại diện (AC3)
   @Patch(':id/primary')
-  @RequirePermissions(Resource.BLOG, Action.UPDATE)
+  @RequirePermissions(Resource.CONTENT_MEDIA, Action.UPDATE)
   async setPrimaryMedia(@Param('id') id: string) {
     const data = await this.mediaService.setPrimaryMedia(id);
     return new BaseResponse(true, 'Đã đặt phương tiện làm ảnh đại diện', data);
@@ -108,7 +108,7 @@ export class MediaController {
 
   // 5. Lưu ảnh sau khi Crop (Nhận 1 file)
   @Post(':id/crop')
-  @RequirePermissions(Resource.BLOG, Action.UPDATE)
+  @RequirePermissions(Resource.CONTENT_MEDIA, Action.UPDATE)
   @UseInterceptors(FileInterceptor('file'))
   async saveCroppedImage(
     @Param('id') id: string,
@@ -121,7 +121,7 @@ export class MediaController {
 
   // 6. Thay thế file (Nhận 1 file)
   @Post(':id/replace')
-  @RequirePermissions(Resource.BLOG, Action.UPDATE)
+  @RequirePermissions(Resource.CONTENT_MEDIA, Action.UPDATE)
   @UseInterceptors(FileInterceptor('file'))
   async replaceMedia(
     @Param('id') id: string,
@@ -134,7 +134,7 @@ export class MediaController {
 
   // 7. Xóa hoàn toàn phương tiện (AC5)
   @Delete(':id')
-  @RequirePermissions(Resource.BLOG, Action.DELETE)
+  @RequirePermissions(Resource.CONTENT_MEDIA, Action.DELETE)
   async hardDeleteMedia(@Param('id') id: string) {
     const result = await this.mediaService.hardDeleteMedia(id);
     return new BaseResponse(true, result.message);

@@ -107,7 +107,7 @@ export class ProductsController {
 
   // ADMIN / STAFF API (DASHBOARD)
   @Post()
-  @RequirePermissions(Resource.PRODUCTS, Action.CREATE)
+  @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.CREATE)
   create(
     @Body() createProductDto: CreateProductDto,
     @CurrentUser() user: IUser,
@@ -124,19 +124,19 @@ export class ProductsController {
   }
 
   @Get()
-  @RequirePermissions(Resource.PRODUCTS, Action.READ)
+  @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.READ)
   findAllAdmin(@Query() query: ProductQueryParam) {
     return this.productsService.findAll(query);
   }
 
   @Get('price-requests/pending')
-  @RequirePermissions(Resource.PRODUCTS, Action.READ)
+  @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.READ)
   findPendingPriceRequests(@Query() query: ProductQueryParam) {
     return this.productsService.findPendingPriceRequests(query);
   }
 
   @Patch('bulk/status')
-  @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
+  @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.UPDATE)
   bulkUpdateStatus(
     @Body() body: { product_ids: string[]; status: ProductStatus },
     @CurrentUser() user: IUser,
@@ -154,7 +154,7 @@ export class ProductsController {
   }
 
   @Delete('bulk/delete')
-  @RequirePermissions(Resource.PRODUCTS, Action.DELETE)
+  @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.DELETE)
   bulkRemove(
     @Body() body: { product_ids: string[] },
     @CurrentUser() user: IUser,
@@ -170,13 +170,13 @@ export class ProductsController {
   }
 
   @Get(':id')
-  @RequirePermissions(Resource.PRODUCTS, Action.READ)
+  @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.READ)
   findOne(@Param('id') id: string) {
     return this.productsService.findOne(id);
   }
 
   @Patch(':id')
-  @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
+  @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.UPDATE)
   update(
     @Param('id') id: string,
     @Body() updateProductDto: UpdateProductDto,
@@ -194,7 +194,7 @@ export class ProductsController {
   }
 
   @Patch(':id/status')
-  @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
+  @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.UPDATE)
   updateStatus(
     @Param('id') id: string,
     @Body() statusDto: UpdateProductStatusDto,
@@ -214,7 +214,7 @@ export class ProductsController {
 
   // US.77: Nhân viên gửi yêu cầu đổi giá
   @Post(':id/price-request')
-  @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
+  @RequirePermissions(Resource.CATALOG_PRICING, Action.SUBMIT_APPROVAL)
   requestPrice(
     @Param('id') id: string,
     @Body() dto: UpdateProductPriceDto,
@@ -233,7 +233,7 @@ export class ProductsController {
 
   // US.77: Quản lý duyệt giá
   @Patch(':id/price-approval')
-  @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
+  @RequirePermissions(Resource.CATALOG_PRICING, Action.APPROVE)
   approvePrice(
     @Param('id') id: string,
     @Body('action') action: 'approve' | 'reject',
@@ -253,7 +253,7 @@ export class ProductsController {
   }
 
   @Delete(':id')
-  @RequirePermissions(Resource.PRODUCTS, Action.DELETE)
+  @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.DELETE)
   remove(
     @Param('id') id: string,
     @CurrentUser() user: IUser,
@@ -264,7 +264,7 @@ export class ProductsController {
   }
 
   @Patch(':id/tags')
-  @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
+  @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.UPDATE)
   async updateTags(
     @Param('id') id: string,
     @Body() body: { tags: string[] },
@@ -306,7 +306,7 @@ export class ProductsController {
 
   // AC4: Nhân viên submit Draft thành Pending
   @Patch(':id/price-request/submit')
-  @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
+  @RequirePermissions(Resource.CATALOG_PRICING, Action.SUBMIT_APPROVAL)
   submitPriceDraft(
     @Param('id') id: string,
     @Body('sku') sku: string, // Nhận mã sku từ Frontend
@@ -325,7 +325,7 @@ export class ProductsController {
 
   // AC3: Quản lý duyệt/từ chối HÀNG LOẠT
   @Patch('price-requests/bulk-action')
-  @RequirePermissions(Resource.PRODUCTS, Action.UPDATE)
+  @RequirePermissions(Resource.CATALOG_PRICING, Action.APPROVE)
   bulkApprovePrice(
     @Body()
     body: {
@@ -389,7 +389,7 @@ export class ProductsController {
   }
 
   @Get('trigger-algolia-setup')
-  @RequirePermissions(Resource.SYSTEM, Action.UPDATE)
+  @RequirePermissions(Resource.CONTENT_CONFIG, Action.UPDATE)
   async triggerAlgoliaSetup() {
     return this.algoliaService.setupAlgoliaIndicesAndReplicas();
   }

@@ -119,13 +119,17 @@ export function useUserManagement() {
 
   const fetchMetadata = useCallback(async () => {
     try {
+      // PATCH: Thêm .catch() để chống sập form khi 1 API hỏng
       const [rolesRes, deptsRes] = await Promise.all([
-        axiosClient.get(`/admin/roles`),
-        axiosClient.get(`/admin/users/staff/metadata/departments`),
+        axiosClient.get("/admin/roles/dropdown").catch(() => ({ data: [] })),
+        axiosClient
+          .get(`/admin/users/staff/metadata/departments`)
+          .catch(() => ({ data: [] })),
       ]);
 
-      const rawRoles: BackendRole[] = rolesRes.data?.data || rolesRes.data;
-      if (Array.isArray(rawRoles)) {
+      const rawRoles: BackendRole[] =
+        rolesRes.data?.data || rolesRes.data || [];
+      if (Array.isArray(rawRoles) && rawRoles.length > 0) {
         const dynamicRoles = rawRoles.map((r) => ({
           label: r.name,
           value: r.slug,
@@ -136,8 +140,8 @@ export function useUserManagement() {
         ]);
       }
 
-      const rawDepts = deptsRes.data?.data || deptsRes.data;
-      if (Array.isArray(rawDepts)) {
+      const rawDepts = deptsRes.data?.data || deptsRes.data || [];
+      if (Array.isArray(rawDepts) && rawDepts.length > 0) {
         const dynamicDepts = rawDepts.map((d: BackendDepartment) => ({
           label: d.label,
           value: d.value,

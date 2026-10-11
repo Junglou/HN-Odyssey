@@ -24,7 +24,7 @@ export class AttributesController {
 
   // 1. TẠO MỚI
   @Post()
-  @RequirePermissions(Resource.ATTRIBUTES, Action.CREATE)
+  @RequirePermissions(Resource.CATALOG_ATTRIBUTES, Action.CREATE)
   create(
     @Body() createAttributeDto: CreateAttributeDto,
     @CurrentUser() user: IUser,
@@ -39,11 +39,20 @@ export class AttributesController {
     );
   }
 
-  // 2. DANH SÁCH
+  // 1. DÀNH CHO PORTAL ADMIN (Cần quyền, lấy TẤT CẢ thuộc tính kể cả bị ẩn)
   @Get()
+  @RequirePermissions(Resource.CATALOG_ATTRIBUTES, Action.READ)
+  findAllAdmin() {
+    return this.attributesService.findAll(); // Service query không điều kiện
+  }
+
+  // 2. DÀNH CHO CLIENT PUBLIC (Không cần quyền, CHỈ lấy thuộc tính đang Active)
+  @Get('public/active')
   @Public()
-  findAll() {
-    return this.attributesService.findAll();
+  findAllPublic() {
+    // Trong attributesService, bạn cần viết thêm hàm findAllActive()
+    // hoặc truyền cờ vào findAll({ is_active: true })
+    return this.attributesService.findAllActive();
   }
 
   // 3. CHI TIẾT
@@ -55,7 +64,7 @@ export class AttributesController {
 
   // 4. CẬP NHẬT
   @Patch(':id')
-  @RequirePermissions(Resource.ATTRIBUTES, Action.UPDATE)
+  @RequirePermissions(Resource.CATALOG_ATTRIBUTES, Action.UPDATE)
   update(
     @Param('id') id: string,
     @Body() updateAttributeDto: UpdateAttributeDto,
@@ -74,7 +83,7 @@ export class AttributesController {
 
   // 5. XÓA
   @Delete(':id')
-  @RequirePermissions(Resource.ATTRIBUTES, Action.DELETE)
+  @RequirePermissions(Resource.CATALOG_ATTRIBUTES, Action.DELETE)
   remove(
     @Param('id') id: string,
     @CurrentUser() user: IUser,

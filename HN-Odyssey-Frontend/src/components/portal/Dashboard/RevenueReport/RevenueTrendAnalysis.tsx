@@ -1,142 +1,136 @@
-import { useState } from "react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import "./RevenueTrendAnalysis.css";
-import type { TrendDataPoint } from "../../../../hooks/portal/Dashboard/RevenueReport/useRevenueReport";
+import type {
+  TrendDataPoint,
+  TrendGranularity,
+} from "../../../../hooks/portal/Dashboard/RevenueReport/useRevenueReport";
+import {
+  formatCompactMoney,
+  formatMoney,
+  toShortVnDate,
+  toVnDate,
+} from "../../../../utils/reportFormat";
+import ChartCard from "../../../../hooks/portal/common/ChartCard/ChartCard";
 
 interface RevenueTrendAnalysisProps {
   trendData: TrendDataPoint[];
+  granularity: TrendGranularity;
+  period: string;
+  canExport: boolean;
 }
+
+const AXIS_TICK = { fontSize: 12, fill: "#64748b" };
+const GRID_COLOR = "#e2e8f0";
 
 export default function RevenueTrendAnalysis({
   trendData,
+  granularity,
+  period,
+  canExport,
 }: RevenueTrendAnalysisProps) {
-  // state cho tooltip động
-  const [hoveredPoint, setHoveredPoint] = useState<TrendDataPoint | null>(null);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const isHourly = granularity === "hour";
 
-  // xử lý trạng thái rỗng
-  if (!trendData || trendData.length === 0) {
-    return (
-      <div className="rta-wrapper">
-        <div className="rta-section-title">Revenue Trend Analysis</div>
-        <div className="rta-empty-state">
-          No revenue data available for the selected period.
-        </div>
-      </div>
-    );
-  }
-
-  // kích thước khung vẽ
-  const width = 1000;
-  const height = 150;
-
-  // tính chiều cao linh động cho biểu đồ
-  const maxDataValue = Math.max(...trendData.map((d) => d.revenue));
-  const maxRevenue = maxDataValue > 0 ? maxDataValue * 1.2 : 1000;
-
-  // vẽ đường gấp khúc cho svg
-  const generateLinePath = () => {
-    const points = trendData.map((point, index) => {
-      const x = (index / (trendData.length - 1)) * width;
-      const y = height - (point.revenue / maxRevenue) * height;
-      return `${x},${y}`;
-    });
-
-    return `M ${points.join(" L ")}`;
-  };
-
-  // bắt tọa độ chuột để hiện tooltip
-  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    const svg = e.currentTarget;
-    const rect = svg.getBoundingClientRect();
-    const xRel = ((e.clientX - rect.left) / rect.width) * width;
-
-    const segmentWidth = width / (trendData.length - 1);
-    const index = Math.round(xRel / segmentWidth);
-    const safeIndex = Math.max(0, Math.min(index, trendData.length - 1));
-
-    const point = trendData[safeIndex];
-    const pointX = (safeIndex / (trendData.length - 1)) * width;
-    const pointY = height - (point.revenue / maxRevenue) * height;
-
-    setHoveredPoint(point);
-    setTooltipPos({
-      x: (pointX / width) * 100,
-      y: (pointY / height) * 100,
-    });
-  };
+  const tooltipLabel = (label: unknown) =>
+    isHourly ? `Hour ${String(label)}` : toVnDate(String(label));
 
   return (
     <div className="rta-wrapper">
       <div className="rta-section-title">Revenue Trend Analysis</div>
-      <div className="rta-container">
-        <div className="rta-header-text">Revenue Trend Over Time</div>
 
-        <div className="rta-svg-wrapper">
-          {/* cột nhãn trục y */}
-          <div className="rta-y-axis">
-            <span>${(maxRevenue / 1000).toFixed(0)}K</span>
-            <span>${((maxRevenue * 0.66) / 1000).toFixed(0)}K</span>
-            <span>${((maxRevenue * 0.33) / 1000).toFixed(0)}K</span>
-            <span>$0K</span>
+      <ChartCard
+        title={isHourly ? "Hourly Revenue (Today)" : "Daily Revenue"}
+        period={period}
+        pdfTitle="Biểu đồ xu hướng doanh thu"
+        fileNamePrefix="RevenueTrend"
+        canExport={canExport}
+      >
+        {trendData.length === 0 ? (
+          <div className="rta-empty-state">
+            No data available for the selected period.
           </div>
-
-          <div className="rta-chart-area">
-            {/* đường kẻ ngang */}
-            <div className="rta-grid-lines">
-              <div className="rta-grid-line"></div>
-              <div className="rta-grid-line"></div>
-              <div className="rta-grid-line"></div>
-              <div className="rta-grid-line"></div>
-            </div>
-
-            <svg
-              viewBox={`0 -10 ${width} 170`}
-              className="rta-line-chart-svg"
-              preserveAspectRatio="none"
-              onMouseMove={handleMouseMove}
-              onMouseLeave={() => setHoveredPoint(null)}
-            >
-              <path d={generateLinePath()} className="rta-chart-line" />
-
-              {/* vẽ các điểm động */}
-              {trendData.map((point, index) => {
-                const x = (index / (trendData.length - 1)) * width;
-                const y = height - (point.revenue / maxRevenue) * height;
-                const isHovered = hoveredPoint?.date === point.date;
-
-                return (
-                  <circle
-                    key={index}
-                    cx={x}
-                    cy={y}
-                    r={isHovered ? "6" : "3"}
-                    fill={isHovered ? "#3b82f6" : "#64748b"}
-                    style={{ transition: "all 0.2s ease" }}
-                  />
-                );
-              })}
-            </svg>
-
-            {/* tooltip */}
-            {hoveredPoint && (
-              <div
-                className="rta-dynamic-tooltip"
-                style={{ left: `${tooltipPos.x}%`, top: `${tooltipPos.y}%` }}
+        ) : (
+          <ResponsiveContainer width="100%" height={300}>
+            {isHourly ? (
+              // US.87 AC1: Hôm nay → biến động theo từng khung giờ
+              <LineChart
+                data={trendData}
+                margin={{ top: 8, right: 16, bottom: 0, left: 8 }}
               >
-                {hoveredPoint.date}:{" "}
-                <strong>${hoveredPoint.revenue.toLocaleString()}</strong>
-              </div>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke={GRID_COLOR}
+                />
+                <XAxis dataKey="date" tick={AXIS_TICK} interval={1} />
+                <YAxis
+                  tick={AXIS_TICK}
+                  width={72}
+                  tickFormatter={(v: number) => formatCompactMoney(v)}
+                />
+                <Tooltip
+                  labelFormatter={tooltipLabel}
+                  formatter={(value) => [formatMoney(Number(value)), "Revenue"]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="revenue"
+                  name="Revenue"
+                  stroke="#334155"
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                  isAnimationActive={false}
+                />
+              </LineChart>
+            ) : (
+              // US.87 AC1: Tuần/Tháng → biểu đồ cột doanh thu từng ngày
+              <BarChart
+                data={trendData}
+                margin={{ top: 8, right: 16, bottom: 0, left: 8 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke={GRID_COLOR}
+                />
+                <XAxis
+                  dataKey="date"
+                  tick={AXIS_TICK}
+                  tickFormatter={toShortVnDate}
+                  minTickGap={16}
+                  interval="preserveStartEnd"
+                />
+                <YAxis
+                  tick={AXIS_TICK}
+                  width={72}
+                  tickFormatter={(v: number) => formatCompactMoney(v)}
+                />
+                <Tooltip
+                  labelFormatter={tooltipLabel}
+                  formatter={(value) => [formatMoney(Number(value)), "Revenue"]}
+                />
+                <Bar
+                  dataKey="revenue"
+                  name="Revenue"
+                  fill="#64748b"
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={36}
+                  isAnimationActive={false}
+                />
+              </BarChart>
             )}
-          </div>
-        </div>
-
-        {/* hàng nhãn trục x */}
-        <div className="rta-x-axis">
-          {trendData.map((d, i) => (
-            <span key={i}>{d.date}</span>
-          ))}
-        </div>
-      </div>
+          </ResponsiveContainer>
+        )}
+      </ChartCard>
     </div>
   );
 }

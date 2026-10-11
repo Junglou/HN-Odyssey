@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
+import tokenStorage from "../../../utils/tokenStorage";
+import { Action, Resource } from "../../../types/permissions";
 import axiosClient from "../../../api/axiosClient";
 
 // 1. ĐỊNH NGHĨA INTERFACE
@@ -36,6 +38,12 @@ interface RequestApiResponse {
   metadata?: PaginationMeta;
 }
 
+// [THÊM MỚI]: Giao diện User cho việc kiểm tra quyền
+interface UserPayload {
+  roles?: string[];
+  permissions?: { resource: string; actions: string[] }[];
+}
+
 export function useRequestTab() {
   const [data, setData] = useState<RequestData[]>([]);
   const [filters, setFilters] = useState({
@@ -51,7 +59,28 @@ export function useRequestTab() {
     totalPages: 1,
   });
 
-  const [triggerRefresh, setTriggerRefresh] = useState<number>(0);
+  const [triggerRefresh, setTriggerRefresh] = useState(0);
+
+  // --- LOGIC PHÂN QUYỀN ---
+  const user = tokenStorage.getUser() as UserPayload | null;
+  const hasPermission = (resourceCode: Resource, actionCode: Action) => {
+    if (!user || !user.permissions) return false;
+    if (user.roles && user.roles.includes("Super Admin")) return true;
+    const perm = user.permissions.find((p) => p.resource === resourceCode);
+    if (!perm) return false;
+    return (
+      perm.actions.includes(actionCode) || perm.actions.includes(Action.MANAGE)
+    );
+  };
+
+  const canApproveTransfer = hasPermission(
+    Resource.INVENTORY_TRANSFERS,
+    Action.APPROVE,
+  );
+  const canCancelTransfer = hasPermission(
+    Resource.INVENTORY_TRANSFERS,
+    Action.CANCEL,
+  );
 
   // 3. LOGIC FETCH DATA (ĐÃ THÊM CHỐNG CACHE)
   useEffect(() => {
@@ -59,19 +88,16 @@ export function useRequestTab() {
 
     const fetchData = async () => {
       try {
-        const res = await axiosClient.get<RequestApiResponse>(
-          "/inventory/stock/requests",
-          {
-            params: {
-              page: pagination.page,
-              limit: pagination.limit,
-              search: filters.search || undefined,
-              type: filters.type !== "all" ? filters.type : undefined,
-              status: filters.status !== "all" ? filters.status : undefined,
-              _t: Date.now(), // [FIX QUAN TRỌNG]: Chống Cache của trình duyệt
-            },
+        const res = await axiosClient.get("/inventory/stock/requests", {
+          params: {
+            page: pagination.page,
+            limit: pagination.limit,
+            search: filters.search || undefined,
+            type: filters.type !== "all" ? filters.type : undefined,
+            status: filters.status !== "all" ? filters.status : undefined,
+            _t: Date.now(), // [FIX QUAN TRỌNG]: Chống Cache của trình duyệt
           },
-        );
+        });
 
         if (!isMounted) return;
 
@@ -140,6 +166,12 @@ export function useRequestTab() {
 
   // 5. KẾT NỐI API DUYỆT (BẮT LỖI ẨN TỪ BE)
   const acceptRequest = async (id: string) => {
+    // [CHẶN QUYỀN]
+    if (!canApproveTransfer) {
+      toast.error("Bạn không có quyền tiếp nhận xử lý yêu cầu nhập/xuất này!");
+      return;
+    }
+
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const res: any = await axiosClient.post(
@@ -184,6 +216,12 @@ export function useRequestTab() {
 
   // 6. KẾT NỐI API TỪ CHỐI
   const rejectRequest = async (id: string, reason: string) => {
+    // [CHẶN QUYỀN]
+    if (!canCancelTransfer) {
+      toast.error("Bạn không có quyền từ chối hoặc tạm giữ yêu cầu này!");
+      return;
+    }
+
     try {
       await axiosClient.post("/inventory/stock/report-issue", {
         order_id: id,
@@ -219,6 +257,10 @@ export function useRequestTab() {
       refreshData,
       acceptRequest,
       rejectRequest,
+    },
+    permissions: {
+      canApproveTransfer,
+      canCancelTransfer,
     },
   };
 }

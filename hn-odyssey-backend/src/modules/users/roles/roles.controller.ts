@@ -29,7 +29,7 @@ export class RolesController {
 
   // 1. TẠO MỚI
   @Post()
-  @RequirePermissions(Resource.ROLES, Action.CREATE)
+  @RequirePermissions(Resource.SYSTEM_ROLES, Action.CREATE)
   create(
     @Body() dto: CreateRoleDto,
     @CurrentUser() user: IUser,
@@ -41,14 +41,14 @@ export class RolesController {
 
   // 2. DANH SÁCH
   @Get()
-  @RequirePermissions(Resource.ROLES, Action.READ)
+  @RequirePermissions(Resource.SYSTEM_ROLES, Action.READ)
   findAll() {
     return this.rolesService.findAll();
   }
 
   // SỬA LỖI Ở ĐÂY: API tĩnh PHẢI nằm trên API động (:id)
   @Get('metadata/permissions')
-  @RequirePermissions(Resource.ROLES, Action.READ)
+  @RequirePermissions(Resource.SYSTEM_ROLES, Action.READ)
   getPermissionMetadata() {
     return {
       message: 'Lấy danh sách quyền hạn thành công',
@@ -56,16 +56,22 @@ export class RolesController {
     };
   }
 
+  @Get('dropdown')
+  @RequirePermissions(Resource.SYSTEM_USERS, Action.READ)
+  getDropdown() {
+    return this.rolesService.getDropdownOptions();
+  }
+
   // 3. CHI TIẾT
   @Get(':id')
-  @RequirePermissions(Resource.ROLES, Action.READ)
+  @RequirePermissions(Resource.SYSTEM_ROLES, Action.READ)
   findOne(@Param('id') id: string) {
     return this.rolesService.findOne(id);
   }
 
   // 4. CẬP NHẬT
   @Patch(':id')
-  @RequirePermissions(Resource.ROLES, Action.UPDATE)
+  @RequirePermissions(Resource.SYSTEM_ROLES, Action.UPDATE)
   update(
     @Param('id') id: string,
     @Body() updateRoleDto: UpdateRoleDto,
@@ -78,7 +84,7 @@ export class RolesController {
 
   // 5. XÓA
   @Delete(':id')
-  @RequirePermissions(Resource.ROLES, Action.DELETE)
+  @RequirePermissions(Resource.SYSTEM_ROLES, Action.DELETE)
   remove(
     @Param('id') id: string,
     @CurrentUser() user: IUser,

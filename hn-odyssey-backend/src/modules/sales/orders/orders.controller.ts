@@ -92,7 +92,7 @@ export class OrdersController {
   // 6. IN HÀNG LOẠT (TRẢ VỀ FILE PDF)
   @Post('print-bulk')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.ORDERS, Action.EXPORT)
+  @RequirePermissions(Resource.SALES_ORDERS, Action.PRINT)
   @ApiOperation({ summary: 'In nhiều đơn hàng cùng lúc (Tải PDF)' })
   async printBulk(
     @Body('ids') ids: string[],
@@ -109,7 +109,7 @@ export class OrdersController {
   // 7. LẤY DANH SÁCH (Query Params)
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.ORDERS, Action.READ)
+  @RequirePermissions(Resource.SALES_ORDERS, Action.READ)
   @ApiOperation({ summary: 'Lấy danh sách đơn hàng (Filter/Sort)' })
   async findAll(@Query() query: FilterOrderDto) {
     return this.ordersService.findAll(query);
@@ -117,7 +117,7 @@ export class OrdersController {
 
   @Get('export/excel')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.ORDERS, Action.READ)
+  @RequirePermissions(Resource.SALES_ORDERS, Action.READ)
   @ApiOperation({ summary: 'Xuất dữ liệu đơn hàng ra Excel' })
   async exportExcel(
     @Query() query: FilterOrderDto,
@@ -133,7 +133,7 @@ export class OrdersController {
   // 8. CHI TIẾT ĐƠN HÀNG
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.ORDERS, Action.READ)
+  @RequirePermissions(Resource.SALES_ORDERS, Action.READ)
   @ApiOperation({ summary: 'Xem chi tiết đơn hàng theo ID' })
   async findOne(@Param('id') id: string) {
     return this.ordersService.findOne(id);
@@ -142,7 +142,7 @@ export class OrdersController {
   // 9. CẬP NHẬT TRẠNG THÁI
   @Patch(':id/status-advanced')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.ORDERS, Action.UPDATE)
+  @RequirePermissions(Resource.SALES_ORDERS, Action.UPDATE)
   @ApiOperation({ summary: 'Cập nhật trạng thái đơn hàng nâng cao' })
   async updateStatusAdvanced(
     @Param('id') id: string,
@@ -165,7 +165,7 @@ export class OrdersController {
   // 10. LẤY DATA IN
   @Get(':id/print')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.ORDERS, Action.READ)
+  @RequirePermissions(Resource.SALES_ORDERS, Action.PRINT)
   @ApiOperation({ summary: 'Lấy dữ liệu để in hóa đơn/phiếu giao' })
   async printOrder(
     @Param('id') id: string,
@@ -177,7 +177,7 @@ export class OrdersController {
   // 11. GỬI EMAIL HÓA ĐƠN
   @Post(':id/send-invoice')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.ORDERS, Action.READ)
+  @RequirePermissions(Resource.SALES_ORDERS, Action.READ)
   @ApiOperation({ summary: 'Gửi lại email hóa đơn cho khách' })
   async sendInvoice(@Param('id') id: string) {
     return this.ordersService.sendInvoiceEmail(id);
@@ -242,7 +242,7 @@ export class OrdersController {
   // 12. LẤY LINK IN TEM VẬN CHUYỂN (GHN/GHTK)
   @Get(':id/shipping-label')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @RequirePermissions(Resource.ORDERS, Action.READ)
+  @RequirePermissions(Resource.SALES_ORDERS, Action.PRINT)
   @ApiOperation({ summary: 'Lấy link in tem vận chuyển từ ĐVVC (GHN/GHTK)' })
   async getShippingLabel(@Param('id') id: string) {
     return this.ordersService.getShippingLabel(id);

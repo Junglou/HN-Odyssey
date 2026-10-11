@@ -2,6 +2,8 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { toast } from "react-toastify";
 import { io } from "socket.io-client";
 import axiosClient from "../../../../api/axiosClient";
+import type { UserPayload } from "../../../../types/auth";
+import { Action, Resource } from "../../../../types/permissions";
 
 // types
 export type TradeInStatus =
@@ -104,12 +106,46 @@ const formatStatusToFE = (beStatus: string): TradeInStatus => {
   return formatted as TradeInStatus;
 };
 
+const useLocalAuth = () => {
+  const [user] = useState(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) return JSON.parse(stored) as UserPayload;
+    } catch (error) {
+      console.warn("Không thể parse dữ liệu user từ localStorage:", error);
+    }
+    return null;
+  });
+  return { user };
+};
+
 // hook
 export function useTradeInManagement() {
   // states
   const [data, setData] = useState<TradeInRow[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isMutating, setIsMutating] = useState<boolean>(false);
+
+  const { user } = useLocalAuth();
+
+  const hasPermission = useCallback(
+    (resourceCode: Resource, actionCode: Action): boolean => {
+      if (!user || !user.permissions) return false;
+      if (user.roles?.includes("SUPER_ADMIN")) return true;
+      return user.permissions.some(
+        (p) =>
+          p.resource === resourceCode &&
+          (p.actions.includes(actionCode) || p.actions.includes(Action.MANAGE)),
+      );
+    },
+    [user],
+  );
+
+  const canUpdate = hasPermission(Resource.SALES_TRADE_IN, Action.UPDATE); // Duyệt/Từ chối sơ bộ
+  const canApprove = hasPermission(Resource.SALES_TRADE_IN, Action.APPROVE); // Chốt giá cuối
+  const canReceive = hasPermission(Resource.SALES_TRADE_IN, Action.RECEIVE); // Xác nhận nhận hàng
+  const canExport = hasPermission(Resource.SALES_TRADE_IN, Action.EXPORT);
+  const canPrint = hasPermission(Resource.SALES_TRADE_IN, Action.PRINT);
 
   const [filters, setFilters] = useState({
     search: "",
@@ -305,17 +341,27 @@ export function useTradeInManagement() {
       setDetailDrawer({ isOpen: true, tradeInId: id }),
     closeDetail: () => setDetailDrawer({ isOpen: false, tradeInId: null }),
 
-    openApproveModal: (id: string) =>
-      setApproveModal({ isOpen: true, tradeInId: id }),
+    openApproveModal: (id: string) => {
+      if (!canUpdate) return toast.error("Bạn không có quyền duyệt sơ bộ.");
+      setApproveModal({ isOpen: true, tradeInId: id });
+    },
+    // PHẢI CÓ HÀM CLOSE NÀY
     closeApproveModal: () =>
       setApproveModal({ isOpen: false, tradeInId: null }),
 
-    openRejectModal: (id: string) =>
-      setRejectModal({ isOpen: true, tradeInId: id }),
+    openRejectModal: (id: string) => {
+      if (!canUpdate) return toast.error("Bạn không có quyền từ chối.");
+      setRejectModal({ isOpen: true, tradeInId: id });
+    },
+    // PHẢI CÓ HÀM CLOSE NÀY
     closeRejectModal: () => setRejectModal({ isOpen: false, tradeInId: null }),
 
-    openFinalizeModal: (id: string) =>
-      setFinalizeModal({ isOpen: true, tradeInId: id }),
+    openFinalizeModal: (id: string) => {
+      if (!canApprove)
+        return toast.error("Bạn không có quyền thẩm định chốt giá.");
+      setFinalizeModal({ isOpen: true, tradeInId: id });
+    },
+    // PHẢI CÓ HÀM CLOSE NÀY
     closeFinalizeModal: () =>
       setFinalizeModal({ isOpen: false, tradeInId: null }),
 
@@ -339,6 +385,7 @@ export function useTradeInManagement() {
     },
 
     createOrder: async (id: string) => {
+      if (!canUpdate) return toast.error("Bạn không có quyền tạo vận đơn.");
       if (isMutating) return;
       setIsMutating(true);
       try {
@@ -354,6 +401,8 @@ export function useTradeInManagement() {
     },
 
     receiveItem: async (id: string) => {
+      if (!canReceive)
+        return toast.error("Bạn không có quyền xác nhận nhận hàng.");
       if (isMutating) return;
       setIsMutating(true);
       try {
@@ -369,6 +418,8 @@ export function useTradeInManagement() {
     },
 
     markShippingAsReceived: async (id: string) => {
+      if (!canReceive)
+        return toast.error("Bạn không có quyền xác nhận nhận hàng.");
       if (isMutating) return;
       setIsMutating(true);
       try {
@@ -430,10 +481,11 @@ export function useTradeInManagement() {
     },
 
     exportExcel: async () => {
+      if (!canExport) return toast.error("Bạn không có quyền xuất dữ liệu.");
       try {
         toast.info("Đang xuất file Excel...");
 
-        const params: Record<string, string> = {};
+        const params: Record<string, unknown> = {};
         if (filters.status !== "all") params.status = filters.status;
         if (filters.search) params.search = filters.search;
         if (filters.fromDate) params.fromDate = filters.fromDate;
@@ -467,6 +519,7 @@ export function useTradeInManagement() {
     },
 
     printInvoice: async (selectedIds?: string[]) => {
+      if (!canPrint) return toast.error("Bạn không có quyền in.");
       if (!selectedIds || selectedIds.length === 0) {
         toast.warning("Vui lòng chọn ít nhất một đơn để in Hóa đơn.");
         return;
@@ -490,6 +543,7 @@ export function useTradeInManagement() {
     },
 
     printDeliverySlip: async (selectedIds?: string[]) => {
+      if (!canPrint) return toast.error("Bạn không có quyền in.");
       if (!selectedIds || selectedIds.length === 0) {
         toast.warning("Vui lòng chọn ít nhất một đơn để in Phiếu giao.");
         return;
@@ -541,5 +595,6 @@ export function useTradeInManagement() {
     actions,
     isLoading,
     isMutating,
+    permissions: { canUpdate, canApprove, canReceive, canExport, canPrint },
   };
 }

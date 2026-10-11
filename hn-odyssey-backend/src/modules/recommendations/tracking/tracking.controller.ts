@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Logger,
   Res,
   Patch,
   Param,
@@ -21,15 +22,19 @@ import { Public } from 'src/common/decorators/public.decorator';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Resource, Action } from 'src/common/enums/resource.enum';
 import {
+  AdSpendEntryQueryDto,
   CouponFilterDto,
+  CreateAdSpendEntryDto,
   LoyaltyFilterDto,
   TrackingFilterDto,
+  VoidAdSpendEntryDto,
 } from './dto/marketing-tracking.dto';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { TrackingSeederService } from './tracking-seeder.service';
 
 @Controller('tracking')
 export class TrackingController {
+  private readonly logger = new Logger(TrackingController.name);
   constructor(
     private readonly trackingService: TrackingService,
     private readonly configService: ConfigService,
@@ -88,21 +93,24 @@ export class TrackingController {
   }
 
   @Get('campaigns')
-  @RequirePermissions(Resource.REPORTS, Action.READ)
+  @RequirePermissions(
+    [Resource.REPORT_MARKETING, Resource.REPORT_INVENTORY],
+    Action.READ,
+  )
   async getCampaignsReport(@Query() filter: TrackingFilterDto) {
     const data = await this.trackingService.getCampaignPerformance(filter);
     return new BaseResponse(true, 'Lấy báo cáo chiến dịch thành công', data);
   }
 
   @Get('coupons')
-  @RequirePermissions(Resource.PROMOTIONS, Action.READ)
+  @RequirePermissions(Resource.REPORT_MARKETING, Action.READ)
   async getCouponsReport(@Query() filter: CouponFilterDto) {
     const data = await this.trackingService.getCouponPerformance(filter);
     return new BaseResponse(true, 'Lấy báo cáo mã giảm giá thành công', data);
   }
 
   @Get('loyalty-health')
-  @RequirePermissions(Resource.LOYALTY, Action.READ)
+  @RequirePermissions(Resource.REPORT_MARKETING, Action.READ)
   async getLoyaltyHealthReport(@Query() filter: LoyaltyFilterDto) {
     const data = await this.trackingService.getLoyaltyHealth(filter);
     return new BaseResponse(
@@ -114,56 +122,88 @@ export class TrackingController {
 
   // AC6 - Export Campaign Report
   @Get('campaigns/export')
-  @RequirePermissions(Resource.REPORTS, Action.EXPORT)
+  @RequirePermissions(Resource.REPORT_MARKETING, Action.EXPORT)
   async exportCampaignsExcel(
     @Query() filter: TrackingFilterDto,
     @Res() res: Response,
-    @CurrentUser() user: UserExportInfo, // Lấy thông tin user hiện tại
-  ) {
+    @CurrentUser() user: UserExportInfo,
+  ): Promise<void> {
+    let buffer: Buffer;
     try {
-      // Truyền thêm object user vào service
       const workbook = await this.trackingService.generateCampaignsExcel(
         filter,
         user,
       );
-
-      res.setHeader(
-        'Content-Type',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Xuất Excel Marketing thất bại: ${msg}`,
+        error instanceof Error ? error.stack : undefined,
       );
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename=Bao_Cao_Marketing_H&N_Odyssey_${Date.now()}.xlsx`,
-      );
-
-      await workbook.xlsx.write(res);
-      res.end();
-    } catch (error) {
       throw new InternalServerErrorException(
-        'Đã xảy ra lỗi khi xuất file báo cáo chuyên sâu.',
-        { cause: error },
+        `Lỗi khi xuất file báo cáo Marketing: ${msg}`,
       );
     }
+
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="Bao_Cao_Marketing_${Date.now()}.xlsx"`,
+      'Content-Length': String(buffer.length),
+      'Cache-Control': 'no-store',
+    });
+    res.end(buffer);
   }
 
-  // US4 - AC1: Cập nhật chi phí quảng cáo (Ad Spend)
-  @Patch('campaigns/:id/ad-spend')
-  // Dành cho Sales & Marketing
-  @RequirePermissions(Resource.REPORTS, Action.UPDATE)
-  async updateAdSpend(
+  // US.82 AC1 — Ad Spend Ledger: xem nhật ký (READ xem được, không thêm/hủy được)
+  @Get('campaigns/:id/ad-spend')
+  @RequirePermissions(Resource.REPORT_MARKETING, Action.READ)
+  async getAdSpendEntries(
     @Param('id') id: string,
-    @Body('ad_spend') adSpend: number,
+    @Query() query: AdSpendEntryQueryDto,
   ) {
-    if (typeof adSpend !== 'number' || adSpend < 0) {
-      return new BaseResponse(false, 'Chi phí quảng cáo không hợp lệ');
-    }
-    await this.trackingService.updateAdSpend(id, adSpend);
-    return new BaseResponse(true, 'Cập nhật chi phí quảng cáo thành công');
+    const data = await this.trackingService.getAdSpendEntries(id, query);
+    return new BaseResponse(
+      true,
+      'Lấy nhật ký chi phí quảng cáo thành công',
+      data,
+    );
+  }
+
+  // US.82 AC1 — thêm 1 dòng chi phí
+  @Post('campaigns/:id/ad-spend')
+  @RequirePermissions(Resource.REPORT_MARKETING, Action.UPDATE)
+  async addAdSpendEntry(
+    @Param('id') id: string,
+    @Body() dto: CreateAdSpendEntryDto,
+    @CurrentUser('_id') userId: string,
+  ) {
+    const data = await this.trackingService.addAdSpendEntry(id, dto, userId);
+    return new BaseResponse(true, 'Đã ghi nhận chi phí quảng cáo', data);
+  }
+
+  // US.82 AC1 — hủy 1 dòng chi phí (bắt buộc lý do)
+  @Patch('campaigns/:id/ad-spend/:entryId/void')
+  @RequirePermissions(Resource.REPORT_MARKETING, Action.UPDATE)
+  async voidAdSpendEntry(
+    @Param('id') id: string,
+    @Param('entryId') entryId: string,
+    @Body() dto: VoidAdSpendEntryDto,
+    @CurrentUser('_id') userId: string,
+  ) {
+    const data = await this.trackingService.voidAdSpendEntry(
+      id,
+      entryId,
+      dto.reason,
+      userId,
+    );
+    return new BaseResponse(true, 'Đã hủy dòng chi phí', data);
   }
 
   // US1 - AC8 & US4 - AC5: Biểu đồ xu hướng chiến dịch
   @Get('campaigns/:id/trend')
-  @RequirePermissions(Resource.REPORTS, Action.READ)
+  @RequirePermissions(Resource.REPORT_MARKETING, Action.READ)
   async getCampaignTrend(
     @Param('id') id: string,
     @Query() filter: TrackingFilterDto,
@@ -174,7 +214,7 @@ export class TrackingController {
 
   // US2 - AC2: Tra cứu chi tiết đơn hàng theo mã giảm giá
   @Get('coupons/:code/orders')
-  @RequirePermissions(Resource.PROMOTIONS, Action.READ)
+  @RequirePermissions(Resource.REPORT_MARKETING, Action.READ)
   async getCouponOrders(
     @Param('code') code: string,
     @Query() filter: CouponFilterDto,

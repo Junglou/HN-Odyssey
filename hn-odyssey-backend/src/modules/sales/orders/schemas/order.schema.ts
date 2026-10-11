@@ -110,6 +110,10 @@ export class Order extends Document {
   @Prop()
   actual_shipping_fee: number;
 
+  // Phí ship tính cho khách (USD) — trước đây gán vào đơn nhưng không được lưu
+  @Prop({ default: 0 })
+  shipping_fee: number;
+
   // Thêm Timeline (AC4 - Chi tiết đơn hàng)
   @Prop({ type: [SchemaFactory.createForClass(OrderTimeline)], default: [] })
   timeline: OrderTimeline[];

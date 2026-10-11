@@ -91,11 +91,23 @@ interface ICampaignReport {
   orders: number;
   conversion_rate: number;
   allocated_revenue: number;
-  ad_spend: number;
-  roi_percent: number;
+  ad_spend: number; // chi phí TRONG KỲ lọc (Ad Spend Ledger)
+  ad_spend_total?: number; // tổng toàn thời gian
+  roi_percent: number | null; // null = kỳ lọc không có chi phí
   net_profit: number;
   profit_status: string;
 }
+
+const toBiCampaignStatus = (value?: string): CampaignData["status"] => {
+  switch ((value || "").toUpperCase()) {
+    case "PAUSED":
+      return "Paused";
+    case "COMPLETED":
+      return "Ended";
+    default:
+      return "Active";
+  }
+};
 
 export function useBusinessIntelligence() {
   // Lấy thời gian chuẩn theo Local của trình duyệt, không dùng múi giờ UTC
@@ -287,7 +299,7 @@ export function useBusinessIntelligence() {
               isUp: bounceData.bounceGrowth > 0,
             },
             totalSessions: {
-              value: bounceData.total_visits.toLocaleString("vi-VN"),
+              value: (bounceData.total_visits ?? 0).toLocaleString("en-US"),
               trend: `${bounceData.visitsGrowth > 0 ? "+" : ""}${bounceData.visitsGrowth}%`,
               isPositive: bounceData.visitsGrowth >= 0,
               isUp: bounceData.visitsGrowth >= 0,
@@ -320,9 +332,10 @@ export function useBusinessIntelligence() {
               ? Math.round((retData.returningCustomers / totalCust) * 100)
               : 0;
           const newRevAmount =
-            retData.newCustomers * retData.aovComparison.newAov;
+            retData.newCustomers * (retData.aovComparison?.newAov ?? 0);
           const retRevAmount =
-            retData.returningCustomers * retData.aovComparison.returningAov;
+            retData.returningCustomers *
+            (retData.aovComparison?.returningAov ?? 0);
 
           setRetentionData({
             newVisitor: newPct,
@@ -347,28 +360,31 @@ export function useBusinessIntelligence() {
             0,
           );
           const netProfitVal = totalRevVal - totalSpendVal;
+          // Cùng quy ước trang Marketing (mục 7 #3): kỳ lọc không có chi phí → "—"
           const overallRoiVal =
-            totalSpendVal > 0
-              ? (netProfitVal / totalSpendVal) * 100
-              : netProfitVal > 0
-                ? 100
-                : 0;
+            totalSpendVal > 0 ? (netProfitVal / totalSpendVal) * 100 : null;
 
           setAdMetrics({
             totalSpend: formatCurrency(totalSpendVal),
             totalRevenue: formatCurrency(totalRevVal),
-            overallROI: `${overallRoiVal > 0 ? "+" : ""}${overallRoiVal.toFixed(2)}%`,
+            overallROI:
+              overallRoiVal === null
+                ? "—"
+                : `${overallRoiVal > 0 ? "+" : ""}${overallRoiVal.toFixed(2)}%`,
           });
 
           setCampaigns(
             campaignDataList.map((c: ICampaignReport) => ({
               id: c.campaign_id,
               name: c.campaign_name,
-              status: (c.status as "Active" | "Paused" | "Ended") || "Active",
+              status: toBiCampaignStatus(c.status),
               budget: c.budget ? formatCurrency(c.budget) : "N/A",
               spend: formatCurrency(c.ad_spend),
               revenue: formatCurrency(c.allocated_revenue),
-              roi: `${c.roi_percent > 0 ? "+" : ""}${c.roi_percent}%`,
+              roi:
+                c.roi_percent === null || c.roi_percent === undefined
+                  ? "—"
+                  : `${c.roi_percent > 0 ? "+" : ""}${c.roi_percent.toFixed(2)}%`,
             })),
           );
         } else {

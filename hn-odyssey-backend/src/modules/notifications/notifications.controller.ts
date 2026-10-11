@@ -38,8 +38,8 @@ export class NotificationsController {
   constructor(private readonly service: NotificationsService) {}
 
   // AC11: Lấy danh sách thông báo cá nhân/theo role (Cơ chế Offline Queue)
+  // [ĐÃ SỬA]: Xóa RequirePermissions để cho phép MỌI USER lấy thông báo cá nhân của mình
   @Get('my-notifications')
-  @RequirePermissions(Resource.NOTIFICATIONS, Action.READ)
   async getMyNotifications(
     @Req() req: RequestWithUser,
     @Query('page') page: number = 1,
@@ -56,8 +56,8 @@ export class NotificationsController {
   }
 
   // AC7: Đánh dấu đã đọc & AC12: Đồng bộ thiết bị
+  // [ĐÃ SỬA]: Xóa RequirePermissions để cho phép MỌI USER đánh dấu đọc thông báo cá nhân của mình
   @Patch(':id/read')
-  @RequirePermissions(Resource.NOTIFICATIONS, Action.UPDATE)
   async markAsRead(@Param('id') id: string, @Req() req: RequestWithUser) {
     const result = await this.service.markAsRead(id, req.user.userId);
     if (!result) return new BaseResponse(false, 'Không tìm thấy thông báo');
@@ -65,8 +65,8 @@ export class NotificationsController {
   }
 
   // AC7: Đánh dấu đã đọc tất cả
+  // [ĐÃ SỬA]: Xóa RequirePermissions
   @Patch('read-all')
-  @RequirePermissions(Resource.NOTIFICATIONS, Action.UPDATE)
   async markAllAsRead(@Req() req: RequestWithUser) {
     const ip = req.ip;
     const userAgent = req.headers['user-agent'];
@@ -80,8 +80,8 @@ export class NotificationsController {
   }
 
   // Lấy số lượng chưa đọc cho Badge (AC2)
+  // [ĐÃ SỬA]: Xóa RequirePermissions (Đây là nguyên nhân chính gây spam log lỗi)
   @Get('unread-count')
-  @RequirePermissions(Resource.NOTIFICATIONS, Action.READ)
   async getUnreadCount(@Req() req: RequestWithUser) {
     const count = await this.service.getUnreadCount(
       req.user.userId,
@@ -94,8 +94,9 @@ export class NotificationsController {
   }
 
   // Lấy dữ liệu biểu đồ cho Dashboard (AC12 - US.19)
+  // [GIỮ NGUYÊN]: API thống kê hệ thống VẪN BẮT BUỘC PHẢI PHÂN QUYỀN
   @Get('stats/trend')
-  @RequirePermissions(Resource.NOTIFICATIONS, Action.READ)
+  @RequirePermissions(Resource.SYSTEM_NOTIFICATIONS, Action.READ)
   async getTrend(): Promise<BaseResponse<NotificationTrend[]>> {
     const data = await this.service.get7DayTrend();
     return new BaseResponse(

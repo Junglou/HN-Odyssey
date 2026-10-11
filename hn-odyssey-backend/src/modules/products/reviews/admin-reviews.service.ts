@@ -243,7 +243,7 @@ export class AdminReviewsService {
 
         await this.auditLogsService.log({
           action: Action.UPDATE,
-          collection_name: Resource.CUSTOMERS,
+          collection_name: Resource.CRM_CUSTOMERS,
           actor_id: adminId,
           department: Department.SUPPORT,
           target_id: String(review.user_id),
@@ -331,48 +331,69 @@ export class AdminReviewsService {
     return review.save();
   }
 
-  async toggleHideStatus(reviewId: string) {
+  async hideReview(reviewId: string) {
     const review = await this.reviewModel
       .findById(reviewId)
       .populate<{ user_id: CustomerDocument }>('user_id');
 
     if (!review) throw new BadRequestException('Đánh giá không tồn tại');
+    if (review.status === ReviewStatus.HIDDEN) {
+      return {
+        success: true,
+        new_status: ReviewStatus.HIDDEN,
+        message: 'Đánh giá đã bị ẩn từ trước',
+      };
+    }
 
     const customer = review.user_id as unknown as {
       _id: Types.ObjectId;
       is_active?: boolean;
     } | null;
 
-    if (
-      customer &&
-      customer.is_active === false &&
-      review.status === ReviewStatus.HIDDEN
-    ) {
+    review.status = ReviewStatus.HIDDEN;
+    review.is_pinned = false;
+    review.pinned_at = null;
+
+    this.eventEmitter.emit('review.deleted_or_hidden', {
+      userId: customer?._id?.toString() || 'unknown_user',
+      reviewId: review._id.toString(),
+      orderId: review.order_id?.toString() || 'unknown_order',
+      reason: 'ADMIN_HIDDEN',
+    });
+
+    await review.save();
+    return { success: true, new_status: ReviewStatus.HIDDEN };
+  }
+
+  async showReview(reviewId: string) {
+    const review = await this.reviewModel
+      .findById(reviewId)
+      .populate<{ user_id: CustomerDocument }>('user_id');
+
+    if (!review) throw new BadRequestException('Đánh giá không tồn tại');
+    if (review.status !== ReviewStatus.HIDDEN) {
+      return {
+        success: true,
+        new_status: review.status,
+        message: 'Đánh giá đang ở trạng thái hiển thị',
+      };
+    }
+
+    const customer = review.user_id as unknown as {
+      _id: Types.ObjectId;
+      is_active?: boolean;
+    } | null;
+
+    if (customer && customer.is_active === false) {
       throw new BadRequestException(
         'Khách hàng này đang bị khóa, không thể hiển thị đánh giá',
       );
     }
 
-    const newStatus =
-      review.status === ReviewStatus.HIDDEN
-        ? review.reply?.content
-          ? ReviewStatus.REPLIED
-          : ReviewStatus.NEW
-        : ReviewStatus.HIDDEN;
-
+    const newStatus = review.reply?.content
+      ? ReviewStatus.REPLIED
+      : ReviewStatus.NEW;
     review.status = newStatus;
-
-    if (newStatus === ReviewStatus.HIDDEN) {
-      review.is_pinned = false;
-      review.pinned_at = null;
-
-      this.eventEmitter.emit('review.deleted_or_hidden', {
-        userId: customer?._id?.toString() || 'unknown_user',
-        reviewId: review._id.toString(),
-        orderId: review.order_id?.toString() || 'unknown_order',
-        reason: 'ADMIN_HIDDEN',
-      });
-    }
 
     await review.save();
     return { success: true, new_status: newStatus };
@@ -420,7 +441,7 @@ export class AdminReviewsService {
           );
           await this.auditLogsService.log({
             action: Action.DELETE,
-            collection_name: Resource.REVIEWS,
+            collection_name: Resource.CRM_REVIEWS,
             actor_id: adminId,
             department: Department.SUPPORT,
             detail: { deleted_ids: dto.review_ids },

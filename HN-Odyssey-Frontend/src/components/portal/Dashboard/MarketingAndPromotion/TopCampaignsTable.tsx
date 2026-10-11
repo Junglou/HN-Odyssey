@@ -1,11 +1,51 @@
+import { useState } from "react";
 import "./TopCampaignsTable.css";
-import type { AdCampaign } from "../../../../hooks/portal/Dashboard/MarketingAndPromotion/useMarketingAndPromotion";
+import {
+  NO_SPEND_TOOLTIP,
+  type AdCampaign,
+  type AdSpendLedgerApi,
+} from "../../../../hooks/portal/Dashboard/MarketingAndPromotion/useMarketingAndPromotion";
+import { getPageItems } from "../../../../utils/pagination";
+import ManageAdSpendDrawer from "./ManageAdSpendDrawer";
 
 interface TopCampaignsTableProps {
   campaigns: AdCampaign[];
   currentPage?: number;
   totalPages?: number;
   onPageChange?: (page: number) => void;
+  adSpendLedger?: AdSpendLedgerApi;
+  canUpdate?: boolean;
+}
+
+// US.82 AC3: tên class theo trạng thái lợi nhuận
+const ROI_CLASS: Record<AdCampaign["profitStatus"], string> = {
+  PROFIT: "tct-roi-profit",
+  BREAK_EVEN: "tct-roi-breakeven",
+  LOSS: "tct-roi-loss",
+  NO_SPEND: "tct-roi-nospend",
+};
+
+const STATUS_CLASS: Record<AdCampaign["status"], string> = {
+  Running: "tct-status-running",
+  Paused: "tct-status-paused",
+  Completed: "tct-status-completed",
+};
+
+function LedgerIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 4h16v16H4z" />
+      <path d="M8 9h8M8 13h8M8 17h5" />
+    </svg>
+  );
 }
 
 export default function TopCampaignsTable({
@@ -13,13 +53,19 @@ export default function TopCampaignsTable({
   currentPage = 1,
   totalPages = 1,
   onPageChange = () => {},
+  adSpendLedger,
+  canUpdate = false,
 }: TopCampaignsTableProps) {
-  // check roi thực tế (>= 20%)
-  const isGoodROI = (roiValue: string | number) => {
-    if (!roiValue) return false;
-    const numericValue = parseFloat(String(roiValue).replace("−", "-"));
-    return numericValue >= 20;
-  };
+  // Chiến dịch đang mở nhật ký (null = drawer đóng)
+  const [openCampaign, setOpenCampaign] = useState<AdCampaign | null>(null);
+
+  // Sau khi thêm/hủy, bảng được tải lại → lấy số liệu mới nhất thay vì giữ bản cũ
+  const activeCampaign = openCampaign
+    ? (campaigns.find((c) => c.id === openCampaign.id) ?? openCampaign)
+    : null;
+
+  // Người chỉ có quyền READ vẫn xem được nhật ký (báo cáo mục 5.2)
+  const showActions = !!adSpendLedger;
 
   return (
     <div className="tct-wrapper">
@@ -27,7 +73,7 @@ export default function TopCampaignsTable({
       <div className="tct-table-wrapper">
         {!campaigns || campaigns.length === 0 ? (
           <div className="tct-empty-state">
-            không có dữ liệu chiến dịch nào trong khoảng thời gian này
+            No campaign data for this period.
           </div>
         ) : (
           <>
@@ -37,10 +83,11 @@ export default function TopCampaignsTable({
                   <th>Campaign Name</th>
                   <th>Status</th>
                   <th className="tct-col-right">Budget</th>
-                  <th className="tct-col-right">Spend</th>
+                  <th className="tct-col-right">Spend (period)</th>
                   <th className="tct-col-right">Conversions</th>
                   <th className="tct-col-right">Revenue</th>
                   <th className="tct-col-right">ROI</th>
+                  {showActions && <th className="tct-col-actions">Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -49,68 +96,116 @@ export default function TopCampaignsTable({
                     <td>{camp.name}</td>
                     <td>
                       <span
-                        className={`tct-status-badge ${
-                          camp.status === "Running"
-                            ? "tct-status-running"
-                            : "tct-status-paused"
-                        }`}
+                        className={`tct-status-badge ${STATUS_CLASS[camp.status] ?? "tct-status-paused"}`}
                       >
                         {camp.status}
                       </span>
                     </td>
                     <td className="tct-col-right">{camp.budget}</td>
-                    <td className="tct-col-right">{camp.spend}</td>
+
+                    {/* Chi phí trong kỳ + dòng phụ tổng toàn thời gian */}
+                    <td className="tct-col-right">
+                      <div>{camp.spend}</div>
+                      <div
+                        className="tct-subvalue"
+                        title="Total spend since the campaign started"
+                      >
+                        Lifetime: {camp.lifetimeSpend}
+                      </div>
+                    </td>
+
                     <td className="tct-col-right">{camp.conversions}</td>
                     <td className="tct-col-right">{camp.revenue}</td>
+
+                    {/* US.82 AC3: Xanh lãi / Vàng hòa vốn / Đỏ lỗ / Xám không có chi phí */}
                     <td
-                      className={`tct-col-right ${
-                        isGoodROI(camp.roi) ? "tct-roi-positive" : ""
-                      }`}
+                      className={`tct-col-right tct-roi ${ROI_CLASS[camp.profitStatus]}`}
+                      title={
+                        camp.profitStatus === "NO_SPEND"
+                          ? NO_SPEND_TOOLTIP
+                          : undefined
+                      }
                     >
+                      {camp.profitStatus === "LOSS" && (
+                        <span
+                          className="tct-roi-warning"
+                          title="This campaign is losing money"
+                        >
+                          ⚠️
+                        </span>
+                      )}
                       {camp.roi}
                     </td>
+
+                    {/* US.82 AC1: nhật ký chi phí */}
+                    {showActions && (
+                      <td className="tct-col-actions">
+                        <button
+                          type="button"
+                          className="tct-action-btn"
+                          onClick={() => setOpenCampaign(camp)}
+                          aria-label={`${canUpdate ? "Manage" : "View"} ad spend for ${camp.name}`}
+                        >
+                          <LedgerIcon />
+                          <span>
+                            {canUpdate ? "Manage Spend" : "View Spend"}
+                          </span>
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
             </table>
 
-            {/* phân trang */}
-            <div className="tct-pagination-container">
-              <button
-                className="tct-page-nav-btn"
-                disabled={currentPage === 1}
-                onClick={() => onPageChange(currentPage - 1)}
-              >
-                Previous
-              </button>
-
-              <div className="tct-page-numbers">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                  (page) => (
-                    <button
-                      key={page}
-                      className={`tct-page-num-btn ${
-                        currentPage === page ? "tct-active" : ""
-                      }`}
-                      onClick={() => onPageChange(page)}
-                    >
-                      {page}
-                    </button>
-                  ),
-                )}
+            {totalPages > 1 && (
+              <div className="tct-pagination-container">
+                <button
+                  className="tct-page-nav-btn"
+                  disabled={currentPage <= 1}
+                  onClick={() => onPageChange(currentPage - 1)}
+                >
+                  Previous
+                </button>
+                <div className="tct-page-numbers">
+                  {getPageItems(currentPage, totalPages).map((item, idx) =>
+                    item === "..." ? (
+                      <span key={`dots-${idx}`} className="tct-page-ellipsis">
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={item}
+                        className={`tct-page-num-btn ${currentPage === item ? "tct-active" : ""}`}
+                        onClick={() => onPageChange(item)}
+                      >
+                        {item}
+                      </button>
+                    ),
+                  )}
+                </div>
+                <button
+                  className="tct-page-nav-btn"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => onPageChange(currentPage + 1)}
+                >
+                  Next
+                </button>
               </div>
-
-              <button
-                className="tct-page-nav-btn"
-                disabled={currentPage === totalPages}
-                onClick={() => onPageChange(currentPage + 1)}
-              >
-                Next
-              </button>
-            </div>
+            )}
           </>
         )}
       </div>
+
+      {activeCampaign && adSpendLedger && (
+        <ManageAdSpendDrawer
+          key={activeCampaign.id}
+          campaign={activeCampaign}
+          ledger={adSpendLedger}
+          canUpdate={canUpdate}
+          onClose={() => setOpenCampaign(null)}
+        />
+      )}
     </div>
   );
 }

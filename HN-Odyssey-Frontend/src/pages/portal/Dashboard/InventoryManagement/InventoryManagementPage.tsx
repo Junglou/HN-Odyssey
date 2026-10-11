@@ -13,15 +13,17 @@ export default function InventoryManagementPage() {
     trendData,
     alerts,
     tableData,
-    selectedWarehouse,
     handleFilterChange,
     handleStartDateChange,
     handleEndDateChange,
     handleApply,
-    handleWarehouseChange,
     handleExportExcel,
     handleExportPdf,
-    handleAlertAction, // <-- 1. Bóc tách hàm xử lý điều hướng từ hook
+    handleAlertAction,
+    tablePage,
+    tableTotalPages,
+    isTableLoading,
+    handleTablePageChange,
   } = useInventoryManagement();
 
   return (
@@ -36,15 +38,17 @@ export default function InventoryManagementPage() {
         trendData={trendData}
         alerts={alerts}
         tableData={tableData}
-        selectedWarehouse={selectedWarehouse}
         onFilterChange={handleFilterChange}
         onStartDateChange={handleStartDateChange}
         onEndDateChange={handleEndDateChange}
         onApply={handleApply}
-        onWarehouseChange={handleWarehouseChange}
         onExportExcel={handleExportExcel}
         onExportPdf={handleExportPdf}
-        onAlertAction={handleAlertAction} // <-- 2. Truyền hàm xuống component con
+        onAlertAction={handleAlertAction}
+        tablePage={tablePage}
+        tableTotalPages={tableTotalPages}
+        isTableLoading={isTableLoading}
+        onTablePageChange={handleTablePageChange}
       />
     </div>
   );

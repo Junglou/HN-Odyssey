@@ -158,7 +158,7 @@ export class PaymentController {
 
   @Patch('admin/configs/:provider')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.SYSTEM, Action.UPDATE) // Quyền cấu hình hệ thống
+  @RequirePermissions(Resource.CONTENT_CONFIG, Action.UPDATE)
   @ApiOperation({
     summary: 'Admin cập nhật cấu hình cổng thanh toán (US1.AC1)',
   })
@@ -174,7 +174,7 @@ export class PaymentController {
 
   @Post('admin/refund/:orderId')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.ORDERS, Action.UPDATE) // Quyền thao tác với đơn hàng
+  @RequirePermissions(Resource.SALES_ORDERS, Action.REFUND) // Quyền thao tác với đơn hàng
   @ApiOperation({ summary: 'Admin yêu cầu hoàn tiền cho đơn hàng (US2.AC4)' })
   async requestRefund(
     @Param('orderId') orderId: string,

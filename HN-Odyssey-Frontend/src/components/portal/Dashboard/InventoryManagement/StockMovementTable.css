@@ -114,7 +114,7 @@
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  color: #9ca3af;
+  color: #475569;
   transition: all 0.2s ease;
 }
 .smtab-btn:hover:not(:disabled),
@@ -132,4 +132,24 @@
   opacity: 0.5;
   cursor: not-allowed;
   pointer-events: none;
+}
+.smtab-ellipsis {
+  padding: 0 4px;
+  color: #94a3b8;
+  font-weight: 600;
+  user-select: none;
+}
+
+.smtab-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  color: #64748b;
+}
+
+.smtab-card.smtab-loading {
+  opacity: 0.6;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
 }

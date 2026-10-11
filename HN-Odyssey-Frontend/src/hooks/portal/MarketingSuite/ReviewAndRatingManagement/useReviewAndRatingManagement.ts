@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
+import type { UserPayload } from "../../../../types/auth";
+import { Action, Resource } from "../../../../types/permissions";
 
 export const ReviewStatusEnum = {
   NEW: "NEW",
@@ -140,6 +142,19 @@ const mapBeToFe = (item: BeReviewItem): ReviewRecord => {
   };
 };
 
+const useLocalAuth = () => {
+  const [user] = useState(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) return JSON.parse(stored) as UserPayload;
+    } catch (error) {
+      console.warn("Không thể parse dữ liệu user từ localStorage:", error);
+    }
+    return null;
+  });
+  return { user };
+};
+
 export function useReviewAndRatingManagement() {
   const [records, setRecords] = useState<ReviewRecord[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -176,6 +191,26 @@ export function useReviewAndRatingManagement() {
     }, 300);
     return () => clearTimeout(handler);
   }, [search, debouncedSearch]);
+
+  const { user } = useLocalAuth();
+
+  const hasPermission = useCallback(
+    (resourceCode: Resource, actionCode: Action): boolean => {
+      if (!user || !user.permissions) return false;
+      if (user.roles?.includes("SUPER_ADMIN")) return true;
+      return user.permissions.some(
+        (p) =>
+          p.resource === resourceCode &&
+          (p.actions.includes(actionCode) || p.actions.includes(Action.MANAGE)),
+      );
+    },
+    [user],
+  );
+
+  const canApprove = hasPermission(Resource.CRM_REVIEWS, Action.APPROVE);
+  const canUpdate = hasPermission(Resource.CRM_REVIEWS, Action.UPDATE);
+  const canPublish = hasPermission(Resource.CRM_REVIEWS, Action.PUBLISH);
+  const canDelete = hasPermission(Resource.CRM_REVIEWS, Action.DELETE);
 
   const fetchReviews = useCallback(async () => {
     try {
@@ -256,6 +291,7 @@ export function useReviewAndRatingManagement() {
     closeDrawer: () => setDrawerConfig((prev) => ({ ...prev, isOpen: false })),
 
     openDeleteModal: (record?: ReviewRecord) => {
+      if (!canDelete) return toast.error("Bạn không có quyền xóa đánh giá.");
       setModalConfig({
         isOpen: true,
         mode: "delete",
@@ -287,15 +323,23 @@ export function useReviewAndRatingManagement() {
     },
 
     toggleHideStatus: async (id: string) => {
+      if (!canPublish)
+        return toast.error("Bạn không có quyền ẩn/hiện đánh giá.");
+      const targetReview = records.find((r) => r.id === id);
+      if (!targetReview) return;
+
       try {
-        const res = await axiosClient.patch<{ new_status: string }>(
-          `/admin/reviews/${id}/toggle-hide`,
-        );
-        toast.success(
-          res.data.new_status === ReviewStatusEnum.HIDDEN
-            ? "Đã ẩn đánh giá."
-            : "Đã hiển thị đánh giá.",
-        );
+        // Nếu đang bị ẩn -> Gọi API /show
+        if (targetReview.status === "Hidden") {
+          await axiosClient.patch(`/admin/reviews/${id}/show`);
+          toast.success("Đã hiển thị đánh giá.");
+        }
+        // Nếu đang hiển thị (New hoặc Replied) -> Gọi API /hide
+        else {
+          await axiosClient.patch(`/admin/reviews/${id}/hide`);
+          toast.success("Đã ẩn đánh giá.");
+        }
+
         fetchReviews();
       } catch (error) {
         console.error(error);
@@ -313,6 +357,8 @@ export function useReviewAndRatingManagement() {
         isPinned: boolean;
       },
     ) => {
+      if (!canApprove && !canUpdate)
+        return toast.error("Bạn không có quyền cập nhật đánh giá này.");
       const targetReview = records.find((r) => r.id === reviewId);
       if (!targetReview) return;
 
@@ -363,6 +409,8 @@ export function useReviewAndRatingManagement() {
 
   const bulkActions = {
     bulkHide: async () => {
+      if (!canPublish)
+        return toast.error("Bạn không có quyền ẩn đánh giá hàng loạt.");
       if (selectedIds.size === 0) return;
       try {
         await axiosClient.post("/admin/reviews/bulk-actions", {
@@ -378,6 +426,8 @@ export function useReviewAndRatingManagement() {
       }
     },
     bulkUnhide: async () => {
+      if (!canPublish)
+        return toast.error("Bạn không có quyền hiển thị đánh giá hàng loạt.");
       if (selectedIds.size === 0) return;
       try {
         await axiosClient.post("/admin/reviews/bulk-actions", {
@@ -393,6 +443,8 @@ export function useReviewAndRatingManagement() {
       }
     },
     bulkDelete: () => {
+      if (!canDelete)
+        return toast.error("Bạn không có quyền xóa đánh giá hàng loạt.");
       if (selectedIds.size === 0) return;
       actions.openDeleteModal();
     },
@@ -415,5 +467,6 @@ export function useReviewAndRatingManagement() {
     modalConfig,
     actions,
     bulkActions,
+    permissions: { canApprove, canUpdate, canPublish, canDelete },
   };
 }

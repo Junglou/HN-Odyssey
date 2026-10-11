@@ -1,5 +1,6 @@
 import "./TopCouponsTable.css";
 import type { CouponData } from "../../../../hooks/portal/Dashboard/MarketingAndPromotion/useMarketingAndPromotion";
+import { getPageItems } from "../../../../utils/pagination";
 
 interface TopCouponsTableProps {
   coupons: CouponData[];
@@ -14,13 +15,15 @@ export default function TopCouponsTable({
   totalPages = 1,
   onPageChange = () => {},
 }: TopCouponsTableProps) {
+  const hasData = Array.isArray(coupons) && coupons.length > 0;
+
   return (
     <div className="tc-wrapper">
       <div className="tc-section-title">Top Performing Coupons</div>
       <div className="tc-table-wrapper">
-        {!coupons || coupons.length === 0 ? (
+        {!hasData ? (
           <div className="tc-empty-state">
-            không có dữ liệu mã giảm giá nào trong khoảng thời gian này
+            No coupons were used in this period
           </div>
         ) : (
           <>
@@ -29,9 +32,23 @@ export default function TopCouponsTable({
                 <tr>
                   <th>Coupon Code</th>
                   <th>Description</th>
-                  <th className="tc-col-right">Usage Count</th>
+                  <th
+                    className="tc-col-right"
+                    title="Times applied at checkout"
+                  >
+                    Applied
+                  </th>
+                  <th
+                    className="tc-col-right"
+                    title="Completed orders using this code"
+                  >
+                    Orders
+                  </th>
                   <th className="tc-col-right">Total Discount</th>
                   <th className="tc-col-right">Revenue Generated</th>
+                  <th className="tc-col-right" title="Discount cost ÷ revenue">
+                    Cost / Revenue
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -39,46 +56,53 @@ export default function TopCouponsTable({
                   <tr key={coupon.id}>
                     <td className="tc-code-cell">{coupon.code}</td>
                     <td>{coupon.description}</td>
-                    <td className="tc-col-right">{coupon.usageCount}</td>
+                    <td className="tc-col-right">{coupon.appliedCount}</td>
+                    <td className="tc-col-right">{coupon.orderCount}</td>
                     <td className="tc-col-right">{coupon.totalDiscount}</td>
                     <td className="tc-col-right">{coupon.revenueGenerated}</td>
+                    <td className="tc-col-right">{coupon.costRatio}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <div className="tc-pagination-container">
-              <button
-                className="tc-page-nav-btn"
-                disabled={currentPage === 1}
-                onClick={() => onPageChange(currentPage - 1)}
-              >
-                Previous
-              </button>
 
-              <div className="tc-page-numbers">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                  (page) => (
-                    <button
-                      key={page}
-                      className={`tc-page-num-btn ${
-                        currentPage === page ? "tc-active" : ""
-                      }`}
-                      onClick={() => onPageChange(page)}
-                    >
-                      {page}
-                    </button>
-                  ),
-                )}
+            {totalPages > 1 && (
+              <div className="tc-pagination-container">
+                <button
+                  className="tc-page-nav-btn"
+                  disabled={currentPage <= 1}
+                  onClick={() => onPageChange(currentPage - 1)}
+                >
+                  Previous
+                </button>
+
+                <div className="tc-page-numbers">
+                  {getPageItems(currentPage, totalPages).map((item, idx) =>
+                    item === "..." ? (
+                      <span key={`dots-${idx}`} className="tc-page-ellipsis">
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={item}
+                        className={`tc-page-num-btn ${currentPage === item ? "tc-active" : ""}`}
+                        onClick={() => onPageChange(item)}
+                      >
+                        {item}
+                      </button>
+                    ),
+                  )}
+                </div>
+
+                <button
+                  className="tc-page-nav-btn"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => onPageChange(currentPage + 1)}
+                >
+                  Next
+                </button>
               </div>
-
-              <button
-                className="tc-page-nav-btn"
-                disabled={currentPage === totalPages}
-                onClick={() => onPageChange(currentPage + 1)}
-              >
-                Next
-              </button>
-            </div>
+            )}
           </>
         )}
       </div>

@@ -1,5 +1,5 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { CreateStaffDto } from './create-staff.dto';
+import { CreateStaffDto } from './create-staff.dto'; // Import hàm validation custom
 import { IsOptional, IsString, MinLength, IsArray } from 'class-validator';
 import { Role } from '../../../../common/enums/role.enum';
 

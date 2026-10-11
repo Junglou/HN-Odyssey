@@ -1,8 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
+import { Action, Resource } from "../../../../types/permissions";
 
-// 1. FE TYPES (GIỮ NGUYÊN THEO COMPONENT YÊU CẦU)
+// 1. FE TYPES
+
+interface UserPayload {
+  roles?: string[];
+  permissions?: { resource: string; actions: string[] }[];
+}
 
 export type OrderStatus =
   | "Pending"
@@ -153,11 +159,43 @@ const mapFeToBeStatus = (feStatus: string): string => {
   return "PENDING";
 };
 
+const useLocalAuth = () => {
+  const [user] = useState(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) return JSON.parse(stored) as UserPayload;
+    } catch (error) {
+      console.warn("Không thể parse dữ liệu user từ localStorage:", error);
+    }
+    return null;
+  });
+  return { user };
+};
+
 // 4. MAIN HOOK
 
 export function useOrderManagement() {
   const [data, setData] = useState<OrderRow[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  const { user } = useLocalAuth();
+
+  const hasPermission = useCallback(
+    (resourceCode: Resource, actionCode: Action): boolean => {
+      if (!user || !user.permissions) return false;
+      if (user.roles?.includes("SUPER_ADMIN")) return true;
+      return user.permissions.some(
+        (p) =>
+          p.resource === resourceCode &&
+          (p.actions.includes(actionCode) || p.actions.includes(Action.MANAGE)),
+      );
+    },
+    [user],
+  );
+
+  const canUpdate = hasPermission(Resource.SALES_ORDERS, Action.UPDATE);
+  const canPrint = hasPermission(Resource.SALES_ORDERS, Action.PRINT);
+  const canExport = hasPermission(Resource.SALES_ORDERS, Action.EXPORT);
 
   const [filters, setFilters] = useState({
     search: "",
@@ -349,6 +387,12 @@ export function useOrderManagement() {
       newStatus: OrderStatus,
       reason: string,
     ): Promise<void> => {
+      if (!canUpdate) {
+        toast.error(
+          "Truy cập từ chối. Bạn không có quyền cập nhật trạng thái đơn hàng.",
+        );
+        return;
+      }
       if (isProcessingAction) return;
       setIsProcessingAction(true);
       try {
@@ -379,6 +423,12 @@ export function useOrderManagement() {
 
     // Đổi type của nextStatus thành string để hỗ trợ truyền "READY_TO_SHIP"
     advanceOrderStatus: async (orderId: string, nextStatus: string) => {
+      if (!canUpdate) {
+        toast.error(
+          "Truy cập từ chối. Bạn không có quyền chuyển trạng thái đơn hàng.",
+        );
+        return;
+      }
       if (isProcessingAction) return;
       setIsProcessingAction(true);
       try {
@@ -410,6 +460,8 @@ export function useOrderManagement() {
 
     // Global Actions
     exportExcel: async () => {
+      if (!canExport)
+        return toast.error("Bạn không có quyền xuất dữ liệu Excel.");
       try {
         toast.info("Đang xử lý xuất dữ liệu Excel, vui lòng đợi...");
 
@@ -448,6 +500,10 @@ export function useOrderManagement() {
     },
 
     printInvoice: async (selectedIds?: string[]) => {
+      if (!canPrint) {
+        toast.error("Truy cập từ chối. Bạn không có quyền in hóa đơn.");
+        return;
+      }
       if (!selectedIds || selectedIds.length === 0) {
         toast.warning("Vui lòng chọn ít nhất một đơn hàng để in hóa đơn.");
         return;
@@ -456,6 +512,10 @@ export function useOrderManagement() {
     },
 
     printDeliverySlip: async (selectedIds?: string[]) => {
+      if (!canPrint) {
+        toast.error("Truy cập từ chối. Bạn không có quyền in phiếu giao hàng.");
+        return;
+      }
       if (!selectedIds || selectedIds.length === 0) {
         toast.warning("Vui lòng chọn ít nhất một đơn hàng để in phiếu giao.");
         return;
@@ -465,6 +525,10 @@ export function useOrderManagement() {
 
     // BỔ SUNG HÀM LẤY LINK IN TEM GHN/GHTK
     printShippingLabel: async (orderId: string) => {
+      if (!canPrint) {
+        toast.error("Truy cập từ chối. Bạn không có quyền in tem vận chuyển.");
+        return;
+      }
       try {
         const response = await axiosClient.get<{ url: string }>(
           `/orders/${orderId}/shipping-label`,
@@ -546,5 +610,6 @@ export function useOrderManagement() {
     selectedOrder: data.find((o) => o.id === detailDrawer.orderId) || null,
     statusModal,
     actions,
+    permissions: { canUpdate, canPrint, canExport },
   };
 }
