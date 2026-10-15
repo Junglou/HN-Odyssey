@@ -4,7 +4,6 @@ import axiosClient from "../../api/axiosClient";
 import tokenStorage from "../../utils/tokenStorage";
 import type { UserProfile } from "../../types/user";
 
-// 1. Tách riêng interface cho metadata để dùng chung, loại bỏ hoàn toàn "any"
 export interface MessageMetadata {
   fileName?: string;
   fileSize?: string;
@@ -14,7 +13,6 @@ export interface MessageMetadata {
   imageUrl?: string;
 }
 
-// 2. Gắn chung kiểu MessageMetadata vào UI Message
 export interface ChatMessage {
   id: string;
   sender_type: "USER" | "BOT" | "AGENT" | "SYSTEM";
@@ -23,7 +21,6 @@ export interface ChatMessage {
   metadata?: MessageMetadata;
 }
 
-// 3. Gắn chung kiểu MessageMetadata vào Server Message
 interface ServerMessage {
   _id?: string;
   sender_type: "USER" | "BOT" | "AGENT" | "SYSTEM";
@@ -32,7 +29,6 @@ interface ServerMessage {
   metadata?: MessageMetadata;
 }
 
-// Định nghĩa kiểu cho cấu hình kết nối Socket
 interface SocketConnectionParams {
   path?: string;
   transports: string[];
@@ -41,14 +37,46 @@ interface SocketConnectionParams {
   extraHeaders?: { Authorization: string };
 }
 
+// Ai đang gõ phía cửa hàng
+export type TypingSender = "BOT" | "AGENT";
+export interface TypingIndicator {
+  senderType: TypingSender;
+  userName?: string;
+}
+
+interface TypingEventPayload {
+  conversation_id: string;
+  sender_type: "USER" | "AGENT" | "BOT";
+  user_name?: string;
+  is_typing: boolean;
+}
+
+const SELF_TYPING_IDLE_MS = 2000; // ngừng gõ 2s -> báo "đã ngừng"
+const AGENT_TYPING_TIMEOUT_MS = 8000; // phòng mất tín hiệu ngừng gõ
+const BOT_TYPING_TIMEOUT_MS = 60000; // n8n có thể trả lời chậm
+
+const toChatMessage = (msg: ServerMessage): ChatMessage => ({
+  id: msg._id || `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+  sender_type: msg.sender_type,
+  content: msg.content,
+  message_type: msg.message_type || "TEXT",
+  metadata: msg.metadata,
+});
+
 export function useChatSupport() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [typingIndicator, setTypingIndicator] =
+    useState<TypingIndicator | null>(null);
+
   const socketRef = useRef<Socket | null>(null);
   const sessionIdRef = useRef<string>("");
+  // Dùng ref để luôn có id mới nhất (kể cả khi server chuyển sang phiên mới)
+  const conversationIdRef = useRef<string | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selfTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSelfTypingRef = useRef(false);
 
   useEffect(() => {
-    // Khởi tạo session ID lưu cục bộ nếu khách chưa từng chat
     let storedSession = localStorage.getItem("chat_session_id");
     if (!storedSession) {
       storedSession =
@@ -59,6 +87,14 @@ export function useChatSupport() {
 
     let isMounted = true;
 
+    const hideTyping = () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      setTypingIndicator(null);
+    };
+
     const initChatAndSocket = async () => {
       try {
         const user = tokenStorage.getUser<UserProfile>();
@@ -67,97 +103,99 @@ export function useChatSupport() {
           ...(user?._id && { customerId: user._id }),
         };
 
-        // Bước 1: Khởi tạo hoặc lấy lại phiên chat từ Backend
+        // Bước 1: Khởi tạo hoặc lấy lại phiên chat
         const initRes = await axiosClient.post(
           "/support/chats/init",
           initPayload,
         );
-        const convId = initRes.data.conversation_id;
+        const convId: string = initRes.data.conversation_id;
 
-        // ĐỒNG BỘ SESSION ID: Cập nhật lại sessionIdRef bằng giá trị BE trả về
-        // Giúp tránh lỗi load mảng rỗng khi F5 cho tài khoản đã đăng nhập
         if (initRes.data.session_id) {
           sessionIdRef.current = initRes.data.session_id;
           localStorage.setItem("chat_session_id", initRes.data.session_id);
         }
 
         if (!isMounted) return;
-        setConversationId(convId);
+        conversationIdRef.current = convId;
 
-        // Bước 2: Gọi lịch sử tin nhắn bằng sessionIdRef ĐÃ ĐƯỢC ĐỒNG BỘ
+        // Bước 2: Lịch sử tin nhắn
         let historyUrl = `/support/chats/session/${sessionIdRef.current}/messages`;
-
-        // Nếu user đã đăng nhập, đính kèm customerId vào URL để Backend nhận diện
-        if (user?._id) {
-          historyUrl += `?customerId=${user._id}`;
-        }
+        if (user?._id) historyUrl += `?customerId=${user._id}`;
 
         const historyRes = await axiosClient.get(historyUrl);
-
         const historyData: ServerMessage[] = historyRes.data || [];
 
-        const formattedHistory: ChatMessage[] = historyData.map(
-          (msg: ServerMessage) => ({
-            id: msg._id || Date.now().toString(),
-            sender_type: msg.sender_type,
-            content: msg.content,
-            message_type: msg.message_type || "TEXT",
-            metadata: msg.metadata,
-          }),
-        );
+        if (isMounted) setMessages(historyData.map(toChatMessage));
 
-        if (isMounted) {
-          setMessages(formattedHistory);
-        }
-
-        // Bước 3: Cấu hình và kết nối Socket.IO
+        // Bước 3: Socket.IO
         const rawApiUrl =
           import.meta.env.VITE_API_URL || "https://api.hnodyssey.id.vn/api";
-
         const baseUrl = rawApiUrl.endsWith("/api")
           ? rawApiUrl.slice(0, -4)
           : rawApiUrl;
 
         const token = tokenStorage.getToken();
-
         const socketParams: SocketConnectionParams = {
           path: "/socket.io",
           transports: ["polling", "websocket"],
         };
-
         if (token) {
           socketParams.auth = { token };
           socketParams.query = { token };
           socketParams.extraHeaders = { Authorization: `Bearer ${token}` };
         }
 
-        const socketUrl = `${baseUrl}/chat`;
-        const socket = io(socketUrl, socketParams);
+        const socket = io(`${baseUrl}/chat`, socketParams);
         socketRef.current = socket;
 
+        // Join cả khi reconnect, luôn dùng id mới nhất
         socket.on("connect", () => {
-          socket.emit("join_room", { conversationId: convId });
-
+          const currentConvId = conversationIdRef.current;
+          if (!currentConvId) return;
+          socket.emit("join_room", { conversationId: currentConvId });
           socket.emit("mark_read", {
-            conversation_id: convId,
+            conversation_id: currentConvId,
             user_type: "USER",
           });
         });
 
-        // Lắng nghe tin nhắn mới từ Bot hoặc Agent (Hứng luôn PRODUCT_CARD)
         socket.on("new_message", (newMsg: ServerMessage) => {
           if (!isMounted) return;
-
-          const incomingMsg: ChatMessage = {
-            id: newMsg._id || Date.now().toString(),
-            sender_type: newMsg.sender_type,
-            content: newMsg.content,
-            message_type: newMsg.message_type || "TEXT",
-            metadata: newMsg.metadata,
-          };
-
-          setMessages((prev) => [...prev, incomingMsg]);
+          // Bot/nhân viên đã gửi xong -> tắt "..."
+          if (newMsg.sender_type !== "USER") hideTyping();
+          setMessages((prev) => [...prev, toChatMessage(newMsg)]);
         });
+
+        socket.on("typing", (data: TypingEventPayload) => {
+          if (!isMounted) return;
+          if (data.sender_type === "USER") return;
+          if (data.conversation_id !== conversationIdRef.current) return;
+
+          if (!data.is_typing) {
+            hideTyping();
+            return;
+          }
+
+          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+          const senderType: TypingSender =
+            data.sender_type === "BOT" ? "BOT" : "AGENT";
+          setTypingIndicator({ senderType, userName: data.user_name });
+          typingTimeoutRef.current = setTimeout(
+            hideTyping,
+            senderType === "BOT"
+              ? BOT_TYPING_TIMEOUT_MS
+              : AGENT_TYPING_TIMEOUT_MS,
+          );
+        });
+
+        // Phiên cũ đã đóng -> server chuyển sang phiên BOT mới
+        socket.on(
+          "conversation_switched",
+          (data: { conversation_id: string }) => {
+            conversationIdRef.current = data.conversation_id;
+            socket.emit("join_room", { conversationId: data.conversation_id });
+          },
+        );
       } catch (error) {
         console.error("Khởi tạo hội thoại thất bại:", error);
       }
@@ -167,11 +205,43 @@ export function useChatSupport() {
 
     return () => {
       isMounted = false;
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-      }
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      if (selfTypingTimerRef.current) clearTimeout(selfTypingTimerRef.current);
+      socketRef.current?.disconnect();
     };
   }, []);
+
+  // Khách đang gõ -> báo cho nhân viên
+  const emitSelfTyping = useCallback((isTyping: boolean) => {
+    const socket = socketRef.current;
+    const convId = conversationIdRef.current;
+    if (!socket || !convId) return;
+    socket.emit("typing", {
+      conversation_id: convId,
+      sender_type: "USER",
+      is_typing: isTyping,
+    });
+  }, []);
+
+  const stopTyping = useCallback(() => {
+    if (selfTypingTimerRef.current) clearTimeout(selfTypingTimerRef.current);
+    if (isSelfTypingRef.current) {
+      isSelfTypingRef.current = false;
+      emitSelfTyping(false);
+    }
+  }, [emitSelfTyping]);
+
+  const notifyTyping = useCallback(() => {
+    if (!isSelfTypingRef.current) {
+      isSelfTypingRef.current = true;
+      emitSelfTyping(true);
+    }
+    if (selfTypingTimerRef.current) clearTimeout(selfTypingTimerRef.current);
+    selfTypingTimerRef.current = setTimeout(() => {
+      isSelfTypingRef.current = false;
+      emitSelfTyping(false);
+    }, SELF_TYPING_IDLE_MS);
+  }, [emitSelfTyping]);
 
   const sendMessage = useCallback(
     (
@@ -179,20 +249,22 @@ export function useChatSupport() {
       message_type: "TEXT" | "IMAGE" | "FILE" = "TEXT",
       metadata?: { fileName?: string; fileSize?: string },
     ) => {
-      if (!conversationId || !socketRef.current) return;
+      const convId = conversationIdRef.current;
+      if (!convId || !socketRef.current) return;
 
-      const payload = {
-        conversationId,
+      stopTyping();
+
+      socketRef.current.emit("send_message", {
+        conversationId: convId,
         content,
         sender_type: "USER",
         message_type,
         metadata,
-      };
-
-      socketRef.current.emit("send_message", payload);
+        page_context: { current_page: window.location.pathname },
+      });
     },
-    [conversationId],
+    [stopTyping],
   );
 
-  return { messages, sendMessage };
+  return { messages, sendMessage, typingIndicator, notifyTyping, stopTyping };
 }

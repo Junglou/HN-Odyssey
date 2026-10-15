@@ -67,6 +67,7 @@ export default function RoleManagement({
   };
 
   const selectedRole = data.roles.find((r) => r.id === uiState.selectedRoleId);
+  const isLockedRole = Boolean(selectedRole?.isLocked);
   const filteredRoles = data.roles.filter((r) =>
     r.name.toLowerCase().includes(uiState.searchTerm.toLowerCase()),
   );
@@ -162,6 +163,12 @@ export default function RoleManagement({
             <div className="rm-right-header">
               <div className="rm-right-title-group">
                 <h2 className="rm-role-title">Role: {selectedRole?.name}</h2>
+                {isLockedRole && (
+                  <span className="rm-system-tag">
+                    <LockIcon stroke="#047857" />
+                    System role · Full access
+                  </span>
+                )}
                 {uiState.hasUnsavedChanges && (
                   <span className="rm-unsaved-tag">
                     <WarningIcon />
@@ -170,18 +177,20 @@ export default function RoleManagement({
                 )}
               </div>
               <div className="rm-right-actions">
-                <button
-                  className="rm-btn-save"
-                  disabled={!uiState.hasUnsavedChanges}
-                  onClick={actions.saveChanges}
-                >
-                  Save Changes
-                </button>
+                {!isLockedRole && (
+                  <button
+                    className="rm-btn-save"
+                    disabled={!uiState.hasUnsavedChanges}
+                    onClick={actions.saveChanges}
+                  >
+                    Save Changes
+                  </button>
+                )}
                 <button
                   className="rm-btn-cancel"
                   onClick={actions.cancelChanges}
                 >
-                  Cancel
+                  {isLockedRole ? "Close" : "Cancel"}
                 </button>
               </div>
             </div>
@@ -252,11 +261,12 @@ export default function RoleManagement({
                                 return (
                                   <label
                                     key={action}
-                                    className="rm-checkbox-label"
+                                    className={`rm-checkbox-label ${isLockedRole ? "locked" : ""}`}
                                   >
                                     <input
                                       type="checkbox"
                                       className="rm-checkbox"
+                                      disabled={isLockedRole}
                                       checked={sub.grantedActions.includes(
                                         action,
                                       )}

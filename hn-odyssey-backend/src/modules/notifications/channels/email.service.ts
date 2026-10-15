@@ -294,6 +294,113 @@ export class EmailService {
     });
   }
 
+  private escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // THÊM MỚI: Báo bộ phận khi Bot chuyển khách sang nhân viên (Live Chat)
+  async sendHandoffAlertToDepartment(
+    to: string,
+    data: {
+      departmentLabel: string;
+      customerName: string;
+      customerEmail?: string;
+      summary: string;
+      portalUrl: string;
+    },
+  ) {
+    const departmentLabel = this.escapeHtml(data.departmentLabel);
+    const customerName = this.escapeHtml(data.customerName);
+    const customerEmail = this.escapeHtml(
+      data.customerEmail || 'Khách chưa đăng nhập',
+    );
+    const summary = this.escapeHtml(data.summary || 'Không có tóm tắt');
+
+    await this.mailerService.sendMail({
+      to,
+      subject: `[H&N Odyssey - ${data.departmentLabel}] Khách đang chờ hỗ trợ trực tiếp`,
+      html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
+        <div style="background-color: #000; color: #fff; padding: 20px; text-align: center;">
+          <h2 style="margin: 0; letter-spacing: 2px;">H&N ODYSSEY</h2>
+        </div>
+        <div style="padding: 25px;">
+          <h3 style="margin-top: 0; color: #333;">Có khách đang chờ bộ phận ${departmentLabel}</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #eee; width: 35%;"><b>Khách hàng:</b></td>
+              <td style="padding: 8px; border-bottom: 1px solid #eee;">${customerName}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #eee;"><b>Email:</b></td>
+              <td style="padding: 8px; border-bottom: 1px solid #eee;">${customerEmail}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #eee;"><b>Tóm tắt từ Bot:</b></td>
+              <td style="padding: 8px; border-bottom: 1px solid #eee;">${summary}</td>
+            </tr>
+          </table>
+          <div style="text-align: center; margin: 25px 0;">
+            <a href="${data.portalUrl}" style="display: inline-block; padding: 12px 25px; background-color: #000; color: #fff; text-decoration: none; border-radius: 5px; font-weight: bold;">MỞ LIVE CHAT SUPPORT</a>
+          </div>
+          <p style="font-size: 13px; color: #666;"><i>Khách đang chờ trong khung chat trên website, vui lòng tiếp nhận sớm.</i></p>
+        </div>
+      </div>
+      `,
+    });
+  }
+
+  // THÊM MỚI: Báo khách khi nhân viên đã tiếp nhận cuộc trò chuyện
+  async sendChatAcceptedToCustomer(
+    email: string,
+    data: {
+      customerName: string;
+      agentName: string;
+      departmentLabel: string;
+      chatUrl: string;
+    },
+  ) {
+    const currentYear = new Date().getFullYear();
+    const customerName = this.escapeHtml(data.customerName);
+    const agentName = this.escapeHtml(data.agentName);
+    const departmentLabel = this.escapeHtml(data.departmentLabel);
+
+    await this.mailerService.sendMail({
+      to: email,
+      subject: '[H&N Odyssey] Nhân viên đã tiếp nhận yêu cầu hỗ trợ của bạn',
+      html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; background-color: #ffffff;">
+        <div style="background-color: #000000; color: #ffffff; padding: 25px 20px; text-align: center;">
+          <h2 style="margin: 0; letter-spacing: 2px; font-size: 24px;">H&N ODYSSEY</h2>
+        </div>
+        <div style="padding: 30px 25px;">
+          <h3 style="color: #333333; margin-top: 0; font-size: 20px;">Yêu cầu hỗ trợ đã được tiếp nhận</h3>
+          <p style="color: #555555; line-height: 1.6; font-size: 15px;">Xin chào <strong>${customerName}</strong>,</p>
+          <p style="color: #555555; line-height: 1.6; font-size: 15px;">
+            Nhân viên <strong>${agentName}</strong> (bộ phận ${departmentLabel}) đã tiếp nhận cuộc trò chuyện của bạn.
+            Vui lòng quay lại khung chat <strong>Support</strong> trên website để tiếp tục trao đổi.
+          </p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${data.chatUrl}" style="display: inline-block; padding: 12px 25px; background-color: #000000; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;">QUAY LẠI KHUNG CHAT</a>
+          </div>
+          <p style="color: #555555; line-height: 1.6; font-size: 15px; margin-bottom: 0;">
+            Trân trọng,<br><strong style="color: #000000;">Đội ngũ H&N Odyssey</strong>
+          </p>
+        </div>
+        <div style="background-color: #f1f1f1; padding: 20px; text-align: center; font-size: 12px; color: #888888; border-top: 1px solid #eeeeee;">
+          &copy; ${currentYear} H&N Odyssey. All rights reserved.<br><br>
+          Hotline: 1900 xxxx | Email: support@hnodyssey.com
+        </div>
+      </div>
+      `,
+    });
+  }
+
   // Hàm chung gửi mail bất kỳ
   async sendRaw(to: string, subject: string, content: string) {
     await this.mailerService.sendMail({

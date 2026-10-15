@@ -32,7 +32,8 @@ interface ChatWidgetProps {
 // component
 export default function ChatWidget({ onClose }: ChatWidgetProps) {
   // hooks
-  const { messages, sendMessage } = useChatSupport();
+  const { messages, sendMessage, typingIndicator, notifyTyping } =
+    useChatSupport();
   const [text, setText] = useState("");
   const [showEmoji, setShowEmoji] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -41,7 +42,7 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
   // auto scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, typingIndicator]);
 
   // handlers
   const handleSend = () => {
@@ -141,7 +142,13 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`cw-msg-row ${msg.sender_type === "USER" ? "user" : "bot"}`}
+            className={`cw-msg-row ${
+              msg.sender_type === "USER"
+                ? "user"
+                : msg.sender_type === "SYSTEM"
+                  ? "system"
+                  : "bot"
+            }`}
           >
             <div className="cw-bubble">
               {/* text type */}
@@ -210,6 +217,24 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
             </div>
           </div>
         ))}
+        {/* hiệu ứng đang gõ */}
+        {typingIndicator && (
+          <div className="cw-msg-row bot">
+            <div className="cw-bubble cw-typing-bubble">
+              <span className="cw-typing-label">
+                {typingIndicator.senderType === "BOT"
+                  ? "Trợ lý ảo đang trả lời"
+                  : `${typingIndicator.userName || "Nhân viên"} đang nhập`}
+              </span>
+              <span className="cw-typing-dots">
+                <span />
+                <span />
+                <span />
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* scroll anchor */}
         <div ref={messagesEndRef} />
       </div>
@@ -247,7 +272,10 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
           className="cw-input"
           placeholder="Type a message..."
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            notifyTyping();
+          }}
           onKeyDown={handleKeyDown}
         />
         <button

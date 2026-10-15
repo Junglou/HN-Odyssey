@@ -213,6 +213,75 @@
   background-color: transparent;
 }
 
+/* tin nhắn hệ thống */
+.cw-msg-row.system {
+  justify-content: center;
+}
+
+.cw-msg-row.system .cw-bubble {
+  background-color: transparent;
+  color: #6c757d;
+  font-size: 11px;
+  font-style: italic;
+  text-align: center;
+  max-width: 90%;
+  padding: 4px 8px;
+}
+
+/* hiệu ứng đang gõ */
+.cw-typing-bubble {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6b7280;
+}
+
+.cw-typing-label {
+  font-size: 11px;
+  font-style: italic;
+}
+
+.cw-typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.cw-typing-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #9ca3af;
+  animation: cw-typing-bounce 1.2s infinite ease-in-out;
+}
+
+.cw-typing-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.cw-typing-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes cw-typing-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cw-typing-dots span {
+    animation: none;
+  }
+}
+
 /* responsive */
 @media screen and (max-width: 768px) {
   .cw-container {

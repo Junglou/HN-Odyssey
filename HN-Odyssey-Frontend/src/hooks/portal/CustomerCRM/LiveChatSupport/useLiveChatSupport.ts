@@ -5,9 +5,11 @@ import axiosClient from "../../../../api/axiosClient";
 import tokenStorage from "../../../../utils/tokenStorage";
 import { Action, Resource } from "../../../../types/permissions";
 import type { UserPayload } from "../../../../types/auth";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
 
 export type ChatStatus = "Waitlist" | "Ongoing" | "Complete";
 export type MessageType = "text" | "image" | "product" | "file";
+export type TypingSender = "USER" | "BOT";
 
 export interface FileData {
   fileName: string;
@@ -36,6 +38,7 @@ export interface ChatMessage {
 export interface TokenUser {
   id?: string;
   _id?: string;
+  full_name?: string; // Backend trả về full_name khi login
   fullName?: string;
   email?: string;
 }
@@ -98,10 +101,22 @@ interface BeConversation {
   updatedAt: string;
 }
 
+interface TypingEventPayload {
+  conversation_id: string;
+  sender_type: "USER" | "AGENT" | "BOT";
+  user_name?: string;
+  is_typing: boolean;
+}
+
 interface ServerToClientEvents {
   new_message: (msg: BeMessage) => void;
-  typing: (data: { user: string; is_typing: boolean }) => void;
+  typing: (data: TypingEventPayload) => void;
   messages_read: (data: { conversation_id: string; read_by: string }) => void;
+  new_waitlist: (data: { conversation_id: string; department: string }) => void;
+  conversation_assigned: (data: {
+    conversation_id: string;
+    agent_id: string;
+  }) => void;
   error: (err: { message: string }) => void;
 }
 
@@ -118,6 +133,7 @@ interface ClientToServerEvents {
   agent_disconnect: (agentId: string) => void;
   typing: (data: {
     conversation_id: string;
+    sender_type: "AGENT";
     user_name: string;
     is_typing: boolean;
   }) => void;
@@ -127,50 +143,37 @@ interface ClientToServerEvents {
   }) => void;
 }
 
-const useLocalAuth = () => {
-  const [user] = useState(() => {
-    try {
-      const stored = localStorage.getItem("user");
-      if (stored) return JSON.parse(stored) as UserPayload;
-    } catch (error) {
-      console.warn("Không thể parse dữ liệu user từ localStorage:", error);
-    }
-    return null;
-  });
-  return { user };
-};
-
 export function useLiveChatSupport() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeTab, setActiveTab] = useState<ChatStatus>("Waitlist");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [typingUsers, setTypingUsers] = useState<Record<string, boolean>>({});
+  // key = conversation_id, value = ai đang gõ trong hội thoại đó
+  const [typingUsers, setTypingUsers] = useState<
+    Record<string, TypingSender | null>
+  >({});
+  const [countsVersion, setCountsVersion] = useState(0); // tăng để fetch lại badge
+  const activeTabRef = useRef<ChatStatus>("Waitlist"); // dùng trong listener socket
+  const typingTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>(
+    {},
+  );
+
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
   const [tabCounts, setTabCounts] = useState({
     Waitlist: 0,
     Ongoing: 0,
     Complete: 0,
   });
 
-  const { user } = useLocalAuth();
+  // Đọc user qua tokenStorage (key "user_info") bằng helper dùng chung của portal
+  const [user] = useState(() => getCurrentUser<UserPayload>());
 
-  const hasPermission = useCallback(
-    (resourceCode: Resource, actionCode: Action): boolean => {
-      if (!user || !user.permissions) return false;
-      if (user.roles?.includes("SUPER_ADMIN")) return true;
-      return user.permissions.some(
-        (p) =>
-          p.resource === resourceCode &&
-          (p.actions.includes(actionCode) || p.actions.includes(Action.MANAGE)),
-      );
-    },
-    [user], // Chỉ phụ thuộc vào user
-  );
-
-  const canReadChat = hasPermission(Resource.CRM_CHAT, Action.READ);
-  const canAssignChat = hasPermission(Resource.CRM_CHAT, Action.ASSIGN);
-  const canReplyChat = hasPermission(Resource.CRM_CHAT, Action.REPLY);
-  const canUpdateChat = hasPermission(Resource.CRM_CHAT, Action.UPDATE);
+  const canReadChat = hasPermission(user, Resource.CRM_CHAT, Action.READ);
+  const canAssignChat = hasPermission(user, Resource.CRM_CHAT, Action.ASSIGN);
+  const canReplyChat = hasPermission(user, Resource.CRM_CHAT, Action.REPLY);
+  const canUpdateChat = hasPermission(user, Resource.CRM_CHAT, Action.UPDATE);
 
   // STATE PHÂN TRANG VÀ TÌM KIẾM SERVER-SIDE
   const [page, setPage] = useState(1);
@@ -182,6 +185,13 @@ export function useLiveChatSupport() {
     ClientToServerEvents
   > | null>(null);
   const fetchedSessionIds = useRef<Set<string>>(new Set());
+  // Các room đã join -> join lại khi socket reconnect
+  const joinedRoomsRef = useRef<Set<string>>(new Set());
+
+  const joinRoom = useCallback((conversationId: string) => {
+    joinedRoomsRef.current.add(conversationId);
+    socketRef.current?.emit("join_room", { conversationId });
+  }, []);
 
   const formatMessage = useCallback((msg: BeMessage): ChatMessage => {
     let senderType: "customer" | "consultant" | "system" = "system";
@@ -247,6 +257,7 @@ export function useLiveChatSupport() {
       const newConv = data.find((c) => c._id === convId);
 
       if (newConv) {
+        joinRoom(newConv._id); // để nhận tin nhắn + typing của khách mới
         const date = new Date(newConv.updatedAt);
         const timeString = isNaN(date.getTime())
           ? ""
@@ -355,21 +366,62 @@ export function useLiveChatSupport() {
 
     socket.on("connect", () => {
       console.log("Socket connected thành công:", socket.id);
-      // Gửi đúng ID nhân viên lên để Backend biết
       if (agentId) {
         socket.emit("agent_connect", agentId);
       }
+      // Reconnect: server đã mất room cũ -> join lại
+      joinedRoomsRef.current.forEach((conversationId) => {
+        socket.emit("join_room", { conversationId });
+      });
     });
 
     socket.on("connect_error", (error: Error) => {
       console.error("Socket Connection Error:", error.message);
     });
 
-    socket.on("typing", (data: { user: string; is_typing: boolean }) => {
+    const typingTimers = typingTimersRef.current;
+
+    socket.on("typing", (data: TypingEventPayload) => {
+      if (data.sender_type === "AGENT") return; // bỏ qua nhân viên khác
+      const convId = data.conversation_id;
+      const sender: TypingSender = data.sender_type === "BOT" ? "BOT" : "USER";
+
+      if (typingTimers[convId]) clearTimeout(typingTimers[convId]);
       setTypingUsers((prev) => ({
         ...prev,
-        [data.user]: data.is_typing,
+        [convId]: data.is_typing ? sender : null,
       }));
+
+      if (data.is_typing) {
+        // Phòng mất tín hiệu "ngừng gõ"
+        typingTimers[convId] = setTimeout(
+          () => setTypingUsers((prev) => ({ ...prev, [convId]: null })),
+          sender === "BOT" ? 60000 : 8000,
+        );
+      }
+    });
+
+    // Bot vừa chuyển khách sang nhân viên
+    socket.on("new_waitlist", (data) => {
+      toast.info(`Có khách đang chờ hỗ trợ (bộ phận ${data.department})`);
+      setCountsVersion((v) => v + 1);
+      if (activeTabRef.current === "Waitlist") {
+        fetchSingleConversationAndAppend(data.conversation_id);
+      }
+    });
+
+    // Một nhân viên khác vừa nhận khách -> gỡ khỏi Waitlist của mình
+    socket.on("conversation_assigned", (data) => {
+      setCountsVersion((v) => v + 1);
+      if (data.agent_id === agentId) return;
+      if (activeTabRef.current === "Waitlist") {
+        setSessions((prev) =>
+          prev.filter((s) => s.id !== data.conversation_id),
+        );
+        setActiveSessionId((cur) =>
+          cur === data.conversation_id ? null : cur,
+        );
+      }
     });
 
     socket.on(
@@ -406,14 +458,14 @@ export function useLiveChatSupport() {
         }
 
         // NẾU ĐÃ CÓ RỒI THÌ LÀM NHƯ CŨ
-        const targetSession = prev.find(
-          (s) => s.id === incomingMsg.conversation_id,
-        );
-        if (targetSession && incomingMsg.sender_type === "USER") {
+        if (
+          incomingMsg.sender_type === "USER" ||
+          incomingMsg.sender_type === "BOT"
+        ) {
           setTimeout(() => {
             setTypingUsers((tPrev) => ({
               ...tPrev,
-              [targetSession.customerName]: false,
+              [incomingMsg.conversation_id]: null,
             }));
           }, 0);
         }
@@ -447,6 +499,7 @@ export function useLiveChatSupport() {
     });
 
     return () => {
+      Object.values(typingTimers).forEach((t) => clearTimeout(t));
       if (socket) {
         if (agentId) {
           socket.emit("agent_disconnect", agentId);
@@ -502,7 +555,7 @@ export function useLiveChatSupport() {
               });
 
           if (activeTab !== "Complete") {
-            socketRef.current?.emit("join_room", { conversationId: conv._id });
+            joinRoom(conv._id);
           }
 
           let preview = conv.latest_message?.content || "Chưa có tin nhắn";
@@ -572,7 +625,10 @@ export function useLiveChatSupport() {
         }
 
         // Chỉ clear nếu đây là Page 1
-        if (page === 1) setActiveSessionId(null);
+        if (page === 1) {
+          setActiveSessionId(null);
+          fetchedSessionIds.current.clear();
+        }
       } catch (error) {
         console.error("Error fetching conversations:", error);
         toast.error("Không thể tải danh sách hội thoại.");
@@ -580,7 +636,7 @@ export function useLiveChatSupport() {
     };
 
     fetchConversations();
-  }, [activeTab, page, debouncedSearch]);
+  }, [activeTab, page, debouncedSearch, joinRoom]);
 
   // 3.1. ĐÁNH DẤU ĐÃ ĐỌC KHI MỞ HỘI THOẠI
   useEffect(() => {
@@ -640,7 +696,7 @@ export function useLiveChatSupport() {
     };
 
     fetchTabCounts();
-  }, [sessions]);
+  }, [sessions, countsVersion]);
 
   // Ghi nhận Active Session
   const activeSession = useMemo(() => {
@@ -682,9 +738,18 @@ export function useLiveChatSupport() {
         );
 
         toast.success("Đã nhận tư vấn khách hàng này.");
-        setActiveTab("Ongoing");
+        actions.changeTab("Ongoing"); // reset page + cache tin nhắn giống bấm tab thủ công
       } catch (error) {
         console.error("Error accepting consultant:", error);
+        const status = (error as { response?: { status?: number } })?.response
+          ?.status;
+        if (status === 409) {
+          toast.warning("Hội thoại này đã được nhân viên khác tiếp nhận.");
+          setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+          setActiveSessionId(null);
+          setCountsVersion((v) => v + 1);
+          return;
+        }
         toast.error("Lỗi khi nhận tư vấn.");
       }
     },
@@ -695,7 +760,7 @@ export function useLiveChatSupport() {
       try {
         await axiosClient.patch(`/support/chats/${sessionId}/close`);
         toast.success("Đã hoàn thành phiên tư vấn.");
-        setActiveTab("Complete");
+        actions.changeTab("Complete");
       } catch (error) {
         console.error("Error completing consultant:", error);
         toast.error("Lỗi khi hoàn thành phiên chat.");
@@ -741,7 +806,8 @@ export function useLiveChatSupport() {
 
       socketRef.current.emit("typing", {
         conversation_id: sessionId,
-        user_name: user?.fullName || "Agent",
+        sender_type: "AGENT",
+        user_name: user?.full_name || user?.fullName || "Nhân viên",
         is_typing: isTyping,
       });
     },

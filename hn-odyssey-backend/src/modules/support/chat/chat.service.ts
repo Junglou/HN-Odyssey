@@ -1,4 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, FilterQuery } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
@@ -14,6 +19,16 @@ import { OrdersService } from 'src/modules/sales/orders/orders.service';
 import { OrderDocument } from 'src/modules/sales/orders/schemas/order.schema';
 import { EmailService } from 'src/modules/notifications/channels/email.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import {
+  CHAT_INTERNAL_EVENTS,
+  SUPPORT_AGENTS_ROOM,
+  SUPPORT_EVENTS,
+} from './chat.events';
+import type {
+  ChatAcceptedPayload,
+  EmitToRoomPayload,
+  HandoffCreatedPayload,
+} from './chat.events';
 
 // 1. Interfaces rõ ràng để tránh "any"
 interface ChatContext {
@@ -30,6 +45,7 @@ interface ChatResponse {
   createdAt?: string;
   conversation_id: string;
   session_id?: string; // Bổ sung để trả về FE
+  switched_from?: string; // id phiên cũ (đã CLOSED) nếu tin nhắn được chuyển sang phiên mới
   sender_type: string;
   content: string;
   conversation_status: string;
@@ -43,6 +59,7 @@ interface SendMessageDto {
   sender_type?: 'USER' | 'AGENT';
   message_type?: 'TEXT' | 'IMAGE' | 'PRODUCT_CARD' | 'FILE';
   metadata?: Record<string, unknown>;
+  page_context?: { current_page?: string };
 }
 
 interface AiEngineResponse {
@@ -73,7 +90,7 @@ interface LatestMessageAggregation {
 
 @Injectable()
 export class ChatService {
-  public onlineAgents = new Set<string>();
+  public onlineAgents = new Map<string, Set<string>>(); // agentId -> các socketId đang mở
   private readonly logger = new Logger(ChatService.name);
   private messageTimestamps = new Map<string, number[]>();
 
@@ -87,6 +104,70 @@ export class ChatService {
   ) {
     // THÊM DÒNG NÀY ĐỂ FAKE CÓ NGƯỜI ONLINE:
     // this.onlineAgents.add('fake-agent-de-test');
+  }
+
+  // ===== QUẢN LÝ NHÂN VIÊN ONLINE (theo từng socket) =====
+  addAgentSocket(agentId: string, socketId: string) {
+    const sockets = this.onlineAgents.get(agentId) ?? new Set<string>();
+    sockets.add(socketId);
+    this.onlineAgents.set(agentId, sockets);
+  }
+
+  removeAgentSocket(agentId: string, socketId: string) {
+    const sockets = this.onlineAgents.get(agentId);
+    if (!sockets) return;
+    sockets.delete(socketId);
+    if (sockets.size === 0) this.onlineAgents.delete(agentId);
+  }
+
+  // ===== HELPER REALTIME / HIỂN THỊ =====
+  // Service không giữ Server socket -> nhờ ChatGateway bắn qua EventEmitter
+  private emitToRoom(room: string, event: string, data: unknown) {
+    const payload: EmitToRoomPayload = { room, event, data };
+    this.eventEmitter.emit(CHAT_INTERNAL_EVENTS.EMIT_TO_ROOM, payload);
+  }
+
+  private async createSystemMessage(
+    conversationId: Types.ObjectId | string,
+    content: string,
+    metadata: Record<string, unknown> = {},
+  ) {
+    const msg = await this.msgModel.create({
+      conversation_id: new Types.ObjectId(String(conversationId)),
+      sender_type: 'SYSTEM',
+      content,
+      message_type: 'TEXT',
+      metadata,
+    });
+    return msg.toObject();
+  }
+
+  private getCustomerInfo(
+    customer: unknown,
+    fallbackName = 'Quý khách',
+  ): { name: string; email?: string } {
+    const c = customer as {
+      first_Name?: string;
+      last_Name?: string;
+      username?: string;
+      email?: string;
+    } | null;
+    if (!c) return { name: fallbackName };
+    const fullName = [c.first_Name, c.last_Name].filter(Boolean).join(' ');
+    return {
+      name: fullName || c.username || c.email?.split('@')[0] || fallbackName,
+      email: c.email,
+    };
+  }
+
+  private getAgentName(agent: unknown): string {
+    const a = agent as {
+      first_Name?: string;
+      last_Name?: string;
+      employee_code?: string;
+    } | null;
+    const fullName = [a?.first_Name, a?.last_Name].filter(Boolean).join(' ');
+    return fullName || a?.employee_code || 'CSKH';
   }
 
   async initOrGetConversation(sessionId: string, customerId?: string) {
@@ -293,19 +374,70 @@ export class ChatService {
     return ((handoffs / total) * 100).toFixed(2) + '%';
   }
 
-  // AC9: Fix lỗi "Cannot find name Types"
+  // AC9: Nhân viên nhận hội thoại từ Waitlist
   async assignToAgent(conversationId: string, agentId: string) {
-    return this.convModel
-      .findByIdAndUpdate(
-        conversationId,
+    if (
+      !Types.ObjectId.isValid(conversationId) ||
+      !Types.ObjectId.isValid(agentId)
+    ) {
+      throw new NotFoundException('Hội thoại hoặc nhân viên không hợp lệ.');
+    }
+
+    // Chỉ nhận được khi đang chờ và CHƯA ai nhận -> chống 2 nhân viên cùng nhận
+    const conv = await this.convModel
+      .findOneAndUpdate(
+        {
+          _id: conversationId,
+          status: ConversationStatus.OPEN,
+          agent_id: { $exists: false },
+        },
         {
           agent_id: new Types.ObjectId(agentId),
-          status: 'OPEN',
+          status: ConversationStatus.OPEN,
+          opened_at: new Date(),
         },
         { new: true },
       )
-      .populate('agent_id', 'fullName')
+      .populate('agent_id', 'first_Name last_Name employee_code')
+      .populate('customer_id', 'first_Name last_Name username email')
       .exec();
+
+    if (!conv) {
+      throw new ConflictException(
+        'Hội thoại đã được nhân viên khác tiếp nhận hoặc không còn chờ hỗ trợ.',
+      );
+    }
+
+    const roomId = conv._id.toString();
+    const agentName = this.getAgentName(conv.agent_id);
+    const customer = this.getCustomerInfo(conv.customer_id);
+
+    // Báo trong khung chat cho khách biết đã có người nhận
+    const sysMsg = await this.createSystemMessage(
+      conv._id,
+      `Nhân viên ${agentName} đã tiếp nhận cuộc trò chuyện và sẽ hỗ trợ anh/chị ngay bây giờ.`,
+    );
+    this.emitToRoom(roomId, 'new_message', sysMsg);
+
+    // Báo các nhân viên khác để gỡ hội thoại khỏi Waitlist của họ
+    this.emitToRoom(SUPPORT_AGENTS_ROOM, 'conversation_assigned', {
+      conversation_id: roomId,
+      agent_id: agentId,
+    });
+
+    // Gửi mail cho khách (chỉ khách đã đăng nhập mới có email)
+    if (customer.email) {
+      const payload: ChatAcceptedPayload = {
+        conversationId: roomId,
+        customerEmail: customer.email,
+        customerName: customer.name,
+        agentName,
+        department: conv.department_tag,
+      };
+      this.eventEmitter.emit(SUPPORT_EVENTS.CHAT_ACCEPTED, payload);
+    }
+
+    return conv;
   }
 
   // AC4: Giữ nguyên logic cũ đã sạch
@@ -423,10 +555,10 @@ export class ChatService {
           },
         },
         {
-          // Bổ sung Headers tại đây
           headers: {
             'n8n-api-key': n8nApiKey,
           },
+          timeout: 45000,
         },
       );
 
@@ -441,15 +573,35 @@ export class ChatService {
     }
   }
 
-  async processUserMessage(data: SendMessageDto): Promise<ChatResponse> {
-    const conv = await this.convModel.findById(data.conversationId).exec();
-    const status = conv?.status || ConversationStatus.BOT;
+  async processUserMessage(data: SendMessageDto): Promise<ChatResponse | null> {
+    if (!Types.ObjectId.isValid(data.conversationId)) return null;
 
-    const cleanContent = this.filterProfanity(data.content);
+    let conv = await this.convModel.findById(data.conversationId).exec();
+    if (!conv) return null;
+
     const senderType = data.sender_type || 'USER';
+    let switchedFrom: string | undefined;
+
+    // Phiên đã đóng (nhân viên Complete / cron tự đóng / khách đánh giá CSAT)
+    if (conv.status === ConversationStatus.CLOSED) {
+      // Nhân viên không được nhắn vào phiên đã đóng
+      if (senderType !== 'USER') return null;
+
+      // Khách nhắn tiếp -> lấy (hoặc tạo) phiên BOT mới để Trợ lý ảo trả lời lại
+      const next = await this.initOrGetConversation(
+        conv.session_id,
+        conv.customer_id?.toString(),
+      );
+      switchedFrom = conv._id.toString();
+      conv = await this.convModel.findById(next.conversation_id).exec();
+      if (!conv) return null;
+    }
+
+    const conversationId = conv._id.toString();
+    const cleanContent = this.filterProfanity(data.content);
 
     const savedMsg = await this.msgModel.create({
-      conversation_id: new Types.ObjectId(data.conversationId),
+      conversation_id: conv._id,
       sender_type: senderType,
       content: cleanContent,
       message_type: data.message_type || 'TEXT',
@@ -461,20 +613,50 @@ export class ChatService {
     return {
       _id: savedMsg._id.toString(),
       createdAt: createdAt.toISOString(),
-      conversation_id: data.conversationId,
+      conversation_id: conversationId,
       sender_type: senderType,
       content: cleanContent,
-      conversation_status: status as string,
+      conversation_status: conv.status as string,
       message_type: savedMsg.message_type,
       metadata: savedMsg.metadata as Record<string, unknown>,
+      switched_from: switchedFrom,
+    };
+  }
+
+  // Ngữ cảnh gửi sang n8n: tên khách (nếu đã login) + trang đang xem
+  private async buildChatContext(
+    conversationId: string,
+    currentPage?: string,
+  ): Promise<ChatContext> {
+    const conv = await this.convModel
+      .findById(conversationId)
+      .populate('customer_id', 'first_Name last_Name username email')
+      .lean()
+      .exec();
+
+    if (!conv) return { currentPage };
+
+    const customer = conv.customer_id
+      ? this.getCustomerInfo(conv.customer_id)
+      : null;
+
+    return {
+      user: customer
+        ? { fullName: customer.name, email: customer.email }
+        : undefined,
+      currentPage: currentPage || conv.context?.current_page,
     };
   }
 
   async getBotResponse(data: SendMessageDto): Promise<ChatResponse> {
+    const context = await this.buildChatContext(
+      data.conversationId,
+      data.page_context?.current_page,
+    );
     const aiResponse = await this.callAiEngine(
       data.conversationId,
       data.content,
-      {},
+      context,
     );
 
     this.logger.debug(`AI raw response: ${JSON.stringify(aiResponse)}`);
@@ -534,6 +716,15 @@ export class ChatService {
       });
     }
 
+    // Đã chuyển cho nhân viên rồi (n8n gọi tool 2 lần) -> không tạo trùng
+    if (conv.status === ConversationStatus.OPEN) {
+      return {
+        success: true,
+        action: 'TRANSFER_TO_AGENT',
+        message: `Yêu cầu đã được chuyển cho bộ phận ${conv.department_tag || validDept} trước đó. Nhân viên sẽ phản hồi bạn trong giây lát.`,
+      };
+    }
+
     // AC5: KIỂM TRA TRẠNG THÁI ONLINE CỦA AGENT
     if (this.onlineAgents.size === 0) {
       this.logger.warn(
@@ -565,11 +756,30 @@ export class ChatService {
 
     await conv.save();
 
-    await this.msgModel.create({
-      conversation_id: conv._id,
-      sender_type: 'SYSTEM',
-      content: `HỆ THỐNG: Yêu cầu hỗ trợ từ bộ phận ${validDept}. \n tóm tắt: ${summary}`,
+    // Tóm tắt NỘI BỘ: chỉ nhân viên thấy, khách load lịch sử sẽ không thấy
+    await this.createSystemMessage(
+      conv._id,
+      `HỆ THỐNG: Yêu cầu hỗ trợ từ bộ phận ${validDept}. \n tóm tắt: ${summary}`,
+      { visibility: 'AGENT' },
+    );
+
+    // Báo realtime cho mọi nhân viên đang mở Live Chat Support
+    this.emitToRoom(SUPPORT_AGENTS_ROOM, 'new_waitlist', {
+      conversation_id: conv._id.toString(),
+      department: validDept,
     });
+
+    // Mail + thông báo in-app cho bộ phận
+    await conv.populate('customer_id', 'first_Name last_Name username email');
+    const customer = this.getCustomerInfo(conv.customer_id, 'Khách vãng lai');
+    const handoffPayload: HandoffCreatedPayload = {
+      conversationId: conv._id.toString(),
+      department: validDept,
+      summary: summary || '',
+      customerName: customer.name,
+      customerEmail: customer.email,
+    };
+    this.eventEmitter.emit(SUPPORT_EVENTS.HANDOFF_CREATED, handoffPayload);
 
     return {
       success: true,
@@ -620,7 +830,10 @@ export class ChatService {
 
     // 3. Trả về toàn bộ tin nhắn của hội thoại đó
     return this.msgModel
-      .find({ conversation_id: { $in: convIds } })
+      .find({
+        conversation_id: { $in: convIds },
+        'metadata.visibility': { $ne: 'AGENT' }, // ẩn tóm tắt nội bộ với khách
+      })
       .sort({ createdAt: 1 })
       .lean();
   }
@@ -651,18 +864,31 @@ export class ChatService {
       .exec();
   }
 
-  // BỔ SUNG: API để Nhân viên tự đóng phiên chat
+  // BỔ SUNG: Nhân viên tự đóng phiên chat
   async closeConversation(conversationId: string) {
-    return this.convModel
-      .findByIdAndUpdate(
-        conversationId,
-        {
-          status: ConversationStatus.CLOSED,
-          closed_at: new Date(),
-        },
+    const conv = await this.convModel
+      .findOneAndUpdate(
+        { _id: conversationId, status: ConversationStatus.OPEN },
+        { status: ConversationStatus.CLOSED, closed_at: new Date() },
         { new: true },
       )
       .exec();
+
+    if (!conv) {
+      throw new NotFoundException(
+        'Hội thoại không tồn tại hoặc đã được đóng trước đó.',
+      );
+    }
+
+    const roomId = conv._id.toString();
+    const sysMsg = await this.createSystemMessage(
+      conv._id,
+      'Nhân viên đã kết thúc phiên hỗ trợ. Trợ lý ảo H&N Odyssey sẽ tiếp tục hỗ trợ anh/chị nếu cần thêm thông tin nhé!',
+    );
+    this.emitToRoom(roomId, 'new_message', sysMsg);
+    this.emitToRoom(roomId, 'conversation_closed', { conversation_id: roomId });
+
+    return conv;
   }
 
   // TỰ ĐỘNG ĐÓNG HỘI THOẠI QUÁ 24 GIỜ (Phá luồng chết)
