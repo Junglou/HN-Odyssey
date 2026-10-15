@@ -159,6 +159,7 @@ export class CartService {
   async getCart(
     userId: string | null,
     guestSessionId?: string,
+    only?: { productId: string; sku: string },
   ): Promise<CartResponse> {
     const filter = userId
       ? { user_id: new Types.ObjectId(userId) }
@@ -216,7 +217,10 @@ export class CartService {
         availableStock = variant.stock;
         originalPrice = variant.price;
         unitPrice = variant.sale_price > 0 ? variant.sale_price : variant.price;
-        thumbnail = variant.image ?? product.thumbnail ?? '';
+        // Schema biến thể lưu mảng images[], không có trường image
+        const variantImages = (variant as unknown as { images?: string[] })
+          .images;
+        thumbnail = variantImages?.[0] || product.thumbnail || '';
         attributes = variant.attributes;
         variantId = (
           variant as unknown as { _id?: Types.ObjectId }
@@ -285,15 +289,22 @@ export class CartService {
       await cart.save();
     }
 
+    // "Mua ngay": chỉ trả về & tính tiền đúng món được chọn (giỏ thật không bị thay đổi)
+    const visibleItems = only
+      ? validatedItems.filter(
+          (v) => v.productId === only.productId && v.sku === only.sku,
+        )
+      : validatedItems;
+
     const summary = await this.calculateSummary(
-      validatedItems,
+      visibleItems,
       userId,
       cart.applied_coupon ?? undefined,
     );
 
     return {
       cartId: cart._id.toString(),
-      items: validatedItems,
+      items: visibleItems,
       summary,
       warnings,
     };
@@ -502,19 +513,21 @@ export class CartService {
         );
       }
 
+      // Giới hạn tối đa (chỉ áp dụng khi sản phẩm có cấu hình)
       if (product.max_purchase_qty && product.max_purchase_qty > 0) {
         if (newQuantity > product.max_purchase_qty) {
           throw new BadRequestException(
             `Sản phẩm này giới hạn mua tối đa ${product.max_purchase_qty} cái.`,
           );
         }
+      }
 
-        const minQty = product.min_purchase_qty || 1;
-        if (newQuantity < minQty) {
-          throw new BadRequestException(
-            `Yêu cầu mua tối thiểu ${minQty} sản phẩm.`,
-          );
-        }
+      // Giới hạn tối thiểu: kiểm tra độc lập, không phụ thuộc giới hạn tối đa
+      const minQty = product.min_purchase_qty || 1;
+      if (newQuantity < minQty) {
+        throw new BadRequestException(
+          `Yêu cầu mua tối thiểu ${minQty} sản phẩm.`,
+        );
       }
 
       await cart.save({ session });
@@ -564,6 +577,14 @@ export class CartService {
     if (product.max_purchase_qty && dto.quantity > product.max_purchase_qty) {
       throw new BadRequestException(
         `Sản phẩm này giới hạn mua tối đa ${product.max_purchase_qty} cái.`,
+      );
+    }
+
+    // Không cho giảm số lượng xuống dưới mức tối thiểu (muốn bỏ hẳn thì dùng nút Xóa)
+    const minQty = product.min_purchase_qty || 1;
+    if (dto.quantity < minQty) {
+      throw new BadRequestException(
+        `Yêu cầu mua tối thiểu ${minQty} sản phẩm. Bạn có thể xóa sản phẩm khỏi giỏ nếu không muốn mua.`,
       );
     }
 

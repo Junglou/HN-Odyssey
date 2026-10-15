@@ -6,6 +6,11 @@ import type {
   TypingSender,
 } from "../../../../hooks/portal/CustomerCRM/LiveChatSupport/useLiveChatSupport";
 import axiosClient from "../../../../api/axiosClient";
+import {
+  formatUsdRange,
+  resolveMediaUrl,
+} from "../../../../utils/chatbotCommerce";
+import type { ChatProductCard } from "../../../../types/chatbot";
 import EmojiPicker, {
   type EmojiClickData,
   EmojiStyle,
@@ -212,6 +217,62 @@ const getValidMediaUrl = (url: string) => {
   }
   return url;
 };
+
+// Thẻ sản phẩm chatbot đã gợi ý (bản cho nhân viên xem lại)
+function ChatProductSnapshot({ products }: { products: ChatProductCard[] }) {
+  return (
+    <div className="lcs-bot-products">
+      <span className="lcs-bot-products-label">
+        Bot đã gợi ý {products.length} sản phẩm
+      </span>
+
+      <div className="lcs-bot-products-grid">
+        {products.map((p) => {
+          const prices =
+            p.has_variants && p.variants.length > 0
+              ? p.variants.map((v) => v.price)
+              : [p.price];
+          const inStock = p.stock > 0;
+
+          return (
+            <a
+              key={p.product_id}
+              href={`/products/${p.slug}`}
+              target="_blank"
+              rel="noreferrer"
+              className="lcs-bot-product"
+              title="Mở trang sản phẩm trên website"
+            >
+              <div className="lcs-bot-product-image">
+                <img
+                  src={resolveMediaUrl(p.image)}
+                  alt={p.name}
+                  loading="lazy"
+                />
+              </div>
+
+              <div className="lcs-bot-product-info">
+                <h4>{p.name}</h4>
+                <span className="lcs-bot-product-price">
+                  {formatUsdRange(Math.min(...prices), Math.max(...prices))}
+                </span>
+                <div className="lcs-bot-product-meta">
+                  <span
+                    className={`lcs-stock-pill ${inStock ? "in" : "out"}`}
+                    title="Số lượng tại thời điểm bot gợi ý"
+                  >
+                    {inStock ? `Còn ${p.stock}` : "Hết hàng"}
+                  </span>
+                  {p.has_variants && <span>{p.variants.length} phân loại</span>}
+                </div>
+              </div>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 interface LiveChatSupportProps {
   filteredSessions: ChatSession[];
@@ -643,6 +704,16 @@ export default function LiveChatSupport({
                               <p>{msg.fileData.fileSize}</p>
                             </div>
                           </div>
+                        )}
+
+                        {msg.type === "product" && msg.content && (
+                          <p
+                            dangerouslySetInnerHTML={formatText(msg.content)}
+                          ></p>
+                        )}
+
+                        {msg.type === "product" && msg.products && (
+                          <ChatProductSnapshot products={msg.products} />
                         )}
 
                         {msg.type === "product" && msg.productData && (

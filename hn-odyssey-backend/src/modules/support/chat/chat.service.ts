@@ -29,6 +29,7 @@ import type {
   EmitToRoomPayload,
   HandoffCreatedPayload,
 } from './chat.events';
+import { ChatProductCardService } from './chat-product-card.service';
 
 // 1. Interfaces rõ ràng để tránh "any"
 interface ChatContext {
@@ -101,6 +102,7 @@ export class ChatService {
     private configService: ConfigService,
     private eventEmitter: EventEmitter2,
     private emailService: EmailService,
+    private productCardService: ChatProductCardService,
   ) {
     // THÊM DÒNG NÀY ĐỂ FAKE CÓ NGƯỜI ONLINE:
     // this.onlineAgents.add('fake-agent-de-test');
@@ -664,8 +666,22 @@ export class ChatService {
     const finalReply =
       aiResponse?.reply ||
       'Hệ thống đang quá tải, anh/chị vui lòng thử lại sau vài giây nhé!';
-    const msgType = aiResponse?.message_type || 'TEXT';
-    const msgMetadata = aiResponse?.metadata || {};
+    let msgType = aiResponse?.message_type || 'TEXT';
+    let msgMetadata: Record<string, unknown> = aiResponse?.metadata || {};
+
+    // Thẻ sản phẩm: AI chỉ được đưa product_ids, giá/ảnh/phân loại/tồn kho lấy thật từ DB
+    if (msgType === 'PRODUCT_CARD') {
+      const cards = await this.productCardService.buildCards(
+        msgMetadata.product_ids,
+      );
+      if (cards.length > 0) {
+        msgMetadata = { products: cards };
+      } else {
+        // Không có sản phẩm hợp lệ -> chỉ gửi câu trả lời dạng chữ, không gửi thẻ rỗng
+        msgType = 'TEXT';
+        msgMetadata = {};
+      }
+    }
 
     // Lưu nội dung chat của Bot vào database kèm theo loại tin nhắn
     const savedMsg = await this.msgModel.create({

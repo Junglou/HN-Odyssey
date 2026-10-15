@@ -1,0 +1,385 @@
+/* THẺ GỌN TRONG CHAT */
+.cpc-carousel {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.cpc-card {
+  flex: 0 0 158px;
+  scroll-snap-align: start;
+  background-color: #ffffff;
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.cpc-card:only-child {
+  flex-basis: 200px;
+}
+
+.cpc-image-btn {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background-color: #f9fafb;
+  cursor: pointer;
+}
+
+.cpc-image {
+  width: 100%;
+  height: 130px;
+  object-fit: contain;
+  display: block;
+  transition: transform 0.2s;
+}
+
+.cpc-image-btn:hover .cpc-image {
+  transform: scale(1.04);
+}
+
+.cpc-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background-color: #111827;
+  color: #ffffff;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.cpc-body {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.cpc-name {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #111827;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 32px;
+}
+
+.cpc-price-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cpc-price {
+  font-size: 14px;
+  font-weight: 700;
+  color: #dc2626;
+}
+
+.cpc-original {
+  font-size: 12px;
+  color: #9ca3af;
+  text-decoration: line-through;
+}
+
+/* Nút dùng chung cho thẻ & bảng chọn */
+.cpc-btn {
+  flex: 1;
+  border-radius: 10px;
+  padding: 9px 8px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: pointer;
+  transition:
+    opacity 0.15s,
+    transform 0.1s;
+}
+
+.cpc-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.cpc-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cpc-btn--ghost {
+  background-color: #ffffff;
+  border: 1px solid #111827;
+  color: #111827;
+}
+
+.cpc-btn--primary {
+  background-color: #111827;
+  border: 1px solid #111827;
+  color: #ffffff;
+}
+
+.cpc-body .cpc-btn {
+  margin-top: auto;
+}
+
+/* BẢNG CHỌN PHÂN LOẠI */
+.cps-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  background-color: rgba(17, 24, 39, 0.4);
+  animation: cps-fade-in 0.2s ease-out;
+}
+
+.cps-sheet {
+  position: relative;
+  width: 100%;
+  max-height: 90%;
+  display: flex;
+  flex-direction: column;
+  background-color: #ffffff;
+  border-radius: 18px 18px 0 0;
+  overflow: hidden;
+  animation: cps-slide-up 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* Thanh tiêu đề nằm NGOÀI vùng cuộn -> nút đóng không đè lên thanh cuộn */
+.cps-header {
+  position: relative;
+  flex-shrink: 0;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.cps-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background-color: #d1d5db;
+}
+
+.cps-close {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background-color: #f3f4f6;
+  color: #111827;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.cps-close:hover {
+  background-color: #e5e7eb;
+}
+
+.cps-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+
+.cps-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.cps-scroll::-webkit-scrollbar-thumb {
+  background-color: #d1d5db;
+  border-radius: 999px;
+}
+
+.cps-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cps-image-wrap {
+  position: relative;
+  height: 210px;
+  background-color: #f9fafb;
+}
+
+.cps-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  animation: cps-fade-in 0.25s ease-out;
+}
+
+.cps-info {
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cps-name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #111827;
+}
+
+.cps-price {
+  font-size: 18px;
+  font-weight: 700;
+  color: #dc2626;
+}
+
+.cps-stock {
+  margin: -4px 0 0;
+  font-size: 12px;
+  color: #b45309;
+}
+
+.cps-option {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cps-option-label {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.cps-option-label strong {
+  color: #111827;
+  font-weight: 600;
+}
+
+.cps-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cps-chip {
+  min-width: 44px;
+  padding: 7px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background-color: #ffffff;
+  color: #111827;
+  font-family: inherit;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cps-chip:hover:not(:disabled) {
+  border-color: #111827;
+}
+
+.cps-chip.active {
+  border-color: #111827;
+  background-color: #111827;
+  color: #ffffff;
+}
+
+.cps-chip:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+.cps-detail-link {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 12px;
+  color: #2563eb;
+  text-decoration: none;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.cps-detail-link:hover {
+  text-decoration: underline;
+}
+
+.cps-footer {
+  flex-shrink: 0;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid #f3f4f6;
+  background-color: #ffffff;
+}
+
+.cps-error {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #dc2626;
+}
+
+.cps-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.cps-actions .cpc-btn {
+  padding: 11px 8px;
+  font-size: 13px;
+}
+
+@keyframes cps-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cps-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cps-overlay,
+  .cps-sheet,
+  .cps-image {
+    animation: none;
+  }
+}

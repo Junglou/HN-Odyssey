@@ -5,12 +5,20 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
-import { Model, Connection, Types, FilterQuery, PipelineStage } from 'mongoose';
+import {
+  Model,
+  Connection,
+  Types,
+  FilterQuery,
+  PipelineStage,
+  ClientSession,
+} from 'mongoose';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { Order, OrderDocument } from './schemas/order.schema';
 import { Cart } from '../cart/schemas/cart.schema';
 import { CreateOrderDto } from './dto/create-order.dto';
+import type { SelectedCartItemDto } from './dto/selected-item.dto';
 import { Product } from 'src/modules/products/catalog/schemas/product.schema';
 import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
 import { ProductStatus } from 'src/common/enums/product-status.enum';
@@ -70,6 +78,7 @@ import {
   DiscountType,
 } from 'src/modules/marketing/promotions/schemas/coupon.schema';
 import { DEFAULT_TIER_CODE } from 'src/common/constants/loyalty.constant';
+import { ChatRefDto } from 'src/modules/support/chat/dto/chat-ref.dto';
 
 // Khớp schema Coupon (modules/marketing/promotions/schemas/coupon.schema.ts).
 // Interface Voucher cũ dùng type/value nên mọi mã đều bị tính giảm 0.
@@ -96,6 +105,9 @@ type VoucherLineItem = {
   price: number;
   quantity: number;
 };
+
+// Thời hạn ghi nhận đơn từ nút "Mua ngay" của chatbot (khớp với Frontend)
+const CHATBOT_REF_MAX_AGE_MS = 2 * 60 * 60 * 1000;
 
 @Injectable()
 export class OrdersService {
@@ -827,6 +839,11 @@ export class OrdersService {
             product_name: product.name,
             price: finalPrice,
             quantity: data.quantity,
+            image:
+              variant.images?.[0] ||
+              product.thumbnail ||
+              product.images?.[0] ||
+              '',
           },
         ],
         total_amount: finalPrice * data.quantity,
@@ -905,10 +922,15 @@ export class OrdersService {
       throw new BadRequestException('Giỏ hàng trống hoặc hết hạn');
     }
 
-    const productIds = cart.items.map((i) => i.product_id);
+    // Mua ngay -> chỉ lấy đúng món được chọn; thanh toán giỏ -> lấy cả giỏ (như cũ)
+    const itemsToOrder = this.pickSelectedItems(cart.items, dto.selectedItems);
+
+    const productIds = itemsToOrder.map((i) => i.product_id);
     const products = await this.productModel
       .find({ _id: { $in: productIds } })
-      .select('name variants thumbnail price weight')
+      .select(
+        'name sku has_variants variants thumbnail price sale_price weight allowed_tiers status is_deleted',
+      )
       .lean();
 
     // 2. LOGIC GIỮ HÀNG & TẠO ĐƠN TẠM (TRANSACTION)
@@ -941,7 +963,7 @@ export class OrdersService {
       }
 
       // B. [AC8] Giữ hàng mới (Soft Allocation)
-      for (const item of cart.items) {
+      for (const item of itemsToOrder) {
         await this.stockService.holdStock(
           {
             product_id: item.product_id.toString(),
@@ -953,7 +975,7 @@ export class OrdersService {
       }
 
       // C. TẠO ĐƠN HÀNG TẠM
-      const orderItems = cart.items.map((cartItem) => {
+      const orderItems = itemsToOrder.map((cartItem) => {
         const product = products.find(
           (p) => p._id.toString() === cartItem.product_id.toString(),
         );
@@ -970,10 +992,43 @@ export class OrdersService {
           );
         }
 
-        // Tìm variant để lấy giá chính xác
-        const variant = product.variants.find((v) => v.sku === cartItem.sku);
-        const realPrice = variant ? variant.sale_price || variant.price : 0;
-        const realImage = variant?.images?.[0] || product.thumbnail || '';
+        // Sản phẩm ngừng bán trong lúc khách đang thanh toán
+        if (product.status !== ProductStatus.ACTIVE || product.is_deleted) {
+          throw new BadRequestException(
+            `Sản phẩm "${product.name}" đã ngừng kinh doanh.`,
+          );
+        }
+
+        // Lấy giá đúng theo loại sản phẩm (cùng quy tắc với luồng tạo đơn của thành viên)
+        let realPrice = 0;
+        let realImage = product.thumbnail || '';
+
+        if (product.has_variants) {
+          const variant = product.variants.find((v) => v.sku === cartItem.sku);
+          if (!variant || !variant.active) {
+            throw new BadRequestException(
+              `Phân loại ${cartItem.sku} của "${product.name}" không còn bán.`,
+            );
+          }
+          realPrice =
+            variant.sale_price > 0 ? variant.sale_price : variant.price;
+          realImage = variant.images?.[0] || realImage;
+        } else {
+          if (product.sku !== cartItem.sku) {
+            throw new BadRequestException(
+              `Mã sản phẩm của "${product.name}" không hợp lệ.`,
+            );
+          }
+          realPrice =
+            product.sale_price > 0 ? product.sale_price : product.price;
+        }
+
+        // Chặn tuyệt đối đơn 0đ do dữ liệu giá lỗi
+        if (realPrice <= 0) {
+          throw new BadRequestException(
+            `Sản phẩm "${product.name}" chưa có giá bán hợp lệ.`,
+          );
+        }
         const productWithWeight = product as unknown as { weight?: number };
         const weight = productWithWeight.weight || 0.5;
 
@@ -1314,6 +1369,7 @@ export class OrdersService {
               this.logger.error(`Failed to send invoice email: ${msg}`);
             });
         }
+        await this.applyChatbotAttribution(order, dto.chatRef);
         await this.logCreateOrder(userId, order, dto.source, ip, userAgent);
 
         this.eventEmitter.emit(NOTIFY_EVENTS.ORDER_CREATED, order);
@@ -1437,9 +1493,12 @@ export class OrdersService {
         await tempOrder.save({ session });
         savedOrder = tempOrder as unknown as MongooseOrderDoc;
 
-        await this.cartModel
-          .deleteOne({ session_id: dto.guestSessionId })
-          .session(session);
+        // Chỉ xoá khỏi giỏ đúng các món đã đặt (Mua ngay 1 món thì các món khác vẫn còn)
+        await this.removeOrderedItemsFromCart(
+          { session_id: dto.guestSessionId },
+          tempOrder.items as unknown as { product_id: unknown; sku: string }[],
+          session,
+        );
       }
 
       // CASE 2: KHÁCH THÀNH VIÊN (MEMBER)
@@ -1451,11 +1510,17 @@ export class OrdersService {
           throw new BadRequestException('Giỏ hàng trống.');
         }
 
+        // Mua ngay -> chỉ lấy đúng món được chọn; thanh toán giỏ -> lấy cả giỏ (như cũ)
+        const itemsToOrder = this.pickSelectedItems(
+          cart.items,
+          dto.selectedItems,
+        );
+
         const orderItems: OrderItem[] = [];
         let itemsTotalAmount = 0;
         let totalWeight = 0;
 
-        for (const item of cart.items) {
+        for (const item of itemsToOrder) {
           const product = await this.productModel
             .findById(item.product_id)
             .session(session);
@@ -1535,7 +1600,12 @@ export class OrdersService {
             currentPrice = currentPrice > 0 ? currentPrice : 0;
           }
 
-          const mainImage = product.images?.[0] || '';
+          // Ảnh dòng đơn: ưu tiên ảnh của phân loại khách chọn → thumbnail → ảnh đầu tiên
+          const variantImage = product.has_variants
+            ? product.variants.find((v) => v.sku === item.sku)?.images?.[0]
+            : undefined;
+          const mainImage =
+            variantImage || product.thumbnail || product.images?.[0] || '';
 
           orderItems.push({
             product_id: product._id,
@@ -1673,7 +1743,11 @@ export class OrdersService {
           totalAfterVoucher - pointsDiscount,
         );
 
-        await this.cartModel.deleteOne({ _id: cart._id }).session(session);
+        await this.removeOrderedItemsFromCart(
+          { _id: cart._id },
+          itemsToOrder,
+          session,
+        );
       } else {
         throw new BadRequestException('Không xác định được danh tính.');
       }
@@ -1756,6 +1830,7 @@ export class OrdersService {
           });
       }
 
+      await this.applyChatbotAttribution(savedOrder, dto.chatRef);
       await this.logCreateOrder(userId, savedOrder, dto.source, ip, userAgent);
 
       this.eventEmitter.emit(NOTIFY_EVENTS.ORDER_CREATED, savedOrder);
@@ -2245,6 +2320,119 @@ export class OrdersService {
       }
     }
     return results;
+  }
+
+  // Gắn nguồn CHATBOT cho đơn — CHỈ khi khách bấm "Mua ngay" trên thẻ sản phẩm của chatbot.
+  // Chạy SAU khi đơn đã commit: lỗi ở đây chỉ ghi log, không ảnh hưởng việc đặt hàng.
+  private async applyChatbotAttribution(
+    order: MongooseOrderDoc,
+    chatRef?: ChatRefDto,
+  ): Promise<void> {
+    if (!chatRef) return;
+
+    try {
+      const { conversationId, productId, sku, clickedAt } = chatRef;
+      if (
+        !Types.ObjectId.isValid(conversationId) ||
+        !Types.ObjectId.isValid(productId)
+      ) {
+        return;
+      }
+
+      // Quá hạn thì không tính (cho phép lệch đồng hồ máy khách tối đa 5 phút)
+      const ageMs = Date.now() - Number(clickedAt);
+      if (
+        !Number.isFinite(ageMs) ||
+        ageMs < -5 * 60 * 1000 ||
+        ageMs > CHATBOT_REF_MAX_AGE_MS
+      ) {
+        return;
+      }
+
+      // Đơn phải thật sự chứa đúng sản phẩm + phân loại khách đã bấm trên thẻ
+      const items = order.items as unknown as {
+        product_id: unknown;
+        sku: string;
+      }[];
+      const hasClickedItem = items.some(
+        (i) => String(i.product_id) === productId && i.sku === sku,
+      );
+      if (!hasClickedItem) return;
+
+      // Hội thoại phải tồn tại thật
+      const conversation = await this.connection
+        .collection('conversations')
+        .findOne(
+          { _id: new Types.ObjectId(conversationId) },
+          { projection: { _id: 1 } },
+        );
+      if (!conversation) return;
+
+      await this.orderModel.updateOne(
+        { _id: order._id },
+        {
+          $set: {
+            sales_channel: 'CHATBOT',
+            chatbot_ref: {
+              conversation_id: new Types.ObjectId(conversationId),
+              product_id: new Types.ObjectId(productId),
+              sku,
+              clicked_at: new Date(Number(clickedAt)),
+            },
+          },
+        },
+      );
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Không gắn được nguồn chatbot cho đơn ${order.order_code}: ${msg}`,
+      );
+    }
+  }
+
+  // Lọc các món được chọn để thanh toán. Không truyền selection -> lấy cả giỏ (hành vi cũ)
+  private pickSelectedItems<T extends { product_id: unknown; sku: string }>(
+    cartItems: T[],
+    selected?: SelectedCartItemDto[],
+  ): T[] {
+    if (!selected || selected.length === 0) return cartItems;
+
+    const keys = new Set(selected.map((s) => `${s.productId}::${s.sku}`));
+    const picked = cartItems.filter((i) =>
+      keys.has(`${String(i.product_id)}::${i.sku}`),
+    );
+
+    if (picked.length === 0) {
+      throw new BadRequestException(
+        'Sản phẩm bạn chọn mua không còn trong giỏ hàng. Vui lòng thử lại.',
+      );
+    }
+    return picked;
+  }
+
+  // Chỉ xoá khỏi giỏ đúng những món vừa đặt; giỏ trống thì xoá hẳn giỏ
+  private async removeOrderedItemsFromCart(
+    cartFilter: FilterQuery<Cart>,
+    orderedItems: { product_id: unknown; sku: string }[],
+    session: ClientSession,
+  ): Promise<void> {
+    const cart = await this.cartModel.findOne(cartFilter).session(session);
+    if (!cart) return;
+
+    const orderedKeys = new Set(
+      orderedItems.map((i) => `${String(i.product_id)}::${i.sku}`),
+    );
+    const remaining = cart.items.filter(
+      (i) => !orderedKeys.has(`${String(i.product_id)}::${i.sku}`),
+    );
+
+    if (remaining.length === 0) {
+      await this.cartModel.deleteOne({ _id: cart._id }).session(session);
+      return;
+    }
+
+    cart.items = remaining;
+    await cart.save({ session });
   }
 
   // Helper: Hàm log tạo đơn hàng (Dùng chung cho cả 2 luồng Cart & BuyNow)

@@ -1,7 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import axiosClient from "../../api/axiosClient";
 import tokenStorage from "../../utils/tokenStorage";
+import { clearChatbotRef, getChatbotRef } from "../../utils/chatbotCommerce";
+import { getBuyNowItemFromSearch } from "../../utils/buyNow";
 
 export interface CheckoutItem {
   id: string;
@@ -121,6 +124,14 @@ export function useCheckout() {
   const [otpTimer, setOtpTimer] = useState(0);
   const [loading, setLoading] = useState(false);
 
+  // Đọc theo URL hiện tại: từ "Mua ngay" sang checkout cả giỏ (cùng trang) vẫn cập nhật đúng
+  const location = useLocation();
+  const buyNowItem = useMemo(
+    () => getBuyNowItemFromSearch(location.search),
+    [location.search],
+  );
+  const selectedItems = buyNowItem ? [buyNowItem] : undefined;
+
   const [summary, setSummary] = useState({
     subtotal: 0,
     discount: 0,
@@ -164,8 +175,19 @@ export function useCheckout() {
   useEffect(() => {
     const fetchCartData = () => {
       axiosClient
-        .get(`/cart?guestSessionId=${guestSessionId}`)
+        .get("/cart", {
+          params: {
+            guestSessionId,
+            buyProductId: buyNowItem?.productId,
+            buySku: buyNowItem?.sku,
+          },
+        })
         .then((res) => {
+          if (buyNowItem && res.data?.items?.length === 0) {
+            toast.warning(
+              "Sản phẩm bạn chọn mua không còn trong giỏ hàng (có thể đã hết hàng).",
+            );
+          }
           if (res.data?.items) {
             const mappedItems = res.data.items.map((i: ApiCartItem) => ({
               id: i.productId,
@@ -277,7 +299,7 @@ export function useCheckout() {
         }
       });
     }
-  }, [guestSessionId, isLogged]);
+  }, [guestSessionId, isLogged, buyNowItem]);
 
   useEffect(() => {
     if (step === 3 || summary.subtotal > 0) {
@@ -511,6 +533,7 @@ export function useCheckout() {
         shippingInfo: getShippingPayload(),
         cartSessionId: guestSessionId,
         phone: formData.phone,
+        selectedItems,
       });
 
       // FIX: Chuyển trách nhiệm đếm lùi cho useEffect bên trên, ở đây chỉ cần set 60
@@ -579,9 +602,12 @@ export function useCheckout() {
           paymentMethod: paymentData.method,
           note: isGift ? "Đơn hàng sử dụng cho mục đích làm quà tặng" : "",
           voucherCode: promoCode || undefined,
+          selectedItems, // Chỉ có khi vào từ "Mua ngay"
+          chatRef: getChatbotRef(), // Chỉ có khi khách vào checkout từ nút "Mua ngay" của chatbot
         };
 
         const res = await axiosClient.post("/orders", payload);
+        clearChatbotRef(); // Đơn đã tạo -> không gắn nguồn cho đơn sau
 
         if (res.data?.paymentUrl) {
           window.location.href = res.data.paymentUrl;
@@ -671,5 +697,6 @@ export function useCheckout() {
     handleReturnHome,
     handleApplyPromoCode,
     setStep,
+    isBuyNow: !!buyNowItem,
   };
 }

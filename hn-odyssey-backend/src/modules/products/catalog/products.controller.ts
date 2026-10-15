@@ -366,6 +366,10 @@ export class ProductsController {
       return { found: false, message: 'Không tìm thấy sản phẩm nào.' };
     }
 
+    const frontendUrl = (
+      process.env.FRONTEND_URL || 'http://localhost:5173'
+    ).replace(/\/$/, '');
+
     const productsData = products.map((p) => {
       let options = 'Sản phẩm đơn (Không phân loại)';
 
@@ -375,13 +379,29 @@ export class ProductsController {
           .join(' | ');
       }
 
+      // Giá thật: sản phẩm có phân loại lấy giá thấp nhất của phân loại đang bán
+      let priceFrom = p.sale_price > 0 ? p.sale_price : p.price;
+      let totalStock = p.stock;
+
+      if (p.has_variants && p.variants?.length) {
+        const sellable = p.variants.filter(
+          (v) => v.active !== false && (v.price ?? 0) > 0,
+        );
+        if (sellable.length > 0) {
+          priceFrom = Math.min(
+            ...sellable.map((v) => (v.sale_price > 0 ? v.sale_price : v.price)),
+          );
+        }
+        totalStock = sellable.reduce((sum, v) => sum + (v.stock ?? 0), 0);
+      }
+
       return {
+        id: String(p._id), // Bot dùng id này để gửi thẻ sản phẩm
         name: p.name,
-        price: p.price,
-        sale_price: p.sale_price,
-        stock: p.stock,
+        price_from_usd: priceFrom,
+        in_stock: totalStock > 0,
         available_options: options,
-        url: `https://your-domain.com/products/${p.slug}`,
+        url: `${frontendUrl}/products/${p.slug}`,
       };
     });
 

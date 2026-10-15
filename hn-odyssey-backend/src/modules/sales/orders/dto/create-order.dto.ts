@@ -13,6 +13,14 @@ import {
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import sanitizeHtml from 'sanitize-html';
+import {
+  ChatRefDto,
+  IsOptionalChatRef,
+} from 'src/modules/support/chat/dto/chat-ref.dto';
+import {
+  IsOptionalSelectedItems,
+  SelectedCartItemDto,
+} from './selected-item.dto';
 
 export class ShippingInfoDto {
   @IsNotEmpty()
@@ -74,4 +82,12 @@ export class CreateOrderDto {
   @IsInt()
   @Min(0)
   pointsToUse?: number;
+
+  // Chỉ có khi khách vào checkout từ nút "Mua ngay" trên thẻ sản phẩm của chatbot
+  @IsOptionalChatRef()
+  chatRef?: ChatRefDto;
+
+  // "Mua ngay": chỉ thanh toán các món này. Không gửi -> thanh toán cả giỏ (như cũ)
+  @IsOptionalSelectedItems()
+  selectedItems?: SelectedCartItemDto[];
 }

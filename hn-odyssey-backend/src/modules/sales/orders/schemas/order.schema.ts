@@ -129,6 +129,19 @@ export class Order extends Document {
   @Prop({ default: 0 })
   points_used: number;
 
+  // Kênh bán: CHATBOT chỉ khi khách bấm "Mua ngay" trên thẻ sản phẩm của chatbot
+  @Prop({ type: String, enum: ['WEB', 'CHATBOT'], default: 'WEB', index: true })
+  sales_channel: string;
+
+  // Dấu vết để đo hiệu quả chatbot (hội thoại nào, sản phẩm nào, bấm lúc nào)
+  @Prop({ type: Object })
+  chatbot_ref?: {
+    conversation_id: Types.ObjectId;
+    product_id: Types.ObjectId;
+    sku: string;
+    clicked_at: Date;
+  };
+
   @Prop()
   createdAt?: Date;
 

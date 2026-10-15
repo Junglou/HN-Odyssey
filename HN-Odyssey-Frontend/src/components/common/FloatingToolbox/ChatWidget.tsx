@@ -13,6 +13,7 @@ import {
 } from "../../../assets/icons/FloatingToolboxIcons";
 import { useChatSupport } from "../../../hooks/common/useChatSupport";
 import axiosClient from "../../../api/axiosClient";
+import ChatProductCarousel from "./ChatProductCarousel";
 import "./ChatWidget.css";
 
 // THÊM HÀM NÀY ĐỂ FIX LỖI LINK KÉP TỪ DB CŨ
@@ -32,8 +33,13 @@ interface ChatWidgetProps {
 // component
 export default function ChatWidget({ onClose }: ChatWidgetProps) {
   // hooks
-  const { messages, sendMessage, typingIndicator, notifyTyping } =
-    useChatSupport();
+  const {
+    messages,
+    sendMessage,
+    typingIndicator,
+    notifyTyping,
+    getConversationId,
+  } = useChatSupport();
   const [text, setText] = useState("");
   const [showEmoji, setShowEmoji] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -45,6 +51,11 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
   }, [messages, typingIndicator]);
 
   // handlers
+  // Mobile: khung chat chiếm toàn màn hình -> thu lại để khách xem trang sản phẩm
+  const closeOnMobile = () => {
+    if (window.matchMedia("(max-width: 768px)").matches) onClose();
+  };
+
   const handleSend = () => {
     if (!text.trim()) return;
     sendMessage(text, "TEXT");
@@ -139,84 +150,109 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
 
       {/* body */}
       <div className="cw-body">
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`cw-msg-row ${
-              msg.sender_type === "USER"
-                ? "user"
-                : msg.sender_type === "SYSTEM"
-                  ? "system"
-                  : "bot"
-            }`}
-          >
-            <div className="cw-bubble">
-              {/* text type */}
-              {msg.message_type === "TEXT" && (
-                <p dangerouslySetInnerHTML={formatText(msg.content)}></p>
-              )}
-
-              {/* image type */}
-              {msg.message_type === "IMAGE" && (
-                <img
-                  src={getValidMediaUrl(msg.content)}
-                  alt="attachment"
-                  className="cw-img-attach"
-                />
-              )}
-
-              {/* file type - Đã thêm thẻ <a> để click vào tải file */}
-              {msg.message_type === "FILE" && (
-                <div className="cw-file-attach">
-                  <FilePdfIcon />
-                  <div className="cw-file-info">
-                    <a
-                      href={getValidMediaUrl(msg.content)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="cw-file-name"
-                      style={{ color: "inherit", textDecoration: "underline" }}
-                    >
-                      {msg.metadata?.fileName || "Attachment"}
-                    </a>
-                    <span className="cw-file-size">
-                      {msg.metadata?.fileSize || "Unknown"}
-                    </span>
+        {messages.map((msg) =>
+          msg.message_type === "PRODUCT_CARD" &&
+          msg.metadata?.products &&
+          msg.metadata.products.length > 0 ? (
+            // Thẻ sản phẩm kiểu mới: câu tư vấn + carousel tối đa 3 thẻ
+            <div key={msg.id} className="cw-msg-row bot">
+              <div className="cw-cards-block">
+                {msg.content && (
+                  <div className="cw-bubble">
+                    <p dangerouslySetInnerHTML={formatText(msg.content)}></p>
                   </div>
-                </div>
-              )}
+                )}
+                <ChatProductCarousel
+                  products={msg.metadata.products}
+                  onAfterNavigate={closeOnMobile}
+                  conversationId={
+                    msg.conversationId || getConversationId() || undefined
+                  }
+                />
+              </div>
+            </div>
+          ) : (
+            <div
+              key={msg.id}
+              className={`cw-msg-row ${
+                msg.sender_type === "USER"
+                  ? "user"
+                  : msg.sender_type === "SYSTEM"
+                    ? "system"
+                    : "bot"
+              }`}
+            >
+              <div className="cw-bubble">
+                {/* text type */}
+                {msg.message_type === "TEXT" && (
+                  <p dangerouslySetInnerHTML={formatText(msg.content)}></p>
+                )}
 
-              {/* hiển thị thẻ thông tin sản phẩm có kèm hình ảnh và liên kết chi tiết */}
-              {msg.message_type === "PRODUCT_CARD" && msg.metadata && (
-                <div className="cw-product-card">
-                  {msg.metadata.imageUrl && (
-                    <img
-                      src={msg.metadata.imageUrl}
-                      alt={msg.metadata.name || "Product"}
-                      className="cw-product-img"
-                    />
-                  )}
-                  <div className="cw-product-info">
-                    <h4 className="cw-product-name">{msg.metadata.name}</h4>
-                    <p className="cw-product-desc">
-                      {msg.metadata.description}
-                    </p>
-                    {msg.metadata.link && (
+                {/* image type */}
+                {msg.message_type === "IMAGE" && (
+                  <img
+                    src={getValidMediaUrl(msg.content)}
+                    alt="attachment"
+                    className="cw-img-attach"
+                  />
+                )}
+
+                {/* file type - Đã thêm thẻ <a> để click vào tải file */}
+                {msg.message_type === "FILE" && (
+                  <div className="cw-file-attach">
+                    <FilePdfIcon />
+                    <div className="cw-file-info">
                       <a
-                        href={msg.metadata.link}
+                        href={getValidMediaUrl(msg.content)}
                         target="_blank"
                         rel="noreferrer"
-                        className="cw-product-link"
+                        className="cw-file-name"
+                        style={{
+                          color: "inherit",
+                          textDecoration: "underline",
+                        }}
                       >
-                        Xem chi tiết sản phẩm
+                        {msg.metadata?.fileName || "Attachment"}
                       </a>
-                    )}
+                      <span className="cw-file-size">
+                        {msg.metadata?.fileSize || "Unknown"}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+
+                {/* hiển thị thẻ thông tin sản phẩm có kèm hình ảnh và liên kết chi tiết */}
+                {msg.message_type === "PRODUCT_CARD" && msg.metadata && (
+                  <div className="cw-product-card">
+                    {msg.metadata.imageUrl && (
+                      <img
+                        src={msg.metadata.imageUrl}
+                        alt={msg.metadata.name || "Product"}
+                        className="cw-product-img"
+                      />
+                    )}
+                    <div className="cw-product-info">
+                      <h4 className="cw-product-name">{msg.metadata.name}</h4>
+                      <p className="cw-product-desc">
+                        {msg.metadata.description}
+                      </p>
+                      {msg.metadata.link && (
+                        <a
+                          href={msg.metadata.link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="cw-product-link"
+                        >
+                          Xem chi tiết sản phẩm
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ),
+        )}
         {/* hiệu ứng đang gõ */}
         {typingIndicator && (
           <div className="cw-msg-row bot">
