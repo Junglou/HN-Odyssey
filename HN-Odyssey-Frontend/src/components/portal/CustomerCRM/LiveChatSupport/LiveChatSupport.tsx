@@ -3,6 +3,7 @@ import "./LiveChatSupport.css";
 import type {
   ChatSession,
   ChatStatus,
+  TypingSender,
 } from "../../../../hooks/portal/CustomerCRM/LiveChatSupport/useLiveChatSupport";
 import axiosClient from "../../../../api/axiosClient";
 import EmojiPicker, {
@@ -220,7 +221,7 @@ interface LiveChatSupportProps {
   activeSessionId: string | null;
   activeSession: ChatSession | null;
   tabCounts: { Waitlist: number; Ongoing: number; Complete: number };
-  typingUsers: Record<string, boolean>;
+  typingUsers: Record<string, TypingSender | null>;
   actions: {
     changeTab: (tab: ChatStatus) => void;
     changeSearch: (query: string) => void;
@@ -682,62 +683,90 @@ export default function LiveChatSupport({
                     </div>
                   );
                 })}
-                {activeSession && typingUsers[activeSession.customerName] && (
-                  <div className="lcs-message-row customer">
-                    <div className="lcs-message-content customer-bg lcs-typing">
-                      Đang gõ...
+                {typingUsers[activeSession.id] && (
+                  <div
+                    className={`lcs-message-row ${
+                      typingUsers[activeSession.id] === "USER"
+                        ? "customer"
+                        : "consultant"
+                    }`}
+                  >
+                    <div
+                      className={`lcs-message-content lcs-typing ${
+                        typingUsers[activeSession.id] === "USER"
+                          ? "customer-bg"
+                          : "consultant-bg"
+                      }`}
+                    >
+                      <span className="lcs-typing-label">
+                        {typingUsers[activeSession.id] === "USER"
+                          ? `${activeSession.customerName} đang nhập`
+                          : "Trợ lý ảo đang trả lời"}
+                      </span>
+                      <span className="lcs-typing-dots">
+                        <span />
+                        <span />
+                        <span />
+                      </span>
                     </div>
                   </div>
                 )}
               </div>
 
-              <div className="lcs-chat-input-area">
-                {showEmojiPicker && (
-                  <div className="lcs-emoji-picker-wrapper">
-                    <EmojiPicker
-                      onEmojiClick={onEmojiClick}
-                      width={320} // Ép chiều rộng cố định để không bị vỡ khi responsive
-                      height={400}
-                      searchDisabled={false} // Có thể tắt search nếu không cần thiết
-                      emojiStyle={EmojiStyle.NATIVE}
-                    />
-                  </div>
-                )}
+              {activeSession.status !== "Complete" ? (
+                <div className="lcs-chat-input-area">
+                  {showEmojiPicker && (
+                    <div className="lcs-emoji-picker-wrapper">
+                      <EmojiPicker
+                        onEmojiClick={onEmojiClick}
+                        width={320} // Ép chiều rộng cố định để không bị vỡ khi responsive
+                        height={400}
+                        searchDisabled={false} // Có thể tắt search nếu không cần thiết
+                        emojiStyle={EmojiStyle.NATIVE}
+                      />
+                    </div>
+                  )}
 
-                <input
-                  type="text"
-                  placeholder="Write a message..."
-                  value={messageText}
-                  onChange={handleMessageChange}
-                  onKeyDown={handleKeyDown}
-                />
-                <div className="lcs-input-actions">
-                  <label className="lcs-icon-btn">
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      style={{ display: "none" }}
-                      onChange={handleFileUpload}
-                      accept="image/*,.pdf,.doc,.docx"
-                    />
-                    <InlineAttachmentIcon />
-                  </label>
-                  <button
-                    type="button"
-                    className="lcs-icon-btn"
-                    onClick={() => setShowEmojiPicker((prev) => !prev)}
-                  >
-                    <InlineEmojiIcon />
-                  </button>
-                  <button
-                    type="button"
-                    className="lcs-send-btn"
-                    onClick={handleSendMessage}
-                  >
-                    <InlineSendIcon />
-                  </button>
+                  <input
+                    type="text"
+                    placeholder="Write a message..."
+                    value={messageText}
+                    onChange={handleMessageChange}
+                    onKeyDown={handleKeyDown}
+                  />
+                  <div className="lcs-input-actions">
+                    <label className="lcs-icon-btn">
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        style={{ display: "none" }}
+                        onChange={handleFileUpload}
+                        accept="image/*,.pdf,.doc,.docx"
+                      />
+                      <InlineAttachmentIcon />
+                    </label>
+                    <button
+                      type="button"
+                      className="lcs-icon-btn"
+                      onClick={() => setShowEmojiPicker((prev) => !prev)}
+                    >
+                      <InlineEmojiIcon />
+                    </button>
+                    <button
+                      type="button"
+                      className="lcs-send-btn"
+                      onClick={handleSendMessage}
+                    >
+                      <InlineSendIcon />
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="lcs-chat-closed-note">
+                  Phiên hỗ trợ đã kết thúc. Nếu khách nhắn tiếp, Trợ lý ảo sẽ
+                  tiếp nhận ở phiên mới.
+                </div>
+              )}
             </>
           ) : (
             <div className="lcs-no-chat-selected">

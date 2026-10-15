@@ -4,6 +4,15 @@ import axiosClient from "../../../../api/axiosClient";
 
 export const STANDARD_ACTIONS = ["READ", "CREATE", "UPDATE", "DELETE"];
 
+// Lấy message Backend trả về (ForbiddenException, BadRequest...), không có thì dùng fallback
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  const msg = (error as { response?: { data?: { message?: unknown } } })
+    ?.response?.data?.message;
+  if (typeof msg === "string" && msg.trim()) return msg;
+  if (Array.isArray(msg) && msg.length > 0) return String(msg[0]);
+  return fallback;
+};
+
 export interface BackendPermission {
   resource: string;
   actions: string[];
@@ -224,6 +233,11 @@ export function useRoleManagement() {
         subModules: mod.subModules.map((sub) => {
           const bePerm = userPerms.find((p) => p.resource === sub.subId);
 
+          // Role hệ thống (Super Admin) luôn toàn quyền, không phụ thuộc permissions lưu trong DB
+          if (selected?.isLocked) {
+            return { ...sub, grantedActions: [...sub.availableActions] };
+          }
+
           let granted: string[] = [];
           if (bePerm) {
             // [CẬP NHẬT]: Nếu backend lỡ trả về MANAGE do dữ liệu cũ,
@@ -248,6 +262,9 @@ export function useRoleManagement() {
     },
 
     togglePermission: (moduleId: string, subId: string, action: string) => {
+      const current = roles.find((r) => r.id === selectedRoleId);
+      if (current?.isLocked) return;
+
       setHasUnsavedChanges(true);
       setPermissions((prev) =>
         prev.map((mod) => {
@@ -272,6 +289,12 @@ export function useRoleManagement() {
     saveChanges: async () => {
       if (!selectedRoleId) return;
 
+      const current = roles.find((r) => r.id === selectedRoleId);
+      if (current?.isLocked) {
+        toast.info("Vai trò hệ thống đã có toàn quyền, không cần cấu hình.");
+        return;
+      }
+
       try {
         const bePermissionsPayload: BackendPermission[] = [];
 
@@ -295,8 +318,10 @@ export function useRoleManagement() {
         setHasUnsavedChanges(false);
         toast.success("Đã lưu phân quyền thành công!");
         void fetchList();
-      } catch {
-        toast.error("Không thể cập nhật cấu hình phân quyền.");
+      } catch (error) {
+        toast.error(
+          getErrorMessage(error, "Không thể cập nhật cấu hình phân quyền."),
+        );
       }
     },
 

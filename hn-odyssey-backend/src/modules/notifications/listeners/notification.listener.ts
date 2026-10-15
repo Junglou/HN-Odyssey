@@ -12,6 +12,14 @@ import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant
 import { WebhookService } from '../channels/webhook.service';
 import { UsersService } from 'src/modules/users/user.Service';
 import { TradeInStatus } from 'src/common/enums/trade-in.enum';
+import {
+  CHAT_DEPARTMENT_LABELS,
+  SUPPORT_EVENTS,
+} from 'src/modules/support/chat/chat.events';
+import type {
+  ChatAcceptedPayload,
+  HandoffCreatedPayload,
+} from 'src/modules/support/chat/chat.events';
 
 interface StockAlertPayload {
   product: { _id: string; name: string; warehouse_id: string };
@@ -428,5 +436,75 @@ export class NotificationListener {
       `[H&N Odyssey - CSKH] Ticket hỗ trợ mới từ ${data.email}`,
       `Hệ thống vừa ghi nhận một Ticket hỗ trợ Offline.\n\n- Khách hàng: ${data.email}\n- Nội dung: ${data.content}\n- Link xử lý: /portal/live-chat`,
     );
+  }
+
+  // Bot chuyển khách sang nhân viên (có nhân viên online)
+  @OnEvent(SUPPORT_EVENTS.HANDOFF_CREATED)
+  async handleChatHandoff(data: HandoffCreatedPayload) {
+    const departmentLabel =
+      CHAT_DEPARTMENT_LABELS[data.department] || data.department;
+
+    await this.notificationsService.createAndSend({
+      recipient_role: 'SUPPORT_STAFF',
+      title: `Khách cần hỗ trợ trực tiếp (${departmentLabel})`,
+      message: `${data.customerName}: ${(data.summary || '').substring(0, 80)}`,
+      type: NotificationType.SYSTEM,
+      priority: NotificationPriority.HIGH,
+      metadata: {
+        target_url: '/portal/live-chat',
+        conversation_id: data.conversationId,
+      },
+    });
+
+    try {
+      await this.emailService.sendHandoffAlertToDepartment(
+        this.getDepartmentMailReceiver(data.department),
+        {
+          departmentLabel,
+          customerName: data.customerName,
+          customerEmail: data.customerEmail,
+          summary: data.summary,
+          portalUrl: `${this.getFrontendUrl()}/portal/live-chat`,
+        },
+      );
+    } catch (error) {
+      this.logger.error('[Support] Lỗi gửi mail handoff cho bộ phận', error);
+    }
+  }
+
+  // Nhân viên đã tiếp nhận -> mail cho khách
+  @OnEvent(SUPPORT_EVENTS.CHAT_ACCEPTED)
+  async handleChatAccepted(data: ChatAcceptedPayload) {
+    try {
+      await this.emailService.sendChatAcceptedToCustomer(data.customerEmail, {
+        customerName: data.customerName,
+        agentName: data.agentName,
+        departmentLabel:
+          CHAT_DEPARTMENT_LABELS[data.department ?? ''] || 'CSKH',
+        chatUrl: this.getFrontendUrl(),
+      });
+    } catch (error) {
+      this.logger.error(
+        `[Support] Lỗi gửi mail tiếp nhận cho ${data.customerEmail}`,
+        error,
+      );
+    }
+  }
+
+  private getFrontendUrl(): string {
+    return (
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173'
+    ).replace(/\/$/, '');
+  }
+
+  private getDepartmentMailReceiver(department: string): string {
+    const fallback =
+      this.configService.get<string>('MAIL_SUPPORT_RECEIVER') ||
+      'support@hn-odyssey.com';
+    if (department === 'SALE')
+      return this.configService.get<string>('MAIL_SALES_RECEIVER') || fallback;
+    if (department === 'TECH')
+      return this.configService.get<string>('MAIL_TECH_RECEIVER') || fallback;
+    return fallback;
   }
 }

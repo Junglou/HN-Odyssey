@@ -4,26 +4,29 @@
   flex-direction: column;
   height: 100%;
   padding-bottom: 20px;
+  letter-spacing: -0.04em;
+  line-height: 1.4;
 }
 
-/* header*/
+/* header — đồng bộ với .crm-title / .crm-breadcrumb (CustomerManagement.css) */
 .lcs-page-header {
   margin-bottom: 20px;
+  font-family: "Lexend Exa", sans-serif;
+  letter-spacing: -0.04em;
+  line-height: 1.4;
 }
 
 .lcs-page-title {
-  font-size: 24px;
-  font-weight: 700;
+  font-size: clamp(1.4rem, 2.5vw, 1.8rem);
+  font-weight: 800;
   color: #111827;
-  margin: 0 0 8px 0;
-  font-family: "Lexend Exa", sans-serif;
+  margin: 0 0 4px 0;
 }
 
 .lcs-page-breadcrumb {
-  font-size: 14px;
-  color: #6b7280;
+  font-size: clamp(0.75rem, 1vw, 0.85rem);
+  color: #666;
   margin: 0;
-  font-family: "Lexend Exa", sans-serif;
 }
 
 /* container */
@@ -503,8 +506,62 @@
 
 /* đang gõ */
 .lcs-typing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-style: italic;
-  color: #666;
+  font-size: 0.8rem;
+}
+
+.lcs-typing.customer-bg {
+  color: #6b7280;
+}
+
+.lcs-typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.lcs-typing-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: currentColor;
+  opacity: 0.4;
+  animation: lcs-typing-bounce 1.2s infinite ease-in-out;
+}
+
+.lcs-typing-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.lcs-typing-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes lcs-typing-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+/* phiên đã kết thúc */
+.lcs-chat-closed-note {
+  padding: 16px 24px;
+  background-color: #ffffff;
+  border-top: 1px solid #e5e7eb;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #6b7280;
+  flex-shrink: 0;
 }
 
 .lcs-chat-input-area {

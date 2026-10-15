@@ -515,3 +515,31 @@
     width: 100%;
   }
 }
+/* nhãn role hệ thống */
+.rm-system-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background-color: #ecfdf5;
+  color: #047857;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rm-system-tag svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* checkbox bị khoá với role hệ thống */
+.rm-checkbox-label.locked,
+.rm-checkbox-label.locked .rm-checkbox {
+  cursor: not-allowed;
+}
+
+.rm-checkbox-label.locked {
+  opacity: 0.75;
+}

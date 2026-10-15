@@ -5,34 +5,60 @@ import {
   MessageBody,
   ConnectedSocket,
   WebSocketServer,
+  OnGatewayDisconnect,
 } from '@nestjs/websockets';
+import { OnEvent } from '@nestjs/event-emitter';
 import { Server, Socket } from 'socket.io';
 import { ChatService } from './chat.service';
 import { SendMessageDto, TypingDto } from './dto/chat-socket.dto';
+import type { TypingEventPayload } from './dto/chat-socket.dto';
 import { WsJwtGuard } from 'src/common/guards/ws-jwt.guard';
+import { CHAT_INTERNAL_EVENTS, SUPPORT_AGENTS_ROOM } from './chat.events';
+import type { EmitToRoomPayload } from './chat.events';
+
+interface AgentSocketData {
+  agentId?: string;
+}
 
 @WebSocketGateway({
   cors: { origin: '*' },
   namespace: 'chat',
 })
 @UseGuards(WsJwtGuard)
-export class ChatGateway {
+export class ChatGateway implements OnGatewayDisconnect {
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(ChatGateway.name);
   constructor(private readonly chatService: ChatService) {}
 
-  // 1. THÊM EVENT NÀY ĐỂ USER/AGENT JOIN VÀO PHÒNG CHAT
-  @SubscribeMessage('join_room')
-  async handleJoinRoom(
-    @MessageBody() data: { conversationId: string }, // Nhận object
-    @ConnectedSocket() client: Socket,
-  ) {
-    const room = data.conversationId;
-    await client.join(room);
-    this.logger.log(`Client ${client.id} joined room: ${room}`);
+  // 0. NHẬN YÊU CẦU BẮN SOCKET TỪ ChatService (assign / close / handoff)
+  @OnEvent(CHAT_INTERNAL_EVENTS.EMIT_TO_ROOM)
+  handleInternalEmit(payload: EmitToRoomPayload) {
+    this.server.to(payload.room).emit(payload.event, payload.data);
   }
 
-  // 2. LOGIC GỬI TIN NHẮN
+  // Socket rớt (đóng tab, mất mạng) -> gỡ nhân viên khỏi danh sách online
+  handleDisconnect(client: Socket) {
+    const socketData = client.data as AgentSocketData | undefined;
+    if (socketData?.agentId) {
+      this.chatService.removeAgentSocket(socketData.agentId, client.id);
+      this.logger.log(
+        `Agent ${socketData.agentId} mất kết nối (socket ${client.id}).`,
+      );
+    }
+  }
+
+  // 1. USER/AGENT JOIN VÀO PHÒNG CHAT
+  @SubscribeMessage('join_room')
+  async handleJoinRoom(
+    @MessageBody() data: { conversationId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    if (!data?.conversationId) return;
+    await client.join(data.conversationId);
+    this.logger.log(`Client ${client.id} joined room: ${data.conversationId}`);
+  }
+
+  // 2. GỬI TIN NHẮN
   @SubscribeMessage('send_message')
   async handleMessage(
     @MessageBody() data: SendMessageDto,
@@ -43,38 +69,93 @@ export class ChatGateway {
       return;
     }
 
-    // Xử lý và lưu tin nhắn
     const userMsg = await this.chatService.processUserMessage(data);
 
-    // ĐỔI client.emit THÀNH server.to().emit ĐỂ GỬI CHO CẢ USER LẪN AGENT TRONG PHÒNG
-    this.server.to(data.conversationId).emit('new_message', userMsg);
+    if (!userMsg) {
+      client.emit('error', {
+        message:
+          'Không thể gửi tin nhắn: phiên chat không tồn tại hoặc đã kết thúc.',
+      });
+      return;
+    }
 
-    // Nếu đang ở trạng thái BOT, gọi AI và gửi lại cho phòng
-    if (userMsg.conversation_status === 'BOT') {
-      const botReply = await this.chatService.getBotResponse(data);
-      this.server.to(data.conversationId).emit('new_message', botReply);
+    const roomId = userMsg.conversation_id;
+
+    // Phiên cũ đã CLOSED -> Service đã chuyển tin nhắn sang phiên BOT mới
+    if (userMsg.switched_from) {
+      await client.join(roomId);
+      client.emit('conversation_switched', {
+        old_conversation_id: userMsg.switched_from,
+        conversation_id: roomId,
+      });
+    }
+
+    this.server.to(roomId).emit('new_message', userMsg);
+
+    // Chỉ khi KHÁCH nhắn và phiên đang ở chế độ BOT thì mới gọi AI
+    if (
+      userMsg.sender_type === 'USER' &&
+      userMsg.conversation_status === 'BOT'
+    ) {
+      this.emitTyping(roomId, 'BOT', true);
+      try {
+        const botReply = await this.chatService.getBotResponse({
+          ...data,
+          conversationId: roomId,
+        });
+        this.server.to(roomId).emit('new_message', botReply);
+      } finally {
+        this.emitTyping(roomId, 'BOT', false);
+      }
     }
   }
 
+  private emitTyping(
+    room: string,
+    senderType: TypingEventPayload['sender_type'],
+    isTyping: boolean,
+  ) {
+    const payload: TypingEventPayload = {
+      conversation_id: room,
+      sender_type: senderType,
+      user_name: senderType === 'BOT' ? 'Trợ lý ảo' : undefined,
+      is_typing: isTyping,
+    };
+    this.server.to(room).emit('typing', payload);
+  }
+
+  // 3. KHÁCH / NHÂN VIÊN ĐANG GÕ
   @SubscribeMessage('typing')
   handleTyping(
     @MessageBody() data: TypingDto,
     @ConnectedSocket() client: Socket,
   ): void {
-    // Phát tín hiệu cho những người khác trong cùng hội thoại
-    client.broadcast.to(data.conversation_id).emit('typing', {
-      user: data.user_name,
-      is_typing: data.is_typing,
-    });
+    if (!data?.conversation_id) return;
+
+    // Không cho client giả danh BOT
+    const senderType = data.sender_type === 'AGENT' ? 'AGENT' : 'USER';
+
+    const payload: TypingEventPayload = {
+      conversation_id: data.conversation_id,
+      sender_type: senderType,
+      user_name: data.user_name,
+      is_typing: !!data.is_typing,
+    };
+
+    client.broadcast.to(data.conversation_id).emit('typing', payload);
   }
 
+  // 4. NHÂN VIÊN ONLINE / OFFLINE
   @SubscribeMessage('agent_connect')
-  handleAgentConnect(
+  async handleAgentConnect(
     @ConnectedSocket() client: Socket,
     @MessageBody() agentId: string,
   ) {
-    this.chatService.onlineAgents.add(agentId);
-    this.logger.log(`Agent ${agentId} is now online.`);
+    if (!agentId) return;
+    (client.data as AgentSocketData).agentId = agentId;
+    this.chatService.addAgentSocket(agentId, client.id);
+    await client.join(SUPPORT_AGENTS_ROOM);
+    this.logger.log(`Agent ${agentId} is now online (socket ${client.id}).`);
   }
 
   @SubscribeMessage('agent_disconnect')
@@ -82,10 +163,13 @@ export class ChatGateway {
     @ConnectedSocket() client: Socket,
     @MessageBody() agentId: string,
   ) {
-    this.chatService.onlineAgents.delete(agentId);
-    this.logger.log(`Agent ${agentId} is now offline.`);
+    if (!agentId) return;
+    this.chatService.removeAgentSocket(agentId, client.id);
+    (client.data as AgentSocketData).agentId = undefined;
+    this.logger.log(`Agent ${agentId} is now offline (socket ${client.id}).`);
   }
 
+  // 5. ĐÁNH DẤU ĐÃ ĐỌC
   @SubscribeMessage('mark_read')
   async handleMarkRead(
     @MessageBody()
@@ -97,7 +181,6 @@ export class ChatGateway {
       data.user_type,
     );
 
-    // Báo cho bên kia biết tin nhắn đã được xem
     client.broadcast.to(data.conversation_id).emit('messages_read', {
       conversation_id: data.conversation_id,
       read_by: data.user_type,
