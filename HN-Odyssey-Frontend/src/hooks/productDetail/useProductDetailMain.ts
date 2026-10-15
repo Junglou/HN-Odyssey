@@ -2,7 +2,8 @@ import { useState } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../api/axiosClient";
 import type { ProductDetailState } from "./useProductDetail";
-import { useTracking, BehaviorAction } from "../common/useTracking"; // [BỔ SUNG]
+import { useTracking, BehaviorAction } from "../common/useTracking";
+import { buildBuyNowCheckoutUrl } from "../../utils/buyNow";
 
 interface INormalizedError {
   status?: number;
@@ -46,7 +47,7 @@ export function useProductDetailMain() {
     product: ProductDetailState,
     selectedOptions: Record<string, string>,
     quantity: number,
-  ) => {
+  ): Promise<boolean> => {
     if (product.hasVariants) {
       const missingOptions = product.options.filter(
         (opt) => !selectedOptions[opt.code],
@@ -55,7 +56,7 @@ export function useProductDetailMain() {
         setOptionError(
           `Vui lòng chọn: ${missingOptions.map((m) => m.label).join(", ")}.`,
         );
-        return;
+        return false;
       }
     }
     setOptionError("");
@@ -80,12 +81,14 @@ export function useProductDetailMain() {
           price: product.price,
         },
       });
+      return true;
     } catch (error: unknown) {
       console.error("Lỗi Add to Cart:", error);
       const err = error as INormalizedError;
 
       setOptionError(err.message || "Lỗi khi thêm vào giỏ hàng");
       toast.error(err.message || "Không thể thêm vào giỏ hàng");
+      return false;
     }
   };
 
@@ -94,8 +97,14 @@ export function useProductDetailMain() {
     selectedOptions: Record<string, string>,
     quantity: number,
   ) => {
-    await handleAddToCart(product, selectedOptions, quantity);
-    window.location.href = "/checkout";
+    const added = await handleAddToCart(product, selectedOptions, quantity);
+    if (!added) return; // Thêm giỏ lỗi -> ở lại trang để khách thấy lỗi
+
+    // Chỉ thanh toán đúng sản phẩm này, không kéo theo các món khác trong giỏ
+    window.location.href = buildBuyNowCheckoutUrl({
+      productId: product.id,
+      sku: product.sku,
+    });
   };
 
   const clearOptionError = () => setOptionError("");

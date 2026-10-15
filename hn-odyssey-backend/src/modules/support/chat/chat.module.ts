@@ -14,12 +14,18 @@ import { OrdersModule } from 'src/modules/sales/orders/orders.module';
 import { WsJwtGuard } from 'src/common/guards/ws-jwt.guard';
 import { NotificationsModule } from 'src/modules/notifications/notifications.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import {
+  Product,
+  ProductSchema,
+} from 'src/modules/products/catalog/schemas/product.schema';
+import { ChatProductCardService } from './chat-product-card.service';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Conversation.name, schema: ConversationSchema },
       { name: Message.name, schema: MessageSchema },
+      { name: Product.name, schema: ProductSchema },
     ]),
     // Cấu hình JwtModule để WsJwtGuard có thể sử dụng JwtService
     JwtModule.registerAsync({
@@ -34,7 +40,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     ScheduleModule.forRoot(),
   ],
   controllers: [ChatController],
-  providers: [ChatService, ChatGateway, WsJwtGuard],
+  providers: [ChatService, ChatGateway, WsJwtGuard, ChatProductCardService],
   exports: [ChatService],
 })
 export class ChatModule {}

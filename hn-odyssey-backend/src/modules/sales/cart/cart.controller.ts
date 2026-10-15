@@ -40,9 +40,16 @@ export class CartController {
   async getCart(
     @CurrentUser() user: IUser | null,
     @Query('guestSessionId') guestSessionId: string,
+    @Query('buyProductId') buyProductId?: string,
+    @Query('buySku') buySku?: string,
   ): Promise<CartResponse> {
     const userId = user ? user._id : null;
-    return this.cartService.getCart(userId, guestSessionId);
+    // Trang checkout ở chế độ "Mua ngay" chỉ cần thấy đúng 1 món
+    const only =
+      buyProductId && buySku
+        ? { productId: buyProductId, sku: buySku }
+        : undefined;
+    return this.cartService.getCart(userId, guestSessionId, only);
   }
 
   // 2. THÊM VÀO GIỎ

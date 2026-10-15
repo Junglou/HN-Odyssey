@@ -1,7 +1,8 @@
 /* container */
 .cw-container {
-  width: 360px;
-  height: 500px;
+  position: relative; /* Mốc cho bảng chọn phân loại phủ lên khung chat */
+  width: 380px;
+  height: min(580px, calc(100vh - 110px));
   background-color: #ededed;
   border-radius: 12px;
   display: flex;
@@ -280,6 +281,22 @@
   .cw-typing-dots span {
     animation: none;
   }
+}
+
+/* khối thẻ sản phẩm của bot */
+.cw-cards-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.cw-cards-block .cw-bubble {
+  align-self: flex-start;
+  background-color: #ffffff;
+  color: #000000;
+  border-bottom-left-radius: 4px;
 }
 
 /* responsive */

@@ -1907,7 +1907,7 @@ export class ProductsService {
         status: ProductStatus.ACTIVE,
         is_deleted: false,
       })
-      .select('name slug price sale_price stock has_variants specs')
+      .select('name slug price sale_price stock has_variants specs variants')
       .limit(5)
       .lean()
       .exec();

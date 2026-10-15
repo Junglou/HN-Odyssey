@@ -6,6 +6,7 @@ import tokenStorage from "../../../../utils/tokenStorage";
 import { Action, Resource } from "../../../../types/permissions";
 import type { UserPayload } from "../../../../types/auth";
 import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import type { ChatProductCard } from "../../../../types/chatbot";
 
 export type ChatStatus = "Waitlist" | "Ongoing" | "Complete";
 export type MessageType = "text" | "image" | "product" | "file";
@@ -33,6 +34,7 @@ export interface ChatMessage {
     imageUrl: string;
   };
   fileData?: FileData;
+  products?: ChatProductCard[];
 }
 
 export interface TokenUser {
@@ -74,6 +76,7 @@ export interface MessageMetadata {
   imageUrl?: string;
   fileName?: string;
   fileSize?: string;
+  products?: ChatProductCard[];
   [key: string]: unknown;
 }
 
@@ -226,8 +229,12 @@ export function useLiveChatSupport() {
       timestamp: timeString,
       date: dateString,
       isRead: msg.is_read || false,
+      products:
+        isProduct && Array.isArray(msg.metadata?.products)
+          ? msg.metadata.products
+          : undefined,
       productData:
-        isProduct && msg.metadata
+        isProduct && msg.metadata && !Array.isArray(msg.metadata.products)
           ? {
               name: msg.metadata.name || "Sản phẩm",
               description: msg.metadata.description || "",

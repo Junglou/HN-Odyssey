@@ -3,6 +3,7 @@ import { io, Socket } from "socket.io-client";
 import axiosClient from "../../api/axiosClient";
 import tokenStorage from "../../utils/tokenStorage";
 import type { UserProfile } from "../../types/user";
+import type { ChatProductCard } from "../../types/chatbot";
 
 export interface MessageMetadata {
   fileName?: string;
@@ -11,10 +12,12 @@ export interface MessageMetadata {
   description?: string;
   link?: string;
   imageUrl?: string;
+  products?: ChatProductCard[]; // Thẻ sản phẩm kiểu mới (tối đa 3)
 }
 
 export interface ChatMessage {
   id: string;
+  conversationId?: string;
   sender_type: "USER" | "BOT" | "AGENT" | "SYSTEM";
   content: string;
   message_type: "TEXT" | "IMAGE" | "FILE" | "PRODUCT_CARD";
@@ -23,6 +26,7 @@ export interface ChatMessage {
 
 interface ServerMessage {
   _id?: string;
+  conversation_id?: string;
   sender_type: "USER" | "BOT" | "AGENT" | "SYSTEM";
   content: string;
   message_type?: "TEXT" | "IMAGE" | "FILE" | "PRODUCT_CARD";
@@ -61,6 +65,7 @@ const toChatMessage = (msg: ServerMessage): ChatMessage => ({
   content: msg.content,
   message_type: msg.message_type || "TEXT",
   metadata: msg.metadata,
+  conversationId: msg.conversation_id,
 });
 
 export function useChatSupport() {
@@ -266,5 +271,14 @@ export function useChatSupport() {
     [stopTyping],
   );
 
-  return { messages, sendMessage, typingIndicator, notifyTyping, stopTyping };
+  const getConversationId = useCallback(() => conversationIdRef.current, []);
+
+  return {
+    messages,
+    sendMessage,
+    typingIndicator,
+    notifyTyping,
+    stopTyping,
+    getConversationId,
+  };
 }

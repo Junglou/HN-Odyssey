@@ -8,6 +8,10 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ShippingInfoDto } from './create-order.dto';
+import {
+  IsOptionalSelectedItems,
+  SelectedCartItemDto,
+} from './selected-item.dto';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class InitGuestCheckoutDto {
@@ -26,6 +30,10 @@ export class InitGuestCheckoutDto {
     message: 'Số điện thoại không hợp lệ (Phải có 10 số và đúng đầu số VN)',
   })
   phone: string;
+
+  // "Mua ngay": chỉ giữ hàng & tạo đơn tạm cho các món này
+  @IsOptionalSelectedItems()
+  selectedItems?: SelectedCartItemDto[];
 }
 
 export class VerifyGuestOtpDto {
