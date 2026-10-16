@@ -31,6 +31,59 @@ import type {
 } from './chat.events';
 import { ChatProductCardService } from './chat-product-card.service';
 
+// Ảnh gửi cho AI: thu nhỏ tối đa 1024px, nén, ép về JPG (đọc được cả ảnh HEIC từ iPhone)
+const BOT_IMAGE_TRANSFORM = 'c_limit,w_1024,h_1024,q_auto,f_jpg';
+
+type ChatLang = 'vi' | 'en';
+
+interface ChatFixedText {
+  fileNotSupported: string;
+  imageUnreadable: string;
+  aiError: string;
+  aiEmpty: string;
+  agentAccepted: (agentName: string) => string;
+  agentClosed: string;
+  autoClosed: string;
+  noAgentOnline: (department: string) => string;
+}
+
+// Câu cố định của Bot/hệ thống theo ngôn ngữ khách (lưu ở conv.context.language)
+const CHAT_TEXT: Record<ChatLang, ChatFixedText> = {
+  vi: {
+    fileNotSupported:
+      'Dạ, Trợ lý ảo hiện chưa đọc được tệp đính kèm. Anh/chị mô tả giúp em bằng lời hoặc gửi ảnh chụp nhé. Nếu cần nhân viên xem trực tiếp tệp này, anh/chị nhắn "gặp nhân viên" giúp em ạ.',
+    imageUnreadable:
+      'Dạ, em chưa mở được ảnh này. Anh/chị gửi lại ảnh giúp em nhé!',
+    aiError: 'Hệ thống AI đang bảo trì, vui lòng thử lại sau!',
+    aiEmpty:
+      'Hệ thống đang quá tải, anh/chị vui lòng thử lại sau vài giây nhé!',
+    agentAccepted: (agentName) =>
+      `Nhân viên ${agentName} đã tiếp nhận cuộc trò chuyện và sẽ hỗ trợ anh/chị ngay bây giờ.`,
+    agentClosed:
+      'Nhân viên đã kết thúc phiên hỗ trợ. Trợ lý ảo H&N Odyssey sẽ tiếp tục hỗ trợ anh/chị nếu cần thêm thông tin nhé!',
+    autoClosed:
+      'Phiên tư vấn đã tự động đóng do quá thời gian. Bạn hãy bắt đầu đoạn chat mới để Bot hoặc nhân viên tiếp tục hỗ trợ nhé.',
+    noAgentOnline: (department) =>
+      `Hiện tại các nhân viên bộ phận ${department} đều đang bận hoặc ngoài giờ làm việc. Vui lòng cung cấp địa chỉ Email của bạn để chúng tôi tạo Ticket hỗ trợ!`,
+  },
+  en: {
+    fileNotSupported:
+      'Sorry, our virtual assistant can’t read attached files yet. Please describe your question or send a photo instead. If you need a staff member to check this file, just type "talk to staff".',
+    imageUnreadable:
+      'Sorry, I couldn’t open this image. Could you send it again?',
+    aiError: 'Our AI assistant is under maintenance. Please try again later!',
+    aiEmpty: 'The system is busy right now. Please try again in a few seconds!',
+    agentAccepted: (agentName) =>
+      `${agentName} from our support team has joined the conversation and will assist you now.`,
+    agentClosed:
+      'The support session has ended. The H&N Odyssey virtual assistant is still here if you need anything else!',
+    autoClosed:
+      'This chat was closed automatically due to inactivity. Send a new message and our assistant or staff will continue helping you.',
+    noAgentOnline: (department) =>
+      `All ${department} staff are currently busy or outside working hours. Please share your email so we can create a support ticket for you!`,
+  },
+};
+
 // 1. Interfaces rõ ràng để tránh "any"
 interface ChatContext {
   user?: {
@@ -66,6 +119,7 @@ interface SendMessageDto {
 interface AiEngineResponse {
   reply: string;
   action?: string;
+  lang?: string; // 'vi' | 'en' do Bot nhận diện
   message_type?: 'TEXT' | 'IMAGE' | 'PRODUCT_CARD' | 'FILE';
   metadata?: Record<string, unknown>;
 }
@@ -172,6 +226,19 @@ export class ChatService {
     return fullName || a?.employee_code || 'CSKH';
   }
 
+  private toLang(value: unknown): ChatLang {
+    return value === 'en' ? 'en' : 'vi';
+  }
+
+  private async getConversationLang(conversationId: string): Promise<ChatLang> {
+    const conv = await this.convModel
+      .findById(conversationId)
+      .select('context.language')
+      .lean()
+      .exec();
+    return this.toLang(conv?.context?.language);
+  }
+
   async initOrGetConversation(sessionId: string, customerId?: string) {
     // 1. Tìm xem khách này (Guest hoặc User) đang có hội thoại nào chưa đóng không?
     const query: FilterQuery<Conversation> = customerId
@@ -222,6 +289,51 @@ export class ChatService {
     });
 
     return filteredText;
+  }
+
+  // Khách chỉ được gửi TEXT / IMAGE / FILE (PRODUCT_CARD chỉ do server tạo)
+  private normalizeIncomingType(
+    senderType: string,
+    type?: SendMessageDto['message_type'],
+  ): NonNullable<SendMessageDto['message_type']> {
+    const msgType = type || 'TEXT';
+    if (senderType === 'USER' && msgType === 'PRODUCT_CARD') return 'TEXT';
+    return msgType;
+  }
+
+  // Chỉ giữ các trường metadata khách được phép gửi
+  private sanitizeUserMetadata(
+    raw?: Record<string, unknown>,
+  ): Record<string, unknown> {
+    if (!raw) return {};
+    const meta: Record<string, unknown> = {};
+    if (typeof raw.fileName === 'string') {
+      meta.fileName = raw.fileName.slice(0, 255);
+    }
+    if (typeof raw.fileSize === 'string') {
+      meta.fileSize = raw.fileSize.slice(0, 20);
+    }
+    if (typeof raw.caption === 'string') {
+      const caption = this.filterProfanity(raw.caption.trim()).slice(0, 1000);
+      if (caption) meta.caption = caption;
+    }
+    return meta;
+  }
+
+  // Chỉ nhận ảnh trên Cloudinary của shop (tránh n8n tải link lạ do client gửi)
+  private toBotImageUrl(rawUrl: string): string | null {
+    if (!rawUrl) return null;
+    const start = rawUrl.indexOf('https://res.cloudinary.com/');
+    if (start === -1) return null;
+
+    const cloudName = this.configService.get<string>('CLOUDINARY_CLOUD_NAME');
+    if (!cloudName) return null;
+
+    const url = rawUrl.substring(start); // xử lý luôn link kép từ DB cũ
+    const prefix = `https://res.cloudinary.com/${cloudName}/image/upload/`;
+    if (!url.startsWith(prefix)) return null;
+
+    return `${prefix}${BOT_IMAGE_TRANSFORM}/${url.substring(prefix.length)}`;
   }
 
   private normalizeDepartment(input: string): string {
@@ -415,9 +527,10 @@ export class ChatService {
     const customer = this.getCustomerInfo(conv.customer_id);
 
     // Báo trong khung chat cho khách biết đã có người nhận
+    const lang = this.toLang(conv.context?.language);
     const sysMsg = await this.createSystemMessage(
       conv._id,
-      `Nhân viên ${agentName} đã tiếp nhận cuộc trò chuyện và sẽ hỗ trợ anh/chị ngay bây giờ.`,
+      CHAT_TEXT[lang].agentAccepted(agentName),
     );
     this.emitToRoom(roomId, 'new_message', sysMsg);
 
@@ -533,6 +646,7 @@ export class ChatService {
     sessionId: string,
     text: string,
     context: ChatContext,
+    imageUrl?: string,
   ): Promise<AiEngineResponse> {
     const n8nUrl =
       this.configService.get<string>('N8N_AI_CHAT_URL') ||
@@ -549,6 +663,9 @@ export class ChatService {
         {
           sessionId,
           chatInput: text,
+          // Ảnh khách gửi (đã thu nhỏ qua Cloudinary) -> n8n tải về cho model xem
+          has_image: !!imageUrl,
+          image_url: imageUrl || null,
           context: {
             user_name: context.user?.fullName || 'Khách',
             current_page: context.currentPage || 'Unknown',
@@ -560,7 +677,7 @@ export class ChatService {
           headers: {
             'n8n-api-key': n8nApiKey,
           },
-          timeout: 45000,
+          timeout: imageUrl ? 55000 : 45000,
         },
       );
 
@@ -571,7 +688,8 @@ export class ChatService {
       this.logger.error(
         `AI Engine Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
-      return { reply: 'Hệ thống AI đang bảo trì, vui lòng thử lại sau!' };
+      // Câu báo lỗi do getBotResponse chọn theo ngôn ngữ khách
+      return { reply: '', action: 'AI_ERROR' };
     }
   }
 
@@ -600,14 +718,26 @@ export class ChatService {
     }
 
     const conversationId = conv._id.toString();
-    const cleanContent = this.filterProfanity(data.content);
+    const messageType = this.normalizeIncomingType(
+      senderType,
+      data.message_type,
+    );
+    // Link ảnh/tệp không chạy bộ lọc từ ngữ (tránh làm hỏng URL)
+    const cleanContent =
+      messageType === 'TEXT'
+        ? this.filterProfanity(data.content)
+        : data.content;
+    const cleanMetadata =
+      senderType === 'USER'
+        ? this.sanitizeUserMetadata(data.metadata)
+        : data.metadata || {};
 
     const savedMsg = await this.msgModel.create({
       conversation_id: conv._id,
       sender_type: senderType,
       content: cleanContent,
-      message_type: data.message_type || 'TEXT',
-      metadata: data.metadata || {},
+      message_type: messageType,
+      metadata: cleanMetadata,
     });
 
     const createdAt = savedMsg.get('createdAt') as Date;
@@ -651,21 +781,71 @@ export class ChatService {
   }
 
   async getBotResponse(data: SendMessageDto): Promise<ChatResponse> {
+    const incomingType = data.message_type || 'TEXT';
+    const lang = await this.getConversationLang(data.conversationId);
+
+    // Tệp PDF/DOC: Trợ lý ảo chưa đọc được -> trả lời cố định, không gọi n8n
+    if (incomingType === 'FILE') {
+      return this.saveBotReply(
+        data.conversationId,
+        CHAT_TEXT[lang].fileNotSupported,
+      );
+    }
+
+    let chatInput = data.content;
+    let imageUrl: string | undefined;
+
+    if (incomingType === 'IMAGE') {
+      imageUrl = this.toBotImageUrl(data.content) ?? undefined;
+      if (!imageUrl) {
+        return this.saveBotReply(
+          data.conversationId,
+          CHAT_TEXT[lang].imageUnreadable,
+        );
+      }
+      const caption =
+        typeof data.metadata?.caption === 'string'
+          ? data.metadata.caption.trim()
+          : '';
+      // Chat Memory của n8n chỉ lưu chữ -> ghi rõ lượt này khách có gửi ảnh
+      chatInput = caption
+        ? `[Khách gửi kèm 1 ảnh] ${caption}`
+        : '[Khách gửi 1 ảnh, không kèm lời nhắn]';
+    }
+
     const context = await this.buildChatContext(
       data.conversationId,
       data.page_context?.current_page,
     );
     const aiResponse = await this.callAiEngine(
       data.conversationId,
-      data.content,
+      chatInput,
       context,
+      imageUrl,
     );
 
     this.logger.debug(`AI raw response: ${JSON.stringify(aiResponse)}`);
 
+    // Bot tự nhận diện ngôn ngữ khách -> lưu lại cho câu cố định / tin hệ thống
+    const detectedLang: ChatLang =
+      aiResponse?.lang === 'en'
+        ? 'en'
+        : aiResponse?.lang === 'vi'
+          ? 'vi'
+          : lang;
+    if (detectedLang !== lang) {
+      await this.convModel
+        .updateOne(
+          { _id: data.conversationId },
+          { $set: { 'context.language': detectedLang } },
+        )
+        .exec();
+    }
+
     const finalReply =
-      aiResponse?.reply ||
-      'Hệ thống đang quá tải, anh/chị vui lòng thử lại sau vài giây nhé!';
+      aiResponse?.action === 'AI_ERROR'
+        ? CHAT_TEXT[detectedLang].aiError
+        : aiResponse?.reply || CHAT_TEXT[detectedLang].aiEmpty;
     let msgType = aiResponse?.message_type || 'TEXT';
     let msgMetadata: Record<string, unknown> = aiResponse?.metadata || {};
 
@@ -683,13 +863,27 @@ export class ChatService {
       }
     }
 
-    // Lưu nội dung chat của Bot vào database kèm theo loại tin nhắn
+    return this.saveBotReply(
+      data.conversationId,
+      finalReply,
+      msgType,
+      msgMetadata,
+    );
+  }
+
+  // Lưu tin của Bot và trả về đúng định dạng FE đang dùng
+  private async saveBotReply(
+    conversationId: string,
+    content: string,
+    messageType = 'TEXT',
+    metadata: Record<string, unknown> = {},
+  ): Promise<ChatResponse> {
     const savedMsg = await this.msgModel.create({
-      conversation_id: new Types.ObjectId(data.conversationId),
+      conversation_id: new Types.ObjectId(conversationId),
       sender_type: 'BOT',
-      content: finalReply,
-      message_type: msgType,
-      metadata: msgMetadata,
+      content,
+      message_type: messageType,
+      metadata,
     });
 
     const createdAt = savedMsg.get('createdAt') as Date;
@@ -697,12 +891,12 @@ export class ChatService {
     return {
       _id: savedMsg._id.toString(),
       createdAt: createdAt.toISOString(),
-      conversation_id: data.conversationId,
+      conversation_id: conversationId,
       sender_type: 'BOT',
-      content: finalReply,
+      content,
       conversation_status: 'BOT',
-      message_type: msgType,
-      metadata: msgMetadata,
+      message_type: messageType,
+      metadata,
     };
   }
 
@@ -749,7 +943,10 @@ export class ChatService {
       await this.msgModel.create({
         conversation_id: conv._id,
         sender_type: 'SYSTEM',
-        content: `Hiện tại các nhân viên bộ phận ${validDept} đều đang bận hoặc ngoài giờ làm việc. Vui lòng cung cấp địa chỉ Email của bạn để chúng tôi tạo Ticket hỗ trợ!`,
+        content:
+          CHAT_TEXT[this.toLang(conv.context?.language)].noAgentOnline(
+            validDept,
+          ),
       });
 
       return {
@@ -899,7 +1096,7 @@ export class ChatService {
     const roomId = conv._id.toString();
     const sysMsg = await this.createSystemMessage(
       conv._id,
-      'Nhân viên đã kết thúc phiên hỗ trợ. Trợ lý ảo H&N Odyssey sẽ tiếp tục hỗ trợ anh/chị nếu cần thêm thông tin nhé!',
+      CHAT_TEXT[this.toLang(conv.context?.language)].agentClosed,
     );
     this.emitToRoom(roomId, 'new_message', sysMsg);
     this.emitToRoom(roomId, 'conversation_closed', { conversation_id: roomId });
@@ -936,11 +1133,10 @@ export class ChatService {
     );
 
     // 2. Gửi một tin nhắn báo cho khách hàng biết phiên chat đã đóng
-    const systemMessages = convIds.map((id) => ({
-      conversation_id: id,
+    const systemMessages = idleConversations.map((conv) => ({
+      conversation_id: conv._id,
       sender_type: 'SYSTEM',
-      content:
-        'Phiên tư vấn đã tự động đóng do quá thời gian. Bạn hãy bắt đầu đoạn chat mới để Bot hoặc nhân viên tiếp tục hỗ trợ nhé.',
+      content: CHAT_TEXT[this.toLang(conv.context?.language)].autoClosed,
       message_type: 'TEXT',
     }));
 

@@ -59,6 +59,9 @@ import { NotificationsModule } from 'src/modules/notifications/notifications.mod
     PurchaseBasedService,
     CollaborativeFilteringService,
     NewArrivalsService,
+    MlIntegrationService,
+    CollaborativeFilteringService,
+    PersonalizedService,
   ],
 })
 export class RecommendationsModule {}

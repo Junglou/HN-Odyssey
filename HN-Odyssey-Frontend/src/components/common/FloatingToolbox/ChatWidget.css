@@ -343,3 +343,46 @@
     max-width: 90%;
   }
 }
+/* ảnh chờ gửi kèm chú thích */
+.cw-pending-image {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid #eee;
+  background: #fafafa;
+}
+.cw-pending-image img {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.cw-pending-hint {
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #666;
+}
+.cw-pending-remove {
+  display: flex;
+  padding: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.cw-pending-remove svg {
+  width: 16px;
+  height: 16px;
+}
+.cw-pending-remove:disabled,
+.cw-icon-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.cw-img-caption {
+  margin-top: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

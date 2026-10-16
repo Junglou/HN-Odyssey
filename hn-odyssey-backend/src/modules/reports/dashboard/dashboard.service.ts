@@ -30,6 +30,7 @@ import {
   TopProduct,
   VariantContribution,
   SystemStageStat,
+  ChatbotSalesReport,
 } from 'src/common/interfaces/dashboard.interface';
 import {
   WarrantyClaim,
@@ -57,6 +58,7 @@ import {
   resolveThresholds,
   type StockAlertStatus,
 } from 'src/common/utils/stock-status.util';
+import { Message } from 'src/modules/support/chat/schemas/message.schema';
 
 interface RawAggregationResult {
   total_revenue: number;
@@ -119,6 +121,8 @@ export class DashboardService {
     private readonly categoryModel: Model<CategoryDocument>,
     @InjectModel(Conversation.name)
     private readonly conversationModel: Model<ConversationDocument>,
+    @InjectModel(Message.name)
+    private readonly messageModel: Model<Message>,
     @InjectModel(WarrantyClaim.name)
     private readonly warrantyClaimModel: Model<WarrantyClaimDocument>,
     @InjectModel(SystemMetric.name)
@@ -414,6 +418,189 @@ export class DashboardService {
       system_activities,
       // [BỔ SUNG ĐẦU RA]: Map mảng object thành mảng string các mã transaction
       inventory_batches: inventoryBatches.map((b) => b.transaction_code),
+    };
+  }
+
+  // DOANH THU TỪ CHATBOT — cùng luật doanh thu với getOverviewStats để chatbot + web = Total Revenue
+  async getChatbotSales(
+    filter: DashboardFilterDto,
+  ): Promise<ChatbotSalesReport> {
+    const { start, end, prevStart, prevEnd } = getReportDateRange(filter);
+    const validStatuses = { $nin: NON_REVENUE_ORDER_STATUSES };
+    const isChatbot = { sales_channel: 'CHATBOT' };
+
+    const isHourlyChart =
+      (filter.time_filter ?? TimeFilter.TODAY) === TimeFilter.TODAY;
+    const chartGroupId = isHourlyChart
+      ? { $hour: { date: '$createdAt', timezone: 'Asia/Ho_Chi_Minh' } }
+      : {
+          $dateToString: {
+            format: '%Y-%m-%d',
+            date: '$createdAt',
+            timezone: 'Asia/Ho_Chi_Minh',
+          },
+        };
+
+    interface ChannelAgg {
+      _id: string;
+      revenue: number;
+      orders: number;
+    }
+    interface TopAgg {
+      _id: Types.ObjectId;
+      name: string;
+      quantity: number;
+      revenue: number;
+    }
+    interface FacetResult {
+      byChannel: ChannelAgg[];
+      chart: ChartRawData[];
+      topProducts: TopAgg[];
+      converted: { count: number }[];
+    }
+
+    const [facetRaw, prevRaw, suggestionRaw] = await Promise.all([
+      this.orderModel.aggregate<FacetResult>([
+        {
+          $match: {
+            createdAt: { $gte: start, $lte: end },
+            status: validStatuses,
+          },
+        },
+        {
+          $facet: {
+            // Đơn cũ (trước khi có sales_channel) tính là WEB
+            byChannel: [
+              {
+                $group: {
+                  _id: { $ifNull: ['$sales_channel', 'WEB'] },
+                  revenue: { $sum: '$total_amount' },
+                  orders: { $sum: 1 },
+                },
+              },
+            ],
+            chart: [
+              { $match: isChatbot },
+              {
+                $group: {
+                  _id: chartGroupId,
+                  revenue: { $sum: '$total_amount' },
+                  orders: { $sum: 1 },
+                },
+              },
+              { $sort: { _id: 1 } },
+            ],
+            topProducts: [
+              { $match: isChatbot },
+              { $unwind: '$items' },
+              {
+                $group: {
+                  _id: '$items.product_id',
+                  name: { $first: '$items.product_name' },
+                  quantity: { $sum: '$items.quantity' },
+                  revenue: {
+                    $sum: { $multiply: ['$items.price', '$items.quantity'] },
+                  },
+                },
+              },
+              { $sort: { revenue: -1 } },
+              { $limit: 5 },
+            ],
+            converted: [
+              {
+                $match: {
+                  ...isChatbot,
+                  'chatbot_ref.conversation_id': { $exists: true },
+                },
+              },
+              { $group: { _id: '$chatbot_ref.conversation_id' } },
+              { $count: 'count' },
+            ],
+          },
+        },
+      ]),
+      this.orderModel.aggregate<{ _id: null; revenue: number }>([
+        {
+          $match: {
+            createdAt: { $gte: prevStart, $lte: prevEnd },
+            status: validStatuses,
+            ...isChatbot,
+          },
+        },
+        { $group: { _id: null, revenue: { $sum: '$total_amount' } } },
+      ]),
+      // Mẫu số tỷ lệ chuyển đổi: hội thoại có ít nhất 1 thẻ sản phẩm trong kỳ
+      this.messageModel.aggregate<{ count: number }>([
+        {
+          $match: {
+            sender_type: 'BOT',
+            message_type: 'PRODUCT_CARD',
+            createdAt: { $gte: start, $lte: end },
+          },
+        },
+        { $group: { _id: '$conversation_id' } },
+        { $count: 'count' },
+      ]),
+    ]);
+
+    const facet = facetRaw[0] ?? {
+      byChannel: [],
+      chart: [],
+      topProducts: [],
+      converted: [],
+    };
+    const chatbot = facet.byChannel.find((c) => c._id === 'CHATBOT') ?? {
+      revenue: 0,
+      orders: 0,
+    };
+    const totalRevenue = facet.byChannel.reduce((s, c) => s + c.revenue, 0);
+    const totalOrders = facet.byChannel.reduce((s, c) => s + c.orders, 0);
+    const webRevenue = totalRevenue - chatbot.revenue;
+    const webOrders = totalOrders - chatbot.orders;
+    const prevChatbotRevenue = prevRaw[0]?.revenue ?? 0;
+    const suggestionConversations = suggestionRaw[0]?.count ?? 0;
+    const convertedConversations = facet.converted[0]?.count ?? 0;
+
+    const pct = (part: number, whole: number) =>
+      whole > 0 ? Number(((part / whole) * 100).toFixed(2)) : 0;
+    const avg = (sum: number, count: number) =>
+      count > 0 ? Number((sum / count).toFixed(2)) : 0;
+
+    return {
+      chatbot_revenue: chatbot.revenue,
+      chatbot_orders: chatbot.orders,
+      total_revenue: totalRevenue,
+      total_orders: totalOrders,
+      revenue_share_percent: pct(chatbot.revenue, totalRevenue),
+      orders_share_percent: pct(chatbot.orders, totalOrders),
+      chatbot_aov: avg(chatbot.revenue, chatbot.orders),
+      web_aov: avg(webRevenue, webOrders),
+      prev_chatbot_revenue: prevChatbotRevenue,
+      revenue_growth_percent: this.calculateGrowth(
+        chatbot.revenue,
+        prevChatbotRevenue,
+      ),
+      suggestion_conversations: suggestionConversations,
+      converted_conversations: convertedConversations,
+      // Đơn trong kỳ có thể đến từ thẻ gửi cuối kỳ trước -> chặn trần 100%
+      conversion_rate_percent: Math.min(
+        100,
+        pct(convertedConversations, suggestionConversations),
+      ),
+      chart_data: facet.chart.map((item) => ({
+        label:
+          typeof item._id === 'number'
+            ? `${String(item._id).padStart(2, '0')}:00`
+            : String(item._id),
+        revenue: Number(item.revenue),
+        orders: Number(item.orders),
+      })),
+      top_products: facet.topProducts.map((p) => ({
+        product_id: String(p._id),
+        name: p.name,
+        quantity: Number(p.quantity),
+        revenue: Number(Number(p.revenue).toFixed(2)),
+      })),
     };
   }
 

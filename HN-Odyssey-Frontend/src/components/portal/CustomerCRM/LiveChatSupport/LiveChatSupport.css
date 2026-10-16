@@ -877,3 +877,8 @@
     width: calc(50% - 5px);
   }
 }
+.lcs-message-caption {
+  margin-top: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

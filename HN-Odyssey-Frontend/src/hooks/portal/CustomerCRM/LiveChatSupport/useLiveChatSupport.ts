@@ -35,6 +35,7 @@ export interface ChatMessage {
   };
   fileData?: FileData;
   products?: ChatProductCard[];
+  caption?: string; // Chữ khách gõ kèm ảnh
 }
 
 export interface TokenUser {
@@ -77,6 +78,7 @@ export interface MessageMetadata {
   fileName?: string;
   fileSize?: string;
   products?: ChatProductCard[];
+  caption?: string;
   [key: string]: unknown;
 }
 
@@ -145,6 +147,9 @@ interface ClientToServerEvents {
     user_type: "USER" | "AGENT";
   }) => void;
 }
+
+const imagePreview = (metadata?: MessageMetadata) =>
+  metadata?.caption ? `[Hình ảnh] ${metadata.caption}` : "[Hình ảnh]";
 
 export function useLiveChatSupport() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -242,6 +247,10 @@ export function useLiveChatSupport() {
               imageUrl: msg.metadata.imageUrl || "",
             }
           : undefined,
+      caption:
+        msg.message_type === "IMAGE" && msg.metadata?.caption
+          ? msg.metadata.caption
+          : undefined,
       fileData:
         isFile && msg.metadata
           ? {
@@ -275,7 +284,7 @@ export function useLiveChatSupport() {
 
         let preview = newConv.latest_message?.content || "Chưa có tin nhắn";
         if (newConv.latest_message?.message_type === "IMAGE")
-          preview = "[Hình ảnh]";
+          preview = imagePreview(newConv.latest_message.metadata);
         if (newConv.latest_message?.message_type === "FILE")
           preview = "[Tệp đính kèm]";
 
@@ -490,7 +499,7 @@ export function useLiveChatSupport() {
               lastMessageTime: "Vừa xong",
               previewText:
                 incomingMsg.message_type === "IMAGE"
-                  ? "[Hình ảnh]"
+                  ? imagePreview(incomingMsg.metadata)
                   : incomingMsg.message_type === "FILE"
                     ? "[Tệp đính kèm]"
                     : incomingMsg.content,
@@ -567,7 +576,7 @@ export function useLiveChatSupport() {
 
           let preview = conv.latest_message?.content || "Chưa có tin nhắn";
           if (conv.latest_message?.message_type === "IMAGE")
-            preview = "[Hình ảnh]";
+            preview = imagePreview(conv.latest_message.metadata);
           if (conv.latest_message?.message_type === "FILE")
             preview = "[Tệp đính kèm]";
 
@@ -814,7 +823,7 @@ export function useLiveChatSupport() {
       socketRef.current.emit("typing", {
         conversation_id: sessionId,
         sender_type: "AGENT",
-        user_name: user?.full_name || user?.fullName || "Nhân viên",
+        user_name: user?.full_name || user?.fullName || "Support agent",
         is_typing: isTyping,
       });
     },

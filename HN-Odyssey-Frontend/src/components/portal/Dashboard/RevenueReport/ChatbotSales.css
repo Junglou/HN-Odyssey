@@ -1,0 +1,177 @@
+/* Khối "Sales from Chatbot" — cùng phong cách với KeyRevenueMetrics / RevenueTrendAnalysis */
+.cbs-wrapper {
+  background-color: #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cbs-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cbs-section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.cbs-definition {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+/* thẻ KPI */
+.cbs-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.cbs-card {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cbs-card-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.cbs-card-value {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.cbs-card-note {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.cbs-trend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.cbs-trend.cbs-up {
+  color: #16a34a;
+}
+
+.cbs-trend.cbs-down {
+  color: #dc2626;
+}
+
+.cbs-trend-vs {
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* biểu đồ + bảng top sản phẩm */
+.cbs-bottom {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.cbs-top {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.cbs-top-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.cbs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  table-layout: fixed;
+}
+
+.cbs-table th {
+  text-align: left;
+  font-weight: 600;
+  color: #475569;
+  padding: 8px 6px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.cbs-table th:first-child,
+.cbs-table td:first-child {
+  width: 28px;
+}
+
+.cbs-table th:nth-child(3),
+.cbs-table td:nth-child(3) {
+  width: 44px;
+}
+
+.cbs-table th:last-child,
+.cbs-table td:last-child {
+  width: 88px;
+  text-align: right;
+}
+
+.cbs-table td {
+  padding: 8px 6px;
+  color: #1e293b;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.cbs-product-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cbs-revenue-cell {
+  font-weight: 700;
+}
+
+.cbs-empty-state {
+  padding: 24px 12px;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+/* responsive */
+@media screen and (max-width: 1200px) {
+  .cbs-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .cbs-bottom {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media screen and (max-width: 640px) {
+  .cbs-grid {
+    grid-template-columns: 1fr;
+  }
+}

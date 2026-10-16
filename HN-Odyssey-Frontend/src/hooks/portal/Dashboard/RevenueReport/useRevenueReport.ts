@@ -37,6 +37,48 @@ export interface CashFlow {
   pending: number;
 }
 
+// Khối "Sales from Chatbot"
+export interface ChatbotSalesView {
+  revenue: number;
+  orders: number;
+  revenueShare: number;
+  ordersShare: number;
+  chatbotAov: number;
+  webAov: number;
+  revenueGrowth: number;
+  suggestionConversations: number;
+  convertedConversations: number;
+  conversionRate: number;
+  trend: TrendDataPoint[];
+  topProducts: {
+    productId: string;
+    name: string;
+    quantity: number;
+    revenue: number;
+  }[];
+}
+
+// GET /reports/dashboard/chatbot-sales
+interface ChatbotSalesResponse {
+  chatbot_revenue: number;
+  chatbot_orders: number;
+  revenue_share_percent: number;
+  orders_share_percent: number;
+  chatbot_aov: number;
+  web_aov: number;
+  revenue_growth_percent: number;
+  suggestion_conversations: number;
+  converted_conversations: number;
+  conversion_rate_percent: number;
+  chart_data: ChartDataPoint[];
+  top_products: {
+    product_id: string;
+    name: string;
+    quantity: number;
+    revenue: number;
+  }[];
+}
+
 export interface TopProduct {
   rank: number;
   name: string;
@@ -217,6 +259,9 @@ export function useRevenueReport() {
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [paymentShares, setPaymentShares] = useState<PaymentShare[]>([]);
   const [cashFlow, setCashFlow] = useState<CashFlow>({ paid: 0, pending: 0 });
+  const [chatbotSales, setChatbotSales] = useState<ChatbotSalesView | null>(
+    null,
+  );
 
   // Quyền chỉ dùng để ẩn/hiện nút — Backend vẫn kiểm tra lại
   const user = getCurrentUser();
@@ -282,27 +327,37 @@ export function useRevenueReport() {
           end_date: `${end}T23:59:59.999Z`,
         };
 
-        const [overviewRes, topProductsRes, businessRes] = await Promise.all([
-          axiosClient.get<BaseResponse<OverviewResponse>>(
-            "/reports/dashboard/overview",
-            { params },
-          ),
-          axiosClient.get<BaseResponse<TopProductResponse[]>>(
-            "/reports/dashboard/top-products",
-            {
-              params: { ...params, sort_by: "REVENUE", sort_order: "DESC" },
-            },
-          ),
-          // US.87 AC6, AC7 — lỗi ở API này không được làm hỏng cả trang
-          axiosClient
-            .get<
-              BaseResponse<BusinessRevenueResponse>
-            >("/admin/reports/business/revenue", { params })
-            .catch((error: unknown) => {
-              console.error("Lỗi khi tải phân tích thanh toán:", error);
-              return null;
-            }),
-        ]);
+        const [overviewRes, topProductsRes, businessRes, chatbotRes] =
+          await Promise.all([
+            axiosClient.get<BaseResponse<OverviewResponse>>(
+              "/reports/dashboard/overview",
+              { params },
+            ),
+            axiosClient.get<BaseResponse<TopProductResponse[]>>(
+              "/reports/dashboard/top-products",
+              {
+                params: { ...params, sort_by: "REVENUE", sort_order: "DESC" },
+              },
+            ),
+            // US.87 AC6, AC7 — lỗi ở API này không được làm hỏng cả trang
+            axiosClient
+              .get<
+                BaseResponse<BusinessRevenueResponse>
+              >("/admin/reports/business/revenue", { params })
+              .catch((error: unknown) => {
+                console.error("Lỗi khi tải phân tích thanh toán:", error);
+                return null;
+              }),
+            // Sales from Chatbot — lỗi API này không được làm hỏng cả trang
+            axiosClient
+              .get<
+                BaseResponse<ChatbotSalesResponse>
+              >("/reports/dashboard/chatbot-sales", { params })
+              .catch((error: unknown) => {
+                console.error("Lỗi khi tải doanh thu từ chatbot:", error);
+                return null;
+              }),
+          ]);
 
         const overview =
           overviewRes.data?.data || ({} as Partial<OverviewResponse>);
@@ -384,6 +439,39 @@ export function useRevenueReport() {
           paid: Number(business?.cashFlow?.paidAmount ?? 0),
           pending: Number(business?.cashFlow?.pendingAmount ?? 0),
         });
+
+        const bot = chatbotRes?.data?.data;
+        setChatbotSales(
+          bot
+            ? {
+                revenue: Number(bot.chatbot_revenue) || 0,
+                orders: Number(bot.chatbot_orders) || 0,
+                revenueShare: Number(bot.revenue_share_percent) || 0,
+                ordersShare: Number(bot.orders_share_percent) || 0,
+                chatbotAov: Number(bot.chatbot_aov) || 0,
+                webAov: Number(bot.web_aov) || 0,
+                revenueGrowth: Number(bot.revenue_growth_percent) || 0,
+                suggestionConversations:
+                  Number(bot.suggestion_conversations) || 0,
+                convertedConversations:
+                  Number(bot.converted_conversations) || 0,
+                conversionRate: Number(bot.conversion_rate_percent) || 0,
+                // Đủ khung giờ/ngày, không có đơn = 0 (giống biểu đồ doanh thu)
+                trend: buildTrendSeries(
+                  bot.chart_data ?? [],
+                  filterName,
+                  start,
+                  end,
+                ),
+                topProducts: (bot.top_products ?? []).map((p) => ({
+                  productId: p.product_id,
+                  name: p.name,
+                  quantity: Number(p.quantity) || 0,
+                  revenue: Number(p.revenue) || 0,
+                })),
+              }
+            : null,
+        );
 
         setAppliedFilter({ filterName, start, end });
       } catch (error) {
@@ -491,6 +579,7 @@ export function useRevenueReport() {
     comparisonLabel: getComparisonLabel(appliedFilter.filterName),
     paymentShares,
     cashFlow,
+    chatbotSales,
     paginatedProducts,
     totalPages,
     currentPage,

@@ -99,9 +99,13 @@ export class ChatGateway implements OnGatewayDisconnect {
     ) {
       this.emitTyping(roomId, 'BOT', true);
       try {
+        // Dùng bản tin ĐÃ được server làm sạch (loại tin, metadata, lọc từ ngữ)
         const botReply = await this.chatService.getBotResponse({
           ...data,
           conversationId: roomId,
+          content: userMsg.content,
+          message_type: userMsg.message_type as SendMessageDto['message_type'],
+          metadata: userMsg.metadata,
         });
         this.server.to(roomId).emit('new_message', botReply);
       } finally {

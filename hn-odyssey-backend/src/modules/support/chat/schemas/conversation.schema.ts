@@ -27,6 +27,7 @@ export class Conversation extends Document {
     current_page?: string; // AC3: Nhận diện trang đang xem
     last_product_id?: string;
     device?: string;
+    language?: 'vi' | 'en'; // Ngôn ngữ khách dùng, do Bot nhận diện
   };
 
   @Prop({ type: Object })

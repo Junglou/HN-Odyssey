@@ -14,6 +14,7 @@ export default function RevenueReportPage() {
     comparisonLabel,
     paymentShares,
     cashFlow,
+    chatbotSales,
     paginatedProducts,
     currentPage,
     totalPages,
@@ -45,6 +46,7 @@ export default function RevenueReportPage() {
         comparisonLabel={comparisonLabel}
         paymentShares={paymentShares}
         cashFlow={cashFlow}
+        chatbotSales={chatbotSales}
         paginatedProducts={paginatedProducts}
         currentPage={currentPage}
         totalPages={totalPages}

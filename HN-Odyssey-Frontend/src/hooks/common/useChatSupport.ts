@@ -8,6 +8,7 @@ import type { ChatProductCard } from "../../types/chatbot";
 export interface MessageMetadata {
   fileName?: string;
   fileSize?: string;
+  caption?: string; // Chữ khách gõ kèm ảnh
   name?: string;
   description?: string;
   link?: string;
@@ -252,7 +253,7 @@ export function useChatSupport() {
     (
       content: string,
       message_type: "TEXT" | "IMAGE" | "FILE" = "TEXT",
-      metadata?: { fileName?: string; fileSize?: string },
+      metadata?: Pick<MessageMetadata, "fileName" | "fileSize" | "caption">,
     ) => {
       const convId = conversationIdRef.current;
       if (!convId || !socketRef.current) return;
