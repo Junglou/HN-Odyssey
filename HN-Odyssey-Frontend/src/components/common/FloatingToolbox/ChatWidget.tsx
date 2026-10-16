@@ -25,6 +25,13 @@ const getValidMediaUrl = (url: string) => {
   return url;
 };
 
+const MAX_CHAT_IMAGE_MB = 10;
+
+interface PendingImage {
+  file: File;
+  previewUrl: string;
+}
+
 // props
 interface ChatWidgetProps {
   onClose: () => void;
@@ -42,8 +49,19 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
   } = useChatSupport();
   const [text, setText] = useState("");
   const [showEmoji, setShowEmoji] = useState(false);
+  // Ảnh khách đã chọn nhưng chưa gửi (để gõ kèm câu hỏi rồi gửi chung 1 tin)
+  const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
+  const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textInputRef = useRef<HTMLInputElement>(null);
+
+  // Giải phóng URL xem trước khi đổi ảnh / bỏ ảnh / đóng khung chat
+  useEffect(() => {
+    return () => {
+      if (pendingImage) URL.revokeObjectURL(pendingImage.previewUrl);
+    };
+  }, [pendingImage]);
 
   // auto scroll
   useEffect(() => {
@@ -56,7 +74,44 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
     if (window.matchMedia("(max-width: 768px)").matches) onClose();
   };
 
-  const handleSend = () => {
+  const uploadToServer = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const uploadRes = await axiosClient.post("/upload/single", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    // Nhận diện link Cloudinary hay link Local
+    const rawPath: string = uploadRes.data.path;
+    if (rawPath.startsWith("http")) return rawPath;
+
+    const baseUrl = import.meta.env.VITE_API_URL.replace("/api", "");
+    return `${baseUrl}${rawPath.startsWith("/") ? "" : "/"}${rawPath}`;
+  };
+
+  const handleSend = async () => {
+    if (isSending) return;
+
+    // Có ảnh đang chờ -> gửi 1 tin IMAGE, chữ trong ô nhập thành chú thích
+    if (pendingImage) {
+      const caption = text.trim();
+      setIsSending(true);
+      try {
+        const imageUrl = await uploadToServer(pendingImage.file);
+        sendMessage(imageUrl, "IMAGE", caption ? { caption } : undefined);
+        setPendingImage(null);
+        setText("");
+        setShowEmoji(false);
+      } catch (error) {
+        console.error(error);
+        window.alert("Couldn't send the image. Please try again.");
+      } finally {
+        setIsSending(false);
+      }
+      return;
+    }
+
     if (!text.trim()) return;
     sendMessage(text, "TEXT");
     setText("");
@@ -64,7 +119,7 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") handleSend();
+    if (e.key === "Enter") void handleSend();
   };
 
   const onEmojiClick = (emojiData: EmojiClickData) => {
@@ -77,47 +132,45 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = ""; // cho phép chọn lại đúng file vừa bỏ
     if (!file) return;
 
+    // Ảnh: chưa gửi ngay, hiện xem trước để khách gõ thêm câu hỏi
+    if (file.type.startsWith("image/")) {
+      if (file.size > MAX_CHAT_IMAGE_MB * 1024 * 1024) {
+        window.alert(
+          `Images must be ${MAX_CHAT_IMAGE_MB}MB or smaller. Please choose a smaller image.`,
+        );
+        return;
+      }
+      setPendingImage({ file, previewUrl: URL.createObjectURL(file) });
+      textInputRef.current?.focus();
+      return;
+    }
+
+    // Tệp PDF/DOC: gửi ngay như cũ
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const uploadRes = await axiosClient.post("/upload/single", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+      const fileUrl = await uploadToServer(file);
+      const sizeInMB = (file.size / (1024 * 1024)).toFixed(2) + "mb";
+      sendMessage(fileUrl, "FILE", {
+        fileName: file.name,
+        fileSize: sizeInMB,
       });
-
-      // FIX: Thông minh nhận diện link Cloudinary hay link Local
-      const rawPath = uploadRes.data.path;
-      let fileUrl = rawPath;
-
-      if (!rawPath.startsWith("http")) {
-        const baseUrl = import.meta.env.VITE_API_URL.replace("/api", "");
-        fileUrl = `${baseUrl}${rawPath.startsWith("/") ? "" : "/"}${rawPath}`;
-      }
-
-      if (file.type.startsWith("image/")) {
-        sendMessage(fileUrl, "IMAGE");
-      } else {
-        const sizeInMB = (file.size / (1024 * 1024)).toFixed(2) + "mb";
-        sendMessage(fileUrl, "FILE", {
-          fileName: file.name,
-          fileSize: sizeInMB,
-        });
-      }
     } catch (error) {
       console.error(error);
-    } finally {
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     }
   };
 
   // xử lý markdown in đậm cho text
   const formatText = (text: string) => {
-    // tìm các chuỗi nằm trong 2 dấu sao và chuyển thành thẻ strong
-    const htmlText = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    // Escape HTML trước để chặn XSS, sau đó mới đổi **...** thành <strong>
+    const escaped = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+    const htmlText = escaped.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
     return { __html: htmlText };
   };
 
@@ -143,7 +196,11 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
           </div>
           <span className="cw-title">Support</span>
         </div>
-        <button className="cw-close-btn" onClick={onClose}>
+        <button
+          className="cw-close-btn"
+          onClick={onClose}
+          aria-label="Close chat"
+        >
           <CloseIcon />
         </button>
       </div>
@@ -190,11 +247,16 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
 
                 {/* image type */}
                 {msg.message_type === "IMAGE" && (
-                  <img
-                    src={getValidMediaUrl(msg.content)}
-                    alt="attachment"
-                    className="cw-img-attach"
-                  />
+                  <>
+                    <img
+                      src={getValidMediaUrl(msg.content)}
+                      alt="attachment"
+                      className="cw-img-attach"
+                    />
+                    {msg.metadata?.caption && (
+                      <p className="cw-img-caption">{msg.metadata.caption}</p>
+                    )}
+                  </>
                 )}
 
                 {/* file type - Đã thêm thẻ <a> để click vào tải file */}
@@ -243,7 +305,7 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
                           rel="noreferrer"
                           className="cw-product-link"
                         >
-                          Xem chi tiết sản phẩm
+                          View product details
                         </a>
                       )}
                     </div>
@@ -259,8 +321,8 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
             <div className="cw-bubble cw-typing-bubble">
               <span className="cw-typing-label">
                 {typingIndicator.senderType === "BOT"
-                  ? "Trợ lý ảo đang trả lời"
-                  : `${typingIndicator.userName || "Nhân viên"} đang nhập`}
+                  ? "Assistant is typing"
+                  : `${typingIndicator.userName || "Support agent"} is typing`}
               </span>
               <span className="cw-typing-dots">
                 <span />
@@ -288,6 +350,26 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
         </div>
       )}
 
+      {/* ảnh chờ gửi */}
+      {pendingImage && (
+        <div className="cw-pending-image">
+          <img src={pendingImage.previewUrl} alt="Image to send" />
+          <span className="cw-pending-hint">
+            {isSending
+              ? "Sending image..."
+              : "Add a question about this image (optional), then send"}
+          </span>
+          <button
+            className="cw-pending-remove"
+            onClick={() => setPendingImage(null)}
+            disabled={isSending}
+            aria-label="Remove image"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+      )}
+
       {/* footer */}
       <div className="cw-footer">
         {/* input ẩn */}
@@ -299,14 +381,22 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
           accept="image/*,.pdf,.doc,.docx"
         />
 
-        <button className="cw-icon-btn" onClick={handleAttachClick}>
+        <button
+          className="cw-icon-btn"
+          onClick={handleAttachClick}
+          disabled={isSending}
+          aria-label="Attach file"
+        >
           <PaperClipIcon />
         </button>
 
         <input
+          ref={textInputRef}
           type="text"
           className="cw-input"
-          placeholder="Type a message..."
+          placeholder={
+            pendingImage ? "Ask about this image..." : "Type a message..."
+          }
           value={text}
           onChange={(e) => {
             setText(e.target.value);
@@ -317,10 +407,16 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
         <button
           className="cw-icon-btn"
           onClick={() => setShowEmoji((prev) => !prev)}
+          aria-label="Emoji"
         >
           <SmileIcon />
         </button>
-        <button className="cw-icon-btn cw-send-btn" onClick={handleSend}>
+        <button
+          className="cw-icon-btn cw-send-btn"
+          onClick={() => void handleSend()}
+          disabled={isSending}
+          aria-label="Send"
+        >
           <SendIcon />
         </button>
       </div>

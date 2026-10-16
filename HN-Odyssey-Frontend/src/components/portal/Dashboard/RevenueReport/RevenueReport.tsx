@@ -7,12 +7,14 @@ import type {
   TrendDataPoint,
   TrendGranularity,
   TopProduct,
+  ChatbotSalesView,
 } from "../../../../hooks/portal/Dashboard/RevenueReport/useRevenueReport";
 
 import KeyRevenueMetrics from "./KeyRevenueMetrics";
 import RevenueTrendAnalysis from "./RevenueTrendAnalysis";
 import BestSellingProducts from "./BestSellingProducts";
 import PaymentAnalysis from "./PaymentAnalysis";
+import ChatbotSales from "./ChatbotSales";
 
 interface RevenueReportProps {
   activeFilter: string;
@@ -25,6 +27,7 @@ interface RevenueReportProps {
   comparisonLabel: string;
   paymentShares: PaymentShare[];
   cashFlow: CashFlow;
+  chatbotSales?: ChatbotSalesView | null;
   paginatedProducts: TopProduct[];
   currentPage: number;
   totalPages: number;
@@ -54,6 +57,7 @@ export default function RevenueReport({
   comparisonLabel,
   paymentShares,
   cashFlow,
+  chatbotSales = null,
   paginatedProducts,
   currentPage,
   totalPages,
@@ -181,6 +185,14 @@ export default function RevenueReport({
           paymentShares={paymentShares}
           cashFlow={cashFlow}
           period={period}
+          canExport={canExport}
+        />
+        {/* Doanh thu & đơn từ chatbot (dựa trên sales_channel) */}
+        <ChatbotSales
+          data={chatbotSales}
+          granularity={trendGranularity}
+          period={period}
+          comparisonLabel={comparisonLabel}
           canExport={canExport}
         />
         <BestSellingProducts

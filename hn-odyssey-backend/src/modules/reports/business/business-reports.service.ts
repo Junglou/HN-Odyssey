@@ -137,7 +137,10 @@ export class BusinessReportsService {
             paymentShare: [
               {
                 $group: {
-                  _id: '$payment.method',
+                  // Chuẩn hóa chữ hoa để "vnpay" và "VNPAY" gộp chung 1 nhóm
+                  _id: {
+                    $toUpper: { $ifNull: ['$payment.method', 'UNKNOWN'] },
+                  },
                   revenue: { $sum: '$total_amount' },
                 },
               },

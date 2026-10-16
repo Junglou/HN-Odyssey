@@ -62,6 +62,10 @@ import { AlgoliaService } from 'src/modules/search/algolia.service';
 import { MediaService } from 'src/modules/marketing/content/media.service';
 import { UploadService } from 'src/modules/system/upload/upload.service';
 
+// Escape ký tự đặc biệt để từ khóa không phá regex
+const escapeRegex = (text: string) =>
+  text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 interface PopulatedCategory {
   _id: Types.ObjectId;
   name: string;
@@ -1894,26 +1898,68 @@ export class ProductsService {
     console.log('\n--- N8N CHATBOT TÌM KIẾM SẢN PHẨM ---');
     console.log('1. Keyword gốc n8n gửi sang:', keyword);
 
-    const safeKeyword = keyword.trim().replace(/\s+/g, '.*');
-    const searchRegex = new RegExp(safeKeyword, 'i');
-    console.log('2. Regex query trong DB:', searchRegex);
+    const words = keyword
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 5);
+    if (words.length === 0) return [];
 
-    const results = await this.productModel
+    const baseFilter: FilterQuery<ProductDocument> = {
+      status: ProductStatus.ACTIVE,
+      is_deleted: false,
+    };
+    const fields =
+      'name slug tags price sale_price stock has_variants specs variants';
+
+    // Bước 1: khớp đủ các từ theo thứ tự (vd "snake bite" khớp "SnakeBite Emergency Extractor")
+    const strictRegex = new RegExp(words.map(escapeRegex).join('.*'), 'i');
+    const strict = await this.productModel
       .find({
-        $or: [
-          { name: { $regex: searchRegex } },
-          { tags: { $regex: searchRegex } },
-        ],
-        status: ProductStatus.ACTIVE,
-        is_deleted: false,
+        ...baseFilter,
+        $or: [{ name: strictRegex }, { tags: strictRegex }],
       })
-      .select('name slug price sale_price stock has_variants specs variants')
+      .select(fields)
       .limit(5)
       .lean()
       .exec();
 
-    console.log('3. Số sản phẩm DB trả về:', results.length);
-    return results;
+    if (strict.length > 0) {
+      console.log('2. Khớp đủ từ khóa:', strict.length, 'sản phẩm');
+      return strict;
+    }
+
+    // Bước 2: khớp từng từ (>= 3 ký tự), xếp theo số từ khớp được
+    const wordRegexes = words
+      .filter((w) => w.length >= 3)
+      .map((w) => new RegExp(escapeRegex(w), 'i'));
+    if (wordRegexes.length === 0 || words.length === 1) return [];
+
+    const candidates = await this.productModel
+      .find({
+        ...baseFilter,
+        $or: wordRegexes.flatMap((r) => [{ name: r }, { tags: r }]),
+      })
+      .select(fields)
+      .limit(30)
+      .lean()
+      .exec();
+
+    const ranked = candidates
+      .map((product) => ({
+        product,
+        score: wordRegexes.filter(
+          (r) =>
+            r.test(product.name) || (product.tags ?? []).some((t) => r.test(t)),
+        ).length,
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5)
+      .map((item) => item.product);
+
+    console.log('2. Khớp từng từ:', ranked.length, 'sản phẩm');
+    return ranked;
   }
 
   async bulkSyncToAlgolia() {

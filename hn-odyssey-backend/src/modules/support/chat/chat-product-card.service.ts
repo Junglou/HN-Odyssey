@@ -6,17 +6,21 @@ import {
   ProductDocument,
 } from 'src/modules/products/catalog/schemas/product.schema';
 import { ProductStatus } from 'src/common/enums/product-status.enum';
+import {
+  Attribute,
+  AttributeDocument,
+} from 'src/modules/products/attributes/schemas/attribute.schema';
 
 const MAX_CARDS = 3;
 
 // Nhãn cho các mã thuộc tính hay gặp; mã lạ thì hiển thị nguyên mã
 const OPTION_LABELS: Record<string, string> = {
-  color: 'Màu sắc',
-  colour: 'Màu sắc',
-  size: 'Kích cỡ',
-  capacity: 'Dung tích',
-  material: 'Chất liệu',
-  condition: 'Tình trạng',
+  color: 'Color',
+  colour: 'Color',
+  size: 'Size',
+  capacity: 'Capacity',
+  material: 'Material',
+  condition: 'Condition',
 };
 
 export interface ChatCardVariant {
@@ -32,6 +36,12 @@ export interface ChatCardOption {
   code: string;
   label: string;
   values: string[];
+  value_labels?: Record<string, string>; // Giá trị lưu DB -> tên hiển thị (VD "100%" -> "Brand new")
+}
+
+interface AttributeLabelInfo {
+  name: string;
+  values: Map<string, string>; // value (chữ thường) -> label
 }
 
 export interface ChatProductCard {
@@ -82,6 +92,8 @@ export class ChatProductCardService {
   constructor(
     @InjectModel(Product.name)
     private readonly productModel: Model<ProductDocument>,
+    @InjectModel(Attribute.name)
+    private readonly attributeModel: Model<AttributeDocument>,
   ) {}
 
   // Nhận product_ids do AI trả về -> trả về tối đa 3 thẻ hợp lệ, đúng thứ tự AI gợi ý
@@ -106,6 +118,7 @@ export class ChatProductCardService {
       .lean<LeanProduct[]>()
       .exec();
 
+    const attributeInfo = await this.loadAttributeLabels(products);
     const byId = new Map(products.map((p) => [String(p._id), p]));
     const cards: ChatProductCard[] = [];
 
@@ -115,14 +128,48 @@ export class ChatProductCardService {
       // Quà độc quyền theo hạng thành viên không bán thường -> không gợi ý
       if (product.allowed_tiers && product.allowed_tiers.length > 0) continue;
 
-      const card = this.toCard(product);
+      const card = this.toCard(product, attributeInfo);
       if (card) cards.push(card);
     }
 
     return cards;
   }
 
-  private toCard(p: LeanProduct): ChatProductCard | null {
+  // Tên hiển thị của thuộc tính & giá trị lấy từ bảng Attribute (giống trang chi tiết sản phẩm)
+  private async loadAttributeLabels(
+    products: LeanProduct[],
+  ): Promise<Map<string, AttributeLabelInfo>> {
+    const codes = new Set<string>();
+    products.forEach((p) =>
+      p.variants?.forEach((v) =>
+        v.attributes?.forEach((a) => codes.add(a.code)),
+      ),
+    );
+
+    const result = new Map<string, AttributeLabelInfo>();
+    if (codes.size === 0) return result;
+
+    const attributes = await this.attributeModel
+      .find({ code: { $in: Array.from(codes) } })
+      .select('code name values')
+      .lean<Pick<Attribute, 'code' | 'name' | 'values'>[]>()
+      .exec();
+
+    for (const attr of attributes) {
+      result.set(attr.code, {
+        name: attr.name,
+        values: new Map(
+          (attr.values ?? []).map((v) => [v.value.toLowerCase(), v.label]),
+        ),
+      });
+    }
+    return result;
+  }
+
+  private toCard(
+    p: LeanProduct,
+    attributeInfo: Map<string, AttributeLabelInfo>,
+  ): ChatProductCard | null {
     const base = {
       product_id: String(p._id),
       name: p.name,
@@ -183,13 +230,24 @@ export class ChatProductCardService {
     }
 
     const options: ChatCardOption[] = Array.from(optionMap.entries()).map(
-      ([code, values]) => ({
-        code,
-        label:
-          OPTION_LABELS[code.toLowerCase()] ||
-          code.charAt(0).toUpperCase() + code.slice(1),
-        values,
-      }),
+      ([code, values]) => {
+        const info = attributeInfo.get(code);
+        const valueLabels: Record<string, string> = {};
+        values.forEach((value) => {
+          const label = info?.values.get(value.toLowerCase());
+          if (label) valueLabels[value] = label;
+        });
+
+        return {
+          code,
+          label:
+            info?.name ||
+            OPTION_LABELS[code.toLowerCase()] ||
+            code.charAt(0).toUpperCase() + code.slice(1),
+          values,
+          value_labels: valueLabels,
+        };
+      },
     );
 
     const cheapest = variants.reduce(

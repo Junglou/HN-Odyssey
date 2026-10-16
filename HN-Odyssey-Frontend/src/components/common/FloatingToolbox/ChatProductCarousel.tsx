@@ -4,7 +4,11 @@ import { toast } from "react-toastify";
 import axiosClient from "../../../api/axiosClient";
 import { getGuestSessionId } from "../../../hooks/common/cartDrop/useCart";
 import { useTracking, BehaviorAction } from "../../../hooks/common/useTracking";
-import type { ChatCardVariant, ChatProductCard } from "../../../types/chatbot";
+import type {
+  ChatCardOption,
+  ChatCardVariant,
+  ChatProductCard,
+} from "../../../types/chatbot";
 import {
   formatUsd,
   formatUsdRange,
@@ -37,6 +41,25 @@ const formatValue = (value: string) => {
   return text.toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
 };
 
+// Nhãn nhóm lựa chọn lấy theo mã thuộc tính -> cả thẻ cũ (snapshot nhãn tiếng Việt) cũng hiện tiếng Anh
+const OPTION_LABELS: Record<string, string> = {
+  color: "Color",
+  colour: "Color",
+  size: "Size",
+  capacity: "Capacity",
+  material: "Material",
+  condition: "Condition",
+};
+
+const getOptionLabel = (opt: { code: string; label?: string }) =>
+  OPTION_LABELS[opt.code.toLowerCase()] ||
+  opt.label ||
+  opt.code.charAt(0).toUpperCase() + opt.code.slice(1);
+
+// Ưu tiên tên hiển thị từ bảng thuộc tính (VD "100%" -> "Brand new"); thẻ cũ không có thì tự định dạng
+const getValueLabel = (opt: ChatCardOption, value: string) =>
+  opt.value_labels?.[value] || formatValue(value);
+
 const isProductSoldOut = (product: ChatProductCard) =>
   product.has_variants
     ? product.variants.every((v) => v.stock <= 0)
@@ -64,7 +87,7 @@ function CompactCard({ product, onOpen }: CompactCardProps) {
         type="button"
         className="cpc-image-btn"
         onClick={onOpen}
-        aria-label={`Xem ${product.name}`}
+        aria-label={`View ${product.name}`}
       >
         <img
           src={resolveMediaUrl(product.image)}
@@ -72,7 +95,7 @@ function CompactCard({ product, onOpen }: CompactCardProps) {
           className="cpc-image"
           loading="lazy"
         />
-        {soldOut && <span className="cpc-badge">Hết hàng</span>}
+        {soldOut && <span className="cpc-badge">Sold out</span>}
       </button>
 
       <div className="cpc-body">
@@ -95,7 +118,7 @@ function CompactCard({ product, onOpen }: CompactCardProps) {
           onClick={onOpen}
           disabled={soldOut}
         >
-          {soldOut ? "Hết hàng" : "Chọn mua"}
+          {soldOut ? "Sold out" : "Shop now"}
         </button>
       </div>
     </div>
@@ -204,7 +227,7 @@ function ProductSheet({
     const missing = product.options.filter((opt) => !selected[opt.code]);
     if (product.has_variants && missing.length > 0) {
       setError(
-        `Vui lòng chọn ${missing.map((m) => m.label.toLowerCase()).join(", ")}`,
+        `Please select ${missing.map((m) => getOptionLabel(m).toLowerCase()).join(", ")}`,
       );
       return null;
     }
@@ -215,11 +238,11 @@ function ProductSheet({
       : product.stock;
 
     if (!sku) {
-      setError("Phân loại này hiện không có sẵn");
+      setError("This option isn't available right now");
       return null;
     }
     if (available < product.min_qty) {
-      setError("Phân loại này đã hết hàng");
+      setError("This option is out of stock");
       return null;
     }
 
@@ -249,7 +272,7 @@ function ProductSheet({
       return sku;
     } catch (err: unknown) {
       const apiError = err as ApiError;
-      setError(apiError.message || "Không thể thêm vào giỏ hàng");
+      setError(apiError.message || "Couldn't add to cart. Please try again.");
       return null;
     } finally {
       setBusy(false);
@@ -259,7 +282,7 @@ function ProductSheet({
   const handleAddToCart = async () => {
     const sku = await addToCart();
     if (!sku) return;
-    toast.success("Đã thêm vào giỏ hàng!");
+    toast.success("Added to cart!");
     onClose();
   };
 
@@ -291,7 +314,7 @@ function ProductSheet({
             type="button"
             className="cps-close"
             onClick={onClose}
-            aria-label="Đóng"
+            aria-label="Close"
           >
             <svg
               width="16"
@@ -317,7 +340,7 @@ function ProductSheet({
               alt={product.name}
               className="cps-image"
             />
-            {soldOut && <span className="cpc-badge">Hết hàng</span>}
+            {soldOut && <span className="cpc-badge">Sold out</span>}
           </div>
 
           <div className="cps-info">
@@ -335,15 +358,15 @@ function ProductSheet({
             </div>
 
             {displayStock !== null && displayStock > 0 && displayStock <= 5 && (
-              <p className="cps-stock">Chỉ còn {displayStock} sản phẩm</p>
+              <p className="cps-stock">Only {displayStock} left</p>
             )}
 
             {product.options.map((opt) => (
               <div key={opt.code} className="cps-option">
                 <span className="cps-option-label">
-                  {opt.label}
+                  {getOptionLabel(opt)}
                   {selected[opt.code] && (
-                    <strong>: {formatValue(selected[opt.code])}</strong>
+                    <strong>: {getValueLabel(opt, selected[opt.code])}</strong>
                   )}
                 </span>
                 <div className="cps-chips">
@@ -358,7 +381,7 @@ function ProductSheet({
                         disabled={!isAvailable && !isActive}
                         onClick={() => pick(opt.code, value)}
                       >
-                        {formatValue(value)}
+                        {getValueLabel(opt, value)}
                       </button>
                     );
                   })}
@@ -371,7 +394,7 @@ function ProductSheet({
               className="cps-detail-link"
               onClick={onViewDetail}
             >
-              Xem chi tiết sản phẩm →
+              View product details →
             </button>
           </div>
         </div>
@@ -385,7 +408,7 @@ function ProductSheet({
               disabled={busy || soldOut}
               onClick={handleAddToCart}
             >
-              Thêm vào giỏ
+              Add to Cart
             </button>
             <button
               type="button"
@@ -393,7 +416,7 @@ function ProductSheet({
               disabled={busy || soldOut}
               onClick={handleBuyNow}
             >
-              {busy ? "Đang xử lý..." : "Mua ngay"}
+              {busy ? "Processing..." : "Buy Now"}
             </button>
           </div>
         </div>

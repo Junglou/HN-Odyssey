@@ -41,6 +41,21 @@ export class DashboardController {
     return new BaseResponse(true, 'Lấy thống kê tổng quan thành công', data);
   }
 
+  // Doanh thu & đơn từ chatbot (trang Revenue Report)
+  @Get('chatbot-sales')
+  @RequirePermissions(
+    [Resource.DASHBOARD, Resource.REPORT_REVENUE, Resource.REPORT_MARKETING],
+    Action.READ,
+  )
+  async getChatbotSales(@Query() query: DashboardFilterDto) {
+    const data = await this.dashboardService.getChatbotSales(query);
+    return new BaseResponse(
+      true,
+      'Lấy thống kê doanh thu từ chatbot thành công',
+      data,
+    );
+  }
+
   // Cho phép 3 nhóm quyền cùng truy cập API sản phẩm bán chạy
   @Get('top-products')
   @RequirePermissions(

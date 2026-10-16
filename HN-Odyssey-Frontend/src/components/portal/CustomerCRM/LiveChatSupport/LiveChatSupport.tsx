@@ -435,7 +435,14 @@ export default function LiveChatSupport({
 
   // chuyển đổi cú pháp markdown in đậm thành thẻ strong HTML
   const formatText = (text: string) => {
-    const htmlText = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    // Escape HTML trước để chặn XSS, sau đó mới đổi **...** thành <strong>
+    const escaped = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+    const htmlText = escaped.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
     return { __html: htmlText };
   };
 
@@ -686,6 +693,11 @@ export default function LiveChatSupport({
                               src={getValidMediaUrl(msg.content)}
                               alt="attachment"
                             />
+                            {msg.caption && (
+                              <p className="lcs-message-caption">
+                                {msg.caption}
+                              </p>
+                            )}
                           </div>
                         )}
 

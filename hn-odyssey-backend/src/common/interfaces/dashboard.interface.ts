@@ -103,3 +103,28 @@ export interface TopCategory {
   return_rate_percent: number;
   growth_percent: number;
 }
+export interface ChatbotTopProduct {
+  product_id: string;
+  name: string;
+  quantity: number;
+  revenue: number;
+}
+
+// Doanh thu & đơn từ chatbot (trang Revenue Report)
+export interface ChatbotSalesReport {
+  chatbot_revenue: number;
+  chatbot_orders: number;
+  total_revenue: number;
+  total_orders: number;
+  revenue_share_percent: number;
+  orders_share_percent: number;
+  chatbot_aov: number;
+  web_aov: number;
+  prev_chatbot_revenue: number;
+  revenue_growth_percent: number;
+  suggestion_conversations: number; // Hội thoại có ít nhất 1 thẻ sản phẩm
+  converted_conversations: number; // Hội thoại dẫn tới đơn chatbot
+  conversion_rate_percent: number;
+  chart_data: ChartDataPoint[];
+  top_products: ChatbotTopProduct[];
+}

@@ -19,6 +19,14 @@ import {
   ProductSchema,
 } from 'src/modules/products/catalog/schemas/product.schema';
 import { ChatProductCardService } from './chat-product-card.service';
+import {
+  Attribute,
+  AttributeSchema,
+} from 'src/modules/products/attributes/schemas/attribute.schema';
+import { PromotionsModule } from 'src/modules/marketing/promotions/promotions.module';
+import { RecommendationsModule } from 'src/modules/recommendations/recommendations.module';
+import { ChatInternalController } from './chat-internal.controller';
+import { ChatPersonalizationService } from './chat-personalization.service';
 
 @Module({
   imports: [
@@ -26,6 +34,7 @@ import { ChatProductCardService } from './chat-product-card.service';
       { name: Conversation.name, schema: ConversationSchema },
       { name: Message.name, schema: MessageSchema },
       { name: Product.name, schema: ProductSchema },
+      { name: Attribute.name, schema: AttributeSchema },
     ]),
     // Cấu hình JwtModule để WsJwtGuard có thể sử dụng JwtService
     JwtModule.registerAsync({
@@ -37,10 +46,18 @@ import { ChatProductCardService } from './chat-product-card.service';
     }),
     forwardRef(() => OrdersModule),
     NotificationsModule,
+    RecommendationsModule,
+    PromotionsModule,
     ScheduleModule.forRoot(),
   ],
-  controllers: [ChatController],
-  providers: [ChatService, ChatGateway, WsJwtGuard, ChatProductCardService],
+  controllers: [ChatController, ChatInternalController],
+  providers: [
+    ChatService,
+    ChatGateway,
+    WsJwtGuard,
+    ChatProductCardService,
+    ChatPersonalizationService,
+  ],
   exports: [ChatService],
 })
 export class ChatModule {}

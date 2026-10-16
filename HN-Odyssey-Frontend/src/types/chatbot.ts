@@ -12,6 +12,7 @@ export interface ChatCardOption {
   code: string;
   label: string;
   values: string[];
+  value_labels?: Record<string, string>; // Giá trị lưu DB -> tên hiển thị
 }
 
 export interface ChatProductCard {

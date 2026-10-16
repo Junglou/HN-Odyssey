@@ -32,6 +32,10 @@ import {
   StockTransaction,
   StockTransactionSchema,
 } from 'src/modules/inventory/transactions/schemas/stock-transaction.schema';
+import {
+  Message,
+  MessageSchema,
+} from 'src/modules/support/chat/schemas/message.schema';
 
 @Module({
   imports: [
@@ -40,6 +44,7 @@ import {
       { name: Order.name, schema: OrderSchema },
       { name: Category.name, schema: CategorySchema },
       { name: Conversation.name, schema: ConversationSchema },
+      { name: Message.name, schema: MessageSchema },
       { name: WarrantyClaim.name, schema: WarrantyClaimSchema },
       { name: SystemMetric.name, schema: SystemMetricSchema },
       { name: IntegrationLog.name, schema: IntegrationLogSchema },
