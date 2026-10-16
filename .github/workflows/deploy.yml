@@ -16,8 +16,10 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_KEY }}
+          command_timeout: 30m
           port: 22
           script: |
+            set -e
             # di chuyển vào thư mục dự án
             cd /var/www/odyssey/HN-Odyssey
             
