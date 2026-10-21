@@ -5,6 +5,7 @@ import {
   type UserOrder,
 } from "../../../types/user";
 import "./OrderManagementBox.css";
+import SmartImage from "../../common/SmartImage/SmartImage";
 
 interface OrderBoxProp {
   id: string;
@@ -44,7 +45,12 @@ const OrderManagementBox = ({ id: orderId, order }: OrderBoxProp) => {
           {primary && (
             <div className="order-thumbnail-container">
               <div className="thumbnail-img-container">
-                <img src={primary.image} className="order-img" alt="" />
+                {" "}
+                <SmartImage
+                  src={primary.image}
+                  className="order-img"
+                  alt={primary.name}
+                />
               </div>
               <div className="thumbnail-detail-container">
                 <span className="lbl-thumb-text">{primary.name}</span>

@@ -8,6 +8,7 @@ import { useCustomerManagement } from "../../../../hooks/portal/CustomerCRM/Cust
 export default function CustomerManagementPage() {
   const {
     currentRecords,
+    isLoading,
     pagination,
     search,
     statusFilter,
@@ -27,6 +28,7 @@ export default function CustomerManagementPage() {
     <div className="crm-page-container">
       <CustomerManagement
         data={currentRecords}
+        isLoading={isLoading}
         pagination={pagination}
         search={search}
         statusFilter={statusFilter}

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import type { CheckoutItem } from "../../hooks/checkout/useCheckout";
 import axiosClient from "../../api/axiosClient";
 import "./CheckoutRecommendations.css";
+import SmartImage from "../common/SmartImage/SmartImage";
 
 interface CheckoutRecommendationsProps {
   items: CheckoutItem[];
@@ -98,7 +99,7 @@ export default function CheckoutRecommendations({
             style={{ cursor: "pointer" }}
           >
             <div className="checkout-recommend-img-box">
-              <img src={item.image} alt={item.name} />
+              <SmartImage src={item.image} alt={item.name} />
             </div>
 
             <div className="checkout-recommend-info">

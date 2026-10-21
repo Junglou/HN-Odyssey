@@ -8,6 +8,7 @@ import "./TagManagementPage.css";
 export default function TagManagementPage() {
   const {
     filteredTags,
+    isLoading,
     search,
     drawerConfig,
     deleteConfig,
@@ -20,7 +21,12 @@ export default function TagManagementPage() {
   return (
     <div className="tm-page-container">
       {/* component chính hiển thị danh sách tag */}
-      <TagManagement data={filteredTags} search={search} actions={actions} />
+      <TagManagement
+        data={filteredTags}
+        isLoading={isLoading}
+        search={search}
+        actions={actions}
+      />
 
       {/* thanh trượt thêm/sửa tag */}
       <TagDrawer

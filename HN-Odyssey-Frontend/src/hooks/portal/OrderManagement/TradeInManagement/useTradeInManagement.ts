@@ -123,7 +123,7 @@ const useLocalAuth = () => {
 export function useTradeInManagement() {
   // states
   const [data, setData] = useState<TradeInRow[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isMutating, setIsMutating] = useState<boolean>(false);
 
   const { user } = useLocalAuth();

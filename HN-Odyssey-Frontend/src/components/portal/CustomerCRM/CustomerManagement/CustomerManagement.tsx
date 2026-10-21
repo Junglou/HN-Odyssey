@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import "./CustomerManagement.css";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
+import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
 import {
   EyeIcon,
   EditUserIcon,
@@ -17,6 +18,7 @@ import type {
 
 interface CustomerManagementProps {
   data: CustomerRecord[];
+  isLoading?: boolean;
   search: string;
   statusFilter: CustomerStatus | "All";
   typeFilter: CustomerType | "All";
@@ -54,6 +56,7 @@ interface CustomerManagementProps {
 
 export default function CustomerManagement({
   data,
+  isLoading = false,
   search,
   statusFilter,
   typeFilter,
@@ -284,8 +287,12 @@ export default function CustomerManagement({
                 <th className="crm-col-actions">Actions</th>
               </tr>
             </thead>
-            <tbody>
-              {data.length > 0 ? (
+            <tbody
+              className={`portal-tbody ${isLoading && data.length > 0 ? "is-refreshing" : ""}`}
+            >
+              {isLoading && data.length === 0 ? (
+                <TableSkeleton columns={7} />
+              ) : data.length > 0 ? (
                 data.map((record) => (
                   <tr
                     key={record.id}
@@ -418,7 +425,7 @@ export default function CustomerManagement({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="crm-empty-state">
+                  <td colSpan={7} className="portal-empty-state">
                     No customers found matching your criteria.
                   </td>
                 </tr>

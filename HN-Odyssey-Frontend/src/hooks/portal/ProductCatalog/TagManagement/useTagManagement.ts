@@ -27,6 +27,7 @@ export interface ApiError {
 
 export function useTagManagement() {
   const [tags, setTags] = useState<Tag[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [search, setSearch] = useState("");
   const [drawerConfig, setDrawerConfig] = useState<{
     isOpen: boolean;
@@ -49,6 +50,8 @@ export function useTagManagement() {
         }
       } catch (error) {
         console.error("lỗi khi tải danh sách thẻ:", error);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     };
     fetchTags();
@@ -126,6 +129,7 @@ export function useTagManagement() {
   return {
     tags,
     filteredTags,
+    isLoading,
     search,
     drawerConfig,
     deleteConfig,

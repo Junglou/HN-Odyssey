@@ -74,6 +74,7 @@ export default function StockManagement({
       <div className="sm-body">
         {activeTab === "requests" && (
           <RequestTab
+            isLoading={requests.loading}
             data={requests.data}
             filters={requests.filters}
             pagination={requests.pagination}
@@ -83,6 +84,7 @@ export default function StockManagement({
         )}
         {activeTab === "overview" && (
           <StockOverviewTab
+            isLoading={overview.loading}
             data={overview.data}
             filters={overview.filters}
             pagination={overview.pagination}
@@ -92,6 +94,7 @@ export default function StockManagement({
         )}
         {activeTab === "tickets" && (
           <StockTicketsTab
+            isLoading={tickets.loading}
             data={tickets.data}
             filters={tickets.filters}
             pagination={tickets.pagination}

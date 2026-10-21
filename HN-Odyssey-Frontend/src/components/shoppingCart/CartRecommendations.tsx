@@ -4,6 +4,7 @@ import { PlusIconSmall } from "../../assets/icons/ShoppingCartIcons";
 import type { RecommendItem } from "../../hooks/shoppingCart/useShoppingCart";
 import axiosClient from "../../api/axiosClient";
 import "./CartRecommendations.css";
+import SmartImage from "../common/SmartImage/SmartImage";
 
 interface CartRecommendationsProps {
   items: RecommendItem[];
@@ -100,7 +101,7 @@ export default function CartRecommendations({
             style={{ cursor: "pointer" }}
           >
             <div className="cart-rec-img-box">
-              <img src={item.image} alt={item.name} />
+              <SmartImage src={item.image} alt={item.name} />
             </div>
             <div className="cart-rec-info">
               <h4 className="cart-rec-name">{item.name}</h4>

@@ -17,6 +17,7 @@ import {
 } from "../../../utils/chatbotCommerce";
 import { buildBuyNowCheckoutUrl } from "../../../utils/buyNow";
 import "./ChatProductCarousel.css";
+import SmartImage from "../SmartImage/SmartImage";
 
 interface ApiError {
   message?: string;
@@ -89,11 +90,10 @@ function CompactCard({ product, onOpen }: CompactCardProps) {
         onClick={onOpen}
         aria-label={`View ${product.name}`}
       >
-        <img
+        <SmartImage
           src={resolveMediaUrl(product.image)}
           alt={product.name}
           className="cpc-image"
-          loading="lazy"
         />
         {soldOut && <span className="cpc-badge">Sold out</span>}
       </button>

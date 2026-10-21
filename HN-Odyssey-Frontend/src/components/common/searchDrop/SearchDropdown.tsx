@@ -2,6 +2,7 @@ import { useHits } from "react-instantsearch";
 import { Link } from "react-router-dom";
 import axiosClient from "../../../api/axiosClient";
 import "./SearchDropdown.css";
+import SmartImage from "../SmartImage/SmartImage";
 
 interface SearchDropdownProps {
   isOpen: boolean;
@@ -60,12 +61,11 @@ export default function SearchDropdown({
                 onClick={() => handleHitClick(hit)}
               >
                 <div className="search-hit-img-box">
-                  <img
-                    src={
-                      hit.thumbnail ||
-                      "https://placehold.co/70x70/f3f4f6/000?text=Img"
-                    }
+                  <SmartImage
+                    src={hit.thumbnail}
+                    fallbackSrc="https://placehold.co/70x70/f3f4f6/000?text=Img"
                     alt={hit.name}
+                    loading="eager"
                   />
                 </div>
                 <div className="search-hit-info">

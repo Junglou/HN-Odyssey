@@ -158,6 +158,7 @@ const useLocalAuth = () => {
 export function useReviewAndRatingManagement() {
   const [records, setRecords] = useState<ReviewRecord[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -213,6 +214,7 @@ export function useReviewAndRatingManagement() {
   const canDelete = hasPermission(Resource.CRM_REVIEWS, Action.DELETE);
 
   const fetchReviews = useCallback(async () => {
+    setIsLoading(true);
     try {
       const params: Record<string, string | number> = { page, limit };
       if (debouncedSearch) params.keyword = debouncedSearch;
@@ -237,6 +239,8 @@ export function useReviewAndRatingManagement() {
     } catch (error) {
       console.error(error);
       toast.error("Lỗi khi tải danh sách đánh giá.");
+    } finally {
+      setIsLoading(false);
     }
   }, [page, limit, debouncedSearch, statusFilter, ratingFilter]);
 
@@ -452,6 +456,7 @@ export function useReviewAndRatingManagement() {
 
   return {
     currentRecords: records,
+    isLoading,
     pagination: {
       page,
       limit,

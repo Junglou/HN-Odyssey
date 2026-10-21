@@ -12,6 +12,7 @@ export default function OverviewPage() {
     recentTickets,
     pendingReturns,
     activities,
+    isLoading,
   } = useOverview();
 
   return (
@@ -25,6 +26,7 @@ export default function OverviewPage() {
         recentTickets={recentTickets}
         pendingReturns={pendingReturns}
         activities={activities}
+        isLoading={isLoading}
       />
     </div>
   );

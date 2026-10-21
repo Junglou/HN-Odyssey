@@ -3,6 +3,7 @@ import { useOtherHalfConfig } from "../../hooks/home/useOtherHalfConfig";
 import type { ConfigElement } from "../../hooks/home/useJustForYouSlider";
 import type { SectionConfig } from "../../hooks/portal/Communication/ContentConfig/useContentConfig";
 import "./OtherHalfSection.css";
+import SmartImage from "../common/SmartImage/SmartImage";
 
 const processStyle = (style?: React.CSSProperties): React.CSSProperties => {
   if (!style) return {};
@@ -60,7 +61,7 @@ const renderContentElement = (
   switch (el.type) {
     case "image":
       return (
-        <img
+        <SmartImage
           key={el.id}
           src={el.content}
           alt=""

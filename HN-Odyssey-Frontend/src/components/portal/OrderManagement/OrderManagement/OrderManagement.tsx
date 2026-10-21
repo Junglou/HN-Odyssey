@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import "./OrderManagement.css";
+import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
 import {
   EyeIcon,
   ChevronDownSmallIcon,
@@ -94,6 +95,7 @@ function CustomDropdown({
 // props
 interface OrderManagementProps {
   data: OrderRow[];
+  isLoading?: boolean;
   filters: {
     search: string;
     status: string;
@@ -166,6 +168,7 @@ const getPageNumbers = (
 // component
 export default function OrderManagement({
   data,
+  isLoading = false,
   filters,
   pagination,
   actions,
@@ -388,10 +391,14 @@ export default function OrderManagement({
                 <th className="om-text-right">Actions</th>
               </tr>
             </thead>
-            <tbody>
-              {data.length === 0 ? (
+            <tbody
+              className={`portal-tbody ${isLoading && data.length > 0 ? "is-refreshing" : ""}`}
+            >
+              {isLoading && data.length === 0 ? (
+                <TableSkeleton columns={9} />
+              ) : data.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="om-empty-state">
+                  <td colSpan={9} className="portal-empty-state">
                     No orders found.
                   </td>
                 </tr>

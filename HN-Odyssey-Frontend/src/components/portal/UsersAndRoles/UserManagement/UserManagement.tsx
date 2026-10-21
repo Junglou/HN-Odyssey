@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import "./UserManagement.css";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
+import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
 import {
   ViewIcon,
   EditIcon,
@@ -20,6 +21,7 @@ import type {
 // types
 interface UserManagementProps {
   data: User[];
+  isLoading?: boolean;
   filters: { search: string; status: string; role: string };
   pagination: {
     page: number;
@@ -122,6 +124,7 @@ function CustomDropdown({
 // component
 export default function UserManagement({
   data,
+  isLoading = false,
   filters,
   pagination,
   options,
@@ -251,8 +254,12 @@ export default function UserManagement({
                 <th>Actions</th>
               </tr>
             </thead>
-            <tbody>
-              {data.length > 0 ? (
+            <tbody
+              className={`portal-tbody ${isLoading && data.length > 0 ? "is-refreshing" : ""}`}
+            >
+              {isLoading && data.length === 0 ? (
+                <TableSkeleton columns={6} />
+              ) : data.length > 0 ? (
                 data.map((user) => (
                   <tr
                     key={user.id}
@@ -373,7 +380,7 @@ export default function UserManagement({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="um-td-empty">
+                  <td colSpan={6} className="portal-empty-state">
                     No users found matching your filters.
                   </td>
                 </tr>

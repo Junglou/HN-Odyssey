@@ -6,6 +6,7 @@ import {
   RefreshIcon,
 } from "../../../../assets/icons/StockManagementIcons";
 import "./RequestTab.css";
+import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
 
 // options
 const TYPE_OPTIONS = [
@@ -95,6 +96,7 @@ interface RequestTabProps {
   pagination: ReturnType<typeof useRequestTab>["pagination"];
   actions: ReturnType<typeof useRequestTab>["actions"];
   showHeader?: boolean;
+  isLoading?: boolean;
 }
 
 export default function RequestTab({
@@ -103,6 +105,7 @@ export default function RequestTab({
   pagination,
   actions,
   showHeader = true,
+  isLoading = false,
 }: RequestTabProps) {
   // states
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -270,13 +273,14 @@ export default function RequestTab({
                 <th style={{ width: "20%", textAlign: "center" }}>Actions</th>
               </tr>
             </thead>
-            <tbody>
-              {data.length === 0 ? (
+            <tbody
+              className={`portal-tbody ${isLoading && data.length > 0 ? "is-refreshing" : ""}`}
+            >
+              {isLoading && data.length === 0 ? (
+                <TableSkeleton columns={7} />
+              ) : data.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={7}
-                    style={{ textAlign: "center", color: "#6b7280" }}
-                  >
+                  <td colSpan={7} className="portal-empty-state">
                     No requests found
                   </td>
                 </tr>

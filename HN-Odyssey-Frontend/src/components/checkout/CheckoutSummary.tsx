@@ -3,6 +3,7 @@ import { useState } from "react";
 import { PlusSquareIcon } from "../../assets/icons/CheckoutIcons";
 import { type CheckoutItem } from "../../hooks/checkout/useCheckout";
 import "./CheckoutSummary.css";
+import SmartImage from "../common/SmartImage/SmartImage";
 
 // interfaces
 interface CheckoutSummaryProps {
@@ -58,7 +59,7 @@ export default function CheckoutSummary({
         {items.map((item) => (
           <div key={item.id} className="checkout-summary-item-card">
             <div className="checkout-summary-item-img-box">
-              <img src={item.image} alt={item.name} />
+              <SmartImage src={item.image} alt={item.name} />
             </div>
 
             <div className="checkout-summary-item-info">

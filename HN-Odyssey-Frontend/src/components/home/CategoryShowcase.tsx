@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useCategoryShowcase } from "../../hooks/home/useCategoryShowcase";
 import "./CategoryShowcase.css";
+import SmartImage from "../common/SmartImage/SmartImage";
 
 export default function CategoryShowcase() {
   const { activeGender, handleSwitchGender, showcaseItems } =
@@ -47,7 +48,11 @@ export default function CategoryShowcase() {
             onClick={() => handleItemClick(item.gender, item.category)} // Gắn sự kiện click
             style={{ cursor: "pointer" }} // Đổi con trỏ chuột thành hình bàn tay
           >
-            <img src={item.imageUrl} alt={item.name} className="cs-image" />
+            <SmartImage
+              src={item.imageUrl}
+              alt={item.name}
+              className="cs-image"
+            />
             <div className="cs-image-overlay">
               <span>{item.name}</span>
             </div>

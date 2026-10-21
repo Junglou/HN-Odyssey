@@ -249,6 +249,7 @@ export function useBlogNewsManagement() {
   const [limit, setLimit] = useState(10);
   const [totalFiltered, setTotalFiltered] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [drawerConfig, setDrawerConfig] = useState<{
     isOpen: boolean;
@@ -292,6 +293,7 @@ export function useBlogNewsManagement() {
   const canPublish = hasPermission(Resource.CONTENT_POSTS, Action.UPDATE);
 
   const fetchPosts = useCallback(async () => {
+    setIsLoading(true);
     try {
       const params: FetchPostsParams = { page, limit };
       if (search) params.search = search;
@@ -337,6 +339,8 @@ export function useBlogNewsManagement() {
       }
     } catch (error) {
       console.error("Failed to fetch data:", error);
+    } finally {
+      setIsLoading(false);
     }
   }, [page, limit, search, statusFilter]);
 
@@ -542,6 +546,7 @@ export function useBlogNewsManagement() {
 
   return {
     records,
+    isLoading,
     categoriesList,
     productsList,
     pagination: { page, limit, totalPages, totalFiltered, startIndex },

@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import "./PromotionManagement.css";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
+import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
 import {
   SearchIcon,
   ChevronDownIcon,
@@ -16,6 +17,7 @@ import type {
 
 interface PromotionManagementProps {
   data: PromotionRecord[];
+  isLoading?: boolean;
   search: string;
   statusFilter: PromotionStatus | "All";
   typeFilter: PromotionType | "All";
@@ -50,6 +52,7 @@ interface PromotionManagementProps {
 
 export default function PromotionManagement({
   data,
+  isLoading = false,
   search,
   statusFilter,
   typeFilter,
@@ -274,8 +277,12 @@ export default function PromotionManagement({
                 <th style={{ width: "10%", textAlign: "right" }}>Actions</th>
               </tr>
             </thead>
-            <tbody>
-              {data.length > 0 ? (
+            <tbody
+              className={`portal-tbody ${isLoading && data.length > 0 ? "is-refreshing" : ""}`}
+            >
+              {isLoading && data.length === 0 ? (
+                <TableSkeleton columns={9} />
+              ) : data.length > 0 ? (
                 data.map((record) => (
                   <tr
                     key={record.id}
@@ -336,7 +343,7 @@ export default function PromotionManagement({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={9} className="promo-empty-state">
+                  <td colSpan={9} className="portal-empty-state">
                     No promotions found matching your criteria.
                   </td>
                 </tr>

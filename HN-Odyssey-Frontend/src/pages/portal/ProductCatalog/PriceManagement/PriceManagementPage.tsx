@@ -6,6 +6,7 @@ import "./PriceManagementPage.css";
 export default function PriceManagementPage() {
   const {
     currentRecords,
+    isLoading,
     pagination,
     search,
     statusFilter,
@@ -24,6 +25,7 @@ export default function PriceManagementPage() {
       {/* Component chính hiển thị bảng danh sách */}
       <PriceManagement
         data={currentRecords}
+        isLoading={isLoading}
         pagination={pagination}
         search={search}
         statusFilter={statusFilter}

@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useHeroBannerConfig } from "../../hooks/home/useHeroBannerConfig";
 import { AlertCircleIcon } from "../../assets/icons/HomeIcons";
 import "./HeroBanner.css";
+import SmartImage from "../common/SmartImage/SmartImage";
 
 export default function HeroBanner() {
   const { slides, currentIndex, goToSlide } = useHeroBannerConfig();
@@ -54,10 +55,11 @@ export default function HeroBanner() {
                   className="hb-media-element"
                 />
               ) : (
-                <img
+                <SmartImage
                   src={slide.mediaUrl}
                   alt={slide.title}
                   className="hb-media-element"
+                  loading="eager"
                 />
               )}
 

@@ -5,6 +5,9 @@ import type {
 } from "../../hooks/products/useProductList";
 import { ArrowDownIcon, FilterIcon } from "../../assets/icons/ProductIcons";
 import ProductCard from "./ProductCard";
+import ProductCardSkeleton from "./ProductCardSkeleton";
+
+const SKELETON_COUNT = 12; // khớp itemsPerPage để layout không bị giật
 import PromoCard from "./PromoCard";
 import ProductPagination from "./ProductPagination";
 import { useProductMain } from "../../hooks/products/useProductMain";
@@ -21,6 +24,7 @@ export default function ProductMainContent({
   onTabChange,
   onSortChange,
   onOpenFilter,
+  isLoading,
 }: {
   gridItems: GridItem[];
   currentPage: number;
@@ -32,6 +36,7 @@ export default function ProductMainContent({
   onTabChange: (slug: string) => void;
   onSortChange: (val: string) => void;
   onOpenFilter: () => void;
+  isLoading: boolean;
 }) {
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [hasSortOpened, setHasSortOpened] = useState(false);
@@ -106,14 +111,21 @@ export default function ProductMainContent({
         </div>
       </div>
 
-      <div className="pl-grid">
-        {gridItems.map((item) => {
-          if (item.type === "product")
-            return <ProductCard key={item.id} product={item} />;
-          if (item.type === "banner")
-            return <PromoCard key={item.id} banner={item} />;
-          return null;
-        })}
+      <div
+        className={`pl-grid ${isLoading ? "is-loading" : ""}`}
+        aria-busy={isLoading}
+      >
+        {isLoading
+          ? Array.from({ length: SKELETON_COUNT }).map((_, idx) => (
+              <ProductCardSkeleton key={`skeleton-${idx}`} />
+            ))
+          : gridItems.map((item) => {
+              if (item.type === "product")
+                return <ProductCard key={item.id} product={item} />;
+              if (item.type === "banner")
+                return <PromoCard key={item.id} banner={item} />;
+              return null;
+            })}
       </div>
 
       <ProductPagination

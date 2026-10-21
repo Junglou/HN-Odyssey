@@ -7,6 +7,7 @@ import "./BlogNewsManagementPage.css";
 export default function BlogNewsManagementPage() {
   const {
     records,
+    isLoading,
     categoriesList,
     productsList,
     pagination,
@@ -23,6 +24,7 @@ export default function BlogNewsManagementPage() {
     <div className="ban-page-container">
       <BlogNewsManagement
         data={records}
+        isLoading={isLoading}
         search={search}
         statusFilter={statusFilter}
         selectedIds={selectedIds}

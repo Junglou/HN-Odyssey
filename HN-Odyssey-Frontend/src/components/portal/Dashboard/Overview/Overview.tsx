@@ -10,6 +10,7 @@ interface RevenueHistory {
 }
 
 interface OverviewProps {
+  isLoading?: boolean;
   revenue?: { total: string; trendValue?: number; history: RevenueHistory[] };
   pipeline?: { label: string; value: number; color: string }[];
   alerts?: { lowStock: number; openTickets: number };
@@ -50,6 +51,46 @@ const generateWaveData = (history: RevenueHistory[]) => {
   return { strokePath: path, fillPath: `${path} L1440,200 L0,200 Z` };
 };
 
+// khung skeleton hiển thị trong lúc chờ API
+function OverviewSkeleton() {
+  return (
+    <div className="ov-container" aria-busy="true">
+      <div className="portal-skel ov-skel-heading" />
+      <div className="ov-top-row">
+        <div className="ov-card ov-skel-card">
+          <div className="portal-skel ov-skel-title" />
+          <div className="portal-skel ov-skel-amount" />
+          <div className="portal-skel ov-skel-line short ov-skel-center" />
+        </div>
+        <div className="ov-card ov-skel-card">
+          <div className="portal-skel ov-skel-title" />
+          <div className="portal-skel ov-skel-line" />
+          <div className="portal-skel ov-skel-line" />
+          <div className="portal-skel ov-skel-line short" />
+        </div>
+        <div className="ov-card ov-attention-card ov-skel-card">
+          <div className="portal-skel ov-skel-title" />
+          <div className="portal-skel ov-skel-block" />
+        </div>
+      </div>
+      <div className="ov-mid-row">
+        <div className="ov-card ov-skel-card">
+          <div className="portal-skel ov-skel-title" />
+          <div className="portal-skel ov-skel-block" />
+        </div>
+        <div className="ov-card ov-skel-card">
+          <div className="portal-skel ov-skel-title" />
+          <div className="portal-skel ov-skel-block" />
+        </div>
+      </div>
+      <div className="ov-card ov-skel-card">
+        <div className="portal-skel ov-skel-title" />
+        <div className="portal-skel ov-skel-block" />
+      </div>
+    </div>
+  );
+}
+
 export default function Overview({
   revenue,
   pipeline = [],
@@ -59,13 +100,16 @@ export default function Overview({
   recentTickets = [],
   pendingReturns = [],
   activities = [],
+  isLoading = false,
 }: OverviewProps) {
+  if (isLoading) return <OverviewSkeleton />;
+
   const trendValue = revenue?.trendValue ?? 0;
   const isTrendUp = trendValue >= 0;
   const { strokePath, fillPath } = generateWaveData(revenue?.history || []);
 
   return (
-    <div className="ov-container">
+    <div className="ov-container ov-loaded">
       {/* phần chào mừng */}
       <div style={{ marginBottom: "4px" }}>
         <h1
@@ -96,9 +140,7 @@ export default function Overview({
         <div className="ov-card ov-revenue-card">
           <div className="ov-card-title">Revenue Velocity (Today)</div>
           <div className="ov-revenue-content">
-            <div className="ov-revenue-amount">
-              {revenue?.total || "$132,400"}
-            </div>
+            <div className="ov-revenue-amount">{revenue?.total || "$0"}</div>
             <div className="ov-revenue-subtitle">
               <span
                 className={`ov-trend-text ${isTrendUp ? "ov-trend-up" : "ov-trend-down"}`}
@@ -179,7 +221,7 @@ export default function Overview({
               </div>
               <div>
                 <span style={{ color: "#ca8a04", fontWeight: 700 }}>
-                  {alerts?.lowStock ?? 18}
+                  {alerts?.lowStock ?? 0}
                 </span>{" "}
                 Low Stock SKUs
               </div>
@@ -191,7 +233,7 @@ export default function Overview({
               </div>
               <div>
                 <span style={{ color: "#dc2626", fontWeight: 700 }}>
-                  {alerts?.openTickets ?? 18}
+                  {alerts?.openTickets ?? 0}
                 </span>{" "}
                 Open Tickets
               </div>

@@ -50,6 +50,7 @@ export function useVariantManagement() {
   const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [search, setSearch] = useState("");
   const [accessError, setAccessError] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const user = tokenStorage.getUser() as UserPayload | null;
   const hasPermission = (resourceCode: Resource, actionCode: Action) => {
@@ -127,7 +128,8 @@ export function useVariantManagement() {
             "Lỗi tải danh sách thuộc tính";
           toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
         }
-      });
+      })
+      .finally(() => setIsLoading(false));
   }, []);
 
   useEffect(() => {
@@ -230,6 +232,7 @@ export function useVariantManagement() {
 
   return {
     attributes: filteredAttributes,
+    isLoading,
     search,
     drawerConfig,
     deleteConfig,

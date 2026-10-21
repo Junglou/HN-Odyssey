@@ -7,6 +7,7 @@ import "./ReviewAndRatingManagementPage.css";
 export default function ReviewAndRatingManagementPage() {
   const {
     currentRecords,
+    isLoading,
     pagination,
     search,
     statusFilter,
@@ -23,6 +24,7 @@ export default function ReviewAndRatingManagementPage() {
       {/* component bảng */}
       <ReviewAndRatingManagement
         data={currentRecords}
+        isLoading={isLoading}
         search={search}
         statusFilter={statusFilter}
         ratingFilter={ratingFilter}

@@ -70,7 +70,7 @@ const useLocalAuth = () => {
 export function useStaticPageManagement() {
   const [records, setRecords] = useState<StaticPageRecord[]>([]);
   const [totalFiltered, setTotalFiltered] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const [search, setSearch] = useState<string>("");
   const [apiSearch, setApiSearch] = useState<string>("");

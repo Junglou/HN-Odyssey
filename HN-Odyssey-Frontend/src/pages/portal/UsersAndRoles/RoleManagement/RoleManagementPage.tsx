@@ -7,6 +7,7 @@ import "./RoleManagementPage.css";
 export default function RoleManagementPage() {
   const {
     roles,
+    isLoading,
     permissions,
     uiState,
     modalConfig,
@@ -22,6 +23,7 @@ export default function RoleManagementPage() {
     <div className="rm-page-container">
       <RoleManagement
         data={{ roles, permissions }}
+        isLoading={isLoading}
         uiState={uiState}
         actions={actions}
       />

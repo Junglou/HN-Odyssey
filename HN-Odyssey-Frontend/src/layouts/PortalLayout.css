@@ -539,3 +539,96 @@ button:focus,
     visibility: visible;
   }
 }
+/* ===== hiệu ứng loading dùng chung cho portal ===== */
+.portal-skel {
+  background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 40%, #f1f5f9 80%);
+  background-size: 200% 100%;
+  animation: portal-skel-shimmer 1.2s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+@keyframes portal-skel-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+/* thanh skeleton trong ô bảng */
+.portal-skel-bar {
+  height: 14px;
+}
+
+/* hàng dữ liệu hiện dần lần lượt khi API trả về */
+.portal-tbody > tr:not(.portal-skel-row) {
+  animation: portal-row-in 0.35s ease-out backwards;
+}
+.portal-tbody > tr:nth-child(2) {
+  animation-delay: 30ms;
+}
+.portal-tbody > tr:nth-child(3) {
+  animation-delay: 60ms;
+}
+.portal-tbody > tr:nth-child(4) {
+  animation-delay: 90ms;
+}
+.portal-tbody > tr:nth-child(5) {
+  animation-delay: 120ms;
+}
+.portal-tbody > tr:nth-child(6) {
+  animation-delay: 150ms;
+}
+.portal-tbody > tr:nth-child(7) {
+  animation-delay: 180ms;
+}
+.portal-tbody > tr:nth-child(8) {
+  animation-delay: 210ms;
+}
+.portal-tbody > tr:nth-child(9) {
+  animation-delay: 240ms;
+}
+.portal-tbody > tr:nth-child(n + 10) {
+  animation-delay: 270ms;
+}
+
+/* đang tải lại (đổi trang/lọc): làm mờ dữ liệu cũ thay vì xóa trắng */
+.portal-tbody {
+  transition: opacity 0.2s ease;
+}
+.portal-tbody.is-refreshing {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+@keyframes portal-row-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-skel,
+  .portal-tbody > tr {
+    animation: none;
+  }
+}
+/* chữ "không có dữ liệu" dùng chung, theo mẫu Stock Management */
+.portal-empty-state,
+table td.portal-empty-state {
+  text-align: center;
+  justify-content: center; /* căn giữa cả khi bảng chuyển sang dạng thẻ trên mobile */
+  padding: 40px;
+  color: #6b7280;
+  font-style: italic;
+}
+/* hàng mở rộng (biến thể / chi tiết phiếu) đã có hiệu ứng xổ xuống riêng */
+.portal-tbody > tr.sot-row-variants,
+.portal-tbody > tr.stt-row-items,
+.portal-tbody > tr.rt-row-items {
+  animation: none;
+}

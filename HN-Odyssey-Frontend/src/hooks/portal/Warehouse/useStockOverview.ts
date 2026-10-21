@@ -76,7 +76,7 @@ export function useStockOverview() {
   const [categories, setCategories] = useState<
     { value: string; label: string }[]
   >([{ value: "all", label: "All Categories" }]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refetchTrigger, setRefetchTrigger] = useState(0);
 
   const user = tokenStorage.getUser<UserPayload>();

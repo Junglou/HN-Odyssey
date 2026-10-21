@@ -3,6 +3,7 @@ import { EditIcon, TrashIcon } from "../../assets/icons/ShoppingCartIcons";
 import { MinusIcon, PlusIcon } from "../../assets/icons/CartIcons";
 import type { DetailedCartItem } from "../../hooks/shoppingCart/useShoppingCart";
 import "./CartItemList.css";
+import SmartImage from "../common/SmartImage/SmartImage";
 
 // interface
 interface CartItemListProps {
@@ -35,7 +36,7 @@ export default function CartItemList({
           {items.map((item) => (
             <div key={item.id} className="cart-list-item">
               <div className="cart-list-item-img">
-                <img src={item.image} alt={item.name} />
+                <SmartImage src={item.image} alt={item.name} />
               </div>
 
               <div className="cart-list-item-details">

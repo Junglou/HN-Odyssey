@@ -8,6 +8,7 @@ import "./VariantManagementPage.css";
 export default function VariantManagementPage() {
   const {
     attributes,
+    isLoading,
     search,
     drawerConfig,
     deleteConfig,
@@ -39,7 +40,12 @@ export default function VariantManagementPage() {
   return (
     <div className="vm-page-container">
       {/* component chính hiển thị danh sách thuộc tính */}
-      <VariantManagement data={attributes} search={search} actions={actions} />
+      <VariantManagement
+        data={attributes}
+        isLoading={isLoading}
+        search={search}
+        actions={actions}
+      />
 
       {/* thanh trượt thêm/sửa thuộc tính */}
       <VariantDrawer

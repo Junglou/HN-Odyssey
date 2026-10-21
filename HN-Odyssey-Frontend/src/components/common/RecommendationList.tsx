@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useTracking, BehaviorAction } from "../../hooks/common/useTracking"; // [BỔ SUNG]
 import "./RecommendationList.css";
+import SmartImage from "./SmartImage/SmartImage";
 import type { Product } from "../../types/product";
 
 interface RecommendationListProps {
@@ -42,7 +43,7 @@ const RecommendationList = ({
             style={{ cursor: "pointer" }}
           >
             {/* Ảnh sản phẩm */}
-            <img src={item.image} alt={item.name} className="reco-img" />
+            <SmartImage src={item.image} alt={item.name} className="reco-img" />
 
             {/* Thông tin */}
             <div className="reco-info">

@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import "./BannerManagement.css";
+import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 import {
   SearchIcon,
@@ -13,9 +14,11 @@ import type {
   BannerStatus,
   BannerPosition,
 } from "../../../../hooks/portal/Communication/BannerManagement/useBannerManagement";
+import SmartImage from "../../../common/SmartImage/SmartImage";
 
 interface BannerManagementProps {
   data: BannerRecord[];
+  isLoading?: boolean;
   selectedIds: string[];
   search: string;
   statusFilter: BannerStatus | "All";
@@ -49,6 +52,7 @@ interface BannerManagementProps {
 
 export default function BannerManagement({
   data,
+  isLoading = false,
   selectedIds,
   search,
   statusFilter,
@@ -273,8 +277,12 @@ export default function BannerManagement({
                 <th style={{ width: "15%" }}>Actions</th>
               </tr>
             </thead>
-            <tbody>
-              {data.length > 0 ? (
+            <tbody
+              className={`portal-tbody ${isLoading && data.length > 0 ? "is-refreshing" : ""}`}
+            >
+              {isLoading && data.length === 0 ? (
+                <TableSkeleton columns={7} />
+              ) : data.length > 0 ? (
                 data.map((record) => {
                   // xác định tình trạng thời gian
                   const isPending =
@@ -300,7 +308,7 @@ export default function BannerManagement({
                       </td>
                       <td data-label="Banner Name">
                         <div className="bm-name-cell">
-                          <img
+                          <SmartImage
                             src={record.imageDesktopUrl}
                             alt={record.name}
                             className="bm-name-thumbnail"
@@ -408,7 +416,7 @@ export default function BannerManagement({
                 })
               ) : (
                 <tr>
-                  <td colSpan={7} className="bm-empty-state">
+                  <td colSpan={7} className="portal-empty-state">
                     No banners found matching your criteria.
                   </td>
                 </tr>

@@ -122,6 +122,7 @@ export function useCustomerManagement() {
 
   const [pagination, setPagination] = useState({ page: 1, limit: 10 });
   const [totalFiltered, setTotalFiltered] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const { user } = useLocalAuth();
   const hasPermission = useCallback(
     (resourceCode: Resource, actionCode: Action): boolean => {
@@ -173,6 +174,7 @@ export function useCustomerManagement() {
   }>({ isOpen: false, mode: "add", editingRecord: null, isSubmitting: false });
 
   const fetchCustomers = useCallback(async () => {
+    setIsLoading(true);
     try {
       const queryParams = new URLSearchParams({
         page: pagination.page.toString(),
@@ -221,6 +223,8 @@ export function useCustomerManagement() {
     } catch (error) {
       toast.error("Không thể tải danh sách khách hàng từ hệ thống.");
       console.error("Fetch Error:", error);
+    } finally {
+      setIsLoading(false);
     }
   }, [
     pagination.page,
@@ -606,6 +610,7 @@ export function useCustomerManagement() {
 
   return {
     currentRecords: records,
+    isLoading,
     pagination: {
       ...pagination,
       totalPages,

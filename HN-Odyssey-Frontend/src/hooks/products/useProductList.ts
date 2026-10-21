@@ -151,7 +151,7 @@ export function useProductList() {
   const [banners, setBanners] = useState<BannerItem[]>([]);
 
   const [totalItems, setTotalItems] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // 3. ĐỒNG BỘ URL VÀ GIAO DIỆN BỘ LỌC MỖI KHI CLICK CHUYỂN TRANG
   useEffect(() => {

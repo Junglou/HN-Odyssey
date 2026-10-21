@@ -7,6 +7,7 @@ import "./OrderManagementPage.css";
 export default function OrderManagementPage() {
   const {
     data,
+    isLoading,
     filters,
     pagination,
     detailDrawer,
@@ -20,6 +21,7 @@ export default function OrderManagementPage() {
       {/* Component hiển thị bảng chính */}
       <OrderManagement
         data={data}
+        isLoading={isLoading}
         filters={filters}
         pagination={pagination}
         actions={actions}

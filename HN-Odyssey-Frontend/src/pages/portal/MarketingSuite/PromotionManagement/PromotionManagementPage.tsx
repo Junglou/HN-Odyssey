@@ -7,6 +7,7 @@ import "./PromotionManagementPage.css";
 export default function PromotionManagementPage() {
   const {
     currentRecords,
+    isLoading,
     pagination,
     search,
     statusFilter,
@@ -22,6 +23,7 @@ export default function PromotionManagementPage() {
     <div className="promo-page-container">
       <PromotionManagement
         data={currentRecords}
+        isLoading={isLoading}
         pagination={pagination}
         search={search}
         statusFilter={statusFilter}

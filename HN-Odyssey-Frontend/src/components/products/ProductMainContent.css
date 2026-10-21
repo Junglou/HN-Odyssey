@@ -222,6 +222,64 @@
   width: 100%;
 }
 
+/* hiệu ứng card xuất hiện lần lượt */
+.pl-grid:not(.is-loading) > * {
+  animation: pl-item-enter 0.45s ease-out backwards;
+}
+.pl-grid:not(.is-loading) > *:nth-child(2) {
+  animation-delay: 50ms;
+}
+.pl-grid:not(.is-loading) > *:nth-child(3) {
+  animation-delay: 100ms;
+}
+.pl-grid:not(.is-loading) > *:nth-child(4) {
+  animation-delay: 150ms;
+}
+.pl-grid:not(.is-loading) > *:nth-child(5) {
+  animation-delay: 200ms;
+}
+.pl-grid:not(.is-loading) > *:nth-child(6) {
+  animation-delay: 250ms;
+}
+.pl-grid:not(.is-loading) > *:nth-child(7) {
+  animation-delay: 300ms;
+}
+.pl-grid:not(.is-loading) > *:nth-child(8) {
+  animation-delay: 350ms;
+}
+.pl-grid:not(.is-loading) > *:nth-child(9) {
+  animation-delay: 400ms;
+}
+.pl-grid:not(.is-loading) > *:nth-child(10) {
+  animation-delay: 450ms;
+}
+.pl-grid:not(.is-loading) > *:nth-child(11) {
+  animation-delay: 500ms;
+}
+.pl-grid:not(.is-loading) > *:nth-child(12) {
+  animation-delay: 550ms;
+}
+.pl-grid:not(.is-loading) > *:nth-child(n + 13) {
+  animation-delay: 600ms;
+}
+
+@keyframes pl-item-enter {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pl-grid:not(.is-loading) > * {
+    animation: none;
+  }
+}
+
 .pl-grid .shape-horizontal {
   grid-column: span 2;
   grid-row: span 1;

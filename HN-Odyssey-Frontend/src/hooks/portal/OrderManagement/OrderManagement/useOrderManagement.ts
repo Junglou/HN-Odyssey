@@ -176,7 +176,7 @@ const useLocalAuth = () => {
 
 export function useOrderManagement() {
   const [data, setData] = useState<OrderRow[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const { user } = useLocalAuth();
 

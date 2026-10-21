@@ -6,6 +6,7 @@ import {
 } from "../../assets/icons/ProductDetailIcons";
 import type { ProductDetailState } from "../../hooks/productDetail/useProductDetail";
 import "./ProductDetailMain.css";
+import SmartImage from "../common/SmartImage/SmartImage";
 
 interface ProductDetailMainProps {
   product: ProductDetailState;
@@ -70,26 +71,18 @@ export default function ProductDetailMain({
   const safeQuantity = typeof quantity === "number" ? quantity : 1;
   const isOutOfStock = product.stock - (product.stockOnHold || 0) <= 0;
 
-  // Xử lý fallback khi URL ảnh bị chết (404) hoặc nhập bậy bạ
-  const handleImageError = (
-    e: React.SyntheticEvent<HTMLImageElement, Event>,
-  ) => {
-    e.currentTarget.src = "/Logo.png";
-    e.currentTarget.onerror = null;
-  };
-
   return (
     <>
       <div className="pdp-main-section">
         {/* -- KHU VỰC ẢNH -- */}
         <div className="pdp-gallery-container">
           <div className="pdp-main-image-wrap">
-            <img
+            <SmartImage
               className="pdp-main-image"
               src={currentMainImage}
               alt={product.name}
+              loading="eager"
               onClick={() => setIsZoomed(true)}
-              onError={handleImageError}
             />
             <button
               className={`pdp-heart-btn ${isWishlisted ? "active" : ""}`}
@@ -106,11 +99,10 @@ export default function ProductDetailMain({
                   className={`pdp-thumbnail-wrap ${activeImageIndex === idx ? "active" : ""}`}
                   onClick={() => onImageChange(idx)}
                 >
-                  <img
+                  <SmartImage
                     className="pdp-thumbnail"
                     src={img}
                     alt={`${product.name} ${idx + 1}`}
-                    onError={handleImageError}
                   />
                 </div>
               ))}
@@ -258,11 +250,11 @@ export default function ProductDetailMain({
             >
               ✕
             </button>
-            <img
+            <SmartImage
               src={currentMainImage}
               alt={product.name}
               className="pdp-lightbox-img"
-              onError={handleImageError}
+              loading="eager"
             />
           </div>
         </div>

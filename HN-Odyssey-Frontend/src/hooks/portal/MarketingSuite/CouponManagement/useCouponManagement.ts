@@ -101,7 +101,7 @@ const useLocalAuth = () => {
 export function useCouponManagement() {
   // Loại bỏ hoàn toàn cú pháp useState để tránh lỗi Parser toán tử trong file .ts
   const [records, setRecords] = useState<CouponRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<CouponStatus | "All">("All");

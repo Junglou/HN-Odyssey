@@ -61,6 +61,7 @@ export interface ApiError {
 
 export function usePriceManagement() {
   const [records, setRecords] = useState<PriceRecord[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<PriceStatus | "All">("All");
   const [currencyFilter, setCurrencyFilter] = useState<string>("All");
@@ -173,7 +174,8 @@ export function usePriceManagement() {
             ? error.message
             : "Lỗi tải danh sách sản phẩm");
         toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
-      });
+      })
+      .finally(() => setIsLoading(false));
   }, []);
 
   useEffect(() => {
@@ -450,6 +452,7 @@ export function usePriceManagement() {
 
   return {
     currentRecords,
+    isLoading,
     pagination: {
       ...pagination,
       totalPages,

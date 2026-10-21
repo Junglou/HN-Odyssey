@@ -104,6 +104,7 @@ export function useUserManagement() {
   const [pagination, setPagination] = useState({ page: 1, limit: 10 });
   const [totalPages, setTotalPages] = useState(1);
   const [totalFiltered, setTotalFiltered] = useState(0);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
@@ -164,6 +165,7 @@ export function useUserManagement() {
   }, [filters.search, debouncedSearch]);
 
   const fetchList = useCallback(async () => {
+    setIsLoading(true);
     try {
       const params: Record<string, string | number> = {
         page: pagination.page,
@@ -202,6 +204,8 @@ export function useUserManagement() {
       setTotalFiltered(rawMeta.total_docs || 0);
     } catch {
       toast.error("Không thể tải danh sách người dùng.");
+    } finally {
+      setIsLoading(false);
     }
   }, [
     pagination.page,
@@ -398,6 +402,7 @@ export function useUserManagement() {
 
   return {
     currentUsers: users,
+    isLoading,
     filters,
     pagination,
     totalPages,

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import "./TradeInManagement.css";
+import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
 import {
   ChevronDownSmallIcon,
   RefreshIcon,
@@ -88,6 +89,7 @@ function CustomDropdown({
 // props
 interface TradeInManagementProps {
   data: TradeInRow[];
+  isLoading?: boolean;
   filters: {
     search: string;
     status: string;
@@ -127,6 +129,7 @@ interface TradeInManagementProps {
 // component
 export default function TradeInManagement({
   data,
+  isLoading = false,
   filters,
   pagination,
   actions,
@@ -325,10 +328,14 @@ export default function TradeInManagement({
                 <th className="tim-text-right">Actions</th>
               </tr>
             </thead>
-            <tbody>
-              {data.length === 0 ? (
+            <tbody
+              className={`portal-tbody ${isLoading && data.length > 0 ? "is-refreshing" : ""}`}
+            >
+              {isLoading && data.length === 0 ? (
+                <TableSkeleton columns={9} />
+              ) : data.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="tim-empty-state">
+                  <td colSpan={9} className="portal-empty-state">
                     No trade-in requests found.
                   </td>
                 </tr>
