@@ -88,6 +88,8 @@ export function useProductCard(
 
       if (response.data.success) {
         setIsWishlisted(response.data.isAdded);
+        // báo cho Header cập nhật chấm đỏ wishlist
+        window.dispatchEvent(new Event("wishlist_updated"));
         toast.success(response.data.message);
       }
     } catch (error: unknown) {
@@ -129,6 +131,8 @@ export function useProductCard(
       };
 
       await axiosClient.post("/cart/add", payload);
+      // báo cho Header/CartDropdown fetch lại giỏ hàng
+      window.dispatchEvent(new Event("cart_updated"));
       toast.success("Đã thêm sản phẩm vào giỏ hàng thành công!");
 
       // FIX 2: Bắn Tracking khi user BẤM THÊM VÀO GIỎ HÀNG THÀNH CÔNG

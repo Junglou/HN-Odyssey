@@ -41,7 +41,10 @@ const authService = {
   // Logout
   async logout(): Promise<void> {
     try {
-      await axiosClient.post("/auth/logout");
+      // gửi refresh token để backend chỉ đăng xuất đúng thiết bị này
+      await axiosClient.post("/auth/logout", {
+        refresh_token: tokenStorage.getRefreshToken(),
+      });
     } catch (error) {
       console.error("Lỗi khi gọi API logout:", error);
     } finally {

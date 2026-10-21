@@ -16,22 +16,25 @@ export class UsersService {
     });
   }
 
+  // CHỈ dùng cho luồng đăng nhập: lấy kèm hash password để so sánh
+  async findByEmailOrPhoneWithPassword(
+    account: string,
+  ): Promise<UserDocument | null> {
+    // Truyền '+password' qua tham số projection để giữ đúng kiểu trả về
+    return this.userModel
+      .findOne(
+        {
+          $or: [{ email: account }, { phone: account }],
+        },
+        '+password',
+      )
+      .exec();
+  }
+
   async findById(id: string): Promise<UserDocument> {
     const user = await this.userModel.findById(id);
     if (!user) throw new NotFoundException('User not found');
     return user;
-  }
-
-  async saveRefreshToken(userId: string, refreshToken: string) {
-    return this.userModel.findByIdAndUpdate(userId, {
-      refreshToken,
-    });
-  }
-
-  async clearRefreshToken(userId: string) {
-    return this.userModel.findByIdAndUpdate(userId, {
-      refreshToken: null,
-    });
   }
 
   async increaseFailedAttempt(userId: string) {

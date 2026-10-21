@@ -55,6 +55,7 @@ export interface UserSearchPreferences {
  * (`password`, OTP / pending contact fields) are not included.
  */
 export interface UserProfile {
+  has_password?: boolean; // false = tài khoản Google/Facebook chưa đặt mật khẩu
   _id: string;
   avatar: string | null;
   /** Virtual from backend — `first_Name` + `last_Name`, or email prefix */

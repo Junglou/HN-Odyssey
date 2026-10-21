@@ -217,6 +217,7 @@ export function useCheckout() {
           guestSessionId: !isLogged ? guestSessionId : undefined,
         });
         fetchCartData();
+        window.dispatchEvent(new Event("cart_updated"));
       } catch (error: unknown) {
         const err = error as ApiError;
         console.error("Lỗi thêm sản phẩm:", err?.message || "Không xác định");

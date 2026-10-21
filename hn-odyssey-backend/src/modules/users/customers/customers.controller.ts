@@ -22,11 +22,12 @@ import {
   ApiConsumes,
 } from '@nestjs/swagger';
 import { CustomersService } from './customers.service';
-import { Public } from 'src/common/decorators/public.decorator';
+
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { SetPasswordDto } from './dto/set-password.dto';
 import {
   RequestChangeContactDto,
   VerifyContactChangeDto,
@@ -68,19 +69,6 @@ export class CustomersController {
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
     return this.customersService.updateProfile(userId, updateProfileDto);
-  }
-
-  // CÁC CHỨC NĂNG KHÁC
-  @Post('convert-guest')
-  @Public()
-  @ApiOperation({ summary: 'Chuyển đổi Guest thành Member từ đơn hàng' })
-  async convertGuestToMember(
-    @Body() body: { orderId: string; password: string },
-  ) {
-    return this.customersService.convertGuestToMember(
-      body.orderId,
-      body.password,
-    );
   }
 
   @Patch('avatar')
@@ -129,6 +117,18 @@ export class CustomersController {
     @Body() dto: ChangePasswordDto,
   ) {
     return this.customersService.changePassword(userId, dto);
+  }
+
+  @Patch('set-password')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Đặt mật khẩu lần đầu cho tài khoản đăng ký bằng Google/Facebook',
+  })
+  async setPassword(
+    @CurrentUser('_id') userId: string,
+    @Body() dto: SetPasswordDto,
+  ) {
+    return this.customersService.setPassword(userId, dto);
   }
 
   @Post('request-change-contact')

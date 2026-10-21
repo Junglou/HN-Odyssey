@@ -279,6 +279,7 @@ const mapProfileFromApi = (raw: ApiProfilePayload): UserProfile => {
     review_access: (raw.review_access as UserReviewAccess) ?? "ALLOWED",
     status_reason: String(raw.status_reason ?? ""),
     search_preferences: raw.search_preferences ?? {},
+    has_password: Boolean(raw.has_password),
     followed_brands: Array.isArray(raw.followed_brands)
       ? raw.followed_brands.map(String)
       : [],

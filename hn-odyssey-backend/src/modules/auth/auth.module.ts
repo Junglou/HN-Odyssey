@@ -16,6 +16,10 @@ import {
 } from './schema/recovery-request.schema';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import {
+  RefreshSession,
+  RefreshSessionSchema,
+} from './schema/refresh-session.schema';
+import {
   AuditLog,
   AuditLogSchema,
 } from '../system/audit-logs/schemas/audit-log.schema';
@@ -31,6 +35,7 @@ import { Role, RoleSchema } from '../users/roles/schemas/role.schema';
       { name: RecoveryRequest.name, schema: RecoveryRequestSchema },
       { name: AuditLog.name, schema: AuditLogSchema },
       { name: Role.name, schema: RoleSchema },
+      { name: RefreshSession.name, schema: RefreshSessionSchema },
     ]), // 2. Cấu hình JWT (Token) sử dụng registerAsync
     JwtModule.registerAsync({
       imports: [ConfigModule],

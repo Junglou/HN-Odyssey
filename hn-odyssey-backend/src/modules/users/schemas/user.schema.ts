@@ -29,7 +29,9 @@ export class User {
   @Prop({ required: false, unique: true, index: true, sparse: true })
   phone: string;
 
-  @Prop({ required: false }) // Có thể null nếu login bằng Google/Facebook
+  // Có thể null nếu login bằng Google/Facebook.
+  // select: false -> mặc định KHÔNG trả về ở mọi query, muốn dùng phải .select('+password')
+  @Prop({ required: false, select: false })
   password?: string;
 
   @Prop({ required: true })
@@ -99,7 +101,8 @@ export class User {
   // Trường bắt buộc cho Discriminator
   type: string;
 
-  @Prop({ type: String, default: null })
+  // Không còn dùng (đã chuyển sang collection refresh_sessions), ẩn khỏi mọi query
+  @Prop({ type: String, default: null, select: false })
   refresh_token: string | null;
 
   @Prop({ type: Types.ObjectId, ref: 'Warehouse', default: null })

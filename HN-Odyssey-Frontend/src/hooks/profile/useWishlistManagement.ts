@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
-import axios from "axios";
+import axiosClient from "../../api/axiosClient";
 import type { Product } from "../../types/product";
 import {
   type WishlistItemApiResponse,
@@ -13,25 +13,11 @@ import {
 } from "./useResponsiveOrderPageLimit";
 import { useNavigate } from "react-router-dom";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
-
-const getAuthHeaders = () => {
-  const token = tokenStorage.getToken();
-  return {
-    headers: { Authorization: token ? `Bearer ${token}` : undefined },
-  };
-};
-
+// axiosClient trả lỗi đã chuẩn hóa dạng { status, message, data }
 const getErrorMessage = (error: unknown, fallback: string): string => {
-  if (axios.isAxiosError(error)) {
-    return (
-      (error.response?.data as { message?: string })?.message ||
-      error.message ||
-      fallback
-    );
-  }
-  if (error instanceof Error && error.message) {
-    return error.message;
+  if (error && typeof error === "object") {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message) return message;
   }
   return fallback;
 };
@@ -45,13 +31,13 @@ const paginateProducts = (
   return items.slice(start, start + limit);
 };
 
-// Hàm tiện ích lấy guestSessionId (nếu cần cho add to cart)
+// Hàm tiện ích lấy guestSessionId (dùng chung key "guestSessionId" với giỏ hàng)
 const getGuestSessionId = (): string => {
-  let sessionId = localStorage.getItem("guest_session_id");
+  let sessionId = localStorage.getItem("guestSessionId");
   if (!sessionId) {
     sessionId =
       Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
-    localStorage.setItem("guest_session_id", sessionId);
+    localStorage.setItem("guestSessionId", sessionId);
   }
   return sessionId;
 };
@@ -75,9 +61,7 @@ export function useWishlistManagement() {
 
     setLoading(true);
     try {
-      const res = await axios.get(`${API_URL}/users/wishlist`, {
-        ...getAuthHeaders(),
-      });
+      const res = await axiosClient.get("/users/wishlist");
 
       const payload = res.data;
       const list = Array.isArray(payload?.data)
@@ -122,9 +106,7 @@ export function useWishlistManagement() {
         body.variantId = targetItem.variantId;
       }
 
-      const res = await axios.post(`${API_URL}/users/wishlist/toggle`, body, {
-        ...getAuthHeaders(),
-      });
+      const res = await axiosClient.post("/users/wishlist/toggle", body);
 
       // Bổ sung check an toàn: Nếu API trả về isAdded: true nghĩa là bị lỗi gửi sai ID
       // (Nó đã tự động thêm 1 cái mới vào DB)
@@ -136,6 +118,9 @@ export function useWishlistManagement() {
       }
 
       toast.success(data.message || "Đã xóa sản phẩm khỏi wishlist!");
+
+      // báo cho Header cập nhật chấm đỏ wishlist
+      window.dispatchEvent(new Event("wishlist_updated"));
 
       // Gọi lại danh sách để đồng bộ DB với UI
       await fetchWishlist();
@@ -171,9 +156,9 @@ export function useWishlistManagement() {
         guestSessionId: getGuestSessionId(),
       };
 
-      await axios.post(`${API_URL}/cart/add`, payload, {
-        ...getAuthHeaders(),
-      });
+      await axiosClient.post("/cart/add", payload);
+      // báo cho Header/CartDropdown fetch lại giỏ hàng
+      window.dispatchEvent(new Event("cart_updated"));
 
       toast.success("Đã thêm sản phẩm vào giỏ hàng!");
     } catch (err: unknown) {
