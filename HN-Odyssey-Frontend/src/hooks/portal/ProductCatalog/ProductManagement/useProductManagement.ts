@@ -74,6 +74,7 @@ export function useProductManagement() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [totalFiltered, setTotalFiltered] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [filters, setFilters] = useState<{
     search: string;
@@ -101,6 +102,7 @@ export function useProductManagement() {
   }, [filters.search, debouncedSearch]);
 
   const fetchProducts = useCallback(async () => {
+    setIsLoading(true);
     try {
       const params: Record<string, string | number> = {
         page: pagination.page,
@@ -122,6 +124,8 @@ export function useProductManagement() {
     } catch (error) {
       console.error(error);
       toast.error("Không thể tải danh sách sản phẩm.");
+    } finally {
+      setIsLoading(false);
     }
   }, [
     debouncedSearch,
@@ -365,6 +369,7 @@ export function useProductManagement() {
 
   return {
     currentProducts,
+    isLoading,
     filters,
     pagination,
     totalPages,

@@ -7,6 +7,7 @@ import "./UserManagementPage.css";
 export default function UserManagementPage() {
   const {
     currentUsers,
+    isLoading,
     filters,
     pagination,
     totalPages,
@@ -28,6 +29,7 @@ export default function UserManagementPage() {
     <div className="um-page-container">
       <UserManagement
         data={currentUsers}
+        isLoading={isLoading}
         filters={filters}
         pagination={{
           page: pagination.page,

@@ -92,7 +92,7 @@ export function useStockTickets() {
     initialSku?: string;
   }>({ isOpen: false, defaultType: "import" });
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refetchTrigger, setRefetchTrigger] = useState(0);
 
   // --- LOGIC PHÂN QUYỀN ---

@@ -1,5 +1,6 @@
 import type { Product } from "../../../types/product";
 import "./MyWishlistBox.css";
+import SmartImage from "../../common/SmartImage/SmartImage";
 
 interface MyWishlistProp {
   product: Product;
@@ -16,7 +17,11 @@ const WishlistBox = ({ product, onDelete, onAddToCart }: MyWishlistProp) => {
           <div className="order-thumbnail-container">
             {/* ... Giữ nguyên phần hình ảnh và mô tả ... */}
             <div className="thumbnail-img-container">
-              <img src={product.image} className="order-img" />
+              <SmartImage
+                src={product.image}
+                alt={product.name}
+                className="order-img"
+              />
             </div>
             <div className="thumbnail-detail-container">
               <span className="lbl-thumb-text">{product.name}</span>

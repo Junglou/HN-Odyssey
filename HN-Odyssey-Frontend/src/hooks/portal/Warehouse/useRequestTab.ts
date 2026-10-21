@@ -60,6 +60,7 @@ export function useRequestTab() {
   });
 
   const [triggerRefresh, setTriggerRefresh] = useState(0);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // --- LOGIC PHÂN QUYỀN ---
   const user = tokenStorage.getUser() as UserPayload | null;
@@ -87,6 +88,7 @@ export function useRequestTab() {
     let isMounted = true;
 
     const fetchData = async () => {
+      setIsLoading(true);
       try {
         const res = await axiosClient.get("/inventory/stock/requests", {
           params: {
@@ -122,6 +124,8 @@ export function useRequestTab() {
         console.error("Lỗi khi tải danh sách yêu cầu kho:", error);
         toast.error("Lỗi khi tải danh sách yêu cầu kho!"); // Đã đổi sang toast
         if (isMounted) setData([]);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     };
 
@@ -247,6 +251,7 @@ export function useRequestTab() {
 
   return {
     data,
+    loading: isLoading,
     filters,
     pagination,
     actions: {

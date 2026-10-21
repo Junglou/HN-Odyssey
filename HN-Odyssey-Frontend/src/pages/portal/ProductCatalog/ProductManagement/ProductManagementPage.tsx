@@ -6,6 +6,7 @@ import "./ProductManagementPage.css";
 export default function ProductManagementPage() {
   const {
     currentProducts,
+    isLoading,
     filters,
     pagination,
     totalPages,
@@ -22,6 +23,7 @@ export default function ProductManagementPage() {
     <div className="pm-page-container">
       <ProductManagement
         data={currentProducts}
+        isLoading={isLoading}
         filters={filters}
         pagination={{
           page: pagination.page,

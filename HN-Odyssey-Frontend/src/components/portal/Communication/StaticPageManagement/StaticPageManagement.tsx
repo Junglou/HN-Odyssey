@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import "./StaticPageManagement.css";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
+import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
 import {
   SearchIcon,
   ChevronDownIcon,
@@ -16,6 +17,7 @@ import type {
 // props
 interface StaticPageManagementProps {
   data: StaticPageRecord[];
+  isLoading?: boolean;
   search: string;
   statusFilter: PageStatus | "All";
   typeFilter: PageType | "All";
@@ -49,6 +51,7 @@ interface StaticPageManagementProps {
 
 export default function StaticPageManagement({
   data,
+  isLoading = false,
   search,
   statusFilter,
   typeFilter,
@@ -262,8 +265,12 @@ export default function StaticPageManagement({
                 <th style={{ width: "15%", textAlign: "right" }}>Actions</th>
               </tr>
             </thead>
-            <tbody>
-              {data.length > 0 ? (
+            <tbody
+              className={`portal-tbody ${isLoading && data.length > 0 ? "is-refreshing" : ""}`}
+            >
+              {isLoading && data.length === 0 ? (
+                <TableSkeleton columns={6} />
+              ) : data.length > 0 ? (
                 data.map((record) => (
                   <tr
                     key={record.id}
@@ -329,7 +336,7 @@ export default function StaticPageManagement({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="sp-empty-state">
+                  <td colSpan={6} className="portal-empty-state">
                     No static pages found matching your criteria.
                   </td>
                 </tr>

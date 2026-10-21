@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import "./TradeInDetailDrawer.css";
 import type { TradeInRow } from "../../../../hooks/portal/OrderManagement/TradeInManagement/useTradeInManagement";
 import { TimelineCheckIcon } from "../../../../assets/icons/OrderManagementIcons";
+import SmartImage from "../../../common/SmartImage/SmartImage";
 
 // props
 interface TradeInDetailDrawerProps {
@@ -158,7 +159,7 @@ export default function TradeInDetailDrawer({
                     {tradeInData.device.images &&
                     tradeInData.device.images.length > 0 ? (
                       tradeInData.device.images.map((imgUrl, index) => (
-                        <img
+                        <SmartImage
                           key={index}
                           src={imgUrl}
                           alt={`${tradeInData.device.productName} - ${index + 1}`}

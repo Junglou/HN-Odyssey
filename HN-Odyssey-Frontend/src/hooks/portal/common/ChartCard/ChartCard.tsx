@@ -10,6 +10,7 @@ interface ChartCardProps {
   pdfTitle: string; // Tiêu đề in ở đầu file PDF
   fileNamePrefix: string; // Tiền tố tên file PDF
   canExport: boolean; // Quyền EXPORT của trang (US.95 AC6)
+  isLoading?: boolean; // đang chờ API -> hiện skeleton, khóa Export
   children: ReactNode;
 }
 
@@ -21,11 +22,12 @@ export default function ChartCard({
   pdfTitle,
   fileNamePrefix,
   canExport,
+  isLoading = false,
   children,
 }: ChartCardProps) {
   const captureRef = useRef<HTMLDivElement>(null);
   const { exportPdf, isExporting } = useExportChartPdf();
-  const disabled = !canExport || isExporting;
+  const disabled = !canExport || isExporting || isLoading;
 
   return (
     <div className="cc-card">
@@ -58,7 +60,11 @@ export default function ChartCard({
         </div>
         {subtitle && <div className="cc-subtitle">{subtitle}</div>}
         {legend && <div className="cc-legend">{legend}</div>}
-        <div className="cc-body">{children}</div>
+        {isLoading ? (
+          <div className="portal-skel cc-skeleton" aria-busy="true" />
+        ) : (
+          <div className="cc-body cc-body-enter">{children}</div>
+        )}
       </div>
     </div>
   );

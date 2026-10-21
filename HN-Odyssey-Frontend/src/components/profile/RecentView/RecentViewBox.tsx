@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { Product } from "../../../types/product";
 import "./RecentViewBox.css";
+import SmartImage from "../../common/SmartImage/SmartImage";
 
 interface RecentViewBoxProps {
   product: Product;
@@ -31,7 +32,7 @@ const RecentViewBox = ({
         <div className="box-infor">
           <div className="order-thumbnail-container">
             <div className="thumbnail-img-container">
-              <img
+              <SmartImage
                 src={product.image}
                 className="order-img"
                 alt={product.name}

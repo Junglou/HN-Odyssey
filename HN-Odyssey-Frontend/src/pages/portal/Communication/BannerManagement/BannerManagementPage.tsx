@@ -17,6 +17,7 @@ export default function BannerManagementPage() {
     deleteModalConfig,
     actions,
     handleDrawerSubmit,
+    isLoading,
   } = useBannerManagement();
 
   // Nội dung cảnh báo xóa
@@ -30,6 +31,7 @@ export default function BannerManagementPage() {
       {/* Bảng dữ liệu chính */}
       <BannerManagement
         data={currentRecords}
+        isLoading={isLoading}
         selectedIds={selectedIds}
         search={search}
         statusFilter={statusFilter}

@@ -15,6 +15,7 @@ export default function ProductListPage() {
     selectedFilters,
     priceRange, // <-- Lấy state priceRange từ hook ra để truyền xuống Sidebar
     sortValue,
+    isLoading,
     handlePageChange,
     handleTabChange,
     handleFilterToggle,
@@ -48,6 +49,7 @@ export default function ProductListPage() {
         onTabChange={handleTabChange}
         onSortChange={handleSortChange}
         onOpenFilter={() => setIsMobileFilterOpen(true)}
+        isLoading={isLoading}
       />
     </div>
   );

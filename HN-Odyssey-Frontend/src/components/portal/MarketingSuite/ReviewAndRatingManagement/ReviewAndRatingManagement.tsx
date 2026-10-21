@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import "./ReviewAndRatingManagement.css";
+import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 import {
   StarIcon,
@@ -20,6 +21,7 @@ import type {
 // Prop
 interface ReviewAndRatingManagementProps {
   data: ReviewRecord[];
+  isLoading?: boolean;
   search: string;
   statusFilter: ReviewStatus | "All" | "hidden";
   ratingFilter: string;
@@ -52,6 +54,7 @@ interface ReviewAndRatingManagementProps {
 
 export default function ReviewAndRatingManagement({
   data,
+  isLoading = false,
   search,
   statusFilter,
   ratingFilter,
@@ -282,8 +285,12 @@ export default function ReviewAndRatingManagement({
                 <th style={{ width: "10%", textAlign: "center" }}>Actions</th>
               </tr>
             </thead>
-            <tbody>
-              {data.length > 0 ? (
+            <tbody
+              className={`portal-tbody ${isLoading && data.length > 0 ? "is-refreshing" : ""}`}
+            >
+              {isLoading && data.length === 0 ? (
+                <TableSkeleton columns={8} />
+              ) : data.length > 0 ? (
                 data.map((record) => (
                   <tr
                     key={record.id}
@@ -376,7 +383,7 @@ export default function ReviewAndRatingManagement({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} className="rarm-empty-state">
+                  <td colSpan={8} className="portal-empty-state">
                     No reviews found matching your criteria.
                   </td>
                 </tr>

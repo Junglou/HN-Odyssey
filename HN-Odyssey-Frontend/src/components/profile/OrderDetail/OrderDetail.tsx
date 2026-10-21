@@ -16,6 +16,7 @@ import {
   useLookingSimilar,
 } from "../../../hooks/profile/useOrderDetail";
 import RecommendationList from "../../common/RecommendationList";
+import SmartImage from "../../common/SmartImage/SmartImage";
 
 interface OrderDetailProps {
   orderId: string;
@@ -308,7 +309,7 @@ const OrderDetail = ({
             ) : (
               lineItems.map((item, index) => (
                 <div key={`${item.id}-${index}`} className="pod-item-card">
-                  <img
+                  <SmartImage
                     src={item.image}
                     alt={item.name}
                     className="pod-item-img"

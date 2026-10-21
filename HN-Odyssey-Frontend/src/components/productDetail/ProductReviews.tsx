@@ -15,6 +15,7 @@ import EmojiPicker, {
   EmojiStyle,
 } from "emoji-picker-react";
 import "./ProductReviews.css";
+import SmartImage from "../common/SmartImage/SmartImage";
 
 // --- INLINE ICONS ---
 const InlineAttachmentIcon = () => (
@@ -397,7 +398,7 @@ export default function ProductReviews() {
                           }
                         />
                       ) : (
-                        <img
+                        <SmartImage
                           src={m.url}
                           alt={`review-img-${idx}`}
                           className="pdp-preview-img pdp-preview-img-clickable"
@@ -462,7 +463,7 @@ export default function ProductReviews() {
                               }
                             />
                           ) : (
-                            <img
+                            <SmartImage
                               src={m.url}
                               alt={`reply-img-${idx}`}
                               className="pdp-preview-img pdp-preview-img-clickable"
@@ -642,7 +643,11 @@ export default function ProductReviews() {
               {expandedMedia.type === "VIDEO" ? (
                 <video src={expandedMedia.url} controls autoPlay />
               ) : (
-                <img src={expandedMedia.url} alt="Expanded view" />
+                <SmartImage
+                  src={expandedMedia.url}
+                  alt="Expanded view"
+                  loading="eager"
+                />
               )}
             </div>
           </div>,

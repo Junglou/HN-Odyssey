@@ -126,7 +126,7 @@ export function useBusinessIntelligence() {
   const [startDate, setStartDate] = useState<string>(startOfMonthLocal);
   const [endDate, setEndDate] = useState<string>(todayLocal);
   const [dateError, setDateError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const [metrics, setMetrics] = useState<BIMetrics>({
     conversionRate: { value: "0%", trend: "0%", isPositive: true, isUp: true },

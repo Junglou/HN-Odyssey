@@ -13,6 +13,7 @@ import type {
   DrawerMode,
 } from "../../../../hooks/portal/MarketingSuite/ReviewAndRatingManagement/useReviewAndRatingManagement";
 import { toast } from "react-toastify";
+import SmartImage from "../../../common/SmartImage/SmartImage";
 
 interface ReviewAndRatingDrawerProps {
   isOpen: boolean;
@@ -243,7 +244,7 @@ function DrawerContent({
                         muted
                       />
                     ) : (
-                      <img
+                      <SmartImage
                         src={m.url}
                         alt="review-media"
                         style={{
@@ -357,7 +358,7 @@ function DrawerContent({
                                   muted
                                 />
                               ) : (
-                                <img
+                                <SmartImage
                                   src={m.url}
                                   alt="reply-media"
                                   style={{
@@ -541,7 +542,11 @@ function DrawerContent({
               {expandedMedia.type === "VIDEO" ? (
                 <video src={expandedMedia.url} controls autoPlay />
               ) : (
-                <img src={expandedMedia.url} alt="Zoomed view" />
+                <SmartImage
+                  src={expandedMedia.url}
+                  alt="Zoomed view"
+                  loading="eager"
+                />
               )}
             </div>
           </div>,

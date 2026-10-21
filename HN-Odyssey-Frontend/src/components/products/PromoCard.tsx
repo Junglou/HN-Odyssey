@@ -1,6 +1,7 @@
 import type { BannerItem } from "../../hooks/products/useProductList";
 import { usePromoCard } from "../../hooks/products/usePromoCard";
 import "./PromoCard.css";
+import SmartImage from "../common/SmartImage/SmartImage";
 
 export default function PromoCard({ banner }: { banner: BannerItem }) {
   const { handleBannerClick } = usePromoCard(banner.targetUrl);
@@ -9,12 +10,16 @@ export default function PromoCard({ banner }: { banner: BannerItem }) {
     <div
       // Đổi thành class shape tương ứng để CSS bắt được
       className={`pl-promo-card shape-${banner.shape}`}
-      style={{ backgroundImage: `url(${banner.imageDesktopUrl})` }}
       onClick={handleBannerClick}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === "Enter" && handleBannerClick()}
     >
+      <SmartImage
+        src={banner.imageDesktopUrl}
+        alt={banner.title}
+        className="pl-promo-bg"
+      />
       <div className="pl-promo-overlay"></div>
       <div className="pl-promo-content">
         <h2 className="pl-promo-title">{banner.title}</h2>

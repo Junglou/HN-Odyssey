@@ -7,6 +7,8 @@ import {
   RefreshIcon,
 } from "../../../../assets/icons/StockManagementIcons";
 import "./StockOverviewTab.css";
+import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
+import SmartImage from "../../../common/SmartImage/SmartImage";
 
 // Options lọc đã được khôi phục 3 trạng thái tốt nhất
 const STATUS_OPTIONS = [
@@ -141,6 +143,7 @@ interface StockOverviewTabProps {
   pagination: ReturnType<typeof useStockOverview>["pagination"];
   actions: ReturnType<typeof useStockOverview>["actions"];
   categoriesOptions: { value: string; label: string }[];
+  isLoading?: boolean;
 }
 
 export default function StockOverviewTab({
@@ -149,6 +152,7 @@ export default function StockOverviewTab({
   pagination,
   actions,
   categoriesOptions,
+  isLoading = false,
 }: StockOverviewTabProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [closingRows, setClosingRows] = useState<Set<string>>(new Set());
@@ -264,8 +268,10 @@ export default function StockOverviewTab({
               <th className="sot-col-actions sot-col-5">Actions</th>
             </tr>
           </thead>
-          <tbody>
-            {data.length === 0 ? (
+          <tbody className="portal-tbody">
+            {isLoading && data.length === 0 ? (
+              <TableSkeleton columns={8} />
+            ) : data.length === 0 ? (
               <tr>
                 <td colSpan={8} className="sot-td-empty">
                   No data found
@@ -297,27 +303,18 @@ export default function StockOverviewTab({
                     <td className="sot-cell-sku">{item.sku}</td>
                     <td>
                       <div className="sot-product-info">
-                        {item.thumbnail ? (
-                          <img
-                            src={
-                              item.thumbnail.startsWith("http")
+                        <SmartImage
+                          src={
+                            item.thumbnail
+                              ? item.thumbnail.startsWith("http")
                                 ? item.thumbnail
                                 : `${import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:8080"}${item.thumbnail}`
-                            }
-                            alt=""
-                            className="sot-product-img"
-                            onError={(e) => {
-                              e.currentTarget.src =
-                                "https://placehold.co/400x300/f3f4f6/9ca3af?text=Image+Not+Found";
-                            }}
-                          />
-                        ) : (
-                          <img
-                            src="https://placehold.co/400x300/f3f4f6/9ca3af?text=No+Image"
-                            alt=""
-                            className="sot-product-img"
-                          />
-                        )}
+                              : undefined
+                          }
+                          fallbackSrc="https://placehold.co/400x300/f3f4f6/9ca3af?text=No+Image"
+                          alt={item.name}
+                          className="sot-product-img"
+                        />
                         <span className="sot-product-name">{item.name}</span>
                       </div>
                     </td>

@@ -1,6 +1,7 @@
 // imports
 import { useNavigate } from "react-router-dom";
 import "./BlogCard.css";
+import SmartImage from "../common/SmartImage/SmartImage";
 import type { BlogNewsPost } from "../../hooks/blogNews/useBlogNews";
 
 // types
@@ -44,7 +45,11 @@ export default function BlogCard({
   return (
     <div className={`blog-card ${isFeatured ? "featured" : "standard"}`}>
       <div className="blog-card-img-wrap">
-        <img src={post.thumbnail} alt={post.title} className="blog-card-img" />
+        <SmartImage
+          src={post.thumbnail}
+          alt={post.title}
+          className="blog-card-img"
+        />
       </div>
 
       <div className="blog-card-content">

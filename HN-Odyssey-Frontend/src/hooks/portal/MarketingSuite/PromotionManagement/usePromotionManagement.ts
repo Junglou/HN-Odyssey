@@ -158,6 +158,7 @@ const useLocalAuth = () => {
 
 export function usePromotionManagement() {
   const [records, setRecords] = useState<PromotionRecord[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<PromotionStatus | "All">(
     "All",
@@ -212,6 +213,7 @@ export function usePromotionManagement() {
   const canPublishCombo = hasPermission(Resource.PROMO_COMBOS, Action.PUBLISH);
 
   const fetchPromotions = useCallback(async () => {
+    setIsLoading(true);
     try {
       // 1. CORE API (Bắt buộc): Lấy danh sách Flash Sale & Combo
       // Nếu user không có quyền xem 2 cái này, nó sẽ văng thẳng xuống block catch bự ở dưới cùng.
@@ -321,6 +323,8 @@ export function usePromotionManagement() {
       toast.error(
         extractErrorMessage(error, "Không thể tải danh sách khuyến mãi!"),
       );
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -770,6 +774,7 @@ export function usePromotionManagement() {
 
   return {
     currentRecords,
+    isLoading,
     pagination: {
       ...pagination,
       totalPages,

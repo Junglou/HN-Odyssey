@@ -15,9 +15,11 @@ import type {
   MediaStatus,
   MediaType,
 } from "../../../../hooks/portal/Communication/MediaManagement/useMediaManagement";
+import SmartImage from "../../../common/SmartImage/SmartImage";
 
 interface MediaManagementProps {
   data: MediaRecord[];
+  isLoading?: boolean;
   search: string;
   statusFilter: MediaStatus | "All";
   typeFilter: MediaType | "All";
@@ -47,6 +49,7 @@ interface MediaManagementProps {
 
 export default function MediaManagement({
   data,
+  isLoading = false,
   search,
   statusFilter,
   typeFilter,
@@ -271,8 +274,24 @@ export default function MediaManagement({
           </p>
         </div>
 
-        <div className="mm-grid">
-          {data.length > 0 ? (
+        <div
+          className={`mm-grid ${isLoading && data.length > 0 ? "is-refreshing" : ""}`}
+        >
+          {isLoading && data.length === 0 ? (
+            Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={`skel-${i}`}
+                className="mm-card mm-card-skeleton"
+                aria-hidden="true"
+              >
+                <div className="portal-skel mm-skel-thumb" />
+                <div className="mm-card-info">
+                  <div className="portal-skel mm-skel-line" />
+                  <div className="portal-skel mm-skel-line short" />
+                </div>
+              </div>
+            ))
+          ) : data.length > 0 ? (
             data.map((record) => {
               const isVideo = record.fileName.toLowerCase().endsWith(".mp4");
 
@@ -290,16 +309,13 @@ export default function MediaManagement({
                         onClick={(e) => e.stopPropagation()}
                       />
                     ) : (
-                      <img
+                      <SmartImage
                         src={record.url}
                         alt={record.altText || record.fileName}
+                        fallbackSrc="https://placehold.co/400x300/f3f4f6/9ca3af?text=Image+Not+Found"
                         onClick={() => actions.openEditDrawer(record)} // helper: Mở lại quyền truy cập Drawer
                         style={{ cursor: "pointer" }}
                         title="Click to edit info"
-                        onError={(e) => {
-                          e.currentTarget.src =
-                            "https://placehold.co/400x300/f3f4f6/9ca3af?text=Image+Not+Found";
-                        }}
                       />
                     )}
                     <button
@@ -414,7 +430,7 @@ export default function MediaManagement({
               );
             })
           ) : (
-            <div className="mm-empty-state">
+            <div className="mm-empty-state portal-empty-state">
               No files found matching your criteria.
             </div>
           )}

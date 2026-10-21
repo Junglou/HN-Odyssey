@@ -11,6 +11,7 @@ import {
   PrintIcon,
 } from "../../../../assets/icons/StockManagementIcons";
 import "./StockTicketsTab.css";
+import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
 
 // options
 const TYPE_OPTIONS = [
@@ -92,6 +93,7 @@ interface StockTicketsTabProps {
   filters: ReturnType<typeof useStockTickets>["filters"];
   pagination: ReturnType<typeof useStockTickets>["pagination"];
   actions: ReturnType<typeof useStockTickets>["actions"];
+  isLoading?: boolean;
 }
 
 export default function StockTicketsTab({
@@ -99,6 +101,7 @@ export default function StockTicketsTab({
   filters,
   pagination,
   actions,
+  isLoading = false,
 }: StockTicketsTabProps) {
   // states
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -327,10 +330,14 @@ export default function StockTicketsTab({
               <th style={{ width: "15%", textAlign: "center" }}>Actions</th>
             </tr>
           </thead>
-          <tbody>
-            {data.length === 0 ? (
+          <tbody
+            className={`portal-tbody ${isLoading && data.length > 0 ? "is-refreshing" : ""}`}
+          >
+            {isLoading && data.length === 0 ? (
+              <TableSkeleton columns={8} />
+            ) : data.length === 0 ? (
               <tr>
-                <td colSpan={8} className="stt-td-empty">
+                <td colSpan={8} className="portal-empty-state">
                   No tickets found
                 </td>
               </tr>

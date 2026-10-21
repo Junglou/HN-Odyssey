@@ -117,6 +117,7 @@ export function useMediaManagement() {
   const [records, setRecords] = useState<MediaRecord[]>([]);
   const [totalFiltered, setTotalFiltered] = useState<number>(0);
   const [totalPages, setTotalPages] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const [search, setSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<MediaStatus | "All">("All");
@@ -172,6 +173,7 @@ export function useMediaManagement() {
   const canDelete = hasPermission(Resource.CONTENT_MEDIA, Action.DELETE);
 
   const fetchMedia = useCallback(async () => {
+    setIsLoading(true);
     try {
       const params: Record<string, string | number> = {
         page: pagination.page,
@@ -207,6 +209,8 @@ export function useMediaManagement() {
       setTotalPages(meta.totalPages);
     } catch (error: unknown) {
       toast.error(getErrorMessage(error));
+    } finally {
+      setIsLoading(false);
     }
   }, [pagination.page, pagination.limit, search, statusFilter, typeFilter]);
 
@@ -666,6 +670,7 @@ export function useMediaManagement() {
 
   return {
     currentRecords: records,
+    isLoading,
     pagination: {
       ...pagination,
       totalPages,

@@ -8,6 +8,7 @@ import "./MediaManagementPage.css";
 export default function MediaManagementPage() {
   const {
     currentRecords,
+    isLoading,
     pagination,
     search,
     statusFilter,
@@ -26,6 +27,7 @@ export default function MediaManagementPage() {
       {/* Component chính vẽ giao diện và lưới dữ liệu */}
       <MediaManagement
         data={currentRecords}
+        isLoading={isLoading}
         pagination={pagination}
         search={search}
         statusFilter={statusFilter}

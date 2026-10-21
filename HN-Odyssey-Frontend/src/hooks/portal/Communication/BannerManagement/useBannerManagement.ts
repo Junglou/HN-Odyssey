@@ -128,7 +128,7 @@ const mapBannerToFE = (beBanner: BEBannerResponse): BannerRecord => {
 
 export function useBannerManagement() {
   const [records, setRecords] = useState<BannerRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<BannerStatus | "All">("All");

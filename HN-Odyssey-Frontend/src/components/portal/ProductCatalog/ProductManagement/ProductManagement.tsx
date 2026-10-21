@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import "./ProductManagement.css";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 import { toast } from "react-toastify";
+import SmartImage from "../../../common/SmartImage/SmartImage";
+import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
 
 import {
   ViewIcon,
@@ -23,6 +25,7 @@ import {
 
 interface ProductManagementProps {
   data: ProductRowData[];
+  isLoading?: boolean;
   filters: {
     search: string;
     status: FilterStatus;
@@ -115,6 +118,7 @@ function CustomDropdown({
 
 export default function ProductManagement({
   data,
+  isLoading = false,
   filters,
   pagination,
   actions,
@@ -255,8 +259,12 @@ export default function ProductManagement({
                 </th>
               </tr>
             </thead>
-            <tbody>
-              {data.length > 0 ? (
+            <tbody
+              className={`portal-tbody ${isLoading && data.length > 0 ? "is-refreshing" : ""}`}
+            >
+              {isLoading && data.length === 0 ? (
+                <TableSkeleton columns={6} />
+              ) : data.length > 0 ? (
                 data.map((prod) => (
                   <tr
                     key={prod.id}
@@ -272,7 +280,7 @@ export default function ProductManagement({
                         />
                         <div className="pm-img-placeholder" aria-hidden="true">
                           {prod.image ? (
-                            <img
+                            <SmartImage
                               src={
                                 prod.image.startsWith("http")
                                   ? prod.image
@@ -285,21 +293,10 @@ export default function ProductManagement({
                                 objectFit: "cover",
                                 borderRadius: "8px",
                               }}
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display =
-                                  "none";
-                                (
-                                  e.target as HTMLImageElement
-                                ).nextElementSibling?.removeAttribute("style");
-                              }}
                             />
                           ) : (
                             <div className="pm-img-mock"></div>
                           )}
-                          <div
-                            className="pm-img-mock"
-                            style={{ display: prod.image ? "none" : "block" }}
-                          ></div>
                         </div>
                       </div>
                     </td>
@@ -413,7 +410,7 @@ export default function ProductManagement({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="pm-td-empty">
+                  <td colSpan={6} className="portal-empty-state">
                     No products found.
                   </td>
                 </tr>

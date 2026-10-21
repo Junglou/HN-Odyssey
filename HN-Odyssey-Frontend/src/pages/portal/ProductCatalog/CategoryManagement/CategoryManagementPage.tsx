@@ -22,6 +22,7 @@ export default function CategoryManagementPage() {
     cancelDelete,
     confirmDelete,
     moveCategory,
+    isLoading,
   } = useCategory();
 
   return (
@@ -29,6 +30,7 @@ export default function CategoryManagementPage() {
       {/* components */}
       <CategoryManagement
         data={visibleCategories}
+        isLoading={isLoading}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onAddClick={openAddDrawer}

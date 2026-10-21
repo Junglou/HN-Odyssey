@@ -10,6 +10,7 @@ import "./TradeInManagementPage.css";
 export default function TradeInManagementPage() {
   const {
     data,
+    isLoading,
     filters,
     pagination,
     detailDrawer,
@@ -24,6 +25,7 @@ export default function TradeInManagementPage() {
     <div className="tim-page-container">
       <TradeInManagement
         data={data}
+        isLoading={isLoading}
         filters={filters}
         pagination={pagination}
         actions={actions}

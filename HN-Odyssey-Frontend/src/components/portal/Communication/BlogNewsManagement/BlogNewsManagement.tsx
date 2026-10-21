@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import "./BlogNewsManagement.css";
+import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 import {
   SearchIcon,
@@ -11,9 +12,11 @@ import type {
   BlogNewsRecord,
   BlogNewsStatus,
 } from "../../../../hooks/portal/Communication/BlogNewsManagement/useBlogNewsManagement";
+import SmartImage from "../../../common/SmartImage/SmartImage";
 
 interface BlogNewsManagementProps {
   data: BlogNewsRecord[];
+  isLoading?: boolean;
   search: string;
   statusFilter: BlogNewsStatus | "All";
   selectedIds: Set<string>;
@@ -46,6 +49,7 @@ interface BlogNewsManagementProps {
 
 export default function BlogNewsManagement({
   data,
+  isLoading = false,
   search,
   statusFilter,
   selectedIds,
@@ -184,8 +188,12 @@ export default function BlogNewsManagement({
                 <th style={{ width: "12%", textAlign: "right" }}>Actions</th>
               </tr>
             </thead>
-            <tbody>
-              {data.length > 0 ? (
+            <tbody
+              className={`portal-tbody ${isLoading && data.length > 0 ? "is-refreshing" : ""}`}
+            >
+              {isLoading && data.length === 0 ? (
+                <TableSkeleton columns={7} />
+              ) : data.length > 0 ? (
                 data.map((row) => (
                   <tr key={row.id}>
                     <td>
@@ -198,9 +206,9 @@ export default function BlogNewsManagement({
                     </td>
                     <td>
                       <div className="ban-article-info">
-                        <img
+                        <SmartImage
                           src={row.featuredImage}
-                          alt="img"
+                          alt={row.title}
                           className="ban-article-img"
                         />
                         <div className="ban-article-text">
@@ -249,10 +257,7 @@ export default function BlogNewsManagement({
                 ))
               ) : (
                 <tr>
-                  <td
-                    colSpan={7}
-                    style={{ textAlign: "center", padding: "40px" }}
-                  >
+                  <td colSpan={7} className="portal-empty-state">
                     No articles found.
                   </td>
                 </tr>

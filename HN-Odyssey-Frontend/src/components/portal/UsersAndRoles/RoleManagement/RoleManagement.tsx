@@ -21,6 +21,7 @@ import {
 
 // types
 interface RoleManagementProps {
+  isLoading?: boolean;
   data: {
     roles: Role[];
     permissions: ModulePermission[];
@@ -43,6 +44,7 @@ interface RoleManagementProps {
 
 // component
 export default function RoleManagement({
+  isLoading = false,
   data,
   uiState,
   actions,
@@ -67,6 +69,7 @@ export default function RoleManagement({
   };
 
   const selectedRole = data.roles.find((r) => r.id === uiState.selectedRoleId);
+  const roles = data.roles;
   const isLockedRole = Boolean(selectedRole?.isLocked);
   const filteredRoles = data.roles.filter((r) =>
     r.name.toLowerCase().includes(uiState.searchTerm.toLowerCase()),
@@ -109,6 +112,30 @@ export default function RoleManagement({
               <span className="rm-col-role">Role</span>
               <span className="rm-col-status">Status</span>
             </div>
+
+            {isLoading &&
+              roles.length === 0 &&
+              Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={`skel-${i}`}
+                  className="rm-role-item"
+                  style={{ pointerEvents: "none" }}
+                  aria-hidden="true"
+                >
+                  <div
+                    className="portal-skel"
+                    style={{ height: 16, width: "60%" }}
+                  />
+                  <div
+                    className="portal-skel"
+                    style={{ height: 16, width: 60 }}
+                  />
+                </div>
+              ))}
+
+            {!isLoading && filteredRoles.length === 0 && (
+              <div className="portal-empty-state">No roles found.</div>
+            )}
 
             {filteredRoles.map((role) => (
               <div

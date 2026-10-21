@@ -7,6 +7,7 @@ import "./CouponManagementPage.css";
 export default function CouponManagementPage() {
   const {
     currentRecords,
+    isLoading,
     pagination,
     search,
     statusFilter,
@@ -23,6 +24,7 @@ export default function CouponManagementPage() {
       {/* component bảng và thanh công cụ chính */}
       <CouponManagement
         data={currentRecords}
+        isLoading={isLoading}
         pagination={pagination}
         search={search}
         statusFilter={statusFilter}

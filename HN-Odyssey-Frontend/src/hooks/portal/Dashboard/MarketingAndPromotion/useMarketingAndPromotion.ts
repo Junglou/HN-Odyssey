@@ -365,7 +365,7 @@ export function useMarketingAndPromotion() {
     end: formatDate(today),
   });
 
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [dateError, setDateError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState<boolean>(false);
 

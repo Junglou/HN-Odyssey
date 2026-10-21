@@ -5,6 +5,7 @@ import {
 } from "../../hooks/home/useJustForYouSlider";
 import type { SectionConfig } from "../../hooks/portal/Communication/ContentConfig/useContentConfig";
 import "./JustForYou.css";
+import SmartImage from "../common/SmartImage/SmartImage";
 
 const processStyle = (style?: React.CSSProperties): React.CSSProperties => {
   if (!style) return {};
@@ -63,7 +64,7 @@ const renderContentElement = (
   switch (el.type) {
     case "image":
       return (
-        <img
+        <SmartImage
           key={el.id}
           src={el.content}
           alt=""
@@ -162,15 +163,22 @@ export default function JustForYou({
           style={{ transform: `translateX(-${currentIndex * 100}%)` }}
         >
           {slides.map((slide) => (
-            <div
-              key={slide.id}
-              className="jfy-slide-item"
-              style={{
-                backgroundImage: `url("${slide.backgroundUrl}")`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
-            >
+            <div key={slide.id} className="jfy-slide-item">
+              {slide.backgroundUrl && (
+                <SmartImage
+                  src={slide.backgroundUrl}
+                  alt=""
+                  loading="eager"
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    objectPosition: "center",
+                  }}
+                />
+              )}
               <div
                 className="jfy-canvas-layer"
                 style={{

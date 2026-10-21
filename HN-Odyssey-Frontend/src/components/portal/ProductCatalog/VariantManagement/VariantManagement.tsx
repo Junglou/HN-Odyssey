@@ -1,4 +1,5 @@
 import "./VariantManagement.css";
+import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
 import { CleanTrashIcon } from "../../../../assets/icons/VariantManagementIcons";
 import { EditPenIcon } from "../../../../assets/icons/ProductManagementIcons";
 
@@ -6,6 +7,7 @@ import type { Attribute } from "../../../../hooks/portal/ProductCatalog/VariantM
 
 interface VariantManagementProps {
   data: Attribute[];
+  isLoading?: boolean;
   search: string;
   actions: {
     changeSearch: (val: string) => void;
@@ -16,6 +18,7 @@ interface VariantManagementProps {
 
 export default function VariantManagement({
   data,
+  isLoading = false,
   search,
   actions,
 }: VariantManagementProps) {
@@ -60,8 +63,12 @@ export default function VariantManagement({
                 <th style={{ width: "10%" }}>Actions</th>
               </tr>
             </thead>
-            <tbody>
-              {data.length > 0 ? (
+            <tbody
+              className={`portal-tbody ${isLoading && data.length > 0 ? "is-refreshing" : ""}`}
+            >
+              {isLoading && data.length === 0 ? (
+                <TableSkeleton columns={6} />
+              ) : data.length > 0 ? (
                 data.map((attr) => (
                   <tr key={attr.id}>
                     <td className="font-medium">{attr.name}</td>
@@ -113,7 +120,7 @@ export default function VariantManagement({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="vm-td-empty">
+                  <td colSpan={6} className="portal-empty-state">
                     No attributes found.
                   </td>
                 </tr>

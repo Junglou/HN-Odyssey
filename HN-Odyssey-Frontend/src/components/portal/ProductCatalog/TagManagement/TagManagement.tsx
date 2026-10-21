@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import "./TagManagement.css";
+import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
 
 import { DotsIcon } from "../../../../assets/icons/UserManagementIcons";
 import { CleanTrashIcon } from "../../../../assets/icons/VariantManagementIcons";
@@ -11,6 +12,7 @@ import type { Tag } from "../../../../hooks/portal/ProductCatalog/TagManagement/
 // định nghĩa props nhận từ page
 interface TagManagementProps {
   data: Tag[];
+  isLoading?: boolean;
   search: string;
   actions: {
     changeSearch: (val: string) => void;
@@ -21,6 +23,7 @@ interface TagManagementProps {
 
 export default function TagManagement({
   data,
+  isLoading = false,
   search,
   actions,
 }: TagManagementProps) {
@@ -77,8 +80,12 @@ export default function TagManagement({
                 <th style={{ width: "15%", textAlign: "right" }}>Actions</th>
               </tr>
             </thead>
-            <tbody>
-              {data.length > 0 ? (
+            <tbody
+              className={`portal-tbody ${isLoading && data.length > 0 ? "is-refreshing" : ""}`}
+            >
+              {isLoading && data.length === 0 ? (
+                <TableSkeleton columns={4} />
+              ) : data.length > 0 ? (
                 data.map((tag) => (
                   <tr key={tag._id}>
                     <td>
@@ -164,7 +171,7 @@ export default function TagManagement({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={4} className="tm-td-empty">
+                  <td colSpan={4} className="portal-empty-state">
                     No tags found.
                   </td>
                 </tr>

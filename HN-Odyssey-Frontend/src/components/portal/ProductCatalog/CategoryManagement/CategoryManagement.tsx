@@ -2,9 +2,11 @@ import { useState, useRef, useCallback } from "react";
 import "./CategoryManagement.css";
 import CategoryTableRow, { type FlatCategoryNode } from "./CategoryTableRow";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
+import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
 
 interface CategoryManagementProps {
   data: FlatCategoryNode[];
+  isLoading?: boolean;
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onAddClick: () => void;
@@ -16,6 +18,7 @@ interface CategoryManagementProps {
 
 export default function CategoryManagement({
   data,
+  isLoading = false,
   searchQuery,
   onSearchChange,
   onAddClick,
@@ -81,8 +84,12 @@ export default function CategoryManagement({
                 <th className="cm-th-actions">Actions</th>
               </tr>
             </thead>
-            <tbody>
-              {data.length > 0 ? (
+            <tbody
+              className={`portal-tbody ${isLoading && data.length > 0 ? "is-refreshing" : ""}`}
+            >
+              {isLoading && data.length === 0 ? (
+                <TableSkeleton columns={3} />
+              ) : data.length > 0 ? (
                 data.map((cat) => (
                   <CategoryTableRow
                     key={cat.id}
@@ -97,7 +104,7 @@ export default function CategoryManagement({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={3} className="cm-empty-state">
+                  <td colSpan={3} className="portal-empty-state">
                     No categories found.
                   </td>
                 </tr>

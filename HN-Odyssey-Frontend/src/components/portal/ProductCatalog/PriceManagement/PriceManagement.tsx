@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import "./PriceManagement.css";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
+import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
 import {
   CheckCircleIcon,
   XCircleIcon,
@@ -17,6 +18,7 @@ import type {
 
 interface PriceManagementProps {
   data: PriceRecord[];
+  isLoading?: boolean;
   search: string;
   statusFilter: PriceStatus | "All";
   currencyFilter: string;
@@ -54,6 +56,7 @@ interface PriceManagementProps {
 
 export default function PriceManagement({
   data,
+  isLoading = false,
   search,
   statusFilter,
   currencyFilter,
@@ -297,8 +300,12 @@ export default function PriceManagement({
                 <th style={{ width: "13%" }}>Actions</th>
               </tr>
             </thead>
-            <tbody>
-              {data.length > 0 ? (
+            <tbody
+              className={`portal-tbody ${isLoading && data.length > 0 ? "is-refreshing" : ""}`}
+            >
+              {isLoading && data.length === 0 ? (
+                <TableSkeleton columns={7} />
+              ) : data.length > 0 ? (
                 data.map((record) => (
                   <tr
                     key={record.id}
@@ -388,7 +395,7 @@ export default function PriceManagement({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="prm-empty-state">
+                  <td colSpan={7} className="portal-empty-state">
                     No records found matching your criteria.
                   </td>
                 </tr>

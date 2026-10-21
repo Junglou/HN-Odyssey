@@ -4,6 +4,7 @@ import { MinusIcon, PlusIcon } from "../../../assets/icons/CartIcons";
 import type { CartItem } from "../../../hooks/common/cartDrop/useCart";
 import CartConfirmModal from "./CartConfirmModal";
 import "./CartDropdown.css";
+import SmartImage from "../SmartImage/SmartImage";
 
 // interface
 interface CartDropdownProps {
@@ -39,7 +40,7 @@ export default function CartDropdown({
         {items.map((item) => (
           <div key={item.id} className="cart-item">
             <div className="cart-item-img-box">
-              <img src={item.image} alt={item.name} />
+              <SmartImage src={item.image} alt={item.name} />
             </div>
             <div className="cart-item-info">
               <h4 className="cart-item-name">{item.name}</h4>

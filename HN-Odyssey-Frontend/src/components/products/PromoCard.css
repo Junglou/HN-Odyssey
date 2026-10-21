@@ -19,6 +19,21 @@
   cursor: pointer;
 }
 
+.pl-promo-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  z-index: 0;
+  transition: transform 0.35s ease;
+}
+
+.pl-promo-card:hover .pl-promo-bg {
+  transform: scale(1.03);
+}
+
 .pl-promo-overlay {
   position: absolute;
   top: 0;

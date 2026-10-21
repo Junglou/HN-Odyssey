@@ -7,6 +7,7 @@ import "./StaticPageManagementPage.css";
 export default function StaticPageManagementPage() {
   const {
     currentRecords,
+    isLoading,
     pagination,
     search,
     statusFilter,
@@ -22,6 +23,7 @@ export default function StaticPageManagementPage() {
     <div className="sp-page-container">
       <StaticPageManagement
         data={currentRecords}
+        isLoading={isLoading}
         pagination={pagination}
         search={search}
         statusFilter={statusFilter}

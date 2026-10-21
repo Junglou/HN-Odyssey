@@ -45,7 +45,7 @@ const mapCategoryTree = (node: CategoryApiResponse): CategoryNode => {
 
 export function useCategory() {
   const [categories, setCategories] = useState<CategoryNode[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 

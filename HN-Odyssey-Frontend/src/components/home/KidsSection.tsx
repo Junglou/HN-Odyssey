@@ -3,6 +3,7 @@ import { useKidsSectionConfig } from "../../hooks/home/useKidsSectionConfig";
 import type { ConfigElement } from "../../hooks/home/useJustForYouSlider";
 import type { SectionConfig } from "../../hooks/portal/Communication/ContentConfig/useContentConfig";
 import "./KidsSection.css";
+import SmartImage from "../common/SmartImage/SmartImage";
 
 const getSafeImageUrl = (url?: string): string => {
   if (!url) return "https://placehold.co/400x300/e5e7eb/9ca3af?text=No+Image";
@@ -71,7 +72,7 @@ const renderContentElement = (
   switch (el.type) {
     case "image":
       return (
-        <img
+        <SmartImage
           key={el.id}
           src={getSafeImageUrl(el.content)}
           alt=""

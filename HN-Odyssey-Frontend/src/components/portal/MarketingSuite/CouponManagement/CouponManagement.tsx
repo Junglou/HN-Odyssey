@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import "./CouponManagement.css";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
+import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
 import {
   SearchIcon,
   ChevronDownIcon,
@@ -16,6 +17,7 @@ import type {
 // types
 interface CouponManagementProps {
   data: CouponRecord[];
+  isLoading?: boolean;
   search: string;
   statusFilter: CouponStatus | "All";
   discountTypeFilter: DiscountType | "All";
@@ -128,6 +130,7 @@ const TYPE_OPTIONS: DropdownOption[] = [
 // component
 export default function CouponManagement({
   data,
+  isLoading = false,
   search,
   statusFilter,
   discountTypeFilter,
@@ -308,8 +311,12 @@ export default function CouponManagement({
                 <th style={{ width: "6%", textAlign: "right" }}>Actions</th>
               </tr>
             </thead>
-            <tbody>
-              {data.length > 0 ? (
+            <tbody
+              className={`portal-tbody ${isLoading && data.length > 0 ? "is-refreshing" : ""}`}
+            >
+              {isLoading && data.length === 0 ? (
+                <TableSkeleton columns={10} />
+              ) : data.length > 0 ? (
                 data.map((record) => (
                   <tr
                     key={record.id}
@@ -366,7 +373,7 @@ export default function CouponManagement({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={10} className="coupon-empty-state">
+                  <td colSpan={10} className="portal-empty-state">
                     No coupons found matching your criteria.
                   </td>
                 </tr>

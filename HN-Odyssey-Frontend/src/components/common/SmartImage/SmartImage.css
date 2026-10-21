@@ -1,0 +1,47 @@
+/* trạng thái đang tải: shimmer */
+.smart-img {
+  background-color: #f3f4f6;
+  background-image: linear-gradient(
+    90deg,
+    #f3f4f6 0%,
+    #e5e7eb 40%,
+    #f3f4f6 80%
+  );
+  background-size: 200% 100%;
+  animation: smart-img-shimmer 1.2s ease-in-out infinite;
+  color: transparent; /* ẩn alt text khi ảnh chưa tải */
+}
+
+/* tải xong: mờ dần vào (chỉ dùng opacity + blur để không đè transform/rotate có sẵn) */
+.smart-img.is-loaded {
+  background-image: none;
+  background-color: transparent;
+  animation: smart-img-reveal 0.5s ease-out;
+}
+
+@keyframes smart-img-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@keyframes smart-img-reveal {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .smart-img,
+  .smart-img.is-loaded {
+    animation: smart-img-reveal 0.7s ease-out;
+  }
+}

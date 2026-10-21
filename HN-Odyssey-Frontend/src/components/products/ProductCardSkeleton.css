@@ -1,0 +1,47 @@
+.pl-skeleton-card {
+  cursor: default;
+  pointer-events: none;
+}
+
+.pl-skeleton-block,
+.pl-skeleton-line {
+  background: linear-gradient(90deg, #f3f4f6 0%, #e5e7eb 40%, #f3f4f6 80%);
+  background-size: 200% 100%;
+  animation: pl-skeleton-shimmer 1.2s ease-in-out infinite;
+}
+
+.pl-skeleton-line {
+  height: 14px;
+  border-radius: 4px;
+}
+
+.pl-skeleton-title {
+  width: 70%;
+  height: 18px;
+}
+.pl-skeleton-desc {
+  width: 90%;
+}
+.pl-skeleton-price {
+  width: 60px;
+  height: 18px;
+}
+.pl-skeleton-btn {
+  width: 90px;
+}
+
+@keyframes pl-skeleton-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pl-skeleton-block,
+  .pl-skeleton-line {
+    animation: none;
+  }
+}

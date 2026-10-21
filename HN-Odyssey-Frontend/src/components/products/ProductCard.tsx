@@ -6,6 +6,7 @@ import {
 } from "../../assets/icons/ProductIcons";
 import type { ProductItem } from "../../hooks/products/useProductList";
 import { useProductCard } from "../../hooks/products/useProductCard";
+import SmartImage from "../common/SmartImage/SmartImage";
 import "./ProductCard.css";
 
 // component
@@ -35,13 +36,18 @@ export default function ProductCard({ product }: { product: ProductItem }) {
         {/* di chuyển sự kiện điều hướng vào ảnh để tránh bọc nút bấm bên trong một nút bấm khác */}
         <div
           className="pl-card-image-bg"
-          style={{ backgroundImage: `url(${product.imageUrl})` }}
           onClick={handleCardClick}
           role="button"
           tabIndex={0}
           onKeyDown={(e) => e.key === "Enter" && handleCardClick()}
           aria-label={`Xem chi tiết sản phẩm ${product.name}`}
-        ></div>
+        >
+          <SmartImage
+            src={product.imageUrl}
+            alt={product.name}
+            className="pl-card-image"
+          />
+        </div>
 
         {/* hiển thị nhãn phần trăm giảm giá nếu có */}
         {product.discountBadge && (

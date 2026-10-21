@@ -589,3 +589,63 @@
     transform: translateY(-10px);
   }
 }
+.mm-grid > .mm-card:not(.mm-card-skeleton) {
+  animation: mm-card-in 0.35s ease-out backwards;
+}
+.mm-grid > .mm-card:nth-child(2) {
+  animation-delay: 50ms;
+}
+.mm-grid > .mm-card:nth-child(3) {
+  animation-delay: 100ms;
+}
+.mm-grid > .mm-card:nth-child(4) {
+  animation-delay: 150ms;
+}
+.mm-grid > .mm-card:nth-child(5) {
+  animation-delay: 200ms;
+}
+.mm-grid > .mm-card:nth-child(6) {
+  animation-delay: 250ms;
+}
+.mm-grid > .mm-card:nth-child(n + 7) {
+  animation-delay: 300ms;
+}
+
+@keyframes mm-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-grid > .mm-card {
+    animation: none;
+  }
+}
+/* skeleton & trạng thái tải lại */
+.mm-card-skeleton {
+  pointer-events: none;
+}
+.mm-skel-thumb {
+  height: 160px;
+  border-radius: 0;
+}
+.mm-skel-line {
+  height: 14px;
+  width: 80%;
+}
+.mm-skel-line.short {
+  width: 45%;
+}
+.mm-grid {
+  transition: opacity 0.2s ease;
+}
+.mm-grid.is-refreshing {
+  opacity: 0.5;
+  pointer-events: none;
+}

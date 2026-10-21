@@ -68,6 +68,7 @@ export interface RoleFormData {
 
 export function useRoleManagement() {
   const [roles, setRoles] = useState<Role[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [permissionsTemplate, setPermissionsTemplate] = useState<
     ModulePermission[]
   >([]);
@@ -92,6 +93,7 @@ export function useRoleManagement() {
   }>({ isOpen: false, roleId: null });
 
   const fetchList = useCallback(async () => {
+    setIsLoading(true);
     try {
       const [metaRes, rolesRes] = await Promise.all([
         axiosClient.get(`/admin/roles/metadata/permissions`),
@@ -146,6 +148,8 @@ export function useRoleManagement() {
       setRoles(mappedRoles);
     } catch {
       toast.error("Không thể tải danh sách vai trò và phân quyền.");
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -346,6 +350,7 @@ export function useRoleManagement() {
 
   return {
     roles,
+    isLoading,
     permissions,
     uiState: { selectedRoleId, hasUnsavedChanges, searchTerm },
     modalConfig,
