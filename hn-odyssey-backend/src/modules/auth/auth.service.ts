@@ -19,6 +19,10 @@ import { VerifyOtpDto } from '../auth/dto/verify.dto';
 import { CreateRecoveryDto } from './dto/create-recovery.dto';
 import { ProcessRecoveryDto } from './dto/process-recovery.dto';
 import { RecoveryRequest } from './schema/recovery-request.schema';
+import {
+  RefreshSession,
+  RefreshSessionDocument,
+} from './schema/refresh-session.schema';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/user.Service';
 import { ResetPasswordDto } from './dto/reset-password.dto';
@@ -28,7 +32,7 @@ import { RecoverAccountDto } from './dto/recover-account.dto';
 import { AuditLogsService } from '../system/audit-logs/audit-logs.service';
 import { UserStatus } from 'src/common/enums/user-status.enum';
 import { ResendOtpDto } from './dto/resend-otp.dto.ts';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { Department } from 'src/common/enums/department.enum';
 import { Staff } from '../users/admin/schemas/staff.schema';
 import type {
@@ -40,6 +44,7 @@ import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant
 import { Role, RoleDocument } from '../users/roles/schemas/role.schema';
 import { isReservedRoleKey } from 'src/common/constants/system-roles.constant';
 import { Action, Resource } from 'src/common/enums/resource.enum';
+import { ERROR_CODES } from 'src/common/constants/error-codes.constant';
 
 @Injectable()
 export class AuthService {
@@ -60,6 +65,8 @@ export class AuthService {
     private readonly auditLogsService: AuditLogsService,
     private readonly eventEmitter: EventEmitter2,
     @InjectModel(Role.name) private readonly roleModel: Model<RoleDocument>,
+    @InjectModel(RefreshSession.name)
+    private readonly refreshSessionModel: Model<RefreshSessionDocument>,
   ) {}
 
   // Helper lấy động Permissions từ DB (Đã fix định dạng chuẩn cho Frontend)
@@ -386,15 +393,12 @@ export class AuthService {
       const { permissions, is_portal_access } =
         await this.resolveUserPermissions(user.roles);
 
-      // AC14: Tự động đăng nhập
-      const accessToken = await this.generateAccessToken(user);
-      const refreshToken = await this.generateRefreshToken(user, false);
-
-      // Lưu Refresh Token vào User
-      const hashedRt = await bcrypt.hash(refreshToken, 10);
-      await this.userModel.updateOne(
-        { _id: user._id },
-        { refresh_token: hashedRt },
+      // AC14: Tự động đăng nhập (tạo phiên cho thiết bị hiện tại)
+      const { accessToken, refreshToken } = await this.createSessionTokens(
+        user,
+        false,
+        ip,
+        userAgent,
       );
 
       // Ghi Audit Log (Bổ sung thêm field tracking method: SMS hay EMAIL)
@@ -522,7 +526,8 @@ export class AuthService {
         throw new BadRequestException('Email không hợp lệ');
     }
 
-    const user = await this.usersService.findByEmailOrPhone(account);
+    const user =
+      await this.usersService.findByEmailOrPhoneWithPassword(account);
     if (!user) {
       throw new UnauthorizedException(
         'Tài khoản hoặc mật khẩu không chính xác',
@@ -563,6 +568,69 @@ export class AuthService {
     return user;
   }
 
+  // PHIÊN ĐĂNG NHẬP THEO THIẾT BỊ
+  private getRefreshTtlMs(isRemember: boolean): number {
+    // Phải khớp với expiresIn trong generateRefreshToken (30d / 1d)
+    return (isRemember ? 30 : 1) * 24 * 60 * 60 * 1000;
+  }
+
+  // SHA-256 thay cho bcrypt: bcrypt chỉ dùng 72 byte đầu nên không phân biệt được các JWT của cùng 1 user
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  // Tạo phiên mới cho thiết bị hiện tại và cấp cặp token
+  private async createSessionTokens(
+    user: UserDocument,
+    isRemember: boolean,
+    ip: string,
+    userAgent: string,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const sessionId = randomBytes(16).toString('hex');
+    const accessToken = await this.generateAccessToken(user);
+    const refreshToken = await this.generateRefreshToken(
+      user,
+      isRemember,
+      sessionId,
+    );
+
+    await this.refreshSessionModel.create({
+      user_id: user._id,
+      session_id: sessionId,
+      token_hash: this.hashToken(refreshToken),
+      remember_me: isRemember,
+      ip: ip || 'Unknown',
+      user_agent: userAgent || 'Unknown',
+      expires_at: new Date(Date.now() + this.getRefreshTtlMs(isRemember)),
+    });
+
+    return { accessToken, refreshToken };
+  }
+
+  // Thu hồi mọi phiên của 1 user (nhân viên đăng nhập mới, khóa tài khoản...)
+  async revokeAllSessions(userId: unknown): Promise<void> {
+    await this.refreshSessionModel.deleteMany({ user_id: String(userId) });
+  }
+
+  // Lấy session_id từ refresh token (bỏ qua hạn dùng, chỉ cần chữ ký hợp lệ)
+  private async extractSessionId(
+    refreshToken?: string,
+  ): Promise<string | null> {
+    if (!refreshToken) return null;
+    try {
+      const decoded = await this.jwtService.verifyAsync<{ sid?: string }>(
+        refreshToken,
+        {
+          secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+          ignoreExpiration: true,
+        },
+      );
+      return decoded.sid ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   //5. LOGIN
   private async generateAccessToken(user: UserDocument) {
     // Tự động đính kèm quyền CUSTOMER cho mọi loại tài khoản
@@ -587,6 +655,7 @@ export class AuthService {
   private async generateRefreshToken(
     user: UserDocument,
     isRemember: boolean,
+    sessionId: string,
   ): Promise<string> {
     // Tự động đính kèm quyền CUSTOMER
     const mergedRoles = Array.from(new Set([...user.roles, 'CUSTOMER']));
@@ -596,6 +665,7 @@ export class AuthService {
       email: user.email,
       roles: mergedRoles, // Dùng mảng đã gộp
       token_version: user.token_version ?? 0,
+      sid: sessionId, // Phiên của thiết bị
     };
 
     if (user.status !== UserStatus.ACTIVE) {
@@ -616,17 +686,41 @@ export class AuthService {
     ip: string,
     userAgent: string,
   ) {
-    const accessToken = await this.generateAccessToken(user);
-    const refreshToken = await this.generateRefreshToken(user, isRemember);
+    // Tài khoản nhân viên (có role khác CUSTOMER) chỉ được 1 phiên:
+    // tăng token_version để mọi token của phiên cũ mất hiệu lực ngay
+    const isStaffAccount = (user.roles ?? []).some(
+      (role) => role !== 'CUSTOMER',
+    );
+    if (isStaffAccount) {
+      const updated = await this.userModel
+        .findOneAndUpdate(
+          { _id: user._id },
+          { $inc: { token_version: 1 } },
+          { new: true, projection: { token_version: 1 } },
+        )
+        .lean<{ token_version?: number }>()
+        .exec();
+      user.token_version =
+        updated?.token_version ?? (user.token_version ?? 0) + 1;
+    }
 
-    const hashed = await bcrypt.hash(refreshToken, 10);
+    // Nhân viên chỉ giữ 1 phiên: xóa toàn bộ phiên cũ trước khi tạo phiên mới
+    if (isStaffAccount) {
+      await this.revokeAllSessions(user._id);
+    }
 
-    const updatePayload: Record<string, unknown> = {
-      refresh_token: hashed,
-      last_login_at: new Date(),
-    };
+    const { accessToken, refreshToken } = await this.createSessionTokens(
+      user,
+      isRemember,
+      ip,
+      userAgent,
+    );
 
-    await this.userModel.updateOne({ _id: user._id }, { $set: updatePayload });
+    // refresh_token trên users không còn dùng nữa -> dọn về null
+    await this.userModel.updateOne(
+      { _id: user._id },
+      { $set: { last_login_at: new Date(), refresh_token: null } },
+    );
 
     let employeeCode: string | undefined = undefined;
     if ('employee_code' in user) {
@@ -658,6 +752,7 @@ export class AuthService {
         roles: mergedRoles, // Lưu lại mảng roles thực tế đã cấp
         method: user.social_auth ? 'OAUTH' : 'LOCAL',
         remember_me: isRemember,
+        single_session_enforced: isStaffAccount, // true = đã thu hồi phiên cũ
       },
       ip: ip,
       user_agent: userAgent,
@@ -682,7 +777,7 @@ export class AuthService {
   async refreshTokens(refreshToken: string) {
     if (!refreshToken) throw new BadRequestException('Thiếu refresh token');
 
-    let decoded: { sub: string };
+    let decoded: { sub: string; sid?: string; token_version?: number };
 
     try {
       decoded = await this.jwtService.verifyAsync(refreshToken, {
@@ -694,27 +789,68 @@ export class AuthService {
       );
     }
 
-    const user = (await this.userModel.findById(decoded.sub)) as UserDocument;
-
-    if (!user) throw new NotFoundException('User không tồn tại');
-
-    if (!user.refresh_token) {
-      throw new UnauthorizedException('Refresh token đã bị thu hồi');
+    // Token cấp trước khi có cơ chế phiên theo thiết bị -> bắt đăng nhập lại
+    if (!decoded.sid) {
+      throw new UnauthorizedException(
+        'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+      );
     }
 
-    const isValid = await bcrypt.compare(refreshToken, user.refresh_token);
-    if (!isValid) throw new UnauthorizedException('Refresh token không khớp');
+    const user = (await this.userModel.findById(decoded.sub)) as UserDocument;
+    if (!user) throw new NotFoundException('User không tồn tại');
 
+    // Phiên bị thu hồi (nhân viên đăng nhập ở máy khác, đổi mật khẩu...)
+    if ((decoded.token_version ?? 0) !== (user.token_version ?? 0)) {
+      await this.refreshSessionModel.deleteOne({ session_id: decoded.sid });
+      throw new UnauthorizedException({
+        message:
+          'Phiên đăng nhập đã bị thu hồi do tài khoản được đăng nhập ở thiết bị khác hoặc mật khẩu đã thay đổi. Vui lòng đăng nhập lại.',
+        error_code: ERROR_CODES.SESSION_REVOKED,
+      });
+    }
+
+    const session = await this.refreshSessionModel.findOne({
+      session_id: decoded.sid,
+      user_id: user._id,
+    });
+
+    if (!session) {
+      throw new UnauthorizedException({
+        message: 'Phiên đăng nhập đã kết thúc. Vui lòng đăng nhập lại.',
+        error_code: ERROR_CODES.SESSION_REVOKED,
+      });
+    }
+
+    // Chấp nhận token hiện hành, hoặc token liền trước trong 60s (nhiều tab refresh cùng lúc)
+    const GRACE_MS = 60 * 1000;
+    const incomingHash = this.hashToken(refreshToken);
+    const isCurrent = session.token_hash === incomingHash;
+    const isRecentPrevious =
+      session.prev_token_hash === incomingHash &&
+      !!session.rotated_at &&
+      Date.now() - session.rotated_at.getTime() < GRACE_MS;
+
+    if (!isCurrent && !isRecentPrevious) {
+      throw new UnauthorizedException('Refresh token không khớp');
+    }
+
+    // Xoay vòng token, giữ nguyên lựa chọn "ghi nhớ đăng nhập" của phiên
     const newAccessToken = await this.generateAccessToken(user);
-    const newRefreshToken = await this.generateRefreshToken(user, false);
-    const newHash = await bcrypt.hash(newRefreshToken, 10);
-
-    await this.userModel.updateOne(
-      { _id: user._id },
-      { $set: { refresh_token: newHash } },
+    const newRefreshToken = await this.generateRefreshToken(
+      user,
+      session.remember_me,
+      session.session_id,
     );
 
-    // [FIX KIẾN TRÚC]: Resolve lại Permissions và trả kèm object user y hệt như hàm login()
+    session.prev_token_hash = session.token_hash;
+    session.token_hash = this.hashToken(newRefreshToken);
+    session.rotated_at = new Date();
+    session.last_used_at = new Date();
+    session.expires_at = new Date(
+      Date.now() + this.getRefreshTtlMs(session.remember_me),
+    );
+    await session.save();
+
     const mergedRoles = Array.from(new Set([...user.roles, 'CUSTOMER']));
     const { permissions, is_portal_access } =
       await this.resolveUserPermissions(mergedRoles);
@@ -729,17 +865,26 @@ export class AuthService {
         roles: mergedRoles,
         avatar: user.avatar,
         status: user.status,
-        permissions: permissions, // <-- QUAN TRỌNG NHẤT LÀ ĐÂY
+        permissions: permissions,
         is_portal_access: is_portal_access,
       },
     };
   }
 
-  async logout(userId: string, ip: string, userAgent: string) {
-    await this.userModel.updateOne(
-      { _id: userId },
-      { $set: { refresh_token: null } },
-    );
+  async logout(
+    userId: string,
+    ip: string,
+    userAgent: string,
+    refreshToken?: string,
+  ) {
+    // Chỉ xóa phiên của thiết bị đang đăng xuất, các thiết bị khác vẫn giữ nguyên
+    const sessionId = await this.extractSessionId(refreshToken);
+    if (sessionId) {
+      await this.refreshSessionModel.deleteOne({
+        session_id: sessionId,
+        user_id: userId,
+      });
+    }
 
     // [FIX] Ghi Log Logout
     await this.auditLogsService.log({
@@ -748,7 +893,7 @@ export class AuthService {
       actor_id: userId,
       target_id: userId,
       department: Department.SUPPORT,
-      detail: { message: 'User logged out' },
+      detail: { message: 'User logged out', session_id: sessionId },
       ip: ip,
       user_agent: userAgent,
     });
@@ -1251,12 +1396,15 @@ export class AuthService {
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(dto.newPassword, salt);
 
-    // Tự động mở khóa tài khoản và reset số lần nhập sai nếu họ đã tự đổi mật khẩu thành công
-    user.status = UserStatus.ACTIVE;
+    // Đổi mật khẩu thành công -> gỡ khóa tạm do nhập sai nhiều lần.
+    // KHÔNG đổi status: tài khoản bị admin khóa/vô hiệu hóa vẫn giữ nguyên trạng thái.
     user.lock_until = null;
     user.login_attempts = 0;
+    // Thu hồi mọi phiên cũ (kể cả phiên của kẻ gian nếu tài khoản từng bị lộ)
+    user.token_version = (user.token_version ?? 0) + 1;
 
     await user.save();
+    await this.revokeAllSessions(user._id);
 
     this.eventEmitter.emit('notification.security.resolve', {
       user_id: String(user._id),
@@ -1320,9 +1468,12 @@ export class AuthService {
     user.password = await bcrypt.hash(dto.newPassword, salt);
     user.lock_until = null;
     user.login_attempts = 0;
-    user.status = UserStatus.ACTIVE;
+    user.status = UserStatus.ACTIVE; // Admin đã duyệt yêu cầu khôi phục nên được kích hoạt lại
+    // Thu hồi mọi phiên cũ: tài khoản đang được khôi phục có thể đã bị chiếm
+    user.token_version = (user.token_version ?? 0) + 1;
 
     await user.save();
+    await this.revokeAllSessions(user._id);
     await verifyRecord.deleteOne();
 
     this.eventEmitter.emit('notification.security.resolve', {

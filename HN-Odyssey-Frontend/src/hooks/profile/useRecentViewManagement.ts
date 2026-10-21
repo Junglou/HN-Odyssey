@@ -1,16 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
-import axios from "axios";
-import axiosClient from "../../api/axiosClient"; // SỬ DỤNG AXIOS CLIENT
+import axiosClient from "../../api/axiosClient";
 import type { Product } from "../../types/product";
-import tokenStorage from "../../utils/tokenStorage";
+import { getGuestSessionId } from "../common/cartDrop/useCart";
 import {
   clampPaginationPage,
   useResponsiveProfilePagination,
 } from "./useResponsiveOrderPageLimit";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
-const SESSION_KEY = "hn_analytics_session_id";
 const RECENT_VIEW_STORAGE_KEY = "hn_profile_recent_views_v1";
 const LAST_VIEWED_PRODUCT_KEY = "hn_last_viewed_product_id";
 const MAX_RECENT_ITEMS = 12;
@@ -26,19 +23,6 @@ export const isValidMongoObjectId = (
 export const isValidProductIdentifier = (
   value: string | undefined | null,
 ): boolean => !!value && value.trim().length > 0;
-
-const getOrCreateSessionId = (): string => {
-  const existing = localStorage.getItem(SESSION_KEY);
-  if (existing) return existing;
-
-  const id =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `sess_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-
-  localStorage.setItem(SESSION_KEY, id);
-  return id;
-};
 
 const readStoredRecentViews = (): Product[] => {
   try {
@@ -76,19 +60,6 @@ export const recordRecentViewProduct = (product: Product) => {
   ].slice(0, MAX_RECENT_ITEMS);
 
   writeStoredRecentViews(next);
-};
-
-const getAuthHeadersIfValidUser = () => {
-  const token = tokenStorage.getToken();
-  if (!token) return {};
-
-  const user = tokenStorage.getUser() as { _id?: string; id?: string } | null;
-  const userId = user?._id ?? user?.id;
-  if (!isValidMongoObjectId(userId ? String(userId) : undefined)) {
-    return {};
-  }
-
-  return { headers: { Authorization: `Bearer ${token}` } };
 };
 
 const paginateProducts = (
@@ -228,10 +199,10 @@ export function useRecentViewManagement() {
     await fetchRecentView();
 
     try {
-      const sessionId = getOrCreateSessionId();
-      await axios.delete(`${API_URL}/recommendations/recently-viewed`, {
+      // Dùng chung mã phiên với useTracking (key "guestSessionId") để xóa đúng dữ liệu đã ghi
+      const sessionId = getGuestSessionId();
+      await axiosClient.delete("/recommendations/recently-viewed", {
         params: { session_id: sessionId },
-        ...getAuthHeadersIfValidUser(),
       });
       toast.success("Đã xóa lịch sử xem sản phẩm.");
     } catch (err: unknown) {

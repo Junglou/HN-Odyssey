@@ -14,7 +14,7 @@ import {
 import { User, UserDocument } from '../schemas/user.schema';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
-import { UserStatus } from 'src/common/enums/user-status.enum';
+import { SetPasswordDto } from './dto/set-password.dto';
 import {
   RequestChangeContactDto,
   VerifyContactChangeDto,
@@ -24,6 +24,35 @@ import { GetMyOrdersDto, OrderStatus } from './dto/get-my-orders.dto';
 import { EmailService } from 'src/modules/notifications/channels/email.service';
 import { SmsService } from 'src/modules/notifications/channels/sms.service';
 import { AuditLogsService } from 'src/modules/system/audit-logs/audit-logs.service';
+
+// Chỉ trả về cho khách những field trang cá nhân cần (whitelist).
+// Không trả: password, refresh_token, token_version, login_attempts, lock_until,
+// internal_note, status_reason, assigned_warehouse, is_deleted...
+const PUBLIC_PROFILE_FIELDS = [
+  '_id',
+  'type', // khóa discriminator, cần để Mongoose dựng đúng document Customer
+  'avatar',
+  'username',
+  'email',
+  'phone',
+  'first_Name',
+  'last_Name',
+  'gender',
+  'dateOfBirth',
+  'social_auth',
+  'roles',
+  'status',
+  'last_login_at',
+  'createdAt',
+  'updatedAt',
+  'loyalty',
+  'addresses',
+  'wishlist',
+  'is_subscribed',
+  'review_access',
+  'search_preferences',
+  'followed_brands',
+].join(' ');
 
 @Injectable()
 export class CustomersService {
@@ -35,88 +64,24 @@ export class CustomersService {
     private readonly auditLogsService: AuditLogsService,
   ) {}
 
-  // CHUYỂN KHÁCH VÃNG LAI THÀNH THÀNH VIÊN
-  async convertGuestToMember(orderId: string, password: string) {
-    const order = await this.orderModel.findById(orderId);
-    if (!order) throw new NotFoundException('Không tìm thấy đơn hàng');
-    if (!order.guest_info || !order.guest_info.email) {
-      throw new BadRequestException(
-        'Đơn hàng không có thông tin khách vãng lai hợp lệ.',
-      );
-    }
-
-    const existingUser = await this.userModel.findOne({
-      email: order.guest_info.email,
-    });
-    if (existingUser) {
-      throw new BadRequestException(
-        'Email này đã có tài khoản. Vui lòng đăng nhập.',
-      );
-    }
-
-    const hashedPassword = await this.hashPassword(password);
-
-    const nameParts = order.guest_info.name.trim().split(' ');
-    const firstName =
-      nameParts.length > 1 ? nameParts[0] : order.guest_info.name;
-    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
-    const guestUsername =
-      order.guest_info.email.split('@')[0] +
-      '_' +
-      Date.now().toString().slice(-4);
-
-    const newUser = await this.userModel.create({
-      username: guestUsername,
-      email: order.guest_info.email,
-      password: hashedPassword,
-      first_Name: firstName,
-      last_Name: lastName,
-      phone: order.guest_info.phone,
-      roles: ['CUSTOMER'],
-      status: UserStatus.ACTIVE,
-      type: 'Customer',
-    });
-
-    order.user_id = newUser._id;
-    order.isGuest = false;
-    await order.save();
-
-    // Gửi email thông báo tài khoản kèm mật khẩu cho khách hàng
-    await this.emailService.sendRaw(
-      order.guest_info.email,
-      '[H&N Odyssey] Chào mừng bạn trở thành thành viên!',
-      `<p>Xin chào ${order.guest_info.name},</p>
-       <p>Hệ thống đã tự động tạo tài khoản thành viên cho bạn dựa trên thông tin đơn hàng <b>${order.order_code}</b>.</p>
-       <p><b>Thông tin đăng nhập của bạn:</b></p>
-       <ul>
-         <li>Tên đăng nhập / Email: <b>${order.guest_info.email}</b></li>
-         <li>Mật khẩu: <b>${password}</b></li>
-       </ul>
-       <p>Vui lòng đăng nhập và tiến hành đổi mật khẩu để bảo mật tài khoản.</p>`,
-    );
-
-    return {
-      success: true,
-      message: 'Tạo tài khoản thành công. Đã gửi email thông báo.',
-      userId: newUser._id,
-    };
-  }
-
   // US.04: QUẢN LÝ TÀI KHOẢN VÀ BẢO MẬT
   async getProfile(userId: string) {
-    const user = await this.userModel.findById(userId).exec();
+    const user = await this.userModel
+      .findById(userId)
+      .select(PUBLIC_PROFILE_FIELDS)
+      .exec();
     if (!user) throw new NotFoundException('Không tìm thấy người dùng');
-    return user;
+    return this.toProfileResponse(user);
   }
 
   async updateProfile(userId: string, updateDto: UpdateProfileDto) {
     const updatedUser = await this.userModel.findByIdAndUpdate(
       userId,
       { $set: updateDto },
-      { new: true, runValidators: true },
+      { new: true, runValidators: true, projection: PUBLIC_PROFILE_FIELDS },
     );
     if (!updatedUser) throw new NotFoundException('Không tìm thấy người dùng');
-    return { success: true, data: updatedUser };
+    return { success: true, data: await this.toProfileResponse(updatedUser) };
   }
 
   async updateAvatar(userId: string, avatarUrl: string) {
@@ -177,6 +142,61 @@ export class CustomersService {
       success: true,
       message:
         'Đổi mật khẩu thành công. Các phiên đăng nhập khác đã bị đăng xuất.',
+    };
+  }
+
+  // Trả profile kèm has_password (KHÔNG trả hash, chỉ trả true/false)
+  private async toProfileResponse(user: UserDocument) {
+    const hasPassword = await this.userModel.exists({
+      _id: user._id,
+      password: { $type: 'string', $ne: '' },
+    });
+    return {
+      ...(user.toJSON() as Record<string, unknown>),
+      has_password: !!hasPassword,
+    };
+  }
+
+  // Đặt mật khẩu lần đầu cho tài khoản tạo bằng Google/Facebook (chưa có mật khẩu)
+  async setPassword(userId: string, dto: SetPasswordDto) {
+    const user = await this.userModel
+      .findById(userId)
+      .select('+password')
+      .exec();
+    if (!user) throw new NotFoundException('Không tìm thấy người dùng');
+
+    if (user.password) {
+      throw new BadRequestException(
+        'Tài khoản đã có mật khẩu. Vui lòng dùng chức năng đổi mật khẩu.',
+      );
+    }
+
+    user.password = await this.hashPassword(dto.newPassword);
+    await user.save();
+
+    await this.emailService.sendRaw(
+      user.email,
+      '[H&N Odyssey] Thông báo bảo mật: Đã đặt mật khẩu cho tài khoản',
+      `<p>Xin chào,</p>
+       <p>Tài khoản của bạn vừa được đặt mật khẩu. Từ giờ bạn có thể đăng nhập bằng email và mật khẩu, bên cạnh Google/Facebook.</p>
+       <p>Nếu bạn không thực hiện yêu cầu này, vui lòng liên hệ ngay với bộ phận CSKH.</p>`,
+    );
+
+    await this.auditLogsService.log({
+      action: 'SET_PASSWORD',
+      collection_name: 'User',
+      actor_id: userId,
+      target_id: userId,
+      department: 'SUPPORT',
+      detail: {
+        description: 'Tài khoản đăng nhập mạng xã hội đã đặt mật khẩu lần đầu',
+      },
+    });
+
+    return {
+      success: true,
+      message:
+        'Đặt mật khẩu thành công. Từ giờ bạn có thể đăng nhập bằng email và mật khẩu.',
     };
   }
 

@@ -298,28 +298,68 @@
   margin-top: 0;
 }
 
-.social-list {
+.profile-linked-list {
   padding: 0;
   margin: 0;
   list-style: none;
 }
 
-.social-list li {
+.profile-linked-list li {
   margin-left: 0;
   margin-bottom: clamp(0.65rem, 1.5vw, 1rem);
-  font-size: clamp(0.82rem, 1.2vw, 0.9rem);
   display: flex;
   align-items: center;
-  gap: clamp(0.5rem, 1vw, 0.625rem);
-  font-weight: 600;
-  line-height: 1.35;
+  gap: clamp(0.5rem, 1vw, 0.75rem);
   min-width: 0;
 }
 
-.social-list li a {
+/* Khung tròn cố định cho mọi icon -> các dòng thẳng hàng, nhìn đồng bộ */
+.profile-linked-list .icon-wrap {
+  flex: 0 0 2rem;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid #e5e5e5;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-linked-list .icon-wrap svg {
+  width: 1rem;
+  height: 1rem;
+  display: block;
+}
+
+/* Tên ở dòng trên, trạng thái ở dòng dưới -> không bị dính chữ khi cột hẹp */
+.profile-linked-list .linked-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
   min-width: 0;
-  word-break: break-word;
-  overflow-wrap: anywhere;
+}
+
+.profile-linked-list .linked-name {
+  font-size: clamp(0.82rem, 1.2vw, 0.9rem);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.profile-linked-list .linked-status {
+  font-size: clamp(0.72rem, 1vw, 0.78rem);
+  font-weight: 500;
+  color: #999;
+  line-height: 1.3;
+}
+
+.profile-linked-list .linked-status.is-linked {
+  color: #1a7f37;
+}
+.linked-hint {
+  font-size: clamp(0.72rem, 1vw, 0.8rem);
+  color: #999;
+  line-height: 1.4;
+  margin: 0;
 }
 
 .text-link {

@@ -1,5 +1,5 @@
 // imports
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLogin } from "../../hooks/auth/useLogin";
 import type { ApiError } from "../../hooks/auth/useLogin";
@@ -14,6 +14,7 @@ import {
   HeadsetIcon,
 } from "../../assets/icons/AuthIcons";
 import { useOAuthLogin } from "../../hooks/auth/useOAuthLogin";
+import { AUTH_NOTICE_KEY } from "../../api/axiosClient";
 
 // component
 const LoginPage = () => {
@@ -24,6 +25,16 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const { login, loading, error } = useLogin();
   useOAuthLogin();
+
+  // Hiện lý do bị đăng xuất (VD: tài khoản vừa đăng nhập ở thiết bị khác)
+  // Đọc xong xóa ngay -> chỉ hiện 1 lần, tải lại trang không hiện nữa
+  useEffect(() => {
+    const notice = sessionStorage.getItem(AUTH_NOTICE_KEY);
+    if (notice) {
+      sessionStorage.removeItem(AUTH_NOTICE_KEY);
+      toast.warning(notice, { autoClose: 6000 });
+    }
+  }, []);
 
   // handlers
   const handleLogin = async (data: LoginPayload) => {

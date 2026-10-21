@@ -31,7 +31,17 @@ export function useProductDetailMain() {
       const response = await axiosClient.post("/users/wishlist/toggle", {
         productId,
       });
-      setIsWishlisted((prev) => !prev);
+
+      // ưu tiên trạng thái thật từ backend, chỉ tự đảo khi backend không trả isAdded
+      const isAdded = response.data?.isAdded;
+      if (typeof isAdded === "boolean") {
+        setIsWishlisted(isAdded);
+      } else {
+        setIsWishlisted((prev) => !prev);
+      }
+
+      // báo cho Header cập nhật chấm đỏ wishlist
+      window.dispatchEvent(new Event("wishlist_updated"));
       toast.success(response.data.message || "Đã cập nhật danh sách yêu thích");
     } catch (error: unknown) {
       console.error("Lỗi Wishlist:", error);
@@ -68,6 +78,8 @@ export function useProductDetailMain() {
         quantity: quantity,
         guestSessionId: getGuestSessionId(),
       });
+      // báo cho Header/CartDropdown fetch lại giỏ hàng
+      window.dispatchEvent(new Event("cart_updated"));
       toast.success("Đã thêm sản phẩm vào giỏ hàng thành công!");
 
       // [BỔ SUNG] Bắn sự kiện thêm giỏ hàng cho AI Algolia

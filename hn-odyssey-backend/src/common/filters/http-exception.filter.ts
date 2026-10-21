@@ -17,6 +17,7 @@ interface NestErrorResponse {
   message?: string | string[];
   error?: string;
   statusCode?: number;
+  error_code?: string;
 }
 
 @Catch()
@@ -30,6 +31,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string | string[] = 'Internal Server Error';
+    let errorCode: string | undefined;
 
     // TH 1: Nếu là lỗi chuẩn của NestJS (HttpException)
     if (exception instanceof HttpException) {
@@ -40,6 +42,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
         typeof resBody === 'object'
           ? resBody.message || exception.message
           : resBody;
+
+      if (typeof resBody === 'object' && resBody.error_code) {
+        errorCode = resBody.error_code;
+      }
     }
     // TH 2: Nếu là lỗi từ MongoDB (ép kiểu qua interface MongoError)
     else if ((exception as MongoError).code === 11000) {
@@ -64,6 +70,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: request.url,
       message: message,
+      ...(errorCode ? { error_code: errorCode } : {}),
     });
   }
 }

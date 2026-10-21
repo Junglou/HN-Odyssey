@@ -1,3 +1,4 @@
+import { useState } from "react";
 import "./MyProfile.css";
 import RecommendationList from "../common/RecommendationList";
 import type { RecommendProduct } from "../../hooks/profile/useRecommendProduct";
@@ -5,13 +6,9 @@ import { useProfileManagement } from "../../hooks/profile/useProfileManagement";
 import MyProfileModal from "./ProfileModal/MyProfileModal";
 import AccountInformationModal from "./ProfileModal/AccountInformationModal";
 import AvatarModal from "./ProfileModal/AvatarModal";
+import ChangePasswordModal from "./ProfileModal/ChangePasswordModal";
 import { useNavigate } from "react-router-dom";
-import {
-  FacebookIcon,
-  InstagramIcon,
-  TiktokIcon,
-  XIcon,
-} from "../../assets/icons/ProfileIcons";
+import { FacebookIcon } from "../../assets/icons/ProfileIcons";
 import type { UserProfile } from "../../types/user";
 
 interface MyProfileProps {
@@ -45,6 +42,28 @@ const getFullName = (user: UserProfile) =>
   user.email.split("@")[0] ||
   "";
 
+// Logo Google nhiều màu, không khung (GoogleIcon có sẵn là icon cho nút đăng nhập nên có khung tròn riêng)
+const GoogleLogo = () => (
+  <svg viewBox="0 0 48 48" aria-hidden="true">
+    <path
+      fill="#FFC107"
+      d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
+    />
+    <path
+      fill="#FF3D00"
+      d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"
+    />
+    <path
+      fill="#4CAF50"
+      d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"
+    />
+    <path
+      fill="#1976D2"
+      d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"
+    />
+  </svg>
+);
+
 const MyProfile = ({ recommendations }: MyProfileProps) => {
   const {
     user,
@@ -54,9 +73,11 @@ const MyProfile = ({ recommendations }: MyProfileProps) => {
     openProfileEdit,
     openAccountEdit,
     openAvatarEdit,
+    setUser,
   } = useProfileManagement();
 
   const navigate = useNavigate();
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
   const renderNullable = (val: unknown) =>
     val === null || val === undefined || val === ""
@@ -65,6 +86,23 @@ const MyProfile = ({ recommendations }: MyProfileProps) => {
 
   const fullName = getFullName(user);
   const birthday = formatDateOfBirth(user.dateOfBirth);
+
+  // Trạng thái liên kết thật lấy từ social_auth (hệ thống chỉ hỗ trợ Google và Facebook)
+  const linkedProviders = [
+    {
+      key: "google",
+      label: "Google",
+      Icon: GoogleLogo,
+      linked: !!user.social_auth?.google_id,
+    },
+    {
+      key: "facebook",
+      label: "Facebook",
+      Icon: FacebookIcon,
+      linked: !!user.social_auth?.facebook_id,
+    },
+  ];
+  const hasUnlinkedProvider = linkedProviders.some((p) => !p.linked);
 
   return (
     <>
@@ -153,7 +191,11 @@ const MyProfile = ({ recommendations }: MyProfileProps) => {
                     </div>
                     <div className="info-item">
                       <label>Password</label>
-                      <div className="info-value">************</div>
+                      <div className="info-value">
+                        {user.has_password === false
+                          ? "Not set"
+                          : "************"}
+                      </div>
                     </div>
                     <div className="info-item">
                       <label>Email</label>
@@ -175,98 +217,41 @@ const MyProfile = ({ recommendations }: MyProfileProps) => {
               </div>
 
               <div className="grid-section section-social">
-                <div className="social-block align-with-fields">
+                <div className="profile-linked-block align-with-fields">
                   <h3 className="mini-title">Linked Account</h3>
-                  <ul className="social-list">
-                    <li>
-                      <a
-                        href="https://facebook.com"
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                          color: "inherit",
-                          textDecoration: "none",
-                        }}
-                      >
+                  <ul className="profile-linked-list">
+                    {linkedProviders.map(({ key, label, Icon, linked }) => (
+                      <li key={key}>
                         <span className="icon-wrap">
-                          <FacebookIcon />
-                        </span>{" "}
-                        Facebook account
-                      </a>
-                    </li>
-                    <li>
-                      <a
-                        href="https://instagram.com"
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                          color: "inherit",
-                          textDecoration: "none",
-                        }}
-                      >
-                        <span className="icon-wrap">
-                          <InstagramIcon />
-                        </span>{" "}
-                        Instagram account
-                      </a>
-                    </li>
-                    <li>
-                      <a
-                        href="https://twitter.com"
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                          color: "inherit",
-                          textDecoration: "none",
-                        }}
-                      >
-                        <span className="icon-wrap">
-                          <XIcon />
-                        </span>{" "}
-                        X account
-                      </a>
-                    </li>
-                    <li>
-                      <a
-                        href="https://tiktok.com"
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                          color: "inherit",
-                          textDecoration: "none",
-                        }}
-                      >
-                        <span className="icon-wrap">
-                          <TiktokIcon />
-                        </span>{" "}
-                        Tiktok account
-                      </a>
-                    </li>
+                          <Icon />
+                        </span>
+                        <span className="linked-text">
+                          <span className="linked-name">{label}</span>
+                          <span
+                            className={`linked-status ${linked ? "is-linked" : ""}`}
+                          >
+                            {linked ? "Connected" : "Not connected"}
+                          </span>
+                        </span>
+                      </li>
+                    ))}
                   </ul>
+                  {hasUnlinkedProvider && (
+                    <p className="linked-hint">
+                      Sign in with Google or Facebook using this email to
+                      connect it automatically.
+                    </p>
+                  )}
                 </div>
 
                 <div className="links-block align-with-account-fields">
                   <a
                     className="text-link"
-                    onClick={() =>
-                      navigate("/verify-otp", {
-                        state: { type: "FORGOT_PASSWORD" },
-                      })
-                    }
+                    onClick={() => setIsChangePasswordOpen(true)}
                   >
-                    Forgot password
+                    {user.has_password === false
+                      ? "Set password"
+                      : "Change password"}
                   </a>
                   <a
                     className="text-link"
@@ -276,13 +261,13 @@ const MyProfile = ({ recommendations }: MyProfileProps) => {
                   </a>
                   <a
                     className="text-link"
-                    onClick={() => navigate("/about-us")}
+                    onClick={() => navigate("/pages/about-us")}
                   >
                     About us
                   </a>
                   <a
                     className="text-link"
-                    onClick={() => navigate("/return-policy")}
+                    onClick={() => navigate("/pages/return-policy")}
                   >
                     Return Policy
                   </a>
@@ -300,6 +285,14 @@ const MyProfile = ({ recommendations }: MyProfileProps) => {
       <MyProfileModal {...profileModal} />
       <AccountInformationModal {...accountModal} />
       <AvatarModal {...avatarModal} />
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+        hasPassword={user.has_password !== false}
+        onPasswordSet={() =>
+          setUser((prev) => ({ ...prev, has_password: true }))
+        }
+      />
     </>
   );
 };

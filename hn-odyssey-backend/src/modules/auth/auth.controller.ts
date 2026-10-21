@@ -314,7 +314,8 @@ export class AuthController {
     @CurrentUser() user: IUser,
     @Ip() ip: string,
     @UserAgent() userAgent: string,
+    @Body('refresh_token') refreshToken?: string,
   ) {
-    return this.authService.logout(user._id, ip, userAgent);
+    return this.authService.logout(user._id, ip, userAgent, refreshToken);
   }
 }

@@ -6,6 +6,7 @@ import { User, UserDocument } from 'src/modules/users/schemas/user.schema';
 import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { UserStatus } from 'src/common/enums/user-status.enum';
+import { ERROR_CODES } from 'src/common/constants/error-codes.constant';
 
 interface JwtPayload {
   sub: string;
@@ -72,9 +73,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const dbVersion = user.token_version || 0;
 
     if (payloadVersion !== dbVersion) {
-      throw new UnauthorizedException(
-        'Phiên đăng nhập đã hết hạn hoặc mật khẩu đã thay đổi. Vui lòng đăng nhập lại.',
+      const isStaffAccount = (user.roles ?? []).some(
+        (role) => role !== 'CUSTOMER',
       );
+      throw new UnauthorizedException({
+        message: isStaffAccount
+          ? 'Phiên đăng nhập đã bị thu hồi do tài khoản được đăng nhập ở thiết bị khác hoặc mật khẩu đã thay đổi. Vui lòng đăng nhập lại.'
+          : 'Phiên đăng nhập đã hết hạn hoặc mật khẩu đã thay đổi. Vui lòng đăng nhập lại.',
+        error_code: ERROR_CODES.SESSION_REVOKED,
+      });
     }
 
     // US.95 AC7: kèm tên người dùng để ghi vào file báo cáo xuất ra

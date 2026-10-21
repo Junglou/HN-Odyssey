@@ -1,16 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
-import axios from "axios";
-import tokenStorage from "../../utils/tokenStorage";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
-
-const getAuthHeaders = () => {
-  const token = tokenStorage.getToken();
-  return {
-    headers: { Authorization: token ? `Bearer ${token}` : undefined },
-  };
-};
+import axiosClient from "../../api/axiosClient";
 
 /** Display status for profile coupon cards */
 export type CustomerCouponStatus =
@@ -124,8 +114,7 @@ export function useCouponManagement() {
   const fetchCoupons = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_URL}/personalization/vouchers`, {
-        ...getAuthHeaders(),
+      const res = await axiosClient.get("/personalization/vouchers", {
         params: { context: "HOME" },
       });
 
@@ -144,17 +133,13 @@ export function useCouponManagement() {
       setCoupons(mapped);
     } catch (err: unknown) {
       console.error("Không thể tải danh sách mã giảm giá:", err);
-      if (axios.isAxiosError(err)) {
-        const msg =
-          (err.response?.data as { message?: string })?.message ||
-          err.message ||
-          "Lỗi khi tải mã giảm giá";
-        toast.error(msg);
-      } else if (err instanceof Error && err.message) {
-        toast.error(err.message);
-      } else {
-        toast.error("Không thể tải danh sách mã giảm giá.");
-      }
+      // axiosClient trả lỗi đã chuẩn hóa dạng { status, message, data }
+      const msg = (err as { message?: unknown })?.message;
+      toast.error(
+        typeof msg === "string" && msg
+          ? msg
+          : "Không thể tải danh sách mã giảm giá.",
+      );
       setCoupons([]);
     } finally {
       setLoading(false);

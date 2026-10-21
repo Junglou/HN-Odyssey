@@ -43,6 +43,7 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+import { OptionalJwtAuthGuard } from 'src/common/guards/optional-auth.guard';
 
 export class SubmitFeedbackDto implements IRecommendationFeedback {
   session_id: string;
@@ -180,6 +181,7 @@ export class RecommendationsController {
   }
 
   @Public()
+  @UseGuards(OptionalJwtAuthGuard) // Có token -> gom lịch sử theo tài khoản trên mọi thiết bị (AC6)
   @Get('recently-viewed')
   async getRecentlyViewed(
     @Query('session_id') sessionId: string,
@@ -247,6 +249,7 @@ export class RecommendationsController {
   }
 
   @Public()
+  @UseGuards(OptionalJwtAuthGuard) // Có token -> xóa toàn bộ lịch sử của tài khoản (AC10)
   @Delete('recently-viewed')
   async clearRecentlyViewed(
     @Query('session_id') sessionId: string,

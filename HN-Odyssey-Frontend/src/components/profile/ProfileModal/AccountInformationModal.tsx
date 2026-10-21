@@ -86,7 +86,7 @@ export default function AccountModal({
               aria-label="Password masked (read only)"
             />
             <p className="account-field-hint">
-              Use forgot password on the login page to reset your password.
+              Use “Change password” on your profile page to change it.
             </p>
           </div>
 

@@ -1,17 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "react-toastify";
-import axios from "axios";
+import axiosClient from "../../api/axiosClient";
 import { useProfileManagement, type ProfileUser } from "./useProfileManagement";
-import tokenStorage from "../../utils/tokenStorage";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
-
-const getAuthHeaders = () => {
-  const token = tokenStorage.getToken();
-  return {
-    headers: { Authorization: token ? `Bearer ${token}` : undefined },
-  };
-};
 
 interface LoyaltyMyInfoApi {
   points?: number;
@@ -102,28 +92,25 @@ const mapHistoryFromApi = (
 
 export function useLoyaltyManagement() {
   const { user } = useProfileManagement();
-  const [loyaltyInfo, setLoyaltyInfo] = useState<LoyaltyInfo>(() =>
-    mapInfoFromProfile(user),
-  );
+  // Dữ liệu thô từ API loyalty; null = chưa tải xong hoặc tải lỗi
+  const [apiInfo, setApiInfo] = useState<LoyaltyMyInfoApi | null>(null);
   const [history, setHistory] = useState<LoyaltyHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Không phụ thuộc user -> chỉ gọi API 1 lần khi mở trang
   const fetchLoyalty = useCallback(async () => {
     setLoading(true);
-    const fallback = mapInfoFromProfile(user);
-
     try {
       const [infoRes, historyRes] = await Promise.all([
-        axios.get(`${API_URL}/loyalty/my-info`, getAuthHeaders()),
-        axios.get(`${API_URL}/loyalty/history`, {
-          ...getAuthHeaders(),
+        axiosClient.get("/loyalty/my-info"),
+        axiosClient.get("/loyalty/history", {
           params: { page: 1, limit: 10 },
         }),
       ]);
 
       const infoRaw: LoyaltyMyInfoApi =
         infoRes.data?.data ?? infoRes.data ?? {};
-      setLoyaltyInfo(mapInfoFromApi(infoRaw, user));
+      setApiInfo(infoRaw);
 
       const historyPayload = historyRes.data?.data ?? historyRes.data ?? [];
       const historyList: LoyaltyHistoryApi[] = Array.isArray(historyPayload)
@@ -132,31 +119,31 @@ export function useLoyaltyManagement() {
       setHistory(historyList.map(mapHistoryFromApi));
     } catch (err: unknown) {
       console.error("Failed to load loyalty data:", err);
-      setLoyaltyInfo(fallback);
+      setApiInfo(null);
       setHistory([]);
 
-      let msg = "Could not load loyalty details";
-      if (axios.isAxiosError(err)) {
-        msg =
-          (err.response?.data as { message?: string })?.message ||
-          err.message ||
-          msg;
-      } else if (err instanceof Error && err.message) {
-        msg = err.message;
-      }
-      toast.error(msg);
+      // axiosClient trả lỗi đã chuẩn hóa dạng { status, message, data }
+      const apiMsg = (err as { message?: unknown })?.message;
+      toast.error(
+        typeof apiMsg === "string" && apiMsg
+          ? apiMsg
+          : "Could not load loyalty details",
+      );
     } finally {
       setLoading(false);
     }
-  }, [user]);
-
-  useEffect(() => {
-    setLoyaltyInfo(mapInfoFromProfile(user));
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     void fetchLoyalty();
   }, [fetchLoyalty]);
+
+  // Có dữ liệu API thì dùng (profile làm dự phòng cho field thiếu),
+  // chưa có thì hiển thị tạm theo profile
+  const loyaltyInfo = useMemo<LoyaltyInfo>(
+    () => (apiInfo ? mapInfoFromApi(apiInfo, user) : mapInfoFromProfile(user)),
+    [apiInfo, user],
+  );
 
   return {
     user,

@@ -1,8 +1,42 @@
 import axios, {
+  type AxiosError,
   type AxiosInstance,
   type InternalAxiosRequestConfig,
 } from "axios";
 import tokenStorage from "../utils/tokenStorage";
+
+export const SESSION_REVOKED = "SESSION_REVOKED";
+export const AUTH_NOTICE_KEY = "auth_notice";
+
+interface RetryableRequest extends InternalAxiosRequestConfig {
+  _retry?: boolean;
+}
+
+interface ApiErrorBody {
+  message?: string;
+  error_code?: string;
+}
+
+// Các khu vực bắt buộc đăng nhập
+const PROTECTED_ROUTES = ["/profile", "/portal", "/checkout"];
+
+// Đăng xuất cưỡng bức, lưu lý do để trang login hiển thị sau khi tải lại
+const forceLogoutWithNotice = (message?: string) => {
+  tokenStorage.clearAuth();
+  sessionStorage.setItem(
+    AUTH_NOTICE_KEY,
+    message || "Phiên đăng nhập đã kết thúc. Vui lòng đăng nhập lại.",
+  );
+  if (window.location.pathname !== "/login") {
+    window.location.href = "/login";
+  }
+};
+
+const normalizeError = (error: AxiosError<ApiErrorBody>) => ({
+  status: error.response?.status,
+  message: error.response?.data?.message || error.message || "Unknown error",
+  data: error.response?.data,
+});
 
 const axiosClient: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -21,83 +55,102 @@ axiosClient.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  },
+  (error) => Promise.reject(error),
 );
+
+// Chỉ cho phép 1 request refresh tại một thời điểm.
+// Các request 401 xảy ra cùng lúc sẽ chờ chung kết quả của lần refresh này.
+let refreshPromise: Promise<string> | null = null;
+
+const refreshAccessToken = (): Promise<string> => {
+  if (!refreshPromise) {
+    refreshPromise = axios
+      .post(`${import.meta.env.VITE_API_URL}/auth/refresh`, {
+        refresh_token: tokenStorage.getRefreshToken(),
+      })
+      .then((res) => {
+        const data = res.data;
+        if (!data?.access_token) {
+          throw new Error("Refresh không trả về access token");
+        }
+        tokenStorage.setToken(data.access_token);
+        if (data.refresh_token)
+          tokenStorage.setRefreshToken(data.refresh_token);
+        if (data.user) tokenStorage.setUser(data.user); // cập nhật permissions mới nhất
+        return data.access_token as string;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+};
 
 // Trả về Interceptor
 axiosClient.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+  async (error: AxiosError<ApiErrorBody>) => {
+    const originalRequest = error.config as RetryableRequest | undefined;
+    const status = error.response?.status;
+    const body = error.response?.data;
 
-    // Nếu lỗi 401 (Unauthorized) và không phải URL login/refresh => Xử lý
+    // 1. Phiên đã bị thu hồi -> đăng xuất ngay, không thử refresh
+    if (status === 401 && body?.error_code === SESSION_REVOKED) {
+      forceLogoutWithNotice(body.message);
+      return Promise.reject(normalizeError(error));
+    }
+
+    // 2. Access token hết hạn -> refresh rồi gọi lại request
     if (
-      error.response?.status === 401 &&
+      status === 401 &&
+      originalRequest &&
       !originalRequest._retry &&
       originalRequest.url !== "/auth/login"
     ) {
       originalRequest._retry = true;
-      const refreshToken = tokenStorage.getRefreshToken();
 
-      if (refreshToken) {
-        try {
-          const res = await axios.post(
-            `${import.meta.env.VITE_API_URL}/auth/refresh`,
-            { refresh_token: refreshToken },
-          );
-
-          if (res.data?.access_token) {
-            tokenStorage.setToken(res.data.access_token);
-            if (res.data.refresh_token) {
-              tokenStorage.setRefreshToken(res.data.refresh_token);
-            }
-            // [FIX KIẾN TRÚC]: Cập nhật lại User Object kèm theo Permissions mới nhất
-            if (res.data.user) {
-              tokenStorage.setUser(res.data.user);
-            }
-            originalRequest.headers.Authorization = `Bearer ${res.data.access_token}`;
-            return axiosClient(originalRequest);
-          }
-        } catch (refreshError) {
-          tokenStorage.clearAuth();
-          window.location.href = "/login";
-          return Promise.reject(refreshError);
-        }
-      } else {
-        // ---- ĐÂY LÀ PHẦN LÀM LẠI ĐỂ CỨU NÚT EXPLORE ----
-        tokenStorage.clearAuth();
-
-        // 1. Lấy đường dẫn hiện tại của trình duyệt
-        const currentPath = window.location.pathname;
-
-        // 2. Liệt kê các khu vực BẮT BUỘC phải đăng nhập (Private Routes)
-        const protectedRoutes = ["/profile", "/portal", "/checkout"];
-
-        // 3. Kiểm tra xem người dùng có đang đứng ở Private Route không
-        const isProtectedRoute = protectedRoutes.some((route) =>
-          currentPath.startsWith(route),
-        );
-
-        // 4. CHỈ ĐÁ VỀ LOGIN NẾU ĐANG CỐ TÌNH TRUY CẬP VÙNG CẤM
-        if (isProtectedRoute) {
-          window.location.href = "/login";
-        }
-        // NẾU ĐANG Ở TRANG CHỦ / HOẶC TRANG PUBLIC -> Bỏ qua, chỉ trả về lỗi để UI xử lý (giữ nguyên khách vãng lai ở đó)
-
-        return Promise.reject(error);
+      // Tab khác đã refresh xong -> dùng luôn token mới, không refresh lại
+      const sentToken = String(
+        originalRequest.headers?.Authorization || "",
+      ).replace("Bearer ", "");
+      const currentToken = tokenStorage.getToken();
+      if (currentToken && sentToken && currentToken !== sentToken) {
+        originalRequest.headers.Authorization = `Bearer ${currentToken}`;
+        return axiosClient(originalRequest);
       }
+
+      if (tokenStorage.getRefreshToken()) {
+        try {
+          const newAccessToken = await refreshAccessToken();
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+          return axiosClient(originalRequest);
+        } catch (refreshError) {
+          const refreshBody = axios.isAxiosError(refreshError)
+            ? (refreshError.response?.data as ApiErrorBody | undefined)
+            : undefined;
+
+          if (refreshBody?.error_code === SESSION_REVOKED) {
+            forceLogoutWithNotice(refreshBody.message);
+          } else {
+            tokenStorage.clearAuth();
+            window.location.href = "/login";
+          }
+          return Promise.reject(normalizeError(error));
+        }
+      }
+
+      // 3. Không có refresh token: chỉ đá về login nếu đang ở khu vực bắt buộc đăng nhập
+      tokenStorage.clearAuth();
+      const isProtectedRoute = PROTECTED_ROUTES.some((route) =>
+        window.location.pathname.startsWith(route),
+      );
+      if (isProtectedRoute) {
+        window.location.href = "/login";
+      }
+      return Promise.reject(normalizeError(error));
     }
 
-    const normalizedError = {
-      status: error.response?.status,
-      message:
-        error.response?.data?.message || error.message || "Unknown error",
-      data: error.response?.data,
-    };
-
-    return Promise.reject(normalizedError);
+    return Promise.reject(normalizeError(error));
   },
 );
 
