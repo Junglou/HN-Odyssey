@@ -121,14 +121,6 @@ const mapStatusToFE = (status: string): PromotionStatus => {
   return "Inactive";
 };
 
-const mapStatusToBE = (status: PromotionStatus) => {
-  if (status === "Scheduled") return "PENDING";
-  if (status === "Active") return "ACTIVE";
-  if (status === "Expired") return "EXPIRED";
-  if (status === "Draft") return "DRAFT";
-  return "INACTIVE";
-};
-
 const flattenCategories = (
   nodes: BECategory[],
   parentPath = "",
@@ -203,15 +195,19 @@ export function usePromotionManagement() {
     Resource.PROMO_FLASH_SALES,
     Action.DELETE,
   );
+  // Bật/tắt dùng quyền CHANGE_STATUS (giữ tên biến để không ảnh hưởng nơi khác)
   const canPublishFlashSale = hasPermission(
     Resource.PROMO_FLASH_SALES,
-    Action.PUBLISH,
+    Action.CHANGE_STATUS,
   );
 
   const canCreateCombo = hasPermission(Resource.PROMO_COMBOS, Action.CREATE);
   const canUpdateCombo = hasPermission(Resource.PROMO_COMBOS, Action.UPDATE);
   const canDeleteCombo = hasPermission(Resource.PROMO_COMBOS, Action.DELETE);
-  const canPublishCombo = hasPermission(Resource.PROMO_COMBOS, Action.PUBLISH);
+  const canPublishCombo = hasPermission(
+    Resource.PROMO_COMBOS,
+    Action.CHANGE_STATUS,
+  );
 
   const fetchPromotions = useCallback(async () => {
     setIsLoading(true);
@@ -526,15 +522,18 @@ export function usePromotionManagement() {
       return toast.error("Bạn không có quyền bật/tắt Combo Deals.");
     }
 
-    const newStatusFE = currentStatus === "Active" ? "Inactive" : "Active";
-    const beStatus = mapStatusToBE(newStatusFE);
+    // Đang bật = Active hoặc Scheduled. Bật/tắt đi qua bulk/status (quyền CHANGE_STATUS)
+    const isOn = currentStatus === "Active" || currentStatus === "Scheduled";
     const endpoint =
       record.type === "Flash Sale"
-        ? `/promotions/flash-sales/${id}`
-        : `/promotions/combos/${id}`;
+        ? "/promotions/flash-sales/bulk/status"
+        : "/promotions/combos/bulk/status";
 
     try {
-      const res = await axiosClient.patch(endpoint, { status: beStatus });
+      const res = await axiosClient.patch(endpoint, {
+        ids: [id],
+        action: isOn ? "DEACTIVATE" : "ACTIVATE",
+      });
       fetchPromotions();
       toast.success(res.data?.message || "Đã thay đổi trạng thái khuyến mãi!");
     } catch (error: unknown) {
@@ -575,13 +574,21 @@ export function usePromotionManagement() {
     setModalConfig((prev) => ({ ...prev, isSubmitting: true }));
 
     try {
-      const isDraft = data.status === "Draft";
-      const statusBE = isDraft
-        ? "DRAFT"
-        : new Date() < sDate
-          ? "PENDING"
-          : "ACTIVE";
+      const isFlashSale = data.type === "Flash Sale";
+      const canToggle = isFlashSale ? canPublishFlashSale : canPublishCombo;
+      const base = isFlashSale
+        ? "/promotions/flash-sales"
+        : "/promotions/combos";
 
+      // Bật = Published (Active/Scheduled); Draft/Inactive = tắt
+      const wantOn = data.status !== "Draft" && data.status !== "Inactive";
+      const wasOn =
+        mode === "edit" && editingRecord
+          ? editingRecord.status === "Active" ||
+            editingRecord.status === "Scheduled"
+          : false;
+
+      // KHÔNG gửi status: bật/tắt đi qua bulk/status (quyền CHANGE_STATUS)
       const payload: Record<
         string,
         string | number | boolean | string[] | undefined
@@ -590,31 +597,14 @@ export function usePromotionManagement() {
         description: data.description,
         applicable_scope_type: data.applicableScopeType,
         applicable_scope_values: data.applicableScopeValues,
-        status: statusBE,
       };
 
-      let responseMsg = "";
-
-      if (data.type === "Flash Sale") {
+      if (isFlashSale) {
         payload.discount_type =
           data.discountType === "%" ? "PERCENTAGE" : "FIXED_PRICE";
         payload.discount_value = Number(data.discountValueNum);
         payload.start_time = sDate.toISOString();
         payload.end_time = eDate.toISOString();
-
-        if (mode === "add") {
-          const res = await axiosClient.post(
-            "/promotions/flash-sales",
-            payload,
-          );
-          responseMsg = res.data?.message;
-        } else {
-          const res = await axiosClient.patch(
-            `/promotions/flash-sales/${editingRecord!.id}`,
-            payload,
-          );
-          responseMsg = res.data?.message;
-        }
       } else {
         payload.type = "DIRECT_DISCOUNT";
         payload.is_percent = data.discountType === "%";
@@ -622,25 +612,44 @@ export function usePromotionManagement() {
         payload.start_date = sDate.toISOString();
         payload.end_date = eDate.toISOString();
         payload.min_quantity = 1;
-
-        if (mode === "add") {
-          const res = await axiosClient.post("/promotions/combos", payload);
-          responseMsg = res.data?.message;
-        } else {
-          const res = await axiosClient.patch(
-            `/promotions/combos/${editingRecord!.id}`,
-            payload,
-          );
-          responseMsg = res.data?.message;
-        }
       }
 
-      toast.success(
-        responseMsg ||
-          (mode === "add"
-            ? "Thêm khuyến mãi thành công!"
-            : "Cập nhật thành công!"),
-      );
+      let statusNote = "";
+      const changeStatus = async (
+        id: string,
+        action: "ACTIVATE" | "DEACTIVATE",
+      ) => {
+        if (!canToggle) {
+          statusNote =
+            " Bạn không có quyền bật/tắt nên trạng thái được giữ nguyên.";
+          return;
+        }
+        const res = await axiosClient.patch(`${base}/bulk/status`, {
+          ids: [id],
+          action,
+        });
+        // Flash Sale bị trùng lịch sẽ được BE báo "Bỏ qua ..."
+        const msg: string = res.data?.message || "";
+        if (msg.includes("Bỏ qua")) statusNote = ` ${msg}`;
+      };
+
+      if (mode === "add") {
+        const res = await axiosClient.post(base, payload);
+        const newId: string | undefined = res.data?.data?._id;
+        if (wantOn && newId) await changeStatus(newId, "ACTIVATE");
+      } else if (editingRecord) {
+        // Tắt TRƯỚC khi sửa (BE chỉ cho sửa thông tin cốt lõi khi chương trình đã tắt)
+        if (wasOn && !wantOn)
+          await changeStatus(editingRecord.id, "DEACTIVATE");
+        await axiosClient.patch(`${base}/${editingRecord.id}`, payload);
+        // Bật SAU khi sửa
+        if (!wasOn && wantOn) await changeStatus(editingRecord.id, "ACTIVATE");
+      }
+
+      const baseMsg =
+        mode === "add" ? "Thêm khuyến mãi thành công!" : "Cập nhật thành công!";
+      if (statusNote) toast.warning(baseMsg + statusNote);
+      else toast.success(baseMsg);
       fetchPromotions();
       actions.closeModal();
     } catch (error: unknown) {

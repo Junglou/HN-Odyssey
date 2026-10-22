@@ -4,6 +4,8 @@ import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 import { toast } from "react-toastify";
 import SmartImage from "../../../common/SmartImage/SmartImage";
 import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 
 import {
   ViewIcon,
@@ -123,6 +125,11 @@ export default function ProductManagement({
   pagination,
   actions,
 }: ProductManagementProps) {
+  const canChangeStatus = hasPermission(
+    getCurrentUser(),
+    Resource.CATALOG_PRODUCTS,
+    Action.CHANGE_STATUS,
+  );
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
   const limitRef = useRef<HTMLDivElement>(null);
@@ -182,28 +189,32 @@ export default function ProductManagement({
         </div>
 
         <div className="pm-bulk-actions">
-          <button
-            type="button"
-            className="pm-btn-bulk"
-            onClick={(e) => {
-              actions.bulk("activate");
-              e.currentTarget.blur();
-            }}
-            disabled={!hasSelection}
-          >
-            Bulk Activate
-          </button>
-          <button
-            type="button"
-            className="pm-btn-bulk"
-            onClick={(e) => {
-              actions.bulk("deactivate");
-              e.currentTarget.blur();
-            }}
-            disabled={!hasSelection}
-          >
-            Bulk Deactivate
-          </button>
+          {canChangeStatus && (
+            <>
+              <button
+                type="button"
+                className="pm-btn-bulk"
+                onClick={(e) => {
+                  actions.bulk("activate");
+                  e.currentTarget.blur();
+                }}
+                disabled={!hasSelection}
+              >
+                Bulk Activate
+              </button>
+              <button
+                type="button"
+                className="pm-btn-bulk"
+                onClick={(e) => {
+                  actions.bulk("deactivate");
+                  e.currentTarget.blur();
+                }}
+                disabled={!hasSelection}
+              >
+                Bulk Deactivate
+              </button>
+            </>
+          )}
           <button
             type="button"
             className="pm-btn-bulk delete"
@@ -351,17 +362,19 @@ export default function ProductManagement({
                           />
                         </button>
 
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={prod.status === "Active"}
-                          aria-label="Toggle product status"
-                          className={`pm-toggle-switch ${prod.status === "Active" ? "on" : ""} ${prod.status === "Draft" ? "disabled" : ""}`}
-                          onClick={() =>
-                            actions.toggleStatus(prod.id, prod.status)
-                          }
-                          disabled={prod.status === "Draft"}
-                        ></button>
+                        {canChangeStatus && (
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={prod.status === "Active"}
+                            aria-label="Toggle product status"
+                            className={`pm-toggle-switch ${prod.status === "Active" ? "on" : ""} ${prod.status === "Draft" ? "disabled" : ""}`}
+                            onClick={() =>
+                              actions.toggleStatus(prod.id, prod.status)
+                            }
+                            disabled={prod.status === "Draft"}
+                          ></button>
+                        )}
 
                         <div
                           className={`pm-dropdown-wrapper ${openDropdownId === prod.id ? "is-open" : ""}`}

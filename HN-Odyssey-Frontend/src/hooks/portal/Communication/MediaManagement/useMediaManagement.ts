@@ -172,6 +172,10 @@ export function useMediaManagement() {
   const canCreate = hasPermission(Resource.CONTENT_MEDIA, Action.CREATE);
   const canUpdate = hasPermission(Resource.CONTENT_MEDIA, Action.UPDATE);
   const canDelete = hasPermission(Resource.CONTENT_MEDIA, Action.DELETE);
+  const canChangeStatus = hasPermission(
+    Resource.CONTENT_MEDIA,
+    Action.CHANGE_STATUS,
+  );
 
   const fetchMedia = useCallback(async () => {
     setIsLoading(true);
@@ -610,20 +614,40 @@ export function useMediaManagement() {
         });
 
         // handle: Map payload cho Bulk Upload chuẩn xác
+        // KHÔNG gửi status: media mới luôn là Draft, công khai qua bulk/status (quyền CHANGE_STATUS)
         const metadataPayload = formArray.map((form) => ({
           type: form.type,
           targetId: form.targetId,
           altText: form.altText.trim(),
-          status: form.status as MediaStatus,
         }));
 
         formData.append("metadata", JSON.stringify(metadataPayload));
 
-        await axiosClient.post("/marketing/media/upload", formData, {
+        const res = await axiosClient.post<
+          BackendBaseResponse<BackendMediaItem[]>
+        >("/marketing/media/upload", formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
 
-        toast.success(`Tải lên phương tiện thành công!`);
+        // BE trả về danh sách media theo đúng thứ tự file đã gửi
+        const savedItems = res.data?.data || [];
+        const idsToPublish = savedItems
+          .filter((_, i) => formArray[i]?.status === "Published")
+          .map((item) => item._id);
+
+        if (idsToPublish.length > 0 && !canChangeStatus) {
+          toast.warning(
+            "Tải lên thành công. Bạn không có quyền công khai nên phương tiện đang ở trạng thái Draft.",
+          );
+        } else {
+          if (idsToPublish.length > 0) {
+            await axiosClient.patch("/marketing/media/bulk/status", {
+              ids: idsToPublish,
+              status: "Published",
+            });
+          }
+          toast.success(`Tải lên phương tiện thành công!`);
+        }
         setDrawerConfig((prev) => ({
           ...prev,
           uploadDrafts: [],
@@ -640,19 +664,32 @@ export function useMediaManagement() {
         }
 
         // handle: Map chuẩn xác các trường cập nhật (đặc biệt là Toggle Status)
+        // KHÔNG gửi status: đổi trạng thái qua bulk/status (quyền CHANGE_STATUS)
+        const mediaId = drawerConfig.editingRecord.id;
         const payload = {
           type: singleData.type,
           targetId: singleData.targetId,
-          status: singleData.status as MediaStatus,
           altText: singleData.altText.trim(),
         };
 
-        await axiosClient.patch(
-          `/marketing/media/${drawerConfig.editingRecord.id}`,
-          payload,
-        );
+        await axiosClient.patch(`/marketing/media/${mediaId}`, payload);
 
-        toast.success("Cập nhật thông tin phương tiện thành công!");
+        const baseMsg = "Cập nhật thông tin phương tiện thành công!";
+        if (singleData.status !== drawerConfig.editingRecord.status) {
+          if (canChangeStatus) {
+            await axiosClient.patch("/marketing/media/bulk/status", {
+              ids: [mediaId],
+              status: singleData.status,
+            });
+            toast.success(baseMsg);
+          } else {
+            toast.warning(
+              `${baseMsg} Bạn không có quyền đổi trạng thái nên trạng thái được giữ nguyên.`,
+            );
+          }
+        } else {
+          toast.success(baseMsg);
+        }
         setDrawerConfig({
           isOpen: false,
           mode: "upload",
@@ -688,6 +725,6 @@ export function useMediaManagement() {
     handleDrawerSubmit,
     searchTargets,
     resolveTargetName,
-    permissions: { canCreate, canUpdate, canDelete },
+    permissions: { canCreate, canUpdate, canDelete, canChangeStatus },
   };
 }

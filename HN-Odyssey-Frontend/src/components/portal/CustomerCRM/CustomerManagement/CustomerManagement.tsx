@@ -2,6 +2,8 @@ import { useState, useRef } from "react";
 import "./CustomerManagement.css";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 import {
   EyeIcon,
   EditUserIcon,
@@ -66,6 +68,11 @@ export default function CustomerManagement({
   toggleRowStatus,
   bulkActions,
 }: CustomerManagementProps) {
+  const canChangeStatus = hasPermission(
+    getCurrentUser(),
+    Resource.CRM_CUSTOMERS,
+    Action.CHANGE_STATUS,
+  );
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [hasStatusOpened, setHasStatusOpened] = useState(false);
   const [isTypeOpen, setIsTypeOpen] = useState(false);
@@ -237,22 +244,26 @@ export default function CustomerManagement({
           </div>
 
           <div className="crm-bulk-actions">
-            <button
-              type="button"
-              className="crm-btn-bulk"
-              onClick={bulkActions.bulkActivate}
-              disabled={selectedIds.size === 0}
-            >
-              Bulk Activate
-            </button>
-            <button
-              type="button"
-              className="crm-btn-bulk"
-              onClick={bulkActions.bulkDeactivate}
-              disabled={selectedIds.size === 0}
-            >
-              Bulk Deactivate
-            </button>
+            {canChangeStatus && (
+              <>
+                <button
+                  type="button"
+                  className="crm-btn-bulk"
+                  onClick={bulkActions.bulkActivate}
+                  disabled={selectedIds.size === 0}
+                >
+                  Bulk Activate
+                </button>
+                <button
+                  type="button"
+                  className="crm-btn-bulk"
+                  onClick={bulkActions.bulkDeactivate}
+                  disabled={selectedIds.size === 0}
+                >
+                  Bulk Deactivate
+                </button>
+              </>
+            )}
             <button
               type="button"
               className="crm-btn-bulk danger"
@@ -351,19 +362,21 @@ export default function CustomerManagement({
                         >
                           <EditUserIcon />
                         </button>
-                        <div className="crm-toggle-cell">
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={record.status === "Active"}
-                            className={`crm-table-toggle ${record.status === "Active" ? "on" : ""}`}
-                            onClick={() =>
-                              toggleRowStatus(record.id, record.status)
-                            }
-                            disabled={record.status === "Locked"}
-                            title="Toggle Status"
-                          ></button>
-                        </div>
+                        {canChangeStatus && (
+                          <div className="crm-toggle-cell">
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={record.status === "Active"}
+                              className={`crm-table-toggle ${record.status === "Active" ? "on" : ""}`}
+                              onClick={() =>
+                                toggleRowStatus(record.id, record.status)
+                              }
+                              disabled={record.status === "Locked"}
+                              title="Toggle Status"
+                            ></button>
+                          </div>
+                        )}
                         <button
                           type="button"
                           className="crm-icon-btn"
@@ -388,35 +401,36 @@ export default function CustomerManagement({
                             >
                               Delete User
                             </button>
-                            {record.status === "Locked" ? (
-                              <button
-                                type="button"
-                                className="crm-action-item crm-item-unlock"
-                                onClick={() => {
-                                  actions.lockUnlockCustomer(
-                                    record.id,
-                                    record.status,
-                                  );
-                                  setOpenActionId(null);
-                                }}
-                              >
-                                Unlock User
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                className="crm-action-item crm-item-lock"
-                                onClick={() => {
-                                  actions.lockUnlockCustomer(
-                                    record.id,
-                                    record.status,
-                                  );
-                                  setOpenActionId(null);
-                                }}
-                              >
-                                Lock User
-                              </button>
-                            )}
+                            {canChangeStatus &&
+                              (record.status === "Locked" ? (
+                                <button
+                                  type="button"
+                                  className="crm-action-item crm-item-unlock"
+                                  onClick={() => {
+                                    actions.lockUnlockCustomer(
+                                      record.id,
+                                      record.status,
+                                    );
+                                    setOpenActionId(null);
+                                  }}
+                                >
+                                  Unlock User
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="crm-action-item crm-item-lock"
+                                  onClick={() => {
+                                    actions.lockUnlockCustomer(
+                                      record.id,
+                                      record.status,
+                                    );
+                                    setOpenActionId(null);
+                                  }}
+                                >
+                                  Lock User
+                                </button>
+                              ))}
                           </div>
                         )}
                       </div>

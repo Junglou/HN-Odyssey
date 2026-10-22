@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 
 export type BannerStatus = "Active" | "Inactive" | "Pending";
 export type BannerPosition =
@@ -127,6 +129,11 @@ const mapBannerToFE = (beBanner: BEBannerResponse): BannerRecord => {
 };
 
 export function useBannerManagement() {
+  const canChangeStatus = hasPermission(
+    getCurrentUser(),
+    Resource.CONTENT_BANNERS,
+    Action.CHANGE_STATUS,
+  );
   const [records, setRecords] = useState<BannerRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -276,26 +283,27 @@ export function useBannerManagement() {
       setDrawerConfig({ isOpen: false, mode: "create", record: null }),
 
     toggleBannerStatus: async (id: string) => {
-      const banner = records.find((r) => r.id === id);
-      if (!banner) return;
-      const today = getTodayString();
-      if (banner.startDate && banner.startDate > today) {
-        toast.error("Không thể thao tác. Banner chưa đến ngày bắt đầu!");
+      if (!canChangeStatus) {
+        toast.error("Bạn không có quyền bật/tắt banner.");
         return;
       }
-      if (banner.endDate && banner.endDate < today) {
+      const banner = records.find((r) => r.id === id);
+      if (!banner) return;
+
+      // Đang bật = Active hoặc Pending (chờ lịch). Tắt luôn được; bật thì BE tự
+      // xếp ACTIVE / WAITING theo ngày.
+      const isOn = banner.status !== "Inactive";
+      if (!isOn && banner.endDate && banner.endDate < getTodayString()) {
         toast.error("Không thể kích hoạt banner đã hết hạn. Vui lòng gia hạn!");
         return;
       }
 
-      const newStatusBE = banner.status === "Active" ? "HIDDEN" : "ACTIVE";
       try {
-        // [FIX BẤT ĐỒNG BỘ]: Sử dụng API bulk cho chắc ăn, vừa đúng nghiệp vụ vừa nhanh
-        await axiosClient.patch(`/marketing/content/banners/bulk/status`, {
-          ids: [id], // Truyền 1 ID nhưng dạng mảng
-          status: newStatusBE,
-        });
-        toast.success("Đã cập nhật trạng thái banner!");
+        const res = await axiosClient.patch(
+          `/marketing/content/banners/bulk/status`,
+          { ids: [id], status: isOn ? "HIDDEN" : "ACTIVE" },
+        );
+        toast.success(res.data?.message || "Đã cập nhật trạng thái banner!");
         fetchBanners();
       } catch (error) {
         console.error("Toggle status error:", error);
@@ -305,6 +313,10 @@ export function useBannerManagement() {
 
     bulkActivate: async () => {
       if (selectedIds.length === 0) return;
+      if (!canChangeStatus) {
+        toast.error("Bạn không có quyền bật/tắt banner.");
+        return;
+      }
       try {
         setIsLoading(true);
         // CHUẨN CLEAN CODE: Gọi ĐÚNG 1 Request duy nhất
@@ -325,6 +337,10 @@ export function useBannerManagement() {
     },
     bulkDeactivate: async () => {
       if (selectedIds.length === 0) return;
+      if (!canChangeStatus) {
+        toast.error("Bạn không có quyền bật/tắt banner.");
+        return;
+      }
       try {
         setIsLoading(true);
         // Gọi ĐÚNG 1 Request duy nhất lên API Bulk của BE với status là HIDDEN
@@ -434,23 +450,45 @@ export function useBannerManagement() {
         payload.category_id = data.categoryId;
       }
 
+      // KHÔNG gửi status trong payload: bật/tắt đi qua bulk/status (quyền CHANGE_STATUS)
+      let bannerId: string | undefined;
+      let wasOn = false;
+
       if (drawerConfig.mode === "create") {
-        await axiosClient.post("/marketing/content/banners", payload);
-        toast.success("Tạo banner thành công!");
-      } else if (drawerConfig.mode === "edit" && drawerConfig.record) {
-        if (data.status) {
-          payload.status =
-            data.status === "Active"
-              ? "ACTIVE"
-              : data.status === "Pending"
-                ? "WAITING"
-                : "HIDDEN";
-        }
-        await axiosClient.patch(
-          `/marketing/content/banners/${drawerConfig.record.id}`,
+        const res = await axiosClient.post(
+          "/marketing/content/banners",
           payload,
         );
-        toast.success("Cập nhật banner thành công!");
+        bannerId = res.data?.data?._id;
+      } else if (drawerConfig.mode === "edit" && drawerConfig.record) {
+        bannerId = drawerConfig.record.id;
+        wasOn = drawerConfig.record.status !== "Inactive";
+        await axiosClient.patch(
+          `/marketing/content/banners/${bannerId}`,
+          payload,
+        );
+      }
+
+      const wantOn = data.status !== "Inactive";
+      const baseMsg =
+        drawerConfig.mode === "create"
+          ? "Tạo banner thành công!"
+          : "Cập nhật banner thành công!";
+
+      if (bannerId && wantOn !== wasOn) {
+        if (canChangeStatus) {
+          await axiosClient.patch(`/marketing/content/banners/bulk/status`, {
+            ids: [bannerId],
+            status: wantOn ? "ACTIVE" : "HIDDEN",
+          });
+          toast.success(baseMsg);
+        } else {
+          toast.warning(
+            `${baseMsg} Bạn không có quyền bật/tắt nên banner giữ trạng thái ${wasOn ? "đang bật" : "TẮT"}.`,
+          );
+        }
+      } else {
+        toast.success(baseMsg);
       }
 
       actions.closeDrawer();

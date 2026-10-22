@@ -18,6 +18,7 @@ import { RequirePermissions } from 'src/common/decorators/permissions.decorator'
 import { Action, Resource } from 'src/common/enums/resource.enum';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { CreateRoleDto } from './dto/create-role.dto';
+import { ChangeRoleStatusDto } from './dto/change-role-status.dto';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import type { IUser } from 'src/common/interfaces/user.interface';
 import { PERMISSION_METADATA } from 'src/common/constants/permissions-metadata.constant';
@@ -80,6 +81,26 @@ export class RolesController {
     @Headers('user-agent') userAgent: string,
   ) {
     return this.rolesService.update(id, updateRoleDto, user._id, ip, userAgent);
+  }
+
+  // 4b. BẬT/TẮT TRẠNG THÁI (tách khỏi UPDATE)
+  @Patch(':id/status')
+  @RequirePermissions(Resource.SYSTEM_ROLES, Action.CHANGE_STATUS)
+  changeStatus(
+    @Param('id') id: string,
+    @Body() dto: ChangeRoleStatusDto,
+    @CurrentUser() user: IUser,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent: string,
+  ) {
+    return this.rolesService.changeStatus(
+      id,
+      dto.is_active,
+      user._id,
+      user.roles,
+      ip,
+      userAgent,
+    );
   }
 
   // 5. XÓA

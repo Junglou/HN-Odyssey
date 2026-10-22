@@ -22,6 +22,7 @@ import { BaseResponse } from 'src/common/dtos/base-response.dto';
 import { CreateFlashSaleDto } from './dto/create-flash-sale.dto';
 import { FlashSalesService } from './flash-sales.service';
 import { UpdateCouponDto } from './dto/update-coupon.dto';
+import { BulkPromotionStatusDto } from './dto/bulk-status.dto';
 import type { RequestWithUser } from 'src/common/interfaces/request-with-user.interface';
 import type { QueryFlashSaleDto } from './flash-sales.service';
 import type { QueryCouponDto } from './coupons.service';
@@ -211,26 +212,20 @@ export class PromotionsController {
     return new BaseResponse(true, result.message);
   }
 
-  // ------------------------------------
   // BULK ACTIONS - FLASH SALES
-  // ------------------------------------
+
   @Patch('flash-sales/bulk/status')
-  @RequirePermissions(Resource.PROMO_FLASH_SALES, Action.PUBLISH)
+  @RequirePermissions(Resource.PROMO_FLASH_SALES, Action.CHANGE_STATUS)
   async bulkUpdateFlashSaleStatus(
-    @Body() body: { ids: string[]; action: 'ACTIVATE' | 'DEACTIVATE' },
+    @Body() body: BulkPromotionStatusDto,
     @Req() req: RequestWithUser,
   ) {
-    if (body.ids && body.ids.length > 0) {
-      await this.flashSalesService.bulkUpdateStatus(
-        body.ids,
-        body.action,
-        req.user?._id,
-      );
-    }
-    return new BaseResponse(
-      true,
-      'Cập nhật trạng thái Flash Sales hàng loạt thành công',
+    const result = await this.flashSalesService.bulkUpdateStatus(
+      body.ids,
+      body.action,
+      req.user?._id,
     );
+    return new BaseResponse(true, result.message);
   }
 
   @Post('flash-sales/bulk/delete')
@@ -245,13 +240,12 @@ export class PromotionsController {
     return new BaseResponse(true, 'Xóa Flash Sales hàng loạt thành công');
   }
 
-  // ------------------------------------
   // BULK ACTIONS - COMBOS
-  // ------------------------------------
+
   @Patch('combos/bulk/status')
-  @RequirePermissions(Resource.PROMO_COMBOS, Action.PUBLISH)
+  @RequirePermissions(Resource.PROMO_COMBOS, Action.CHANGE_STATUS)
   async bulkUpdateComboStatus(
-    @Body() body: { ids: string[]; action: 'ACTIVATE' | 'DEACTIVATE' },
+    @Body() body: BulkPromotionStatusDto,
     @Req() req: RequestWithUser,
   ) {
     if (body.ids && body.ids.length > 0) {
@@ -279,13 +273,12 @@ export class PromotionsController {
     return new BaseResponse(true, 'Xóa Combos hàng loạt thành công');
   }
 
-  // ------------------------------------
   // BULK ACTIONS - COUPONS
-  // ------------------------------------
+
   @Patch('coupons/bulk/status')
-  @RequirePermissions(Resource.PROMO_COUPONS, Action.PUBLISH)
+  @RequirePermissions(Resource.PROMO_COUPONS, Action.CHANGE_STATUS)
   async bulkUpdateCouponStatus(
-    @Body() body: { ids: string[]; action: 'ACTIVATE' | 'DEACTIVATE' },
+    @Body() body: BulkPromotionStatusDto,
     @Req() req: RequestWithUser,
   ) {
     if (body.ids && body.ids.length > 0) {

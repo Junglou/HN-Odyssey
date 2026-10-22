@@ -187,12 +187,7 @@ const mapFEToBE = (data: BlogNewsFormData) => ({
   meta_title: data.metaTitle,
   meta_description: data.metaDescription,
   embedded_product_ids: data.attachedProducts,
-  status:
-    data.status === "Published"
-      ? "PUBLISHED"
-      : data.status === "Hidden"
-        ? "HIDDEN"
-        : "DRAFT",
+  // KHÔNG gửi status: trạng thái đổi qua publish/unpublish (quyền riêng)
 });
 
 const base64ToFile = async (
@@ -291,7 +286,8 @@ export function useBlogNewsManagement() {
   const canCreate = hasPermission(Resource.CONTENT_POSTS, Action.CREATE);
   const canUpdate = hasPermission(Resource.CONTENT_POSTS, Action.UPDATE);
   const canDelete = hasPermission(Resource.CONTENT_POSTS, Action.DELETE);
-  const canPublish = hasPermission(Resource.CONTENT_POSTS, Action.UPDATE);
+  const canPublish = hasPermission(Resource.CONTENT_POSTS, Action.PUBLISH);
+  const canUnpublish = hasPermission(Resource.CONTENT_POSTS, Action.UNPUBLISH);
 
   const fetchPosts = useCallback(async () => {
     setIsLoading(true);
@@ -467,16 +463,47 @@ export function useBlogNewsManagement() {
 
       const payload = mapFEToBE({ ...data, featuredImage: finalImageUrl });
 
+      let postId: string | undefined;
+      let oldStatus: BlogNewsStatus = "Draft";
+
       if (drawerConfig.mode === "add") {
-        await axiosClient.post("/marketing/content/posts", payload);
-        toast.success("Tạo bài viết mới thành công!");
+        const res = await axiosClient.post("/marketing/content/posts", payload);
+        postId = res.data?.data?._id;
       } else if (drawerConfig.mode === "edit" && drawerConfig.editingRecord) {
-        await axiosClient.patch(
-          `/marketing/content/posts/${drawerConfig.editingRecord.id}`,
-          payload,
-        );
-        toast.success("Cập nhật bài viết thành công!");
+        postId = drawerConfig.editingRecord.id;
+        oldStatus = drawerConfig.editingRecord.status;
+        await axiosClient.patch(`/marketing/content/posts/${postId}`, payload);
       }
+
+      // Đổi trạng thái (nếu có) qua route riêng theo quyền PUBLISH / UNPUBLISH
+      let statusNote = "";
+      if (postId && data.status !== oldStatus) {
+        if (data.status === "Published") {
+          if (canPublish) {
+            await axiosClient.patch("/marketing/content/posts/bulk/publish", {
+              ids: [postId],
+            });
+          } else {
+            statusNote =
+              " Bạn không có quyền Publish nên bài giữ trạng thái cũ.";
+          }
+        } else if (canUnpublish) {
+          await axiosClient.patch("/marketing/content/posts/bulk/unpublish", {
+            ids: [postId],
+            status: data.status === "Hidden" ? "HIDDEN" : "DRAFT",
+          });
+        } else {
+          statusNote =
+            " Bạn không có quyền gỡ xuất bản nên bài giữ trạng thái cũ.";
+        }
+      }
+
+      const baseMsg =
+        drawerConfig.mode === "add"
+          ? "Tạo bài viết mới thành công!"
+          : "Cập nhật bài viết thành công!";
+      if (statusNote) toast.warning(baseMsg + statusNote);
+      else toast.success(baseMsg);
 
       await fetchPosts();
       closeDrawer();
@@ -525,13 +552,22 @@ export function useBlogNewsManagement() {
   const executeBulkStatusChange = async (
     targetStatus: "PUBLISHED" | "HIDDEN",
   ) => {
-    if (!canPublish)
-      return toast.error("Bạn không có quyền thay đổi trạng thái Bài viết.");
+    const isPublish = targetStatus === "PUBLISHED";
+    if (isPublish ? !canPublish : !canUnpublish)
+      return toast.error(
+        isPublish
+          ? "Bạn không có quyền xuất bản Bài viết."
+          : "Bạn không có quyền gỡ / ẩn Bài viết.",
+      );
     try {
-      await axiosClient.patch("/marketing/content/posts/bulk/status", {
-        ids: Array.from(selectedIds),
-        status: targetStatus,
-      });
+      await axiosClient.patch(
+        isPublish
+          ? "/marketing/content/posts/bulk/publish"
+          : "/marketing/content/posts/bulk/unpublish",
+        isPublish
+          ? { ids: Array.from(selectedIds) }
+          : { ids: Array.from(selectedIds), status: "HIDDEN" },
+      );
       setSelectedIds(new Set());
       await fetchPosts();
       toast.success(`Đã cập nhật trạng thái thành ${targetStatus} thành công!`);
@@ -574,6 +610,6 @@ export function useBlogNewsManagement() {
       handleConfirmDelete,
     },
     bulkActions: { bulkPublish, bulkHide, bulkDelete },
-    permissions: { canCreate, canUpdate, canDelete, canPublish },
+    permissions: { canCreate, canUpdate, canDelete, canPublish, canUnpublish },
   };
 }

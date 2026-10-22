@@ -9,6 +9,8 @@ import type {
   PromotionFormData,
 } from "../../../../hooks/portal/MarketingSuite/PromotionManagement/usePromotionManagement";
 import axiosClient from "../../../../api/axiosClient";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 
 interface PromotionModalProps {
   isOpen: boolean;
@@ -297,6 +299,15 @@ function PromotionModalContent({
     };
   });
 
+  // Quyền bật/tắt tùy theo loại đang chọn (Flash Sale / Discount)
+  const canToggleStatus = hasPermission(
+    getCurrentUser(),
+    formData.type === "Flash Sale"
+      ? Resource.PROMO_FLASH_SALES
+      : Resource.PROMO_COMBOS,
+    Action.CHANGE_STATUS,
+  );
+
   const todayStr = new Date().toISOString().split("T")[0];
   const minStartDate =
     mode === "add" ? todayStr : initialData?.startDate || todayStr;
@@ -490,7 +501,7 @@ function PromotionModalContent({
                   name="status"
                   checked={formData.status === "Draft"}
                   onChange={() => handleChange("status", "Draft")}
-                  disabled={isViewMode}
+                  disabled={isViewMode || !canToggleStatus}
                 />
                 Draft
               </label>
@@ -500,7 +511,7 @@ function PromotionModalContent({
                   name="status"
                   checked={isPublishedIntent}
                   onChange={() => handleChange("status", "Active")}
-                  disabled={isViewMode}
+                  disabled={isViewMode || !canToggleStatus}
                 />
                 Published (Active/Scheduled)
               </label>

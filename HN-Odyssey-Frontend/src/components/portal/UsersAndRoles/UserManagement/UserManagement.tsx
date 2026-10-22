@@ -3,6 +3,8 @@ import { useState, useRef, useEffect } from "react";
 import "./UserManagement.css";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 import {
   ViewIcon,
   EditIcon,
@@ -130,6 +132,12 @@ export default function UserManagement({
   options,
   actions,
 }: UserManagementProps) {
+  const canChangeStatus = hasPermission(
+    getCurrentUser(),
+    Resource.SYSTEM_USERS,
+    Action.CHANGE_STATUS,
+  );
+
   // state
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
@@ -200,28 +208,32 @@ export default function UserManagement({
         </div>
 
         <div className="um-bulk-actions">
-          <button
-            type="button"
-            className="um-btn-bulk"
-            onClick={(e) => {
-              actions.bulk("activate");
-              e.currentTarget.blur();
-            }}
-            disabled={!hasSelection}
-          >
-            Bulk Activate
-          </button>
-          <button
-            type="button"
-            className="um-btn-bulk"
-            onClick={(e) => {
-              actions.bulk("deactivate");
-              e.currentTarget.blur();
-            }}
-            disabled={!hasSelection}
-          >
-            Bulk Deactivate
-          </button>
+          {canChangeStatus && (
+            <>
+              <button
+                type="button"
+                className="um-btn-bulk"
+                onClick={(e) => {
+                  actions.bulk("activate");
+                  e.currentTarget.blur();
+                }}
+                disabled={!hasSelection}
+              >
+                Bulk Activate
+              </button>
+              <button
+                type="button"
+                className="um-btn-bulk"
+                onClick={(e) => {
+                  actions.bulk("deactivate");
+                  e.currentTarget.blur();
+                }}
+                disabled={!hasSelection}
+              >
+                Bulk Deactivate
+              </button>
+            </>
+          )}
           <button
             type="button"
             className="um-btn-bulk delete"
@@ -303,16 +315,18 @@ export default function UserManagement({
                         </button>
 
                         {/* Nút toggle trạng thái (Chặn thao tác nếu user đang Locked) */}
-                        <div
-                          className={`um-toggle-switch ${user.status === "Active" ? "on" : ""} ${user.status === "Locked" ? "disabled" : ""}`}
-                          onClick={() => {
-                            if (user.status !== "Locked") {
-                              actions.toggleStatus(user.id, user.status);
-                            }
-                          }}
-                          role="switch"
-                          aria-checked={user.status === "Active"}
-                        ></div>
+                        {canChangeStatus && (
+                          <div
+                            className={`um-toggle-switch ${user.status === "Active" ? "on" : ""} ${user.status === "Locked" ? "disabled" : ""}`}
+                            onClick={() => {
+                              if (user.status !== "Locked") {
+                                actions.toggleStatus(user.id, user.status);
+                              }
+                            }}
+                            role="switch"
+                            aria-checked={user.status === "Active"}
+                          ></div>
+                        )}
 
                         <div
                           className={`um-dropdown-wrapper ${openDropdownId === user.id ? "is-open" : ""}`}
@@ -349,29 +363,30 @@ export default function UserManagement({
                             >
                               <TrashIcon stroke="#ffffff" /> Delete
                             </button>
-                            {user.status === "Locked" ? (
-                              <button
-                                type="button"
-                                className="um-dropdown-item um-item-unlock"
-                                onClick={() => {
-                                  actions.lockUnlock(user.id, user.status);
-                                  setOpenDropdownId(null);
-                                }}
-                              >
-                                <UnlockIcon stroke="#111827" /> Unlock
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                className="um-dropdown-item um-item-lock"
-                                onClick={() => {
-                                  actions.lockUnlock(user.id, user.status);
-                                  setOpenDropdownId(null);
-                                }}
-                              >
-                                <LockIcon stroke="#111827" /> Lock
-                              </button>
-                            )}
+                            {canChangeStatus &&
+                              (user.status === "Locked" ? (
+                                <button
+                                  type="button"
+                                  className="um-dropdown-item um-item-unlock"
+                                  onClick={() => {
+                                    actions.lockUnlock(user.id, user.status);
+                                    setOpenDropdownId(null);
+                                  }}
+                                >
+                                  <UnlockIcon stroke="#111827" /> Unlock
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="um-dropdown-item um-item-lock"
+                                  onClick={() => {
+                                    actions.lockUnlock(user.id, user.status);
+                                    setOpenDropdownId(null);
+                                  }}
+                                >
+                                  <LockIcon stroke="#111827" /> Lock
+                                </button>
+                              ))}
                           </div>
                         </div>
                       </div>

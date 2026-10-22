@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, type FormEvent } from "react";
 import "./CouponModal.css";
 import axiosClient from "../../../../api/axiosClient";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 import {
   ArrowLeftIcon,
   CloseIcon,
@@ -402,7 +404,8 @@ function ModalContent({
         startDate: initialData.startDate.split("/").reverse().join("-"),
         endDate: initialData.endDate.split("/").reverse().join("-"),
         applicableScope: initialData.applicableScope,
-        isDraft: initialData.status === "DRAFT",
+        // Chỉ ACTIVE mới là "đang bật"; DRAFT/INACTIVE đều hiển thị là tắt
+        isDraft: initialData.status !== "ACTIVE",
       };
     }
     return defaultFormData;
@@ -422,6 +425,11 @@ function ModalContent({
   });
 
   const isViewMode = mode === "view";
+  const canChangeStatus = hasPermission(
+    getCurrentUser(),
+    Resource.PROMO_COUPONS,
+    Action.CHANGE_STATUS,
+  );
   const title =
     mode === "add"
       ? "Create Coupon"
@@ -727,12 +735,16 @@ function ModalContent({
                     className="coupon-toggle-input"
                     checked={!formData.isDraft}
                     onChange={(e) => handleChange("isDraft", !e.target.checked)}
-                    disabled={isViewMode}
+                    disabled={isViewMode || !canChangeStatus}
                   />
                   <span className="coupon-toggle-slider"></span>
                 </label>
                 <span className="coupon-toggle-text">
-                  {formData.isDraft ? "Draft" : "Active"}
+                  {formData.isDraft
+                    ? initialData?.status === "INACTIVE"
+                      ? "Inactive"
+                      : "Draft"
+                    : "Active"}
                 </span>
               </div>
             </div>

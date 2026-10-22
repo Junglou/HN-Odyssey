@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 import {
   findNodeInTree,
   flattenVisibleCategories,
@@ -44,6 +46,11 @@ const mapCategoryTree = (node: CategoryApiResponse): CategoryNode => {
 };
 
 export function useCategory() {
+  const canChangeStatus = hasPermission(
+    getCurrentUser(),
+    Resource.CATALOG_CATEGORIES,
+    Action.CHANGE_STATUS,
+  );
   const [categories, setCategories] = useState<CategoryNode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -136,23 +143,45 @@ export function useCategory() {
     async (data: CategoryFormData) => {
       setDrawerConfig((prev) => ({ ...prev, isSubmitting: true }));
       try {
+        // KHÔNG gửi is_active: bật/tắt đi qua /categories/status/:id (quyền CHANGE_STATUS)
         const payload = {
           name: data.name,
           slug: data.slug,
           description: data.description,
           parent_id: data.parentId || null,
-          is_active: data.status === "Active",
         };
 
+        const wantActive = data.status === "Active";
+        let categoryId: string | undefined;
+        let wasActive = false;
+
         if (drawerConfig.mode === "add") {
-          await axiosClient.post("/categories/create", payload);
-          toast.success("Thêm danh mục thành công!");
+          const res = await axiosClient.post("/categories/create", payload);
+          categoryId = res.data?.data?._id;
         } else if (drawerConfig.mode === "edit" && drawerConfig.editingId) {
-          await axiosClient.patch(
-            `/categories/update/${drawerConfig.editingId}`,
-            payload,
-          );
-          toast.success("Cập nhật danh mục thành công!");
+          categoryId = drawerConfig.editingId;
+          wasActive = drawerConfig.initialData?.status === "Active";
+          await axiosClient.patch(`/categories/update/${categoryId}`, payload);
+        }
+
+        const baseMsg =
+          drawerConfig.mode === "add"
+            ? "Thêm danh mục thành công!"
+            : "Cập nhật danh mục thành công!";
+
+        if (categoryId && wantActive !== wasActive) {
+          if (canChangeStatus) {
+            await axiosClient.patch(`/categories/status/${categoryId}`, {
+              is_active: wantActive,
+            });
+            toast.success(baseMsg);
+          } else {
+            toast.warning(
+              `${baseMsg} Bạn không có quyền bật/tắt nên trạng thái được giữ nguyên.`,
+            );
+          }
+        } else {
+          toast.success(baseMsg);
         }
 
         if (data.parentId) {
@@ -173,7 +202,7 @@ export function useCategory() {
         setDrawerConfig((prev) => ({ ...prev, isSubmitting: false }));
       }
     },
-    [drawerConfig, closeDrawer, fetchCategories],
+    [drawerConfig, closeDrawer, fetchCategories, canChangeStatus],
   );
 
   const requestDelete = useCallback((id: string) => {

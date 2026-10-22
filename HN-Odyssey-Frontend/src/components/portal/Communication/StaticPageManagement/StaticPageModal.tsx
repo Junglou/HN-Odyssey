@@ -11,6 +11,8 @@ import type {
   StaticPageFormData,
   PageType,
 } from "../../../../hooks/portal/Communication/StaticPageManagement/useStaticPageManagement";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 
 function CustomSelect({
   value,
@@ -138,6 +140,11 @@ function ModalContent({
   });
 
   const isViewMode = mode === "view";
+  const canChangeStatus = hasPermission(
+    getCurrentUser(),
+    Resource.CONTENT_PAGES,
+    Action.CHANGE_STATUS,
+  );
   const titleText =
     mode === "add"
       ? "Create Static Page"
@@ -329,7 +336,7 @@ function ModalContent({
                         e.target.checked ? "Published" : "Draft",
                       )
                     }
-                    disabled={isViewMode}
+                    disabled={isViewMode || !canChangeStatus}
                   />
                   <span className="sp-toggle-slider"></span>
                 </label>

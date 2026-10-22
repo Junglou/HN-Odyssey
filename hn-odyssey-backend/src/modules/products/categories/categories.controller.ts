@@ -14,6 +14,7 @@ import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { UpdateCategoryOrderDto } from './dto/update-category-order.dto';
+import { ChangeActiveStatusDto } from 'src/common/dtos/change-active-status.dto';
 import { Public } from '../../../common/decorators/public.decorator';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
@@ -98,6 +99,25 @@ export class CategoriesController {
     return this.categoriesService.update(
       id,
       updateCategoryDto,
+      user._id,
+      ip,
+      userAgent,
+    );
+  }
+
+  // BẬT/TẮT TRẠNG THÁI (quyền CHANGE_STATUS)
+  @Patch('status/:id')
+  @RequirePermissions(Resource.CATALOG_CATEGORIES, Action.CHANGE_STATUS)
+  changeStatus(
+    @Param('id') id: string,
+    @Body() dto: ChangeActiveStatusDto,
+    @CurrentUser() user: IUser,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent: string,
+  ) {
+    return this.categoriesService.changeStatus(
+      id,
+      dto.is_active,
       user._id,
       ip,
       userAgent,

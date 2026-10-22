@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Combo, ComboType, ComboStatus } from './schemas/combo.schema';
@@ -95,9 +99,16 @@ export class PromotionEngineService {
   async createCombo(dto: CreateComboDto, userId?: string) {
     if (new Date(dto.start_date) >= new Date(dto.end_date))
       throw new BadRequestException('Ngày bắt đầu phải nhỏ hơn ngày kết thúc');
+    // Combo mới luôn ở DRAFT; kích hoạt qua combos/bulk/status (quyền CHANGE_STATUS)
+    if (dto.status && dto.status !== ComboStatus.DRAFT) {
+      throw new ForbiddenException(
+        'Combo mới phải ở trạng thái Draft. Vui lòng dùng chức năng Kích hoạt.',
+      );
+    }
+
     const newCombo = new this.comboModel({
       ...dto,
-      status: dto.status || ComboStatus.PENDING,
+      status: ComboStatus.DRAFT,
     });
     const savedCombo = await newCombo.save();
 
@@ -124,6 +135,13 @@ export class PromotionEngineService {
   async updateCombo(id: string, dto: Partial<CreateComboDto>) {
     const combo = await this.comboModel.findById(id);
     if (!combo) throw new BadRequestException('Không tìm thấy Combo/Discount');
+
+    // Trạng thái chỉ đổi qua combos/bulk/status (quyền CHANGE_STATUS)
+    if (dto.status !== undefined && dto.status !== combo.status) {
+      throw new ForbiddenException(
+        'Không thể đổi trạng thái qua chức năng sửa Combo. Vui lòng dùng Bulk Activate / Deactivate.',
+      );
+    }
 
     const isCoreFieldChanged =
       (dto.name !== undefined && dto.name !== combo.name) ||

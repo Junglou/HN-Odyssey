@@ -34,15 +34,20 @@ import {
   UpdateStaticPageDto,
 } from './dto/update-content.dto';
 import { RolesGuard } from 'src/common/guards/roles.guard';
-import { BannerStatus } from './schemas/banner.schema';
 import { PostStatus } from './schemas/blog-post.schema';
+import {
+  BulkPostIdsDto,
+  BulkUnpublishPostsDto,
+  ChangeBannerStatusDto,
+  ChangePageStatusDto,
+} from './dto/content-status.dto';
 import { UpdatePageConfigDto } from './dto/page-config.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Public } from 'src/common/decorators/public.decorator';
 
 interface RequestWithUser extends Request {
   user: {
-    userId: string;
+    _id: string; // JwtStrategy.validate() trả về _id, KHÔNG có userId
     email: string;
     roles: string[];
   };
@@ -60,7 +65,7 @@ export class ContentController {
   async createPost(@Body() dto: CreatePostDto, @Req() req: RequestWithUser) {
     const data = await this.contentService.createPost(
       dto,
-      req.user.userId,
+      req.user._id,
       req.user.email,
     );
     return new BaseResponse(true, 'Tạo bài viết thành công', data);
@@ -91,7 +96,7 @@ export class ContentController {
   async deletePost(@Param('id') id: string, @Req() req: RequestWithUser) {
     const result = await this.contentService.softDeletePost(
       id,
-      req.user.userId,
+      req.user._id,
       req.user.email,
     );
     return new BaseResponse(true, result.message);
@@ -108,7 +113,7 @@ export class ContentController {
   ) {
     const data = await this.contentService.createPage(
       dto,
-      req.user.userId,
+      req.user._id,
       req.user.email,
     );
     return new BaseResponse(true, 'Tạo trang tĩnh thành công', data);
@@ -129,7 +134,7 @@ export class ContentController {
   async deletePage(@Param('id') id: string, @Req() req: RequestWithUser) {
     const result = await this.contentService.softDeletePage(
       id,
-      req.user.userId,
+      req.user._id,
       req.user.email,
     );
     return new BaseResponse(true, result.message);
@@ -158,7 +163,7 @@ export class ContentController {
     const data = await this.contentService.updatePost(
       id,
       dto,
-      req.user.userId,
+      req.user._id,
       req.user.email,
     );
     return new BaseResponse(true, 'Cập nhật bài viết thành công', data);
@@ -175,10 +180,32 @@ export class ContentController {
     const data = await this.contentService.updatePage(
       id,
       dto,
-      req.user.userId,
+      req.user._id,
       req.user.email,
     );
     return new BaseResponse(true, 'Cập nhật trang tĩnh thành công', data);
+  }
+
+  // STATIC PAGE: ĐỔI TRẠNG THÁI (quyền CHANGE_STATUS)
+  @Patch('pages/:id/status')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Resource.CONTENT_PAGES, Action.CHANGE_STATUS)
+  async changePageStatus(
+    @Param('id') id: string,
+    @Body() dto: ChangePageStatusDto,
+    @Req() req: RequestWithUser,
+  ) {
+    const data = await this.contentService.changePageStatus(
+      id,
+      dto.status,
+      req.user._id,
+      req.user.email,
+    );
+    return new BaseResponse(
+      true,
+      'Cập nhật trạng thái trang tĩnh thành công',
+      data,
+    );
   }
 
   // API MENU CONFIG (US.126 - AC5)
@@ -188,7 +215,7 @@ export class ContentController {
   async createMenu(@Body() dto: CreateMenuDto, @Req() req: RequestWithUser) {
     const data = await this.contentService.createMenu(
       dto,
-      req.user.userId,
+      req.user._id,
       req.user.email,
     );
     return new BaseResponse(true, 'Tạo cấu hình Menu thành công', data);
@@ -227,7 +254,7 @@ export class ContentController {
   ) {
     const data = await this.contentService.createBanner(
       dto,
-      req.user.userId,
+      req.user._id,
       req.user.email,
     );
     return new BaseResponse(true, 'Tạo banner thành công', data);
@@ -271,7 +298,7 @@ export class ContentController {
   async softDeleteBanner(@Param('id') id: string, @Req() req: RequestWithUser) {
     const result = await this.contentService.softDeleteBanner(
       id,
-      req.user.userId,
+      req.user._id,
       req.user.email,
     );
     return new BaseResponse(true, result.message);
@@ -300,32 +327,49 @@ export class ContentController {
 
   @Patch('banners/bulk/status')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.CONTENT_BANNERS, Action.UPDATE)
+  @RequirePermissions(Resource.CONTENT_BANNERS, Action.CHANGE_STATUS)
   async bulkUpdateBannersStatus(
-    @Body() dto: { ids: string[]; status: BannerStatus },
+    @Body() dto: ChangeBannerStatusDto,
     @Req() req: RequestWithUser,
   ) {
     const result = await this.contentService.bulkUpdateBannerStatus(
       dto.ids,
       dto.status,
-      req.user.userId,
+      req.user._id,
       req.user.email,
     );
     return new BaseResponse(true, result.message);
   }
 
-  // BỔ SUNG: API BULK ACTION CHO POSTS
-  @Patch('posts/bulk/status')
+  // BLOG: XUẤT BẢN HÀNG LOẠT (quyền PUBLISH)
+  @Patch('posts/bulk/publish')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Resource.CONTENT_POSTS, Action.UPDATE)
-  async bulkUpdatePostsStatus(
-    @Body() dto: { ids: string[]; status: PostStatus },
+  @RequirePermissions(Resource.CONTENT_POSTS, Action.PUBLISH)
+  async bulkPublishPosts(
+    @Body() dto: BulkPostIdsDto,
     @Req() req: RequestWithUser,
   ) {
     const result = await this.contentService.bulkUpdatePostStatus(
       dto.ids,
-      dto.status,
-      req.user.userId,
+      PostStatus.PUBLISHED,
+      req.user._id,
+      req.user.email,
+    );
+    return new BaseResponse(true, result.message);
+  }
+
+  // BLOG: GỠ XUẤT BẢN HÀNG LOẠT (quyền UNPUBLISH) — về DRAFT hoặc HIDDEN
+  @Patch('posts/bulk/unpublish')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Resource.CONTENT_POSTS, Action.UNPUBLISH)
+  async bulkUnpublishPosts(
+    @Body() dto: BulkUnpublishPostsDto,
+    @Req() req: RequestWithUser,
+  ) {
+    const result = await this.contentService.bulkUpdatePostStatus(
+      dto.ids,
+      dto.status ?? PostStatus.HIDDEN,
+      req.user._id,
       req.user.email,
     );
     return new BaseResponse(true, result.message);
@@ -340,7 +384,7 @@ export class ContentController {
   ) {
     const result = await this.contentService.bulkDeletePosts(
       dto.ids,
-      req.user.userId,
+      req.user._id,
       req.user.email,
     );
     return new BaseResponse(true, result.message);
@@ -366,7 +410,7 @@ export class ContentController {
     const data = await this.contentService.updatePageConfig(
       pageId,
       dto,
-      req.user.userId,
+      req.user._id,
       req.user.email,
     );
     return new BaseResponse(

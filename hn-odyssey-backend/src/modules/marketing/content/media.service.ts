@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -59,6 +60,18 @@ export class MediaService {
       throw new BadRequestException('Số lượng file và metadata không khớp.');
     }
 
+    // Media mới luôn ở DRAFT; công khai qua PATCH bulk/status (quyền CHANGE_STATUS).
+    // Metadata được JSON.parse thủ công (không qua ValidationPipe) nên phải tự kiểm tra.
+    if (
+      metadataArray.some(
+        (m) => m.status !== undefined && m.status !== MediaStatus.DRAFT,
+      )
+    ) {
+      throw new ForbiddenException(
+        'Phương tiện mới phải ở trạng thái Draft. Vui lòng dùng chức năng đổi trạng thái để công khai.',
+      );
+    }
+
     const savedRecords: Media[] = [];
     const targetCheckMap = new Map<string, boolean>();
 
@@ -92,7 +105,7 @@ export class MediaService {
         originalName: String(file.originalname),
         type: String(meta.type),
         targetId: String(meta.targetId),
-        status: String(meta.status),
+        status: MediaStatus.DRAFT,
         altText: meta.altText ? String(meta.altText) : '',
         size: Number(file.size),
         mimetype: String(file.mimetype),
@@ -199,7 +212,12 @@ export class MediaService {
     if (dto.type !== undefined) media.type = dto.type;
     if (dto.targetId !== undefined) media.targetId = dto.targetId;
     if (dto.altText !== undefined) media.altText = dto.altText;
-    if (dto.status !== undefined) media.status = dto.status;
+    // Trạng thái chỉ đổi qua PATCH bulk/status (quyền CHANGE_STATUS)
+    if (dto.status !== undefined && dto.status !== media.status) {
+      throw new ForbiddenException(
+        'Không thể đổi trạng thái qua chức năng sửa thông tin. Vui lòng dùng nút Publish / Draft.',
+      );
+    }
     if (dto.isPrimary !== undefined) media.isPrimary = dto.isPrimary;
 
     const savedMedia = await media.save();
@@ -373,6 +391,29 @@ export class MediaService {
     this.logger.log(
       `Đã dọn dẹp toàn bộ phương tiện của ${type} có ID: ${targetId}`,
     );
+  }
+
+  // Đổi trạng thái hiển thị (quyền CHANGE_STATUS)
+  async changeStatus(ids: string[], status: MediaStatus) {
+    const medias = await this.mediaModel.find({ _id: { $in: ids } });
+    let modified = 0;
+
+    for (const media of medias) {
+      if (media.status === status) continue;
+      media.status = status;
+      await media.save();
+      modified++;
+
+      // Giữ nguyên cơ chế đồng bộ cũ: product.listener cập nhật ảnh trên Product/Variant
+      this.eventEmitter.emit('media.status.changed', {
+        targetId: media.targetId,
+        type: media.type,
+        url: media.url,
+        status,
+      });
+    }
+
+    return { modified };
   }
 
   // Tự động ẩn toàn bộ ảnh của một đối tượng khi đối tượng đó bị ẩn/xóa mềm

@@ -72,6 +72,7 @@ export enum Action {
   REPLY = 'REPLY',
   ASSIGN = 'ASSIGN',
   RECEIVE = 'RECEIVE',
+  CHANGE_STATUS = 'CHANGE_STATUS', // Bật/tắt, khóa/mở trạng thái (tách khỏi UPDATE)
 
   // --- Super Action ---
   MANAGE = 'MANAGE',

@@ -543,3 +543,11 @@
 .rm-checkbox-label.locked {
   opacity: 0.75;
 }
+
+/* Nhãn quyền dài (CHANGE STATUS, SUBMIT APPROVAL): chỉ xuống dòng giữa các từ,
+   không cắt ngang chữ */
+.rm-checkbox-label .rm-checkbox-text {
+  word-break: normal;
+  overflow-wrap: normal;
+  line-height: 1.3;
+}

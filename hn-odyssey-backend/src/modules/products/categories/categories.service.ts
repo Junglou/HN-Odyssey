@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -131,11 +132,19 @@ export class CategoriesService {
       createCategoryDto.description || '',
     );
 
+    // Danh mục mới luôn TẮT; bật qua categories/status/:id (quyền CHANGE_STATUS)
+    if (createCategoryDto.is_active === true) {
+      throw new ForbiddenException(
+        'Danh mục mới phải ở trạng thái Inactive. Vui lòng dùng chức năng Bật/Tắt.',
+      );
+    }
+
     const newCategory = new this.categoryModel({
       ...createCategoryDto,
       slug,
       description: cleanDescription,
       ancestors,
+      is_active: false,
     });
 
     const savedCategory = await newCategory.save();
@@ -256,10 +265,13 @@ export class CategoriesService {
       updateDto.description = this.sanitizeContent(updateDto.description);
     }
 
-    if (updateDto.is_active === false) {
-      await this.categoryModel.updateMany(
-        { 'ancestors._id': id },
-        { is_active: false },
+    // Trạng thái chỉ đổi qua categories/status/:id (quyền CHANGE_STATUS)
+    if (
+      updateDto.is_active !== undefined &&
+      updateDto.is_active !== (category.is_active !== false)
+    ) {
+      throw new ForbiddenException(
+        'Không thể đổi trạng thái qua chức năng sửa danh mục. Vui lòng dùng nút Bật/Tắt.',
       );
     }
 
@@ -335,6 +347,80 @@ export class CategoriesService {
 
     return {
       message: 'Cập nhật danh mục thành công',
+      data: savedCategory,
+    };
+  }
+
+  // BẬT/TẮT TRẠNG THÁI (quyền CHANGE_STATUS)
+  async changeStatus(
+    id: string,
+    isActive: boolean,
+    actorId: string,
+    ip: string,
+    userAgent: string,
+  ) {
+    const category = await this.categoryModel.findById(id);
+    if (!category) throw new NotFoundException('Danh mục không tồn tại');
+
+    const oldIsActive = category.is_active !== false;
+    if (oldIsActive === isActive) {
+      return { message: 'Trạng thái không thay đổi', data: category };
+    }
+
+    // Giữ nguyên ràng buộc cũ của luồng sửa: đang áp dụng cho sản phẩm thì không đổi
+    const isUsed = await this.productModel.exists({
+      categories: new Types.ObjectId(id),
+      is_deleted: false,
+    });
+    if (isUsed) {
+      throw new BadRequestException(
+        `Danh mục '${category.name}' đang được áp dụng cho sản phẩm, KHÔNG ĐƯỢC PHÉP ĐỔI TRẠNG THÁI. Vui lòng gỡ danh mục khỏi các sản phẩm trước.`,
+      );
+    }
+
+    // Không bật danh mục con khi danh mục cha đang tắt
+    if (isActive && category.parent_id) {
+      const parent = await this.categoryModel
+        .findById(category.parent_id)
+        .select('is_active name')
+        .lean();
+      if (parent && parent.is_active === false) {
+        throw new BadRequestException(
+          `Danh mục cha '${parent.name}' đang Inactive. Vui lòng bật danh mục cha trước.`,
+        );
+      }
+    }
+
+    category.is_active = isActive;
+    const savedCategory = await category.save();
+
+    // Tắt danh mục → tắt luôn toàn bộ danh mục con (giữ logic cũ)
+    if (!isActive) {
+      await this.categoryModel.updateMany(
+        { 'ancestors._id': id },
+        { is_active: false },
+      );
+    }
+
+    await this.auditLogsService.log({
+      action: 'CHANGE_CATEGORY_STATUS',
+      collection_name: 'categories',
+      actor_id: actorId,
+      target_id: category._id,
+      department: Department.WAREHOUSE,
+      detail: {
+        name: category.name,
+        old_is_active: oldIsActive,
+        new_is_active: isActive,
+      },
+      ip,
+      user_agent: userAgent,
+    });
+
+    return {
+      message: isActive
+        ? 'Đã bật danh mục'
+        : 'Đã tắt danh mục (kèm toàn bộ danh mục con)',
       data: savedCategory,
     };
   }

@@ -6,6 +6,8 @@ import type {
   RoleFormData,
 } from "../../../../hooks/portal/UserAndRoles/RoleManagement/useRoleManagement";
 import { CloseIcon } from "../../../../assets/icons/RoleManagementIcons";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 
 // types
 interface RoleModalProps {
@@ -40,13 +42,22 @@ function RoleModalContent({
   // Điều kiện kích hoạt nút Submit
   const isValid = formData.name.trim().length > 0;
 
+  // Đổi trạng thái khi SỬA cần quyền CHANGE_STATUS; khi TẠO MỚI thì không cần
+  const canChangeStatus = hasPermission(
+    getCurrentUser(),
+    Resource.SYSTEM_ROLES,
+    Action.CHANGE_STATUS,
+  );
+  const isStatusLocked =
+    Boolean(initialData?.isLocked) || (mode === "edit" && !canChangeStatus);
+
   // handlers
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({ ...prev, name: e.target.value }));
   };
 
   const handleToggleStatus = () => {
-    if (initialData?.isLocked) return;
+    if (isStatusLocked) return;
     setFormData((prev) => ({
       ...prev,
       status: prev.status === "Active" ? "Inactive" : "Active",
@@ -100,7 +111,7 @@ function RoleModalContent({
             <label>Role Status</label>
             <div className="rm-modal-status-flex">
               <div
-                className={`rm-modal-switch ${formData.status === "Active" ? "on" : ""} ${initialData?.isLocked ? "disabled" : ""}`}
+                className={`rm-modal-switch ${formData.status === "Active" ? "on" : ""} ${isStatusLocked ? "disabled" : ""}`}
                 onClick={handleToggleStatus}
               >
                 <div className="rm-modal-switch-handle"></div>

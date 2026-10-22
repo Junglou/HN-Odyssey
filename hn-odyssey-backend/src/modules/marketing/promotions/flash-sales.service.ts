@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   Logger,
@@ -111,11 +112,17 @@ export class FlashSalesService {
           `Một hoặc nhiều ${dto.applicable_scope_type} đã tồn tại trong Flash Sale khác trùng thời gian.`,
         );
     }
+    // Flash Sale mới luôn ở DRAFT; kích hoạt qua flash-sales/bulk/status (quyền CHANGE_STATUS)
+    if (dto.status && dto.status !== FlashSaleStatus.DRAFT) {
+      throw new ForbiddenException(
+        'Flash Sale mới phải ở trạng thái Draft. Vui lòng dùng chức năng Kích hoạt.',
+      );
+    }
+
     const newFlashSale = new this.flashSaleModel({
       ...dto,
       applicable_scope_values: uniqueScopeValues,
-      status:
-        start <= new Date() ? FlashSaleStatus.ACTIVE : FlashSaleStatus.PENDING,
+      status: FlashSaleStatus.DRAFT,
     });
     const savedSale = await newFlashSale.save();
     await this.auditLogsService.log({
@@ -170,6 +177,13 @@ export class FlashSalesService {
     const flashSale = await this.flashSaleModel.findById(id);
     if (!flashSale)
       throw new NotFoundException('Không tìm thấy chương trình Flash Sale');
+
+    // Trạng thái chỉ đổi qua flash-sales/bulk/status (quyền CHANGE_STATUS)
+    if (dto.status !== undefined && dto.status !== flashSale.status) {
+      throw new ForbiddenException(
+        'Không thể đổi trạng thái qua chức năng sửa Flash Sale. Vui lòng dùng Bulk Activate / Deactivate.',
+      );
+    }
 
     const isCoreFieldChanged =
       (dto.name !== undefined && dto.name !== flashSale.name) ||
@@ -416,9 +430,28 @@ export class FlashSalesService {
   ) {
     const sales = await this.flashSaleModel.find({ _id: { $in: ids } });
     const now = new Date();
+    const skippedConflicts: string[] = [];
+
     for (const sale of sales) {
       if (sale.status === FlashSaleStatus.EXPIRED) continue;
       if (action === 'ACTIVATE') {
+        // Flash Sale mới tạo luôn ở DRAFT nên phải kiểm tra trùng lịch tại bước BẬT
+        // (trước kia chỉ kiểm tra lúc tạo). Lặp tuần tự nên 2 chương trình trùng
+        // nhau trong cùng 1 lần bulk cũng bị bắt.
+        if (sale.applicable_scope_values?.length) {
+          const conflict = await this.flashSaleModel.exists({
+            _id: { $ne: sale._id },
+            status: { $in: [FlashSaleStatus.PENDING, FlashSaleStatus.ACTIVE] },
+            applicable_scope_type: sale.applicable_scope_type,
+            applicable_scope_values: { $in: sale.applicable_scope_values },
+            start_time: { $lt: sale.end_time },
+            end_time: { $gt: sale.start_time },
+          });
+          if (conflict) {
+            skippedConflicts.push(sale.name);
+            continue;
+          }
+        }
         sale.status =
           now >= sale.start_time
             ? FlashSaleStatus.ACTIVE
@@ -428,6 +461,7 @@ export class FlashSalesService {
       }
       await sale.save();
     }
+
     if (userId) {
       await this.auditLogsService.log({
         action: 'BULK_UPDATE_FLASH_SALE_STATUS',
@@ -435,11 +469,22 @@ export class FlashSalesService {
         actor_id: userId,
         target_id: 'BULK_ACTION',
         department: Department.MARKETING,
-        detail: { updated_ids: ids, action },
+        detail: {
+          updated_ids: ids,
+          action,
+          skipped_conflicts: skippedConflicts,
+        },
         is_success: true,
       });
     }
-    return { success: true };
+
+    return {
+      success: true,
+      message:
+        skippedConflicts.length > 0
+          ? `Đã cập nhật trạng thái. Bỏ qua ${skippedConflicts.length} chương trình bị trùng lịch với Flash Sale khác: ${skippedConflicts.join(', ')}`
+          : 'Cập nhật trạng thái Flash Sales hàng loạt thành công',
+    };
   }
 
   async bulkDelete(ids: string[], userId?: string) {

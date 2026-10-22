@@ -176,7 +176,7 @@ export function useProductForm() {
   const user = tokenStorage.getUser() as UserPayload | null;
   const hasPermission = (resourceCode: Resource, actionCode: Action) => {
     if (!user || !user.permissions) return false;
-    if (user.roles && user.roles.includes("Super Admin")) return true;
+    if (user.roles && user.roles.includes("SUPER_ADMIN")) return true;
     const perm = user.permissions.find((p) => p.resource === resourceCode);
     if (!perm) return false;
     return (
@@ -188,6 +188,10 @@ export function useProductForm() {
   const isEditMode = mode === "edit";
   const canCreate = hasPermission(Resource.CATALOG_PRODUCTS, Action.CREATE);
   const canUpdate = hasPermission(Resource.CATALOG_PRODUCTS, Action.UPDATE);
+  const canChangeStatus = hasPermission(
+    Resource.CATALOG_PRODUCTS,
+    Action.CHANGE_STATUS,
+  );
 
   // [THÊM MỚI]: Kiểm tra quyền Gửi yêu cầu duyệt giá
   const canSubmitPrice = hasPermission(
@@ -219,6 +223,9 @@ export function useProductForm() {
     description: "",
     categoryIds: [],
   });
+
+  // Trạng thái lúc tải về, để chỉ gọi API status khi người dùng thật sự đổi
+  const [originalStatus, setOriginalStatus] = useState<string>("");
 
   const [pricingList, setPricingList] = useState<PricingItem[]>(
     mode === "add"
@@ -320,6 +327,7 @@ export function useProductForm() {
                 | "Draft")
             : "Draft";
 
+          setOriginalStatus(formattedStatus);
           setFormData({
             sku: p.sku,
             name: p.name,
@@ -702,22 +710,30 @@ export function useProductForm() {
         } else {
           await axiosClient.patch(`/products/${id}`, payload);
 
-          try {
-            await axiosClient.patch(`/products/${id}/status`, {
-              status: formData.status.toUpperCase(),
-            });
-            toast.success("Cập nhật thông tin và trạng thái thành công!");
-          } catch (statusError: unknown) {
-            const err = statusError as ApiError;
-            const msg = err.response?.data?.message || err.message;
-            let errorMsg =
-              "Lưu thông tin thành công, nhưng không thể đổi trạng thái! ";
-            if (Array.isArray(msg)) {
-              errorMsg += msg.join(", ");
-            } else if (typeof msg === "string") {
-              errorMsg += msg;
+          if (formData.status === originalStatus) {
+            toast.success("Cập nhật thông tin thành công!");
+          } else if (!canChangeStatus) {
+            toast.warning(
+              "Đã lưu thông tin. Bạn không có quyền đổi trạng thái nên trạng thái được giữ nguyên.",
+            );
+          } else {
+            try {
+              await axiosClient.patch(`/products/${id}/status`, {
+                status: formData.status.toUpperCase(),
+              });
+              toast.success("Cập nhật thông tin và trạng thái thành công!");
+            } catch (statusError: unknown) {
+              const err = statusError as ApiError;
+              const msg = err.response?.data?.message || err.message;
+              let errorMsg =
+                "Lưu thông tin thành công, nhưng không thể đổi trạng thái! ";
+              if (Array.isArray(msg)) {
+                errorMsg += msg.join(", ");
+              } else if (typeof msg === "string") {
+                errorMsg += msg;
+              }
+              toast.warning(errorMsg);
             }
-            toast.warning(errorMsg);
           }
         }
 
@@ -763,5 +779,6 @@ export function useProductForm() {
     AVAILABLE_CATEGORIES: availableCategories,
     isAuthorized,
     canSubmitPrice,
+    canChangeStatus,
   };
 }

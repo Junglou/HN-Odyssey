@@ -17,6 +17,8 @@ import type {
   ReviewStatus,
   DrawerMode,
 } from "../../../../hooks/portal/MarketingSuite/ReviewAndRatingManagement/useReviewAndRatingManagement";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 
 // Prop
 interface ReviewAndRatingManagementProps {
@@ -63,6 +65,24 @@ export default function ReviewAndRatingManagement({
   actions,
   bulkActions,
 }: ReviewAndRatingManagementProps) {
+  const currentUser = getCurrentUser();
+  const canPublish = hasPermission(
+    currentUser,
+    Resource.CRM_REVIEWS,
+    Action.PUBLISH,
+  );
+  const canUnpublish = hasPermission(
+    currentUser,
+    Resource.CRM_REVIEWS,
+    Action.UNPUBLISH,
+  );
+  // Review đang ẩn → cần PUBLISH để hiện; đang hiện → cần UNPUBLISH để ẩn
+  const canToggleReview = (status: ReviewStatus) =>
+    status === "Hidden" ? canPublish : canUnpublish;
+  // Khách bị khóa: vẫn ẩn được, nhưng không được hiện lại (BE cũng chặn)
+  const isShowBlocked = (r: ReviewRecord) =>
+    r.status === "Hidden" && r.isUserBanned;
+
   // State quản lý đóng mở dropdown
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [hasStatusOpened, setHasStatusOpened] = useState(false);
@@ -233,22 +253,26 @@ export default function ReviewAndRatingManagement({
 
           {/* Thao tác hàng loạt */}
           <div className="rarm-bulk-actions">
-            <button
-              type="button"
-              className="rarm-btn-bulk outline"
-              onClick={bulkActions.bulkHide}
-              disabled={selectedIds.size === 0}
-            >
-              Bulk Hide
-            </button>
-            <button
-              type="button"
-              className="rarm-btn-bulk outline"
-              onClick={bulkActions.bulkUnhide}
-              disabled={selectedIds.size === 0}
-            >
-              Bulk Unhide
-            </button>
+            {canUnpublish && (
+              <button
+                type="button"
+                className="rarm-btn-bulk outline"
+                onClick={bulkActions.bulkHide}
+                disabled={selectedIds.size === 0}
+              >
+                Bulk Hide
+              </button>
+            )}
+            {canPublish && (
+              <button
+                type="button"
+                className="rarm-btn-bulk outline"
+                onClick={bulkActions.bulkUnhide}
+                disabled={selectedIds.size === 0}
+              >
+                Bulk Unhide
+              </button>
+            )}
             <button
               type="button"
               className="rarm-btn-bulk danger"
@@ -361,13 +385,18 @@ export default function ReviewAndRatingManagement({
                         </button>
                         <button
                           type="button"
-                          className={`rarm-btn-action-text ${record.isUserBanned ? "disabled" : ""} ${record.status === "Hidden" ? "pressed" : ""}`}
+                          className={`rarm-btn-action-text ${isShowBlocked(record) || !canToggleReview(record.status) ? "disabled" : ""} ${record.status === "Hidden" ? "pressed" : ""}`}
                           onClick={() => actions.toggleHideStatus(record.id)}
-                          disabled={record.isUserBanned}
+                          disabled={
+                            isShowBlocked(record) ||
+                            !canToggleReview(record.status)
+                          }
                           title={
-                            record.isUserBanned
-                              ? "User is banned"
-                              : "Toggle Visibility"
+                            isShowBlocked(record)
+                              ? "Khách hàng đang bị khóa, không thể hiển thị lại đánh giá"
+                              : !canToggleReview(record.status)
+                                ? "Bạn không có quyền thao tác này"
+                                : "Toggle Visibility"
                           }
                         >
                           {record.status === "Hidden" ? (

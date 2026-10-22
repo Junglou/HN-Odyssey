@@ -175,27 +175,38 @@ export function useRoleManagement() {
 
   const handleModalSubmit = async (data: RoleFormData) => {
     try {
-      const payload = {
-        name: data.name,
-        is_active: data.status === "Active",
-        permissions: modalConfig.mode === "add" ? [] : undefined,
-      };
-
       if (modalConfig.mode === "add") {
-        await axiosClient.post(`/admin/roles`, payload);
+        await axiosClient.post(`/admin/roles`, {
+          name: data.name,
+          is_active: data.status === "Active",
+          permissions: [],
+        });
         toast.success("Thêm vai trò mới thành công!");
       } else if (modalConfig.mode === "edit" && modalConfig.editingRole) {
-        await axiosClient.patch(
-          `/admin/roles/${modalConfig.editingRole.id}`,
-          payload,
-        );
+        const roleId = modalConfig.editingRole.id;
+
+        // 1. Sửa thông tin (quyền UPDATE) — KHÔNG gửi is_active
+        await axiosClient.patch(`/admin/roles/${roleId}`, { name: data.name });
+
+        // 2. Đổi trạng thái (quyền CHANGE_STATUS) — chỉ gọi khi có thay đổi
+        if (data.status !== modalConfig.editingRole.status) {
+          await axiosClient.patch(`/admin/roles/${roleId}/status`, {
+            is_active: data.status === "Active",
+          });
+        }
         toast.success("Cập nhật vai trò thành công!");
       }
 
       setModalConfig((prev) => ({ ...prev, isOpen: false }));
       void fetchList();
-    } catch {
-      toast.error("Không thể lưu vai trò. Tên vai trò có thể đã tồn tại.");
+    } catch (error) {
+      toast.error(
+        getErrorMessage(
+          error,
+          "Không thể lưu vai trò. Tên vai trò có thể đã tồn tại.",
+        ),
+      );
+      void fetchList();
     }
   };
 

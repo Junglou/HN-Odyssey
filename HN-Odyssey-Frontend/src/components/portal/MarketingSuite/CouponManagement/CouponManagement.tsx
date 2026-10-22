@@ -13,6 +13,8 @@ import type {
   CouponStatus,
   DiscountType,
 } from "../../../../hooks/portal/MarketingSuite/CouponManagement/useCouponManagement";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 
 // types
 interface CouponManagementProps {
@@ -139,6 +141,12 @@ export default function CouponManagement({
   actions,
   bulkActions,
 }: CouponManagementProps) {
+  const canChangeStatus = hasPermission(
+    getCurrentUser(),
+    Resource.PROMO_COUPONS,
+    Action.CHANGE_STATUS,
+  );
+
   // state limit dropdown
   const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
   const [hasLimitOpened, setHasLimitOpened] = useState(false);
@@ -254,22 +262,26 @@ export default function CouponManagement({
           </div>
 
           <div className="coupon-bulk-actions">
-            <button
-              type="button"
-              className="coupon-btn-bulk"
-              onClick={bulkActions.bulkActivate}
-              disabled={selectedIds.size === 0}
-            >
-              Bulk Activate
-            </button>
-            <button
-              type="button"
-              className="coupon-btn-bulk"
-              onClick={bulkActions.bulkDeactivate}
-              disabled={selectedIds.size === 0}
-            >
-              Bulk Deactivate
-            </button>
+            {canChangeStatus && (
+              <>
+                <button
+                  type="button"
+                  className="coupon-btn-bulk"
+                  onClick={bulkActions.bulkActivate}
+                  disabled={selectedIds.size === 0}
+                >
+                  Bulk Activate
+                </button>
+                <button
+                  type="button"
+                  className="coupon-btn-bulk"
+                  onClick={bulkActions.bulkDeactivate}
+                  disabled={selectedIds.size === 0}
+                >
+                  Bulk Deactivate
+                </button>
+              </>
+            )}
             <button
               type="button"
               className="coupon-btn-bulk danger"

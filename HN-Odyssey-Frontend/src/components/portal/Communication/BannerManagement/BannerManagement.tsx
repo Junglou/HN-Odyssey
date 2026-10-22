@@ -15,6 +15,8 @@ import type {
   BannerPosition,
 } from "../../../../hooks/portal/Communication/BannerManagement/useBannerManagement";
 import SmartImage from "../../../common/SmartImage/SmartImage";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 
 interface BannerManagementProps {
   data: BannerRecord[];
@@ -68,6 +70,11 @@ export default function BannerManagement({
   const [isLimitOpen, setIsLimitOpen] = useState(false);
   const [hasLimitOpened, setHasLimitOpened] = useState(false);
 
+  const canChangeStatus = hasPermission(
+    getCurrentUser(),
+    Resource.CONTENT_BANNERS,
+    Action.CHANGE_STATUS,
+  );
   const [openActionId, setOpenActionId] = useState<string | null>(null);
 
   // clickoutside
@@ -226,22 +233,26 @@ export default function BannerManagement({
             </button>
 
             <div className="bm-bulk-actions">
-              <button
-                type="button"
-                className="bm-btn-bulk"
-                onClick={actions.bulkActivate}
-                disabled={selectedIds.length === 0}
-              >
-                Bulk Activate
-              </button>
-              <button
-                type="button"
-                className="bm-btn-bulk"
-                onClick={actions.bulkDeactivate}
-                disabled={selectedIds.length === 0}
-              >
-                Bulk Deactivate
-              </button>
+              {canChangeStatus && (
+                <>
+                  <button
+                    type="button"
+                    className="bm-btn-bulk"
+                    onClick={actions.bulkActivate}
+                    disabled={selectedIds.length === 0}
+                  >
+                    Bulk Activate
+                  </button>
+                  <button
+                    type="button"
+                    className="bm-btn-bulk"
+                    onClick={actions.bulkDeactivate}
+                    disabled={selectedIds.length === 0}
+                  >
+                    Bulk Deactivate
+                  </button>
+                </>
+              )}
               <button
                 type="button"
                 className="bm-btn-bulk danger"
@@ -285,11 +296,12 @@ export default function BannerManagement({
               ) : data.length > 0 ? (
                 data.map((record) => {
                   // xác định tình trạng thời gian
-                  const isPending =
-                    record.startDate && record.startDate > todayDate;
                   const isExpired =
                     record.endDate && record.endDate < todayDate;
-                  const isToggleDisabled = isPending || isExpired;
+                  // Đang bật = Active hoặc Pending (chờ lịch)
+                  const isOn = record.status !== "Inactive" && !isExpired;
+                  // Hết hạn thì không bật được; tắt thì luôn được
+                  const isToggleDisabled = !!isExpired && !isOn;
 
                   return (
                     <tr
@@ -349,26 +361,28 @@ export default function BannerManagement({
                           >
                             <EditIcon />
                           </button>
-                          <div className="bm-toggle-cell">
-                            <button
-                              type="button"
-                              role="switch"
-                              aria-checked={record.status === "Active"}
-                              className={`bm-table-toggle ${record.status === "Active" ? "on" : ""} ${isToggleDisabled ? "disabled" : ""}`}
-                              onClick={() => {
-                                if (!isToggleDisabled)
-                                  actions.toggleBannerStatus(record.id);
-                              }}
-                              disabled={!!isToggleDisabled}
-                              title={
-                                isPending
-                                  ? "Chờ đến ngày bắt đầu"
-                                  : isExpired
+                          {canChangeStatus && (
+                            <div className="bm-toggle-cell">
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={isOn}
+                                className={`bm-table-toggle ${isOn ? "on" : ""} ${isToggleDisabled ? "disabled" : ""}`}
+                                onClick={() => {
+                                  if (!isToggleDisabled)
+                                    actions.toggleBannerStatus(record.id);
+                                }}
+                                disabled={isToggleDisabled}
+                                title={
+                                  isToggleDisabled
                                     ? "Banner đã hết hạn"
-                                    : "Bật/Tắt trạng thái"
-                              }
-                            ></button>
-                          </div>
+                                    : record.status === "Pending"
+                                      ? "Đang chờ đến ngày bắt đầu — bấm để tắt"
+                                      : "Bật/Tắt trạng thái"
+                                }
+                              ></button>
+                            </div>
+                          )}
 
                           <div
                             className={`bm-action-dropdown-wrapper ${openActionId === record.id ? "is-open" : ""}`}

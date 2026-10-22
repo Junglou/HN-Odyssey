@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -54,10 +55,17 @@ export class CouponsService {
     );
     this.validateDates(dto.start_date, dto.end_date);
 
+    // Mã mới luôn ở DRAFT; kích hoạt qua coupons/bulk/status (quyền CHANGE_STATUS)
+    if (dto.status && dto.status !== CouponStatus.DRAFT) {
+      throw new ForbiddenException(
+        'Mã giảm giá mới phải ở trạng thái Draft. Vui lòng dùng chức năng Kích hoạt.',
+      );
+    }
+
     const newCoupon = new this.couponModel({
       ...dto,
       code: dto.code.toUpperCase(),
-      status: dto.status || CouponStatus.DRAFT,
+      status: CouponStatus.DRAFT,
     });
 
     const savedCoupon = await newCoupon.save();
@@ -231,6 +239,13 @@ export class CouponsService {
     const coupon = await this.couponModel.findById(id);
     if (!coupon || coupon.is_deleted) {
       throw new NotFoundException('Không tìm thấy mã giảm giá');
+    }
+
+    // Trạng thái chỉ đổi qua coupons/bulk/status (quyền CHANGE_STATUS)
+    if (dto.status !== undefined && dto.status !== coupon.status) {
+      throw new ForbiddenException(
+        'Không thể đổi trạng thái qua chức năng sửa mã giảm giá. Vui lòng dùng Bulk Activate / Deactivate.',
+      );
     }
 
     const isCoreFieldChanged =

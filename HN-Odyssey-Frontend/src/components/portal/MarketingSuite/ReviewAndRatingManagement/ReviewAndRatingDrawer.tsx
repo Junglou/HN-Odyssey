@@ -94,7 +94,9 @@ function DrawerContent({
   const [isResponsePublished, setIsResponsePublished] = useState(
     !!review.officialResponse,
   );
-  const [isBlockSubmitted, setIsBlockSubmitted] = useState(review.isUserBanned);
+  const [isBlockSubmitted, setIsBlockSubmitted] = useState(
+    !!review.isReviewRestricted,
+  );
 
   const [isReasonOpen, setIsReasonOpen] = useState(false);
   const [hasReasonOpened, setHasReasonOpened] = useState(false);

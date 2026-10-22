@@ -13,6 +13,8 @@ import type {
   BlogNewsStatus,
 } from "../../../../hooks/portal/Communication/BlogNewsManagement/useBlogNewsManagement";
 import SmartImage from "../../../common/SmartImage/SmartImage";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 
 interface BlogNewsManagementProps {
   data: BlogNewsRecord[];
@@ -57,6 +59,18 @@ export default function BlogNewsManagement({
   actions,
   bulkActions,
 }: BlogNewsManagementProps) {
+  const currentUser = getCurrentUser();
+  const canPublish = hasPermission(
+    currentUser,
+    Resource.CONTENT_POSTS,
+    Action.PUBLISH,
+  );
+  const canUnpublish = hasPermission(
+    currentUser,
+    Resource.CONTENT_POSTS,
+    Action.UNPUBLISH,
+  );
+
   // quản lý trạng thái đóng mở cho bộ lọc và phân trang
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [hasStatusOpened, setHasStatusOpened] = useState(false);
@@ -147,18 +161,22 @@ export default function BlogNewsManagement({
             <span className="ban-bulk-text">
               {selectedIds.size} items selected
             </span>
-            <button
-              className="ban-btn-bulk publish"
-              onClick={bulkActions.bulkPublish}
-            >
-              Publish
-            </button>
-            <button
-              className="ban-btn-bulk hide"
-              onClick={bulkActions.bulkHide}
-            >
-              Hide
-            </button>
+            {canPublish && (
+              <button
+                className="ban-btn-bulk publish"
+                onClick={bulkActions.bulkPublish}
+              >
+                Publish
+              </button>
+            )}
+            {canUnpublish && (
+              <button
+                className="ban-btn-bulk hide"
+                onClick={bulkActions.bulkHide}
+              >
+                Hide
+              </button>
+            )}
             <button
               className="ban-btn-bulk delete"
               onClick={bulkActions.bulkDelete}

@@ -75,6 +75,7 @@ export const Action = {
   REPLY: "REPLY",
   ASSIGN: "ASSIGN",
   RECEIVE: "RECEIVE",
+  CHANGE_STATUS: "CHANGE_STATUS",
 
   // --- Super Action ---
   MANAGE: "MANAGE",
@@ -135,6 +136,7 @@ export const PERMISSION_METADATA: IPermissionGroupMeta[] = [
           Action.CREATE,
           Action.UPDATE,
           Action.DELETE,
+          Action.CHANGE_STATUS,
         ],
       },
       {
@@ -145,6 +147,7 @@ export const PERMISSION_METADATA: IPermissionGroupMeta[] = [
           Action.CREATE,
           Action.UPDATE,
           Action.DELETE,
+          Action.CHANGE_STATUS,
         ],
       },
       {
@@ -155,6 +158,7 @@ export const PERMISSION_METADATA: IPermissionGroupMeta[] = [
           Action.CREATE,
           Action.UPDATE,
           Action.DELETE,
+          Action.CHANGE_STATUS,
         ],
       },
       {
@@ -245,6 +249,7 @@ export const PERMISSION_METADATA: IPermissionGroupMeta[] = [
           Action.UPDATE,
           Action.DELETE,
           Action.EXPORT,
+          Action.CHANGE_STATUS,
         ],
       },
       {
@@ -270,8 +275,7 @@ export const PERMISSION_METADATA: IPermissionGroupMeta[] = [
           Action.CREATE,
           Action.UPDATE,
           Action.DELETE,
-          Action.UNPUBLISH,
-          Action.PUBLISH,
+          Action.CHANGE_STATUS,
         ],
       },
       {
@@ -295,8 +299,7 @@ export const PERMISSION_METADATA: IPermissionGroupMeta[] = [
           Action.CREATE,
           Action.UPDATE,
           Action.DELETE,
-          Action.UNPUBLISH,
-          Action.PUBLISH,
+          Action.CHANGE_STATUS,
         ],
       },
       {
@@ -307,8 +310,7 @@ export const PERMISSION_METADATA: IPermissionGroupMeta[] = [
           Action.CREATE,
           Action.UPDATE,
           Action.DELETE,
-          Action.UNPUBLISH,
-          Action.PUBLISH,
+          Action.CHANGE_STATUS,
         ],
       },
     ],
@@ -324,6 +326,7 @@ export const PERMISSION_METADATA: IPermissionGroupMeta[] = [
           Action.CREATE,
           Action.UPDATE,
           Action.DELETE,
+          Action.CHANGE_STATUS,
         ],
       },
       {
@@ -334,6 +337,7 @@ export const PERMISSION_METADATA: IPermissionGroupMeta[] = [
           Action.CREATE,
           Action.UPDATE,
           Action.DELETE,
+          Action.CHANGE_STATUS,
         ],
       },
     ],
@@ -349,8 +353,7 @@ export const PERMISSION_METADATA: IPermissionGroupMeta[] = [
           Action.CREATE,
           Action.UPDATE,
           Action.DELETE,
-          Action.PUBLISH,
-          Action.UNPUBLISH,
+          Action.CHANGE_STATUS,
         ],
       },
       {
@@ -371,8 +374,7 @@ export const PERMISSION_METADATA: IPermissionGroupMeta[] = [
           Action.CREATE,
           Action.UPDATE,
           Action.DELETE,
-          Action.UNPUBLISH,
-          Action.PUBLISH,
+          Action.CHANGE_STATUS,
         ],
       },
       {

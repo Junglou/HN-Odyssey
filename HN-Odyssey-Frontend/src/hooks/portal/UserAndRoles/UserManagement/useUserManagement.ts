@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import type { UserFormData } from "../../../../components/portal/UsersAndRoles/UserManagement/UserModal";
 import axiosClient from "../../../../api/axiosClient";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 
 export type BulkAction = "activate" | "deactivate" | "delete";
 
@@ -86,6 +88,11 @@ const formatLastLogin = (dateString?: string) => {
 };
 
 export function useUserManagement() {
+  const canChangeStatus = hasPermission(
+    getCurrentUser(),
+    Resource.SYSTEM_USERS,
+    Action.CHANGE_STATUS,
+  );
   const [users, setUsers] = useState<User[]>([]);
   const [roleOptions, setRoleOptions] = useState<DropdownOption[]>([
     { label: "All Roles", value: "Role" },
@@ -287,7 +294,6 @@ export function useUserManagement() {
           phone: data.phone,
           roles: [data.role],
           department: data.department,
-          is_active: data.status === "Active",
         };
         if (
           data.password &&
@@ -344,6 +350,10 @@ export function useUserManagement() {
         setDeleteConfig({ isOpen: true, type: "bulk", userId: null });
         return;
       }
+      if (!canChangeStatus) {
+        toast.error("Bạn không có quyền bật/tắt trạng thái tài khoản.");
+        return;
+      }
 
       try {
         const is_active = action === "activate";
@@ -361,6 +371,10 @@ export function useUserManagement() {
     },
 
     toggleStatus: async (id: string, currentStatus: string) => {
+      if (!canChangeStatus) {
+        toast.error("Bạn không có quyền bật/tắt trạng thái tài khoản.");
+        return;
+      }
       if (currentStatus === "Inactive" || currentStatus === "Locked") return;
       try {
         const newStatus = currentStatus === "Active" ? "SUSPENDED" : "ACTIVE";
@@ -376,6 +390,10 @@ export function useUserManagement() {
     },
 
     lockUnlock: (id: string, currentStatus: string) => {
+      if (!canChangeStatus) {
+        toast.error("Bạn không có quyền khóa/mở khóa tài khoản.");
+        return;
+      }
       const runLockUnlock = async () => {
         try {
           const newStatus = currentStatus === "Active" ? "SUSPENDED" : "ACTIVE";

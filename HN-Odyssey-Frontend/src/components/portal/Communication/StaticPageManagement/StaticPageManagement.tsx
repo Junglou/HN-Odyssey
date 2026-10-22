@@ -13,6 +13,8 @@ import type {
   PageStatus,
   PageType,
 } from "../../../../hooks/portal/Communication/StaticPageManagement/useStaticPageManagement";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 
 // props
 interface StaticPageManagementProps {
@@ -60,6 +62,12 @@ export default function StaticPageManagement({
   actions,
   bulkActions,
 }: StaticPageManagementProps) {
+  const canChangeStatus = hasPermission(
+    getCurrentUser(),
+    Resource.CONTENT_PAGES,
+    Action.CHANGE_STATUS,
+  );
+
   // state
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [hasStatusOpened, setHasStatusOpened] = useState(false);
@@ -223,14 +231,16 @@ export default function StaticPageManagement({
             </button>
 
             <div className="sp-bulk-actions">
-              <button
-                type="button"
-                className="sp-btn-bulk"
-                onClick={bulkActions.bulkActivate}
-                disabled={selectedIds.size === 0}
-              >
-                Bulk Activate
-              </button>
+              {canChangeStatus && (
+                <button
+                  type="button"
+                  className="sp-btn-bulk"
+                  onClick={bulkActions.bulkActivate}
+                  disabled={selectedIds.size === 0}
+                >
+                  Bulk Activate
+                </button>
+              )}
               <button
                 type="button"
                 className="sp-btn-bulk danger"
@@ -312,24 +322,26 @@ export default function StaticPageManagement({
                         >
                           <ViewIcon />
                         </button>
-                        <div className="sp-toggle-cell">
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={record.status === "Hidden"}
-                            className={`sp-table-toggle ${
-                              record.status === "Hidden" ? "on" : ""
-                            }`}
-                            onClick={() =>
-                              actions.toggleHiddenStatus(record.id)
-                            }
-                            title={
-                              record.status === "Hidden"
-                                ? "Hiện trang"
-                                : "Ẩn trang"
-                            }
-                          ></button>
-                        </div>
+                        {canChangeStatus && (
+                          <div className="sp-toggle-cell">
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={record.status === "Hidden"}
+                              className={`sp-table-toggle ${
+                                record.status === "Hidden" ? "on" : ""
+                              }`}
+                              onClick={() =>
+                                actions.toggleHiddenStatus(record.id)
+                              }
+                              title={
+                                record.status === "Hidden"
+                                  ? "Hiện trang"
+                                  : "Ẩn trang"
+                              }
+                            ></button>
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>

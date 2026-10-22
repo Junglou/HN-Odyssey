@@ -105,7 +105,11 @@ export function useStaticPageManagement() {
   const canCreate = hasPermission(Resource.CONTENT_PAGES, Action.CREATE);
   const canUpdate = hasPermission(Resource.CONTENT_PAGES, Action.UPDATE);
   const canDelete = hasPermission(Resource.CONTENT_PAGES, Action.DELETE);
-  const canPublish = hasPermission(Resource.CONTENT_PAGES, Action.UPDATE);
+  // Bật/tắt (Draft / Published / Hidden) dùng quyền riêng CHANGE_STATUS
+  const canPublish = hasPermission(
+    Resource.CONTENT_PAGES,
+    Action.CHANGE_STATUS,
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -273,7 +277,7 @@ export function useStaticPageManagement() {
       const targetStatus = record.status === "Hidden" ? "DRAFT" : "HIDDEN";
 
       try {
-        await axiosClient.patch(`/marketing/content/pages/${id}`, {
+        await axiosClient.patch(`/marketing/content/pages/${id}/status`, {
           status: targetStatus,
         });
         toast.success("Cập nhật trạng thái hiển thị thành công!");
@@ -329,23 +333,44 @@ export function useStaticPageManagement() {
     try {
       setModalConfig((prev) => ({ ...prev, isSubmitting: true }));
 
+      // KHÔNG gửi status: trạng thái đổi qua /pages/:id/status (quyền CHANGE_STATUS)
       const payload = {
         title: data.title.trim(),
         slug: data.slug.trim().replace(/^\/+/, "").replace(/\/+$/, ""),
         type: data.type,
         content: data.content,
-        status: data.status.toUpperCase(),
       };
 
+      let pageId: string | undefined;
+      let oldStatus: PageStatus = "Draft";
+
       if (mode === "add") {
-        await axiosClient.post("/marketing/content/pages", payload);
-        toast.success("Tạo trang tĩnh thành công!");
+        const res = await axiosClient.post("/marketing/content/pages", payload);
+        pageId = res.data?.data?._id;
       } else if (mode === "edit" && editingRecord) {
-        await axiosClient.patch(
-          `/marketing/content/pages/${editingRecord.id}`,
-          payload,
-        );
-        toast.success("Cập nhật trang tĩnh thành công!");
+        pageId = editingRecord.id;
+        oldStatus = editingRecord.status;
+        await axiosClient.patch(`/marketing/content/pages/${pageId}`, payload);
+      }
+
+      const baseMsg =
+        mode === "add"
+          ? "Tạo trang tĩnh thành công!"
+          : "Cập nhật trang tĩnh thành công!";
+
+      if (pageId && data.status !== oldStatus) {
+        if (canPublish) {
+          await axiosClient.patch(`/marketing/content/pages/${pageId}/status`, {
+            status: data.status.toUpperCase(),
+          });
+          toast.success(baseMsg);
+        } else {
+          toast.warning(
+            `${baseMsg} Bạn không có quyền đổi trạng thái nên trạng thái được giữ nguyên.`,
+          );
+        }
+      } else {
+        toast.success(baseMsg);
       }
 
       fetchPages();
@@ -369,7 +394,7 @@ export function useStaticPageManagement() {
       try {
         await Promise.all(
           targets.map((t) =>
-            axiosClient.patch(`/marketing/content/pages/${t.id}`, {
+            axiosClient.patch(`/marketing/content/pages/${t.id}/status`, {
               status: "PUBLISHED",
             }),
           ),

@@ -136,7 +136,7 @@ export class ProductsController {
   }
 
   @Patch('bulk/status')
-  @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.UPDATE)
+  @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.CHANGE_STATUS)
   bulkUpdateStatus(
     @Body() body: { product_ids: string[]; status: ProductStatus },
     @CurrentUser() user: IUser,
@@ -194,7 +194,7 @@ export class ProductsController {
   }
 
   @Patch(':id/status')
-  @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.UPDATE)
+  @RequirePermissions(Resource.CATALOG_PRODUCTS, Action.CHANGE_STATUS)
   updateStatus(
     @Param('id') id: string,
     @Body() statusDto: UpdateProductStatusDto,

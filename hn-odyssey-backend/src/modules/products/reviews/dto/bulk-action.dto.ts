@@ -10,3 +10,11 @@ export class BulkActionDto {
   @IsEnum(BulkReviewAction, { message: 'Hành động không hợp lệ' })
   action: BulkReviewAction;
 }
+
+// Dùng cho các route bulk tách theo quyền: bulk/hide, bulk/unhide, bulk/delete
+export class BulkReviewIdsDto {
+  @IsArray()
+  @ArrayNotEmpty({ message: 'Danh sách ID không được để trống' })
+  @IsMongoId({ each: true, message: 'ID không hợp lệ' })
+  review_ids: string[];
+}
