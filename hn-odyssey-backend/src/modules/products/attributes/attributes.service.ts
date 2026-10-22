@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -100,7 +101,14 @@ export class AttributesService {
       }
     }
 
-    const newAttr = new this.attributeModel(createDto);
+    // Thuộc tính mới luôn TẮT; bật qua attributes/:id/status (quyền CHANGE_STATUS)
+    if ((createDto as { is_active?: boolean }).is_active === true) {
+      throw new ForbiddenException(
+        'Thuộc tính mới phải ở trạng thái Inactive. Vui lòng dùng chức năng Bật/Tắt.',
+      );
+    }
+
+    const newAttr = new this.attributeModel({ ...createDto, is_active: false });
     const savedAttr = await newAttr.save();
 
     if (savedAttr.is_filterable) {
@@ -188,6 +196,16 @@ export class AttributesService {
       }
     }
 
+    // Trạng thái chỉ đổi qua attributes/:id/status (quyền CHANGE_STATUS)
+    if (
+      updateDto.is_active !== undefined &&
+      updateDto.is_active !== (attr.is_active !== false)
+    ) {
+      throw new ForbiddenException(
+        'Không thể đổi trạng thái qua chức năng sửa thuộc tính. Vui lòng dùng nút Bật/Tắt.',
+      );
+    }
+
     Object.assign(attr, updateDto);
     const updatedAttr = await attr.save();
     const newData = updatedAttr.toObject();
@@ -216,6 +234,53 @@ export class AttributesService {
     });
 
     return updatedAttr;
+  }
+
+  // BẬT/TẮT TRẠNG THÁI (quyền CHANGE_STATUS)
+  async changeStatus(
+    id: string,
+    isActive: boolean,
+    actorId: string,
+    ip: string,
+    userAgent: string,
+  ) {
+    const attr = await this.attributeModel.findById(id);
+    if (!attr) throw new NotFoundException('Không tìm thấy thuộc tính');
+
+    const oldIsActive = attr.is_active !== false;
+    if (oldIsActive === isActive) return attr;
+
+    // Giữ nguyên ràng buộc cũ của luồng sửa: đang áp dụng cho sản phẩm thì không đổi
+    const isUsed = await this.productModel.exists({
+      'attributes.code': attr.code,
+      is_deleted: false,
+    });
+    if (isUsed) {
+      throw new BadRequestException(
+        `Thuộc tính (Biến thể) '${attr.name}' đang được áp dụng cho sản phẩm, KHÔNG ĐƯỢC PHÉP ĐỔI TRẠNG THÁI.`,
+      );
+    }
+
+    attr.is_active = isActive;
+    const savedAttr = await attr.save();
+    await this.triggerReindexSystem();
+
+    await this.auditLogsService.log({
+      action: 'CHANGE_ATTRIBUTE_STATUS',
+      collection_name: 'attributes',
+      actor_id: actorId,
+      target_id: attr._id,
+      department: Department.WAREHOUSE,
+      detail: {
+        code: attr.code,
+        old_is_active: oldIsActive,
+        new_is_active: isActive,
+      },
+      ip,
+      user_agent: userAgent,
+    });
+
+    return savedAttr;
   }
 
   async remove(id: string, actorId: string, ip: string, userAgent: string) {

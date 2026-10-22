@@ -187,7 +187,7 @@ export default function AuditLogsTab({ canExport }: AuditLogsTabProps) {
             {isLoading && records.length === 0 ? (
               <tr>
                 <td colSpan={7} className="sal-empty">
-                  Đang tải nhật ký...
+                  Loading logs......
                 </td>
               </tr>
             ) : records.length === 0 ? (

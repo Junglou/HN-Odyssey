@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -10,8 +11,12 @@ import {
 } from '@nestjs/common';
 import { AdminReviewsService } from './admin-reviews.service';
 import { AdminQueryReviewDto } from './dto/admin-query-review.dto';
-import { AdminConfirmActionDto } from './dto/admin-confirm-action.dto';
-import { BulkActionDto } from './dto/bulk-action.dto';
+import {
+  AdminConfirmActionDto,
+  BlockCustomerDto,
+} from './dto/admin-confirm-action.dto';
+import { BulkReviewIdsDto } from './dto/bulk-action.dto';
+import { BulkReviewAction } from 'src/common/enums/review.enum';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -52,7 +57,7 @@ export class AdminReviewsController {
     return this.adminReviewsService.togglePin(id);
   }
 
-  // AC3, AC4, AC5: Phản hồi & Chặn tài khoản
+  // AC3, AC4: Phản hồi đánh giá (quyền APPROVE)
   @Patch(':id/confirm-action')
   @RequirePermissions(Resource.CRM_REVIEWS, Action.APPROVE)
   async confirmAction(
@@ -60,7 +65,33 @@ export class AdminReviewsController {
     @Body() dto: AdminConfirmActionDto,
     @CurrentUser() user: IUser, // Dùng IUser chuẩn
   ) {
+    // Chặn khách sẽ XÓA review → không cho đi qua quyền APPROVE nữa
+    if (dto.block_customer) {
+      throw new ForbiddenException(
+        'Chặn khách hàng phải dùng chức năng Block riêng (yêu cầu quyền xóa đánh giá).',
+      );
+    }
     return this.adminReviewsService.confirmAction(id, dto, String(user._id));
+  }
+
+  // AC5: Chặn quyền đánh giá của khách + XÓA review vi phạm (quyền DELETE)
+  @Patch(':id/block-customer')
+  @RequirePermissions(Resource.CRM_REVIEWS, Action.DELETE)
+  async blockCustomer(
+    @Param('id') id: string,
+    @Body() dto: BlockCustomerDto,
+    @CurrentUser() user: IUser,
+  ) {
+    // Tái sử dụng nguyên logic chặn có sẵn trong service (transaction, email, audit log)
+    return this.adminReviewsService.confirmAction(
+      id,
+      {
+        block_customer: true,
+        block_reason: dto.block_reason,
+        block_reason_other: dto.block_reason_other,
+      },
+      String(user._id),
+    );
   }
 
   // AC5: CẬP NHẬT GHI CHÚ NỘI BỘ
@@ -77,13 +108,34 @@ export class AdminReviewsController {
     return this.adminReviewsService.sendPrivateEmailResponse(id, dto);
   }
 
-  // AC6: Thao tác xử lý hàng loạt
-  @Post('bulk-actions')
+  // AC6: Thao tác hàng loạt — tách route theo đúng quyền của từng hành động
+  // Ẩn hàng loạt: quyền UNPUBLISH (giống route :id/hide)
+  @Post('bulk/hide')
+  @RequirePermissions(Resource.CRM_REVIEWS, Action.UNPUBLISH)
+  async bulkHide(@Body() dto: BulkReviewIdsDto, @CurrentUser() user: IUser) {
+    return this.adminReviewsService.bulkActions(
+      { review_ids: dto.review_ids, action: BulkReviewAction.HIDE },
+      String(user._id),
+    );
+  }
+
+  // Hiện lại hàng loạt: quyền PUBLISH (giống route :id/show)
+  @Post('bulk/unhide')
+  @RequirePermissions(Resource.CRM_REVIEWS, Action.PUBLISH)
+  async bulkUnhide(@Body() dto: BulkReviewIdsDto, @CurrentUser() user: IUser) {
+    return this.adminReviewsService.bulkActions(
+      { review_ids: dto.review_ids, action: BulkReviewAction.UNHIDE },
+      String(user._id),
+    );
+  }
+
+  // Xóa hàng loạt: quyền DELETE
+  @Post('bulk/delete')
   @RequirePermissions(Resource.CRM_REVIEWS, Action.DELETE)
-  async bulkActions(
-    @Body() dto: BulkActionDto,
-    @CurrentUser() user: IUser, // Dùng IUser chuẩn
-  ) {
-    return this.adminReviewsService.bulkActions(dto, String(user._id));
+  async bulkDelete(@Body() dto: BulkReviewIdsDto, @CurrentUser() user: IUser) {
+    return this.adminReviewsService.bulkActions(
+      { review_ids: dto.review_ids, action: BulkReviewAction.DELETE },
+      String(user._id),
+    );
   }
 }

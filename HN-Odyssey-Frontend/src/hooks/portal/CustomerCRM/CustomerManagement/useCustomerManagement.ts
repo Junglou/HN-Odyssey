@@ -142,6 +142,10 @@ export function useCustomerManagement() {
   const canUpdate = hasPermission(Resource.CRM_CUSTOMERS, Action.UPDATE);
   const canDelete = hasPermission(Resource.CRM_CUSTOMERS, Action.DELETE);
   const canExport = hasPermission(Resource.CRM_CUSTOMERS, Action.EXPORT);
+  const canChangeStatus = hasPermission(
+    Resource.CRM_CUSTOMERS,
+    Action.CHANGE_STATUS,
+  );
   const [reasonModal, setReasonModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -345,7 +349,7 @@ export function useCustomerManagement() {
     closeModal: () => setModalConfig((prev) => ({ ...prev, isOpen: false })),
 
     lockUnlockCustomer: (id: string, currentStatus: CustomerStatus) => {
-      if (!canUpdate)
+      if (!canChangeStatus)
         return toast.error("Bạn không có quyền khóa/mở khóa tài khoản.");
       setReasonModal({
         isOpen: true,
@@ -406,7 +410,7 @@ export function useCustomerManagement() {
   };
 
   const toggleRowStatus = (id: string, currentStatus: CustomerStatus) => {
-    if (!canUpdate)
+    if (!canChangeStatus)
       return toast.error("Bạn không có quyền cập nhật trạng thái.");
     if (currentStatus === "Locked") {
       toast.warning("Tài khoản đang bị khóa, hãy dùng chức năng Unlock.");
@@ -501,7 +505,7 @@ export function useCustomerManagement() {
 
   const bulkActions = {
     bulkActivate: () => {
-      if (!canUpdate)
+      if (!canChangeStatus)
         return toast.error("Bạn không có quyền thao tác hàng loạt.");
       if (selectedIds.size === 0) return;
       setReasonModal({
@@ -513,7 +517,7 @@ export function useCustomerManagement() {
       });
     },
     bulkDeactivate: () => {
-      if (!canUpdate)
+      if (!canChangeStatus)
         return toast.error("Bạn không có quyền thao tác hàng loạt.");
       if (selectedIds.size === 0) return;
       setReasonModal({
@@ -631,6 +635,12 @@ export function useCustomerManagement() {
     handleReasonSubmit,
     closeReasonModal: () =>
       setReasonModal((prev) => ({ ...prev, isOpen: false })),
-    permissions: { canCreate, canUpdate, canDelete, canExport },
+    permissions: {
+      canCreate,
+      canUpdate,
+      canDelete,
+      canExport,
+      canChangeStatus,
+    },
   };
 }

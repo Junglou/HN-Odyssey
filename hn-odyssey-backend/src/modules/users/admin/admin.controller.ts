@@ -71,7 +71,7 @@ export class AdminController {
   }
 
   @Patch('bulk/status')
-  @RequirePermissions(Resource.SYSTEM_USERS, Action.UPDATE)
+  @RequirePermissions(Resource.SYSTEM_USERS, Action.CHANGE_STATUS)
   async bulkChangeStatus(
     @Body() dto: BulkChangeStatusDto,
     @CurrentUser() user: IUser,
@@ -149,7 +149,7 @@ export class AdminController {
 
   // 5. ĐỔI TRẠNG THÁI (SINGLE)
   @Patch(':id/status')
-  @RequirePermissions(Resource.SYSTEM_USERS, Action.UPDATE)
+  @RequirePermissions(Resource.SYSTEM_USERS, Action.CHANGE_STATUS)
   async changeStatus(
     @Param('id') id: string,
     @Body() dto: ChangeStatusDto,

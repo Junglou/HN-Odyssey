@@ -19,6 +19,11 @@ import {
   CheckIcon,
 } from "../../../../assets/icons/RoleManagementIcons";
 
+// Hiển thị mã action dễ đọc: "CHANGE_STATUS" → "CHANGE STATUS"
+// (chỉ đổi phần hiển thị, giá trị gửi lên BE vẫn giữ nguyên)
+const formatActionLabel = (action: string) =>
+  action.toUpperCase().replace(/_/g, " ");
+
 // types
 interface RoleManagementProps {
   isLoading?: boolean;
@@ -253,8 +258,8 @@ export default function RoleManagement({
                       {/* Header */}
                       <div className="rm-perm-headers">
                         {allModuleActions.map((action) => (
-                          <span key={action} title={action.toUpperCase()}>
-                            {action.toUpperCase()}
+                          <span key={action} title={formatActionLabel(action)}>
+                            {formatActionLabel(action)}
                           </span>
                         ))}
                       </div>
@@ -310,13 +315,9 @@ export default function RoleManagement({
                                     </span>
                                     <span
                                       className="rm-checkbox-text"
-                                      title={
-                                        action.charAt(0).toUpperCase() +
-                                        action.slice(1)
-                                      }
+                                      title={formatActionLabel(action)}
                                     >
-                                      {action.charAt(0).toUpperCase() +
-                                        action.slice(1)}
+                                      {formatActionLabel(action)}
                                     </span>
                                   </label>
                                 );

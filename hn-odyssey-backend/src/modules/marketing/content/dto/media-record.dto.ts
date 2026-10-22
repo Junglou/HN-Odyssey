@@ -1,5 +1,8 @@
 import {
+  ArrayNotEmpty,
+  IsArray,
   IsEnum,
+  IsMongoId,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -72,4 +75,15 @@ export class UpdateMediaInfoDto {
   @IsBoolean()
   @IsOptional()
   isPrimary?: boolean;
+}
+
+// Dùng cho route PATCH marketing/media/bulk/status (quyền CHANGE_STATUS)
+export class ChangeMediaStatusDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsMongoId({ each: true })
+  ids: string[];
+
+  @IsEnum(MediaStatus)
+  status: MediaStatus;
 }

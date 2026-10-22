@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 
 export type ProductStatus = "Active" | "Inactive" | "Draft";
 export type FilterStatus = "all" | ProductStatus;
@@ -69,6 +71,11 @@ export const PRICE_OPTIONS: DropdownOption[] = [
 
 export function useProductManagement() {
   const navigate = useNavigate();
+  const canChangeStatus = hasPermission(
+    getCurrentUser(),
+    Resource.CATALOG_PRODUCTS,
+    Action.CHANGE_STATUS,
+  );
 
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -202,6 +209,10 @@ export function useProductManagement() {
     },
 
     toggleStatus: async (id: string, currentStatus: string) => {
+      if (!canChangeStatus) {
+        toast.error("Bạn không có quyền bật/tắt trạng thái sản phẩm.");
+        return;
+      }
       if (currentStatus === "Draft") return;
       const newStatusBE = currentStatus === "Active" ? "INACTIVE" : "ACTIVE";
 
@@ -263,6 +274,10 @@ export function useProductManagement() {
       }
       if (action === "delete") {
         setDeleteConfig({ isOpen: true, type: "bulk", productId: null });
+        return;
+      }
+      if (!canChangeStatus) {
+        toast.error("Bạn không có quyền bật/tắt trạng thái sản phẩm.");
         return;
       }
 

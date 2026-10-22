@@ -17,6 +17,8 @@ import {
   type BEProductResponse,
 } from "../../../../hooks/portal/Communication/BlogNewsManagement/useBlogNewsManagement";
 import axiosClient from "../../../../api/axiosClient";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 
 interface BlogNewsDrawerProps {
   isOpen: boolean;
@@ -74,6 +76,20 @@ function DrawerContent({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const categoryRef = useRef<HTMLDivElement>(null);
   const isViewMode = mode === "view";
+  const currentUser = getCurrentUser();
+  const canPublish = hasPermission(
+    currentUser,
+    Resource.CONTENT_POSTS,
+    Action.PUBLISH,
+  );
+  const canUnpublish = hasPermission(
+    currentUser,
+    Resource.CONTENT_POSTS,
+    Action.UNPUBLISH,
+  );
+  // Bật lên cần PUBLISH, tắt xuống cần UNPUBLISH
+  const canToggleStatus =
+    formData.status === "Published" ? canUnpublish : canPublish;
 
   const isContentEmpty =
     !formData.content ||
@@ -534,7 +550,7 @@ function DrawerContent({
               <div
                 className={`ban-toggle-switch ${formData.status === "Published" ? "on" : ""}`}
                 onClick={() => {
-                  if (!isViewMode && !isSubmitting) {
+                  if (!isViewMode && !isSubmitting && canToggleStatus) {
                     handleChange(
                       "status",
                       formData.status === "Published" ? "Draft" : "Published",

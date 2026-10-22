@@ -12,6 +12,8 @@ import type {
   AttributeFormData,
   AttributeValue,
 } from "../../../../hooks/portal/ProductCatalog/VariantManagement/useVariantManagement";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 
 // options
 const DISPLAY_TYPE_OPTIONS = [
@@ -116,6 +118,12 @@ function VariantDrawerContent({
   onClose,
   onSubmit,
 }: Omit<VariantDrawerProps, "isOpen">) {
+  const canChangeStatus = hasPermission(
+    getCurrentUser(),
+    Resource.CATALOG_ATTRIBUTES,
+    Action.CHANGE_STATUS,
+  );
+
   // states
   const [formData, setFormData] = useState<AttributeFormData>(() => {
     if (mode === "edit" && initialData) {
@@ -134,7 +142,8 @@ function VariantDrawerContent({
       display_type: "button",
       description: "",
       values: [],
-      is_active: true,
+      // Không có quyền bật/tắt thì mặc định Inactive (BE cũng tạo ở trạng thái tắt)
+      is_active: canChangeStatus,
     };
   });
 
@@ -348,14 +357,14 @@ function VariantDrawerContent({
                 type="button"
                 className={`vd-toggle-switch ${formData.is_active ? "on" : ""}`}
                 onClick={() => {
-                  if (!isSubmitting) {
+                  if (!isSubmitting && canChangeStatus) {
                     setFormData((prev) => ({
                       ...prev,
                       is_active: !prev.is_active,
                     }));
                   }
                 }}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !canChangeStatus}
               ></button>
               <span className="vd-status-label">
                 {formData.is_active ? "Active" : "Inactive"}

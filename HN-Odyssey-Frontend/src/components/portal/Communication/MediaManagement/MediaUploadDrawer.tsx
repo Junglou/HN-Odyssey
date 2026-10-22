@@ -10,6 +10,8 @@ import type {
   MediaRecord,
   TargetOption,
 } from "../../../../hooks/portal/Communication/MediaManagement/useMediaManagement";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 
 export interface UploadDraft {
   id: string;
@@ -76,6 +78,11 @@ function MediaFormSection({
   const autocompleteRef = useRef<HTMLDivElement>(null);
   const typeDropdownRef = useRef<HTMLDivElement>(null);
   const isReadOnly = mode === "view";
+  const canChangeStatus = hasPermission(
+    getCurrentUser(),
+    Resource.CONTENT_MEDIA,
+    Action.CHANGE_STATUS,
+  );
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -162,7 +169,7 @@ function MediaFormSection({
   };
 
   const toggleStatus = () => {
-    if (isSubmitting || isReadOnly) return;
+    if (isSubmitting || isReadOnly || !canChangeStatus) return;
     onChange(index, {
       ...formData,
       status: formData.status === "Published" ? "Draft" : "Published",
@@ -329,7 +336,7 @@ function MediaFormSection({
               formData.status === "Published" ? "on" : ""
             }`}
             onClick={toggleStatus}
-            disabled={isSubmitting || isReadOnly}
+            disabled={isSubmitting || isReadOnly || !canChangeStatus}
           ></button>
           <span className="mm-status-label">
             {formData.status === "Published" ? "Publish" : "Draft"}

@@ -55,7 +55,7 @@ export function useVariantManagement() {
   const user = tokenStorage.getUser() as UserPayload | null;
   const hasPermission = (resourceCode: Resource, actionCode: Action) => {
     if (!user || !user.permissions) return false;
-    if (user.roles && user.roles.includes("Super Admin")) return true;
+    if (user.roles && user.roles.includes("SUPER_ADMIN")) return true;
     const perm = user.permissions.find((p) => p.resource === resourceCode);
     if (!perm) return false;
     return (
@@ -66,6 +66,10 @@ export function useVariantManagement() {
   const canCreate = hasPermission(Resource.CATALOG_ATTRIBUTES, Action.CREATE);
   const canUpdate = hasPermission(Resource.CATALOG_ATTRIBUTES, Action.UPDATE);
   const canDelete = hasPermission(Resource.CATALOG_ATTRIBUTES, Action.DELETE);
+  const canChangeStatus = hasPermission(
+    Resource.CATALOG_ATTRIBUTES,
+    Action.CHANGE_STATUS,
+  );
 
   const [drawerConfig, setDrawerConfig] = useState<{
     isOpen: boolean;
@@ -181,18 +185,41 @@ export function useVariantManagement() {
   const handleSaveAttribute = async (data: AttributeFormData) => {
     setDrawerConfig((prev) => ({ ...prev, isSubmitting: true }));
     try {
+      // KHÔNG gửi is_active: bật/tắt đi qua /attributes/:id/status (quyền CHANGE_STATUS)
+      const { is_active: wantActive, ...payload } = data;
+      let attributeId: string | undefined;
+      let wasActive = false;
+
       if (drawerConfig.mode === "add") {
-        await axiosClient.post("/attributes", data);
-        toast.success("Tạo thuộc tính thành công!");
+        const res = await axiosClient.post("/attributes", payload);
+        attributeId = res.data?._id ?? res.data?.data?._id;
       } else if (
         drawerConfig.mode === "edit" &&
         drawerConfig.editingAttribute
       ) {
-        await axiosClient.patch(
-          `/attributes/${drawerConfig.editingAttribute.id}`,
-          data,
-        );
-        toast.success("Cập nhật thuộc tính thành công!");
+        attributeId = drawerConfig.editingAttribute.id;
+        wasActive = drawerConfig.editingAttribute.is_active;
+        await axiosClient.patch(`/attributes/${attributeId}`, payload);
+      }
+
+      const baseMsg =
+        drawerConfig.mode === "add"
+          ? "Tạo thuộc tính thành công!"
+          : "Cập nhật thuộc tính thành công!";
+
+      if (attributeId && wantActive !== wasActive) {
+        if (canChangeStatus) {
+          await axiosClient.patch(`/attributes/${attributeId}/status`, {
+            is_active: wantActive,
+          });
+          toast.success(baseMsg);
+        } else {
+          toast.warning(
+            `${baseMsg} Bạn không có quyền bật/tắt nên trạng thái được giữ nguyên.`,
+          );
+        }
+      } else {
+        toast.success(baseMsg);
       }
       refreshData();
       actions.closeDrawer();
@@ -244,6 +271,7 @@ export function useVariantManagement() {
       canCreate,
       canUpdate,
       canDelete,
+      canChangeStatus,
     },
   };
 }

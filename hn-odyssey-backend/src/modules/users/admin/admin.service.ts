@@ -49,7 +49,7 @@ export class AdminService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  // ===================== KIỂM SOÁT VAI TRÒ ĐẶC QUYỀN =====================
+  //  KIỂM SOÁT VAI TRÒ ĐẶC QUYỀN
   // Vai trò đặc quyền = slug dành riêng (SUPER_ADMIN, ADMIN) + mọi Role có is_system = true.
   // Chỉ Super Admin mới được GÁN các vai trò này, hoặc SỬA / KHÓA / XÓA tài khoản đang giữ chúng.
 
@@ -115,7 +115,57 @@ export class AdminService {
     return a.size === b.size && [...a].every((r) => b.has(r));
   }
 
-  // ===================== HELPER CŨ =====================
+  //  KIỂM SOÁT CẤP BẬC (RoleLevel)
+  // Số càng nhỏ càng cao: BOARD = 1 > MANAGEMENT = 2 > STAFF = 3
+
+  private async getHighestLevel(roleSlugs: string[] = []): Promise<number> {
+    if (roleSlugs.length === 0) return RoleLevel.STAFF;
+    const roles = await this.roleModel
+      .find({ slug: { $in: roleSlugs } })
+      .select('level')
+      .lean<Array<{ level?: number }>>();
+    if (roles.length === 0) return RoleLevel.STAFF;
+    return Math.min(...roles.map((r) => r.level ?? RoleLevel.STAFF));
+  }
+
+  // Chỉ được đổi trạng thái nhân sự có cấp THẤP HƠN mình (Super Admin bỏ qua)
+  private async assertLowerLevelTargets(
+    targetIds: string[],
+    currentUserRoles: string[],
+  ): Promise<void> {
+    if (this.isSuperAdmin(currentUserRoles)) return;
+
+    const actorLevel = await this.getHighestLevel(currentUserRoles);
+    const targets = await this.userModel
+      .find({ _id: { $in: targetIds } })
+      .select('roles')
+      .lean<Array<{ roles?: string[] }>>();
+
+    const allSlugs = Array.from(new Set(targets.flatMap((t) => t.roles ?? [])));
+    const roleDocs = await this.roleModel
+      .find({ slug: { $in: allSlugs } })
+      .select('slug level')
+      .lean<Array<{ slug: string; level?: number }>>();
+    const levelOf = new Map(
+      roleDocs.map((r) => [r.slug, r.level ?? RoleLevel.STAFF]),
+    );
+
+    const hasBlockedTarget = targets.some((t) => {
+      const levels = (t.roles ?? []).map(
+        (s) => levelOf.get(s) ?? RoleLevel.STAFF,
+      );
+      const targetLevel = levels.length ? Math.min(...levels) : RoleLevel.STAFF;
+      return targetLevel <= actorLevel;
+    });
+
+    if (hasBlockedTarget) {
+      throw new ForbiddenException(
+        'Bạn chỉ được thay đổi trạng thái của nhân sự có cấp bậc thấp hơn mình.',
+      );
+    }
+  }
+
+  //  HELPER CŨ
 
   private removeVietnameseTones(str: string): string {
     return str
@@ -387,8 +437,15 @@ export class AdminService {
       revokeSessions = true;
     }
 
-    if (typeof dto.is_active !== 'undefined') {
-      user.status = dto.is_active ? UserStatus.ACTIVE : UserStatus.SUSPENDED;
+    // Trạng thái chỉ được đổi qua PATCH :id/status (quyền CHANGE_STATUS).
+    // Gửi is_active KHÁC trạng thái hiện tại qua API sửa thông tin → chặn.
+    if (
+      typeof dto.is_active !== 'undefined' &&
+      dto.is_active !== (user.status === UserStatus.ACTIVE)
+    ) {
+      throw new ForbiddenException(
+        'Không thể đổi trạng thái qua chức năng sửa thông tin. Vui lòng dùng nút Bật/Tắt trạng thái.',
+      );
     }
 
     if (dto.email && dto.email !== user.email) {
@@ -658,6 +715,8 @@ export class AdminService {
         'Không thể tự thay đổi trạng thái của chính mình.',
       );
 
+    await this.assertLowerLevelTargets([id], currentUserRoles);
+
     const oldStatus = user.status;
     user.status = dto.status;
 
@@ -726,6 +785,7 @@ export class AdminService {
     }
 
     await this.assertNoPrivilegedTargets(targetIds, currentUserRoles);
+    await this.assertLowerLevelTargets(targetIds, currentUserRoles);
 
     const newStatus = dto.is_active ? UserStatus.ACTIVE : UserStatus.SUSPENDED;
 

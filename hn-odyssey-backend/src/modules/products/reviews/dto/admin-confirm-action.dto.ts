@@ -33,3 +33,14 @@ export class AdminConfirmActionDto {
   @MaxLength(255)
   block_reason_other?: string;
 }
+
+// Dùng cho route PATCH :id/block-customer (quyền DELETE vì sẽ xóa review vi phạm)
+export class BlockCustomerDto {
+  @IsEnum(BlockReason, { message: 'Vui lòng chọn lý do chặn hợp lệ' })
+  block_reason: BlockReason;
+
+  @ValidateIf((o: BlockCustomerDto) => o.block_reason === BlockReason.OTHER)
+  @IsString()
+  @MaxLength(255)
+  block_reason_other?: string;
+}

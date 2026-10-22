@@ -21,6 +21,7 @@ import {
 import { EmailService } from 'src/modules/notifications/channels/email.service';
 import { AdminSendEmailDto } from 'src/modules/users/customers/dto/admin-send-email.dto';
 import { Coupon } from 'src/modules/marketing/promotions/schemas/coupon.schema';
+import { UserStatus } from 'src/common/enums/user-status.enum';
 
 interface IReviewUpdate {
   reply?: {
@@ -131,7 +132,10 @@ export class AdminReviewsService {
     const [items, total] = await Promise.all([
       this.reviewModel
         .find(filter)
-        .populate('user_id', 'first_Name last_Name email is_active')
+        .populate(
+          'user_id',
+          'first_Name last_Name email is_active status review_access',
+        )
         .populate('product_id', 'name price base_price')
         .sort({ is_pinned: -1, pinned_at: -1, createdAt: -1 })
         .skip(skip)
@@ -384,7 +388,14 @@ export class AdminReviewsService {
       is_active?: boolean;
     } | null;
 
-    if (customer && customer.is_active === false) {
+    // Khách bị khóa = is_active false (xóa mềm) HOẶC status khác ACTIVE
+    // (Lock / Deactivate bên Customer Management)
+    const customerStatus = (customer as { status?: UserStatus } | null)?.status;
+    if (
+      customer &&
+      (customer.is_active === false ||
+        (customerStatus !== undefined && customerStatus !== UserStatus.ACTIVE))
+    ) {
       throw new BadRequestException(
         'Khách hàng này đang bị khóa, không thể hiển thị đánh giá',
       );
@@ -418,16 +429,41 @@ export class AdminReviewsService {
         }
 
         case BulkReviewAction.UNHIDE: {
+          // Khách bị khóa = is_active false HOẶC status khác ACTIVE.
+          // Chỉ xét các khách sở hữu review được chọn, không quét toàn bộ khách hàng.
+          const targetUserIds = await this.reviewModel.distinct('user_id', {
+            _id: { $in: objectIds },
+          });
           const blockedUsers = await this.customerModel
-            .find({ is_active: false } as FilterQuery<CustomerDocument>)
+            .find({
+              _id: { $in: targetUserIds },
+              $or: [
+                { is_active: false },
+                { status: { $ne: UserStatus.ACTIVE } },
+              ],
+            } as FilterQuery<CustomerDocument>)
             .select('_id')
             .lean()
             .exec();
 
           const blockedIds = blockedUsers.map((u) => u._id);
 
+          // Chỉ hiện lại review đang HIDDEN, và giữ đúng trạng thái như route :id/show:
+          // đã có phản hồi → REPLIED, chưa có → NEW
+          const unhideFilter = {
+            _id: { $in: objectIds },
+            user_id: { $nin: blockedIds },
+            status: ReviewStatus.HIDDEN,
+          };
+
           await this.reviewModel.updateMany(
-            { _id: { $in: objectIds }, user_id: { $nin: blockedIds } },
+            { ...unhideFilter, 'reply.content': { $nin: ['', null] } },
+            { $set: { status: ReviewStatus.REPLIED } },
+            { session },
+          );
+
+          await this.reviewModel.updateMany(
+            { ...unhideFilter, 'reply.content': { $in: ['', null] } },
             { $set: { status: ReviewStatus.NEW } },
             { session },
           );

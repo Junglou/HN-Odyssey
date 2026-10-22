@@ -15,6 +15,7 @@ import { AuditLogsService } from '../../system/audit-logs/audit-logs.service';
 import { Department } from 'src/common/enums/department.enum';
 import { isReservedRoleKey } from 'src/common/constants/system-roles.constant';
 import { Action, Resource } from 'src/common/enums/resource.enum';
+import { RoleLevel } from 'src/common/enums/role-level.enum';
 
 @Injectable()
 export class RolesService {
@@ -153,9 +154,19 @@ export class RolesService {
       role.slug = newSlug;
     }
 
+    // Trạng thái chỉ được đổi qua PATCH :id/status (quyền CHANGE_STATUS).
+    // Gửi is_active KHÁC trạng thái hiện tại qua API sửa → chặn.
+    if (
+      typeof dto.is_active !== 'undefined' &&
+      dto.is_active !== (role.is_active !== false)
+    ) {
+      throw new ForbiddenException(
+        'Không thể đổi trạng thái qua chức năng sửa vai trò. Vui lòng dùng nút Bật/Tắt trạng thái.',
+      );
+    }
+
     if (dto.name) role.name = dto.name;
     if (dto.description) role.description = dto.description;
-    if (typeof dto.is_active !== 'undefined') role.is_active = dto.is_active;
     if (dto.permissions)
       role.permissions = this.normalizePermissions(dto.permissions);
 
@@ -177,6 +188,82 @@ export class RolesService {
     });
 
     return role;
+  }
+
+  // Cấp cao nhất (số nhỏ nhất) trong các role của người thao tác
+  private async getHighestLevel(roleSlugs: string[] = []): Promise<number> {
+    if (roleSlugs.length === 0) return RoleLevel.STAFF;
+    const roles = await this.roleModel
+      .find({ slug: { $in: roleSlugs } })
+      .select('level')
+      .lean<Array<{ level?: number }>>();
+    if (roles.length === 0) return RoleLevel.STAFF;
+    return Math.min(...roles.map((r) => r.level ?? RoleLevel.STAFF));
+  }
+
+  // 4b. BẬT/TẮT TRẠNG THÁI VAI TRÒ
+  async changeStatus(
+    id: string,
+    isActive: boolean,
+    actorId: string,
+    actorRoles: string[],
+    ip: string,
+    userAgent: string,
+  ) {
+    const role = await this.roleModel.findById(id);
+    if (!role) throw new NotFoundException('Role không tồn tại');
+
+    if (role.is_system) {
+      throw new ForbiddenException(
+        'Không thể thay đổi trạng thái Role hệ thống.',
+      );
+    }
+
+    // Chỉ được thao tác trên vai trò có cấp THẤP HƠN mình (Super Admin bỏ qua)
+    if (!actorRoles.some((r) => isReservedRoleKey(r))) {
+      const actorLevel = await this.getHighestLevel(actorRoles);
+      if ((role.level ?? RoleLevel.STAFF) <= actorLevel) {
+        throw new ForbiddenException(
+          'Bạn chỉ được thay đổi trạng thái của vai trò có cấp bậc thấp hơn mình.',
+        );
+      }
+    }
+
+    const oldIsActive = role.is_active !== false;
+    if (oldIsActive === isActive) {
+      return { message: 'Trạng thái không thay đổi.', role };
+    }
+
+    role.is_active = isActive;
+    await role.save();
+
+    // Tắt role = mọi nhân sự giữ role này mất quyền tương ứng ngay lập tức
+    const affectedUsers = await this.userModel.countDocuments({
+      roles: role.slug,
+    });
+
+    await this.auditLogsService.log({
+      action: 'CHANGE_ROLE_STATUS',
+      collection_name: 'roles',
+      actor_id: actorId,
+      target_id: role._id,
+      department: Department.MANAGEMENT,
+      detail: {
+        role_slug: role.slug,
+        old_is_active: oldIsActive,
+        new_is_active: isActive,
+        affected_users: affectedUsers,
+      },
+      ip,
+      user_agent: userAgent,
+    });
+
+    return {
+      message: isActive
+        ? 'Đã kích hoạt vai trò.'
+        : `Đã vô hiệu hóa vai trò (${affectedUsers} nhân sự bị ảnh hưởng).`,
+      role,
+    };
   }
 
   // 5. XÓA (AC4, AC5)

@@ -12,6 +12,8 @@ import type {
   BannerPosition,
 } from "../../../../hooks/portal/Communication/BannerManagement/useBannerManagement";
 import axiosClient from "../../../../api/axiosClient"; // Bổ sung để gọi API
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 
 type ApiCategory = {
   _id: string;
@@ -73,9 +75,15 @@ function BannerDrawerContent({
   const isViewMode = mode === "view";
   const todayDate = new Date().toISOString().split("T")[0];
 
+  const canChangeStatus = hasPermission(
+    getCurrentUser(),
+    Resource.CONTENT_BANNERS,
+    Action.CHANGE_STATUS,
+  );
   const isPending = !!(formData.startDate && formData.startDate > todayDate);
   const isExpired = !!(formData.endDate && formData.endDate < todayDate);
-  const isToggleDisabled = !!(isViewMode || isPending || isExpired);
+  // Bật/tắt cần quyền CHANGE_STATUS; banner hết hạn thì không bật được
+  const isToggleDisabled = !!(isViewMode || isExpired || !canChangeStatus);
 
   const isFormValid = !!(
     formData.title.trim() &&
@@ -144,14 +152,11 @@ function BannerDrawerContent({
         const start = field === "startDate" ? value : prev.startDate;
         const end = field === "endDate" ? value : prev.endDate;
 
-        if (start && start > todayDate) {
-          updated.status = "Pending";
-        } else if (end && end < todayDate) {
-          if (updated.status === "Pending" || updated.status === "Active") {
-            updated.status = "Inactive";
-          }
-        } else if (updated.status === "Pending") {
-          updated.status = "Inactive";
+        // Banner đang TẮT thì đổi ngày không tự bật lên (bật/tắt cần quyền riêng)
+        if (prev.status !== "Inactive") {
+          if (start && start > todayDate) updated.status = "Pending";
+          else if (end && end < todayDate) updated.status = "Inactive";
+          else updated.status = "Active";
         }
       }
       return updated;
@@ -160,7 +165,14 @@ function BannerDrawerContent({
 
   const handleToggle = () => {
     if (isToggleDisabled) return;
-    updateField("status", formData.status === "Active" ? "Inactive" : "Active");
+    updateField(
+      "status",
+      formData.status === "Inactive"
+        ? isPending
+          ? "Pending"
+          : "Active"
+        : "Inactive",
+    );
   };
 
   const handleFile = (
@@ -385,15 +397,15 @@ function BannerDrawerContent({
             <div className="bm-toggle-wrapper">
               <button
                 type="button"
-                className={`bm-switch ${formData.status === "Active" ? "on" : ""}`}
+                className={`bm-switch ${formData.status !== "Inactive" ? "on" : ""}`}
                 onClick={handleToggle}
                 disabled={isToggleDisabled}
               ></button>
               <span className="bm-toggle-label">
-                {isPending
-                  ? "Pending (Wait)"
-                  : isExpired
-                    ? "Expired"
+                {isExpired
+                  ? "Expired"
+                  : formData.status === "Pending"
+                    ? "Pending (Wait)"
                     : formData.status}
               </span>
             </div>

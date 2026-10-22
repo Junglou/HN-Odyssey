@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -154,6 +155,13 @@ export class ContentService {
   async createPost(dto: CreatePostDto, userId: string, email: string) {
     await this.checkSlugExist(dto.slug);
 
+    // Bài mới luôn ở DRAFT; xuất bản phải qua posts/bulk/publish (quyền PUBLISH)
+    if (dto.status && dto.status !== PostStatus.DRAFT) {
+      throw new ForbiddenException(
+        'Bài viết mới phải ở trạng thái Draft. Vui lòng dùng chức năng Publish để xuất bản.',
+      );
+    }
+
     if (!dto.meta_title && dto.title) {
       // Nếu người dùng không nhập meta_title, tự động lấy title làm meta_title
       dto.meta_title = dto.title;
@@ -168,7 +176,9 @@ export class ContentService {
           : plainText;
     }
 
-    let initialStatus = dto.status || PostStatus.DRAFT;
+    // Sau đoạn chặn phía trên, dto.status chỉ có thể là DRAFT hoặc undefined,
+    // nên khởi tạo DRAFT và khai báo kiểu rõ ràng để còn gán được SCHEDULED
+    let initialStatus: PostStatus = PostStatus.DRAFT;
     if (dto.published_at && new Date(dto.published_at) > new Date()) {
       initialStatus = PostStatus.SCHEDULED;
     }
@@ -293,6 +303,14 @@ export class ContentService {
   async createPage(dto: CreateStaticPageDto, userId: string, email: string) {
     await this.checkSlugExist(String(dto.slug));
 
+    // Trang mới luôn ở DRAFT; đổi trạng thái qua pages/:id/status (quyền CHANGE_STATUS)
+    const requestedStatus = (dto as { status?: PageStatus }).status;
+    if (requestedStatus && requestedStatus !== PageStatus.DRAFT) {
+      throw new ForbiddenException(
+        'Trang mới phải ở trạng thái Draft. Vui lòng dùng chức năng đổi trạng thái.',
+      );
+    }
+
     // ĐÃ THÊM: Fallback cho meta_title nếu bị trống
     if (!dto.meta_title && dto.title) {
       dto.meta_title = dto.title;
@@ -359,18 +377,17 @@ export class ContentService {
   async createBanner(dto: CreateBannerDto, userId: string, email: string) {
     const start = new Date(dto.start_date);
     const end = new Date(dto.end_date);
-    const now = new Date();
 
     // RÀNG BUỘC LOGIC NGÀY
     if (start >= end) {
       throw new BadRequestException('Ngày kết thúc phải lớn hơn ngày bắt đầu');
     }
 
+    // Banner mới luôn TẮT (HIDDEN). Bật lên qua banners/bulk/status (quyền CHANGE_STATUS)
     const newBanner = new this.bannerModel({
       ...dto,
       created_by: email,
-      status:
-        start <= now && now <= end ? BannerStatus.ACTIVE : BannerStatus.WAITING,
+      status: BannerStatus.HIDDEN,
     });
 
     const savedBanner = await newBanner.save();
@@ -470,6 +487,14 @@ export class ContentService {
     return banner;
   }
 
+  // Tính trạng thái theo lịch cho banner ĐANG BẬT
+  private resolveBannerStatusByDate(start: Date, end: Date): BannerStatus {
+    const now = new Date();
+    if (now < new Date(start)) return BannerStatus.WAITING;
+    if (now > new Date(end)) return BannerStatus.HIDDEN;
+    return BannerStatus.ACTIVE;
+  }
+
   async updateBanner(id: string, dto: UpdateBannerDto) {
     const banner = await this.bannerModel.findOne({
       _id: id,
@@ -477,15 +502,23 @@ export class ContentService {
     });
     if (!banner) throw new NotFoundException('Không tìm thấy Banner');
 
+    // Trạng thái chỉ đổi qua banners/bulk/status (quyền CHANGE_STATUS)
+    if (dto.status !== undefined && dto.status !== banner.status) {
+      throw new ForbiddenException(
+        'Không thể đổi trạng thái qua chức năng sửa banner. Vui lòng dùng nút Bật/Tắt.',
+      );
+    }
+
+    const wasHidden = banner.status === BannerStatus.HIDDEN;
     Object.assign(banner, dto);
 
-    if (dto.start_date || dto.end_date) {
-      const start = new Date(banner.start_date);
-      const end = new Date(banner.end_date);
-      const now = new Date();
-      if (now >= start && now <= end) banner.status = BannerStatus.ACTIVE;
-      else if (now < start) banner.status = BannerStatus.WAITING;
-      else banner.status = BannerStatus.HIDDEN;
+    // Banner đang TẮT: đổi ngày KHÔNG được tự bật lại (tránh lách quyền CHANGE_STATUS).
+    // Banner đang bật (ACTIVE/WAITING): tính lại theo lịch như cũ.
+    if ((dto.start_date || dto.end_date) && !wasHidden) {
+      banner.status = this.resolveBannerStatusByDate(
+        banner.start_date,
+        banner.end_date,
+      );
     }
 
     return banner.save();
@@ -567,6 +600,13 @@ export class ContentService {
       await this.checkSlugExist(dto.slug, post._id);
     }
 
+    // Trạng thái chỉ đổi qua publish/unpublish (quyền PUBLISH/UNPUBLISH)
+    if (dto.status !== undefined && dto.status !== post.status) {
+      throw new ForbiddenException(
+        'Không thể đổi trạng thái qua chức năng sửa bài viết. Vui lòng dùng Publish / Hide.',
+      );
+    }
+
     Object.assign(post, dto);
 
     // Nếu có đổi lịch đăng
@@ -617,6 +657,14 @@ export class ContentService {
       await this.checkSlugExist(dto.slug, page._id);
     }
 
+    // Trạng thái chỉ đổi qua pages/:id/status (quyền CHANGE_STATUS)
+    const requestedStatus = (dto as { status?: PageStatus }).status;
+    if (requestedStatus !== undefined && requestedStatus !== page.status) {
+      throw new ForbiddenException(
+        'Không thể đổi trạng thái qua chức năng sửa trang. Vui lòng dùng nút Bật/Tắt.',
+      );
+    }
+
     // ĐÃ THÊM: Fallback cho meta_title nếu bị trống trước khi assign
     if (!dto.meta_title && dto.title) {
       dto.meta_title = dto.title;
@@ -636,6 +684,36 @@ export class ContentService {
     });
 
     return updatedPage;
+  }
+
+  // STATIC PAGE: ĐỔI TRẠNG THÁI (quyền CHANGE_STATUS)
+  async changePageStatus(
+    id: string,
+    status: PageStatus,
+    userId: string,
+    email: string,
+  ) {
+    const page = await this.pageModel.findById(id);
+    if (!page || page.is_deleted)
+      throw new NotFoundException('Không tìm thấy trang tĩnh');
+
+    const oldStatus = page.status;
+    if (oldStatus === status) return page;
+
+    page.status = status;
+    const savedPage = await page.save();
+
+    await this.auditLogsService.log({
+      action: 'CHANGE_STATUS',
+      collection_name: Resource.CONTENT_PAGES,
+      actor_id: userId,
+      actor_email: email,
+      target_id: savedPage._id,
+      department: Department.MARKETING,
+      detail: { from: oldStatus, to: status },
+    });
+
+    return savedPage;
   }
 
   // BỔ SUNG: API PUBLIC CHO FRONTEND KHÁCH HÀNG
@@ -766,18 +844,42 @@ export class ContentService {
     userId: string,
     email: string,
   ) {
-    // Dùng toán tử $in để update 1 lần duy nhất trên MongoDB
-    const result = await this.bannerModel.updateMany(
-      {
-        _id: { $in: ids.map((id) => new Types.ObjectId(id)) },
-        is_deleted: false,
-      },
-      { $set: { status: status } },
-    );
+    const baseFilter: FilterQuery<Banner> = {
+      _id: { $in: ids.map((id) => new Types.ObjectId(id)) },
+      is_deleted: false,
+    };
+    let modified = 0;
+    let skippedExpired = 0;
 
-    // Lưu Audit Log 1 lần cho cả cụm
+    if (status === BannerStatus.HIDDEN) {
+      const result = await this.bannerModel.updateMany(baseFilter, {
+        $set: { status: BannerStatus.HIDDEN },
+      });
+      modified = result.modifiedCount;
+    } else {
+      // BẬT theo lịch: trong khung thời gian → ACTIVE; chưa tới ngày → WAITING
+      // (cron tự bật khi tới ngày); đã hết hạn → bỏ qua (phải gia hạn trước)
+      const now = new Date();
+      const [activeRes, waitingRes, expiredCount] = await Promise.all([
+        this.bannerModel.updateMany(
+          { ...baseFilter, start_date: { $lte: now }, end_date: { $gte: now } },
+          { $set: { status: BannerStatus.ACTIVE } },
+        ),
+        this.bannerModel.updateMany(
+          { ...baseFilter, start_date: { $gt: now } },
+          { $set: { status: BannerStatus.WAITING } },
+        ),
+        this.bannerModel.countDocuments({
+          ...baseFilter,
+          end_date: { $lt: now },
+        }),
+      ]);
+      modified = activeRes.modifiedCount + waitingRes.modifiedCount;
+      skippedExpired = expiredCount;
+    }
+
     await this.auditLogsService.log({
-      action: 'UPDATE',
+      action: 'CHANGE_STATUS',
       collection_name: Resource.CONTENT_BANNERS,
       actor_id: userId,
       actor_email: email,
@@ -785,11 +887,17 @@ export class ContentService {
       department: Department.MARKETING,
       detail: {
         reason: `Bulk change status to ${status} for ${ids.length} banners`,
+        modified,
+        skipped_expired: skippedExpired,
       },
     });
 
     return {
-      message: `Đã cập nhật thành công ${result.modifiedCount} banners`,
+      message:
+        `Đã cập nhật thành công ${modified} banners` +
+        (skippedExpired > 0
+          ? `, bỏ qua ${skippedExpired} banner đã hết hạn`
+          : ''),
     };
   }
 

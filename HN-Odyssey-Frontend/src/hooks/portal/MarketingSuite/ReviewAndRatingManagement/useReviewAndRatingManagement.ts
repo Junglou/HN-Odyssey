@@ -47,7 +47,8 @@ export interface ReviewRecord {
   price: number;
   status: ReviewStatus;
   submittedDate: string;
-  isUserBanned: boolean;
+  isUserBanned: boolean; // Tài khoản khách bị khóa (Lock/Deactivate/Xóa)
+  isReviewRestricted?: boolean; // Khách đã bị chặn quyền đánh giá
   officialResponse?: string;
   blockReason?: string;
   blockNote?: string;
@@ -69,6 +70,8 @@ interface UserData {
   first_Name?: string;
   last_Name?: string;
   is_active?: boolean;
+  status?: string;
+  review_access?: string;
 }
 
 interface BeReviewReply {
@@ -134,7 +137,10 @@ const mapBeToFe = (item: BeReviewItem): ReviewRecord => {
     price: product?.price || product?.base_price || 0,
     status: mappedStatus,
     submittedDate: new Date(item.createdAt).toISOString().split("T")[0],
-    isUserBanned: user?.is_active === false,
+    isUserBanned:
+      user?.is_active === false ||
+      (user?.status !== undefined && user.status !== "ACTIVE"),
+    isReviewRestricted: user?.review_access === "RESTRICTED",
     officialResponse: item.reply?.content,
     isPinned: item.is_pinned,
     pinnedAt: item.pinned_at ? new Date(item.pinned_at).getTime() : undefined,
@@ -211,7 +217,9 @@ export function useReviewAndRatingManagement() {
 
   const canApprove = hasPermission(Resource.CRM_REVIEWS, Action.APPROVE);
   const canUpdate = hasPermission(Resource.CRM_REVIEWS, Action.UPDATE);
+  // Hiện lại cần PUBLISH, ẩn cần UNPUBLISH (khớp với Backend)
   const canPublish = hasPermission(Resource.CRM_REVIEWS, Action.PUBLISH);
+  const canUnpublish = hasPermission(Resource.CRM_REVIEWS, Action.UNPUBLISH);
   const canDelete = hasPermission(Resource.CRM_REVIEWS, Action.DELETE);
 
   const fetchReviews = useCallback(async () => {
@@ -312,9 +320,8 @@ export function useReviewAndRatingManagement() {
           ? [modalConfig.editingRecord.id]
           : Array.from(selectedIds);
 
-        await axiosClient.post("/admin/reviews/bulk-actions", {
+        await axiosClient.post("/admin/reviews/bulk/delete", {
           review_ids: idsToDelete,
-          action: BulkReviewActionEnum.DELETE,
         });
 
         toast.success(`Đã xóa ${idsToDelete.length} đánh giá thành công!`);
@@ -328,10 +335,16 @@ export function useReviewAndRatingManagement() {
     },
 
     toggleHideStatus: async (id: string) => {
-      if (!canPublish)
-        return toast.error("Bạn không có quyền ẩn/hiện đánh giá.");
       const targetReview = records.find((r) => r.id === id);
       if (!targetReview) return;
+
+      const isHidden = targetReview.status === "Hidden";
+      if (isHidden ? !canPublish : !canUnpublish)
+        return toast.error(
+          isHidden
+            ? "Bạn không có quyền hiển thị lại đánh giá."
+            : "Bạn không có quyền ẩn đánh giá.",
+        );
 
       try {
         // Nếu đang bị ẩn -> Gọi API /show
@@ -362,44 +375,53 @@ export function useReviewAndRatingManagement() {
         isPinned: boolean;
       },
     ) => {
-      if (!canApprove && !canUpdate)
-        return toast.error("Bạn không có quyền cập nhật đánh giá này.");
       const targetReview = records.find((r) => r.id === reviewId);
       if (!targetReview) return;
 
+      // Mỗi thao tác cần đúng quyền của nó (khớp với Backend):
+      // Phản hồi = APPROVE, Block (xóa review) = DELETE, Ghim = UPDATE
+      const wantsReply =
+        !!updates.officialResponse &&
+        updates.officialResponse !== (targetReview.officialResponse || "");
+      const wantsBlock =
+        updates.isUserBanned && !targetReview.isReviewRestricted;
+      const wantsPin = updates.isPinned !== !!targetReview.isPinned;
+
+      if (wantsBlock && !canDelete)
+        return toast.error(
+          "Bạn không có quyền chặn khách hàng (cần quyền xóa đánh giá).",
+        );
+      if (!wantsBlock && wantsReply && !canApprove)
+        return toast.error("Bạn không có quyền phản hồi đánh giá.");
+      if (!wantsBlock && wantsPin && !canUpdate)
+        return toast.error("Bạn không có quyền ghim đánh giá.");
+
       try {
-        if (
-          updates.officialResponse !== targetReview.officialResponse ||
-          updates.isUserBanned !== targetReview.isUserBanned
-        ) {
-          const payload: Record<string, string | boolean> = {};
-
-          if (updates.officialResponse) {
-            payload.reply_content = updates.officialResponse;
+        if (wantsBlock) {
+          // Block sẽ XÓA review vi phạm nên không gửi phản hồi / ghim nữa
+          const blockPayload: Record<string, string> = {};
+          if (updates.blockReason === "Spam")
+            blockPayload.block_reason = BlockReasonEnum.SPAM;
+          else if (updates.blockReason === "Offensive")
+            blockPayload.block_reason = BlockReasonEnum.OFFENSIVE;
+          else {
+            blockPayload.block_reason = BlockReasonEnum.OTHER;
+            blockPayload.block_reason_other = updates.blockNote;
           }
-
-          if (updates.isUserBanned) {
-            payload.block_customer = true;
-            if (updates.blockReason === "Spam")
-              payload.block_reason = BlockReasonEnum.SPAM;
-            else if (updates.blockReason === "Offensive")
-              payload.block_reason = BlockReasonEnum.OFFENSIVE;
-            else {
-              payload.block_reason = BlockReasonEnum.OTHER;
-              payload.block_reason_other = updates.blockNote;
-            }
-          }
-
-          if (Object.keys(payload).length > 0) {
+          await axiosClient.patch(
+            `/admin/reviews/${reviewId}/block-customer`,
+            blockPayload,
+          );
+        } else {
+          if (wantsReply) {
             await axiosClient.patch(
               `/admin/reviews/${reviewId}/confirm-action`,
-              payload,
+              { reply_content: updates.officialResponse },
             );
           }
-        }
-
-        if (updates.isPinned !== targetReview.isPinned) {
-          await axiosClient.patch(`/admin/reviews/${reviewId}/toggle-pin`);
+          if (wantsPin) {
+            await axiosClient.patch(`/admin/reviews/${reviewId}/toggle-pin`);
+          }
         }
 
         toast.success("Thay đổi đã được lưu thành công!");
@@ -414,13 +436,12 @@ export function useReviewAndRatingManagement() {
 
   const bulkActions = {
     bulkHide: async () => {
-      if (!canPublish)
+      if (!canUnpublish)
         return toast.error("Bạn không có quyền ẩn đánh giá hàng loạt.");
       if (selectedIds.size === 0) return;
       try {
-        await axiosClient.post("/admin/reviews/bulk-actions", {
+        await axiosClient.post("/admin/reviews/bulk/hide", {
           review_ids: Array.from(selectedIds),
-          action: BulkReviewActionEnum.HIDE,
         });
         toast.info(`Đã ẩn ${selectedIds.size} đánh giá!`);
         setSelectedIds(new Set());
@@ -435,9 +456,8 @@ export function useReviewAndRatingManagement() {
         return toast.error("Bạn không có quyền hiển thị đánh giá hàng loạt.");
       if (selectedIds.size === 0) return;
       try {
-        await axiosClient.post("/admin/reviews/bulk-actions", {
+        await axiosClient.post("/admin/reviews/bulk/unhide", {
           review_ids: Array.from(selectedIds),
-          action: BulkReviewActionEnum.UNHIDE,
         });
         toast.success(`Đã hiển thị lại các đánh giá hợp lệ!`);
         setSelectedIds(new Set());
@@ -473,6 +493,6 @@ export function useReviewAndRatingManagement() {
     modalConfig,
     actions,
     bulkActions,
-    permissions: { canApprove, canUpdate, canPublish, canDelete },
+    permissions: { canApprove, canUpdate, canPublish, canUnpublish, canDelete },
   };
 }

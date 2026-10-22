@@ -8,6 +8,8 @@ import {
 } from "../../../../assets/icons/CategoryIcons";
 import { ChevronDownIcon } from "../../../../assets/icons/HeaderIcons";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 import type {
   CategoryNode,
   CategoryStatus,
@@ -42,6 +44,12 @@ export default function CategoryDrawer({
   onClose,
   onSave,
 }: CategoryDrawerProps) {
+  const canChangeStatus = hasPermission(
+    getCurrentUser(),
+    Resource.CATALOG_CATEGORIES,
+    Action.CHANGE_STATUS,
+  );
+
   // states
   const [formData, setFormData] = useState<CategoryFormData>(
     initialData && mode === "edit"
@@ -57,7 +65,8 @@ export default function CategoryDrawer({
           slug: "",
           description: "",
           parentId: null,
-          status: "Active",
+          // Không có quyền bật/tắt thì mặc định Inactive (BE cũng tạo ở trạng thái tắt)
+          status: canChangeStatus ? "Active" : "Inactive",
         },
   );
 
@@ -434,10 +443,11 @@ export default function CategoryDrawer({
             <div className="cd-status-row">
               <button
                 type="button"
-                className={`cd-toggle-switch ${formData.status === "Active" ? "on" : ""} ${isParentInactive || isSubmitting ? "disabled-toggle" : ""}`}
-                disabled={isSubmitting || isParentInactive}
+                className={`cd-toggle-switch ${formData.status === "Active" ? "on" : ""} ${isParentInactive || isSubmitting || !canChangeStatus ? "disabled-toggle" : ""}`}
+                disabled={isSubmitting || isParentInactive || !canChangeStatus}
                 onClick={() => {
-                  if (isParentInactive || isSubmitting) return;
+                  if (isParentInactive || isSubmitting || !canChangeStatus)
+                    return;
                   setFormData((prev) => ({
                     ...prev,
                     status: prev.status === "Active" ? "Inactive" : "Active",

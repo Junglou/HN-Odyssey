@@ -143,7 +143,11 @@ export function useCouponManagement() {
   const canCreate = hasPermission(Resource.PROMO_COUPONS, Action.CREATE);
   const canUpdate = hasPermission(Resource.PROMO_COUPONS, Action.UPDATE);
   const canDelete = hasPermission(Resource.PROMO_COUPONS, Action.DELETE);
-  const canPublish = hasPermission(Resource.PROMO_COUPONS, Action.PUBLISH);
+  // Bật/tắt dùng quyền CHANGE_STATUS
+  const canPublish = hasPermission(
+    Resource.PROMO_COUPONS,
+    Action.CHANGE_STATUS,
+  );
 
   const formatDate = (isoString: string) => {
     const d = new Date(isoString);
@@ -363,23 +367,56 @@ export function useCouponManagement() {
         ).toISOString(),
         usage_limit: Number(data.totalUsesNum),
         user_usage_limit: Number(data.perCustomerLimitNum || 1),
-        status: data.isDraft ? "DRAFT" : "ACTIVE",
         applicable_scope: data.applicableScope,
       };
 
+      // Bật/tắt đi qua bulk/status (quyền CHANGE_STATUS), không gửi trong payload sửa
+      const wantActive = !data.isDraft;
+      let statusNote = "";
+      const changeStatus = async (
+        id: string,
+        action: "ACTIVATE" | "DEACTIVATE",
+      ) => {
+        if (!canPublish) {
+          statusNote =
+            " Bạn không có quyền bật/tắt nên trạng thái được giữ nguyên.";
+          return;
+        }
+        await axiosClient.patch("/promotions/coupons/bulk/status", {
+          ids: [id],
+          action,
+        });
+      };
+
       if (modalConfig.mode === "add") {
-        await axiosClient.post("/promotions/coupons", payload);
-        toast.success("Tạo mã giảm giá thành công!");
+        const res = await axiosClient.post("/promotions/coupons", payload);
+        const newId: string | undefined = res.data?.data?._id;
+        if (wantActive && newId) await changeStatus(newId, "ACTIVATE");
       } else if (modalConfig.mode === "edit" && modalConfig.editingRecord) {
+        const couponId = modalConfig.editingRecord.id;
+        const wasActive = modalConfig.editingRecord.status === "ACTIVE";
+
+        // Tắt TRƯỚC khi sửa (BE chỉ cho sửa thông tin cốt lõi khi mã đã tắt)
+        if (wasActive && !wantActive)
+          await changeStatus(couponId, "DEACTIVATE");
+
         const updatePayload = { ...payload };
         delete updatePayload.code;
-
         await axiosClient.patch(
-          `/promotions/coupons/${modalConfig.editingRecord.id}`,
+          `/promotions/coupons/${couponId}`,
           updatePayload,
         );
-        toast.success("Cập nhật mã giảm giá thành công!");
+
+        // Bật SAU khi sửa
+        if (!wasActive && wantActive) await changeStatus(couponId, "ACTIVATE");
       }
+
+      const baseMsg =
+        modalConfig.mode === "add"
+          ? "Tạo mã giảm giá thành công!"
+          : "Cập nhật mã giảm giá thành công!";
+      if (statusNote) toast.warning(baseMsg + statusNote);
+      else toast.success(baseMsg);
 
       actions.closeModal();
       fetchCoupons();

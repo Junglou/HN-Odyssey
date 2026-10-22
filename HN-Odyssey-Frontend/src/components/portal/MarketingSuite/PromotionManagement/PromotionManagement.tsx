@@ -14,6 +14,8 @@ import type {
   PromotionStatus,
   PromotionType,
 } from "../../../../hooks/portal/MarketingSuite/PromotionManagement/usePromotionManagement";
+import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { Action, Resource } from "../../../../types/permissions";
 
 interface PromotionManagementProps {
   data: PromotionRecord[];
@@ -61,6 +63,16 @@ export default function PromotionManagement({
   actions,
   bulkActions,
 }: PromotionManagementProps) {
+  // Hiện nút bulk nếu có quyền bật/tắt ít nhất 1 loại; hook sẽ chặn chi tiết từng loại
+  const currentUser = getCurrentUser();
+  const canChangeStatus =
+    hasPermission(
+      currentUser,
+      Resource.PROMO_FLASH_SALES,
+      Action.CHANGE_STATUS,
+    ) ||
+    hasPermission(currentUser, Resource.PROMO_COMBOS, Action.CHANGE_STATUS);
+
   // quản lý trạng thái đóng/mở dropdown
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [hasStatusOpened, setHasStatusOpened] = useState(false);
@@ -224,22 +236,26 @@ export default function PromotionManagement({
           </div>
 
           <div className="promo-bulk-actions">
-            <button
-              type="button"
-              className="promo-btn-bulk"
-              onClick={bulkActions.bulkActivate}
-              disabled={selectedIds.size === 0}
-            >
-              Bulk Activate
-            </button>
-            <button
-              type="button"
-              className="promo-btn-bulk"
-              onClick={bulkActions.bulkDeactivate}
-              disabled={selectedIds.size === 0}
-            >
-              Bulk Deactivate
-            </button>
+            {canChangeStatus && (
+              <>
+                <button
+                  type="button"
+                  className="promo-btn-bulk"
+                  onClick={bulkActions.bulkActivate}
+                  disabled={selectedIds.size === 0}
+                >
+                  Bulk Activate
+                </button>
+                <button
+                  type="button"
+                  className="promo-btn-bulk"
+                  onClick={bulkActions.bulkDeactivate}
+                  disabled={selectedIds.size === 0}
+                >
+                  Bulk Deactivate
+                </button>
+              </>
+            )}
             <button
               type="button"
               className="promo-btn-bulk danger"

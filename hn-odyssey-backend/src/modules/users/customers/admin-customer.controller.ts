@@ -37,7 +37,7 @@ export class CustomersAdminController {
   constructor(private readonly customersService: CustomersAdminService) {}
 
   @Patch('bulk/status')
-  @RequirePermissions(Resource.CRM_CUSTOMERS, Action.UPDATE)
+  @RequirePermissions(Resource.CRM_CUSTOMERS, Action.CHANGE_STATUS)
   async bulkUpdateStatus(
     @Body() dto: BulkUpdateStatusDto,
     @CurrentUser() user: IUser, // Dùng IUser chuẩn
@@ -123,7 +123,7 @@ export class CustomersAdminController {
   }
 
   @Patch(':id/status')
-  @RequirePermissions(Resource.CRM_CUSTOMERS, Action.UPDATE)
+  @RequirePermissions(Resource.CRM_CUSTOMERS, Action.CHANGE_STATUS)
   async updateAccountStatus(
     @Param('id') id: string,
     @Body() body: UpdateCustomerStatusDto,

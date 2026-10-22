@@ -24,12 +24,16 @@ import { BaseResponse } from 'src/common/dtos/base-response.dto';
 
 // Fix lỗi 1272: Tách biệt import type cho interface
 import type { QueryMediaInterface } from './dto/media-record.dto';
-import { MediaMetadataDto, UpdateMediaInfoDto } from './dto/media-record.dto';
+import {
+  ChangeMediaStatusDto,
+  MediaMetadataDto,
+  UpdateMediaInfoDto,
+} from './dto/media-record.dto';
 import { MediaValidationPipe } from 'src/common/pipes/media-validation.pipe';
 
 interface RequestWithUser extends Request {
   user: {
-    userId: string;
+    _id: string; // JwtStrategy.validate() trả về _id, KHÔNG có userId
     email: string;
   };
 }
@@ -74,7 +78,7 @@ export class MediaController {
     const data = await this.mediaService.uploadBulkMedia(
       files,
       metadataArray,
-      req.user.userId,
+      req.user._id,
     );
     return new BaseResponse(
       true,
@@ -83,7 +87,18 @@ export class MediaController {
     );
   }
 
-  // 3. Cập nhật thông tin (Alt Text, Status, Type, TargetId) (AC4)
+  // 2b. Đổi trạng thái hiển thị (quyền CHANGE_STATUS) — dùng cho 1 hoặc nhiều media
+  @Patch('bulk/status')
+  @RequirePermissions(Resource.CONTENT_MEDIA, Action.CHANGE_STATUS)
+  async changeMediaStatus(@Body() dto: ChangeMediaStatusDto) {
+    const result = await this.mediaService.changeStatus(dto.ids, dto.status);
+    return new BaseResponse(
+      true,
+      `Đã cập nhật trạng thái ${result.modified} phương tiện`,
+    );
+  }
+
+  // 3. Cập nhật thông tin (Alt Text, Type, TargetId) (AC4) — Status đổi qua bulk/status
   @Patch(':id')
   @RequirePermissions(Resource.CONTENT_MEDIA, Action.UPDATE)
   async updateMediaInfo(

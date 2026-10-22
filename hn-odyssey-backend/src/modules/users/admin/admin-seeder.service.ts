@@ -104,7 +104,12 @@ export class AdminSeederService implements OnModuleInit {
           },
           {
             resource: Resource.CRM_CUSTOMERS,
-            actions: [Action.READ, Action.CREATE, Action.UPDATE],
+            actions: [
+              Action.READ,
+              Action.CREATE,
+              Action.UPDATE,
+              Action.CHANGE_STATUS,
+            ],
           },
         ],
       },

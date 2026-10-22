@@ -12,6 +12,7 @@ import {
 import { AttributesService } from './attributes.service';
 import { CreateAttributeDto } from './dto/create-attribute.dto';
 import { UpdateAttributeDto } from './dto/update-attribute.dto';
+import { ChangeActiveStatusDto } from 'src/common/dtos/change-active-status.dto';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
 import { Public } from 'src/common/decorators/public.decorator';
@@ -75,6 +76,25 @@ export class AttributesController {
     return this.attributesService.update(
       id,
       updateAttributeDto,
+      user._id,
+      ip,
+      userAgent,
+    );
+  }
+
+  // 4b. BẬT/TẮT TRẠNG THÁI (quyền CHANGE_STATUS)
+  @Patch(':id/status')
+  @RequirePermissions(Resource.CATALOG_ATTRIBUTES, Action.CHANGE_STATUS)
+  changeStatus(
+    @Param('id') id: string,
+    @Body() dto: ChangeActiveStatusDto,
+    @CurrentUser() user: IUser,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent: string,
+  ) {
+    return this.attributesService.changeStatus(
+      id,
+      dto.is_active,
       user._id,
       ip,
       userAgent,

@@ -184,14 +184,6 @@ function ModalContent({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleToggleStatus = () => {
-    if (isViewOnly) return;
-    setFormData((prev) => ({
-      ...prev,
-      status: prev.status === "Active" ? "Inactive" : "Active",
-    }));
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isViewOnly) {
@@ -314,18 +306,21 @@ function ModalContent({
             </div>
           </div>
 
-          <div className="um-form-group">
-            <label>{mode === "view" ? "Status" : "Account Status"}</label>
-            <div className="um-modal-status-flex">
-              <div
-                className={`um-modal-switch ${formData.status === "Active" ? "on" : ""} ${isViewOnly ? "disabled" : ""}`}
-                onClick={handleToggleStatus}
-              >
-                <div className="um-modal-switch-handle"></div>
+          {/* Chỉ hiển thị. Bật/tắt dùng nút ở danh sách (quyền CHANGE_STATUS).
+              Tạo mới thì Backend luôn tạo ACTIVE nên ẩn đi. */}
+          {mode !== "add" && (
+            <div className="um-form-group">
+              <label>Account Status</label>
+              <div className="um-modal-status-flex">
+                <div
+                  className={`um-modal-switch ${formData.status === "Active" ? "on" : ""} disabled`}
+                >
+                  <div className="um-modal-switch-handle"></div>
+                </div>
+                <span className="um-modal-status-text">{formData.status}</span>
               </div>
-              <span className="um-modal-status-text">{formData.status}</span>
             </div>
-          </div>
+          )}
 
           <div className="um-modal-actions">
             {!isViewOnly ? (
