@@ -108,10 +108,10 @@ const PortalLayout = () => {
     hasPermission(Resource.CONTENT_POSTS) ||
     hasPermission(Resource.CONTENT_CONFIG);
 
+  // Trang System gồm giám sát hệ thống (SYSTEM_MONITORING) và Audit Logs (SYSTEM_AUDIT)
   const canSeeSystem =
     hasPermission(Resource.SYSTEM_MONITORING) ||
-    hasPermission(Resource.SYSTEM_AUDIT) ||
-    hasPermission(Resource.SYSTEM_NOTIFICATIONS);
+    hasPermission(Resource.SYSTEM_AUDIT);
 
   // Menu States
   const {
@@ -510,7 +510,8 @@ const PortalLayout = () => {
                 }}
               >
                 <div className="submenu" style={{ minHeight: 0 }}>
-                  {hasPermission(Resource.INVENTORY_STOCK) && (
+                  {(hasPermission(Resource.INVENTORY_STOCK) ||
+                    hasPermission(Resource.INVENTORY_TRANSFERS)) && (
                     <div
                       className={`submenu-item ${isActive("/portal/warehouse") ? "active" : ""}`}
                       onClick={() => handleNavigate("/portal/warehouse")}

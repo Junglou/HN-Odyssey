@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import axiosClient from "../../../api/axiosClient";
-import type { UserPayload } from "../../../types/auth";
-import { Action, Resource } from "../../../types/permissions";
 import { toast } from "react-toastify";
+import axiosClient from "../../../api/axiosClient";
+import type { UserProfile } from "../../../types/user";
+import { Action, Resource } from "../../../types/permissions";
+import { getCurrentUser, hasPermission } from "../../../utils/permission";
 
 // 1. CÁC INTERFACE GIAO TIẾP VỚI COMPONENT UI
 
@@ -31,12 +32,19 @@ export interface VisibleSections {
   networkApi: boolean;
   paymentLogs: boolean;
   securityLogs: boolean;
+  auditLogs: boolean;
 }
 
 export interface Thresholds {
   cpu: number;
   ram: number;
   disk: number;
+}
+
+export interface GaugeData {
+  cpu: { current: number; peak: number };
+  ram: { percent: number; text: string };
+  disk: { percent: number; text: string };
 }
 
 export interface ApiStatusItem {
@@ -68,6 +76,11 @@ export interface SecurityLogItem {
 
 // 2. CÁC INTERFACE MAP DỮ LIỆU THÔ TỪ BACKEND
 
+interface RawStatusWidget {
+  status: "GREEN" | "YELLOW" | "RED";
+  uptime: string;
+}
+
 interface RawResourceHistory {
   time: string;
   cpu: number;
@@ -80,10 +93,15 @@ interface RawPerformanceHistory {
   error_rate: number;
 }
 
+interface RawPerformanceStats {
+  avg_latency_ms: number;
+}
+
 interface RawThirdPartyStatus {
   provider: string;
   status: string;
   avg_latency: number;
+  last_check?: string;
 }
 
 interface RawPaymentLog {
@@ -95,6 +113,11 @@ interface RawPaymentLog {
   error_message: string;
 }
 
+interface RawPaymentResponse {
+  items: RawPaymentLog[];
+  meta?: { todayCount?: number };
+}
+
 interface RawAggregatedSecurityLog {
   id: string;
   time: string;
@@ -104,7 +127,38 @@ interface RawAggregatedSecurityLog {
   status: string;
 }
 
-// 3. GIÁ TRỊ KHỞI TẠO MẶC ĐỊNH
+interface RawIncident {
+  id: string;
+  time: string;
+  severity: "Warning" | "Critical";
+  component: string;
+  message: string;
+}
+
+interface RawIncidentResponse {
+  active_count: number;
+  items: RawIncident[];
+}
+
+type ApiResult = PromiseSettledResult<{ data?: { data?: unknown } }>;
+
+function pickData<T>(result: ApiResult): T | undefined {
+  return result.status === "fulfilled"
+    ? (result.value.data?.data as T | undefined)
+    : undefined;
+}
+
+// 3. HẰNG SỐ & GIÁ TRỊ KHỞI TẠO
+
+const API = "/admin/system-monitoring";
+
+const REFRESH_INTERVAL_MS: Record<string, number> = {
+  "5s": 5000,
+  "10s": 10000,
+  "30s": 30000,
+};
+
+const DEFAULT_THRESHOLDS: Thresholds = { cpu: 90, ram: 90, disk: 85 };
 
 const INITIAL_STATUS: SystemStatus = {
   overall: "Operational",
@@ -112,177 +166,173 @@ const INITIAL_STATUS: SystemStatus = {
   activeIncidents: 0,
 };
 
-const INITIAL_GAUGE = {
+const INITIAL_GAUGE: GaugeData = {
   cpu: { current: 0, peak: 0 },
   ram: { percent: 0, text: "N/A" },
   disk: { percent: 0, text: "N/A" },
 };
 
-const useLocalAuth = () => {
-  const [user] = useState(() => {
-    try {
-      const stored = localStorage.getItem("user");
-      if (stored) return JSON.parse(stored) as UserPayload;
-    } catch (error) {
-      console.warn("Không thể parse dữ liệu user từ localStorage:", error);
-    }
-    return null;
+const formatTime = (value: string) =>
+  new Date(value).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
   });
-  return { user };
+
+const mapOverall = (
+  status: RawStatusWidget["status"],
+): SystemStatus["overall"] =>
+  status === "RED"
+    ? "Critical"
+    : status === "YELLOW"
+      ? "Warning"
+      : "Operational";
+
+const isValidThreshold = (value: number) =>
+  Number.isInteger(value) && value >= 1 && value <= 100;
+
+// Giá trị đang gõ trong ô nhập, lưu dạng chuỗi để không hiện số 0 thừa ("090")
+export type DraftThresholds = Record<keyof Thresholds, string>;
+
+const toDraft = (values: Thresholds): DraftThresholds => ({
+  cpu: String(values.cpu),
+  ram: String(values.ram),
+  disk: String(values.disk),
+});
+
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  const msg = (error as { message?: unknown })?.message;
+  if (typeof msg === "string" && msg.trim()) return msg;
+  if (Array.isArray(msg) && msg.length > 0) return String(msg[0]);
+  return fallback;
 };
 
 export function useSystem() {
-  // State điều khiển UI giao diện
-  const [visibleSections, setVisibleSections] = useState<VisibleSections>({
-    overview: true,
-    cpuRam: false,
-    networkApi: false,
-    paymentLogs: false,
-    securityLogs: false,
-  });
+  // Luôn đọc user qua tokenStorage (key "user_info"), không tự đọc localStorage
+  const user = getCurrentUser<UserProfile>();
+  const canViewSystem = hasPermission(
+    user,
+    Resource.SYSTEM_MONITORING,
+    Action.READ,
+  );
+  const canUpdateThresholds = hasPermission(
+    user,
+    Resource.SYSTEM_MONITORING,
+    Action.UPDATE,
+  );
+  const canViewAudit = hasPermission(user, Resource.SYSTEM_AUDIT, Action.READ);
+  const canExportAudit = hasPermission(
+    user,
+    Resource.SYSTEM_AUDIT,
+    Action.EXPORT,
+  );
 
-  const [serverNode, setServerNode] = useState("Primary Node");
+  // State điều khiển UI: user chỉ có quyền Audit thì mở sẵn tab Audit Logs
+  const [visibleSections, setVisibleSections] = useState<VisibleSections>(
+    () => ({
+      overview: canViewSystem,
+      cpuRam: false,
+      networkApi: false,
+      paymentLogs: false,
+      securityLogs: false,
+      auditLogs: !canViewSystem && canViewAudit,
+    }),
+  );
   const [timeframe, setTimeframe] = useState("Last Hour (Real-time)");
   const [refreshRate, setRefreshRate] = useState("30s");
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isCheckingHealth, setIsCheckingHealth] = useState(false);
 
-  const { user } = useLocalAuth();
-
-  const hasPermission = useCallback(
-    (resourceCode: Resource, actionCode: Action): boolean => {
-      if (!user || !user.permissions) return false;
-      if (user.roles?.includes("SUPER_ADMIN")) return true;
-      return user.permissions.some(
-        (p) =>
-          p.resource === resourceCode &&
-          (p.actions.includes(actionCode) || p.actions.includes(Action.MANAGE)),
-      );
-    },
-    [user],
+  // Ngưỡng cảnh báo (lưu ở DB)
+  const [thresholds, setThresholds] = useState<Thresholds>(DEFAULT_THRESHOLDS);
+  const [draftThresholds, setDraftThresholds] = useState<DraftThresholds>(
+    toDraft(DEFAULT_THRESHOLDS),
   );
-
-  // Màn hình này chỉ cần xem dữ liệu
-  const canViewSystem = hasPermission(Resource.SYSTEM_MONITORING, Action.READ);
-
-  const [thresholds, setThresholds] = useState<Thresholds>({
-    cpu: 90,
-    ram: 90,
-    disk: 85,
-  });
   const [isEditingThresholds, setIsEditingThresholds] = useState(false);
+  const [isSavingThresholds, setIsSavingThresholds] = useState(false);
 
-  // State lưu trữ dữ liệu thực từ API với kiểu dữ liệu chuẩn xác
+  // Dữ liệu thực từ API
   const [systemStatus, setSystemStatus] =
     useState<SystemStatus>(INITIAL_STATUS);
-  const [gaugeData, setGaugeData] = useState(INITIAL_GAUGE);
+  const [gaugeData, setGaugeData] = useState<GaugeData>(INITIAL_GAUGE);
   const [cpuHistory, setCpuHistory] = useState<MetricDataPoint[]>([]);
   const [ramHistory, setRamHistory] = useState<MetricDataPoint[]>([]);
-  const [pageLoadData, setPageLoadData] = useState<MetricDataPoint[]>([]);
-  const [networkData, setNetworkData] = useState<MetricDataPoint[]>([]);
+  const [latencyData, setLatencyData] = useState<MetricDataPoint[]>([]);
   const [errorRateData, setErrorRateData] = useState<MetricDataPoint[]>([]);
   const [apiStatusList, setApiStatusList] = useState<ApiStatusItem[]>([]);
   const [paymentLogs, setPaymentLogs] = useState<PaymentLogItem[]>([]);
+  const [failedPaymentsToday, setFailedPaymentsToday] = useState(0);
   const [securityLogs, setSecurityLogs] = useState<SecurityLogItem[]>([]);
   const [incidentLogs, setIncidentLogs] = useState<IncidentLog[]>([]);
+  const [avgLatency, setAvgLatency] = useState(0);
 
-  // Hàm gọi tổng hợp các API
+  // Gọi tổng hợp các API (1 API lỗi không làm trống cả trang)
   const fetchSystemData = useCallback(async () => {
     if (!canViewSystem) return;
+    const params = { timeframe };
+
     try {
-      const params = {
-        node: serverNode,
-        timeframe: timeframe,
-      };
       const responses = await Promise.allSettled([
-        axiosClient.get("/admin/system-monitoring/status-widget", { params }),
-        axiosClient.get("/admin/system-monitoring/resources-current", {
-          params,
-        }),
-        axiosClient.get("/admin/system-monitoring/resources-history-24h", {
-          params,
-        }),
-        axiosClient.get("/admin/system-monitoring/performance-history-24h", {
-          params,
-        }),
-        axiosClient.get("/admin/system-monitoring/third-party-status", {
-          params,
-        }),
-        axiosClient.get("/admin/system-monitoring/payment-errors", {
+        axiosClient.get(`${API}/status-widget`, { params }), // 0
+        axiosClient.get(`${API}/resources-current`, { params }), // 1
+        axiosClient.get(`${API}/resources-history-24h`, { params }), // 2
+        axiosClient.get(`${API}/performance-history-24h`, { params }), // 3
+        axiosClient.get(`${API}/third-party-status`, { params }), // 4
+        axiosClient.get(`${API}/payment-errors`, {
           params: { ...params, limit: 10 },
-        }),
-        // SỬA LỖI URL Ở ĐÂY: Dùng đúng endpoint của Monitoring thay vì /audit-logs
-        axiosClient.get("/admin/system-monitoring/security-logs-recent", {
-          params: { ...params, limit: 10 },
-        }),
+        }), // 5
+        axiosClient.get(`${API}/security-logs-recent`, { params }), // 6
+        axiosClient.get(`${API}/incidents`, { params }), // 7
+        axiosClient.get(`${API}/performance-stats`, { params }), // 8
       ]);
 
-      // 0. Widget Tổng quan
-      if (
-        responses[0].status === "fulfilled" &&
-        responses[0].value.data?.data
-      ) {
-        const widgetData = responses[0].value.data.data;
-        setSystemStatus({
-          overall:
-            widgetData.status === "RED"
-              ? "Critical"
-              : widgetData.status === "YELLOW"
-                ? "Warning"
-                : "Operational",
-          uptime: widgetData.uptime || "100%",
-          activeIncidents: widgetData.error_rate > 5 ? 1 : 0,
-        });
+      // 0 + 7. KPI tổng quan
+      const widget = pickData<RawStatusWidget>(responses[0]);
+      const incidents = pickData<RawIncidentResponse>(responses[7]);
+      if (widget || incidents) {
+        setSystemStatus((prev) => ({
+          overall: widget ? mapOverall(widget.status) : prev.overall,
+          uptime: widget?.uptime ?? prev.uptime,
+          activeIncidents: incidents?.active_count ?? prev.activeIncidents,
+        }));
+      }
+      if (incidents) {
+        setIncidentLogs(
+          incidents.items.map((item) => ({
+            id: item.id,
+            time: formatTime(item.time),
+            severity: item.severity,
+            component: item.component,
+            message: item.message,
+          })),
+        );
       }
 
-      // 1. Đồng hồ Gauge ổ cứng
-      if (
-        responses[1].status === "fulfilled" &&
-        responses[1].value.data?.data
-      ) {
-        setGaugeData(responses[1].value.data.data);
-      }
+      // 1. Gauge CPU / RAM / Disk
+      const gauge = pickData<GaugeData>(responses[1]);
+      if (gauge) setGaugeData(gauge);
 
       // 2. Lịch sử CPU & RAM
-      if (
-        responses[2].status === "fulfilled" &&
-        responses[2].value.data?.data
-      ) {
-        const historyData = responses[2].value.data.data;
+      const resourceHistory = pickData<RawResourceHistory[]>(responses[2]);
+      if (resourceHistory) {
         setCpuHistory(
-          historyData.map((item: RawResourceHistory) => ({
-            time: item.time,
-            value: item.cpu,
-          })),
+          resourceHistory.map((item) => ({ time: item.time, value: item.cpu })),
         );
         setRamHistory(
-          historyData.map((item: RawResourceHistory) => ({
-            time: item.time,
-            value: item.ram,
-          })),
+          resourceHistory.map((item) => ({ time: item.time, value: item.ram })),
         );
       }
 
-      // 3. API & Network
-      if (
-        responses[3].status === "fulfilled" &&
-        responses[3].value.data?.data
-      ) {
-        const perfHistory = responses[3].value.data.data;
-        setPageLoadData(
-          perfHistory.map((item: RawPerformanceHistory) => ({
-            time: item.hour,
-            value: item.avg_latency,
-          })),
-        );
-        setNetworkData(
-          perfHistory.map((item: RawPerformanceHistory) => ({
+      // 3. Thời gian phản hồi & tỷ lệ lỗi API
+      const perfHistory = pickData<RawPerformanceHistory[]>(responses[3]);
+      if (perfHistory) {
+        setLatencyData(
+          perfHistory.map((item) => ({
             time: item.hour,
             value: item.avg_latency,
           })),
         );
         setErrorRateData(
-          perfHistory.map((item: RawPerformanceHistory) => ({
+          perfHistory.map((item) => ({
             time: item.hour,
             value: item.error_rate,
           })),
@@ -290,14 +340,11 @@ export function useSystem() {
       }
 
       // 4. Đối tác thứ 3
-      if (
-        responses[4].status === "fulfilled" &&
-        responses[4].value.data?.data
-      ) {
-        const thirdParty = responses[4].value.data.data;
+      const thirdParty = pickData<RawThirdPartyStatus[]>(responses[4]);
+      if (thirdParty) {
         setApiStatusList(
-          thirdParty.map((item: RawThirdPartyStatus, index: number) => ({
-            id: index.toString(),
+          thirdParty.map((item) => ({
+            id: item.provider,
             service: item.provider,
             severity:
               item.status === "RED"
@@ -306,24 +353,18 @@ export function useSystem() {
                   ? "Warning"
                   : "Stable",
             avgLatency: `${item.avg_latency}ms`,
-            lastCheck: "Vừa xong",
+            lastCheck: item.last_check ? formatTime(item.last_check) : "—",
           })),
         );
       }
 
-      // 5. Thanh toán
-      if (
-        responses[5].status === "fulfilled" &&
-        responses[5].value.data?.data?.items
-      ) {
-        const payments = responses[5].value.data.data.items;
+      // 5. Lỗi thanh toán
+      const payments = pickData<RawPaymentResponse>(responses[5]);
+      if (payments) {
         setPaymentLogs(
-          payments.map((item: RawPaymentLog) => ({
+          payments.items.map((item) => ({
             id: item._id,
-            time: new Date(item.date).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
+            time: formatTime(item.date),
             orderId: item.order_code,
             gateway: item.provider,
             code: item.error_type === "TECHNICAL_ERROR" ? "Tech" : "User",
@@ -334,59 +375,60 @@ export function useSystem() {
                 : "User Error",
           })),
         );
+        setFailedPaymentsToday(payments.meta?.todayCount ?? 0);
       }
 
-      // 6. Security Logs đã Aggregate
-      if (
-        responses[6].status === "fulfilled" &&
-        responses[6].value.data?.data
-      ) {
-        const logs = responses[6].value.data.data;
+      // 6. Log bảo mật
+      const security = pickData<RawAggregatedSecurityLog[]>(responses[6]);
+      if (security) {
         setSecurityLogs(
-          logs.map((item: RawAggregatedSecurityLog) => ({
+          security.map((item) => ({
             id: item.id,
-            time: new Date(item.time).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
+            time: formatTime(item.time),
             ip: item.ip,
             target: item.target,
             attempts: item.attempts,
             status: item.status,
           })),
         );
-
-        // Map một phần vào log incident cho OverviewTab
-        setIncidentLogs(
-          logs.slice(0, 5).map((err: RawAggregatedSecurityLog) => ({
-            id: err.id,
-            time: new Date(err.time).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            severity: err.status === "IP Blocked" ? "Critical" : "Warning",
-            component: "Security",
-            message: `Truy cập bất thường từ ${err.ip} (${err.attempts} lần)`,
-          })),
-        );
       }
+
+      // 8. Độ trễ trung bình cho mini chart
+      const perfStats = pickData<RawPerformanceStats>(responses[8]);
+      if (perfStats) setAvgLatency(perfStats.avg_latency_ms);
     } catch (error) {
       console.error("Lỗi khi tải dữ liệu giám sát hệ thống", error);
     }
-  }, [serverNode, timeframe, canViewSystem]);
+  }, [timeframe, canViewSystem]);
 
-  // Xử lý chu kỳ làm mới dữ liệu
+  // Tải ngưỡng cảnh báo 1 lần
   useEffect(() => {
-    fetchSystemData();
+    if (!canViewSystem) return;
+    let ignore = false;
+    axiosClient
+      .get(`${API}/thresholds`)
+      .then((res) => {
+        const data = res.data?.data as Thresholds | undefined;
+        if (!ignore && data) {
+          setThresholds(data);
+          setDraftThresholds(toDraft(data));
+        }
+      })
+      .catch(() => {
+        // Giữ ngưỡng mặc định nếu không tải được
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [canViewSystem]);
 
-    let intervalMs = 30000;
-    if (refreshRate === "10s") intervalMs = 10000;
-    if (refreshRate === "5s") intervalMs = 5000;
-
-    const timer = setInterval(() => {
-      fetchSystemData();
-    }, intervalMs);
-
+  // Chu kỳ làm mới dữ liệu
+  useEffect(() => {
+    void fetchSystemData();
+    const timer = setInterval(
+      () => void fetchSystemData(),
+      REFRESH_INTERVAL_MS[refreshRate] ?? 30000,
+    );
     return () => clearInterval(timer);
   }, [refreshRate, fetchSystemData]);
 
@@ -398,68 +440,119 @@ export function useSystem() {
     setActiveDropdown((prev) => (prev === dropdownName ? null : dropdownName));
   };
 
-  const updateThreshold = (key: keyof Thresholds, value: string) => {
-    const num = parseInt(value, 10);
-    if (!isNaN(num)) {
-      setThresholds((prev) => ({ ...prev, [key]: num }));
+  const startEditThresholds = () => {
+    if (!canUpdateThresholds) return;
+    setDraftThresholds(toDraft(thresholds));
+    setIsEditingThresholds(true);
+  };
+
+  const cancelEditThresholds = () => {
+    setDraftThresholds(toDraft(thresholds));
+    setIsEditingThresholds(false);
+  };
+
+  const updateThresholdDraft = (key: keyof Thresholds, value: string) => {
+    // Chỉ giữ chữ số, tối đa 3 ký tự, bỏ số 0 thừa ở đầu ("090" -> "90")
+    const cleaned = value
+      .replace(/\D/g, "")
+      .slice(0, 3)
+      .replace(/^0+(?=\d)/, "");
+    setDraftThresholds((prev) => ({ ...prev, [key]: cleaned }));
+  };
+
+  const saveThresholds = async () => {
+    if (!canUpdateThresholds) return;
+
+    const payload: Thresholds = {
+      cpu: Number(draftThresholds.cpu),
+      ram: Number(draftThresholds.ram),
+      disk: Number(draftThresholds.disk),
+    };
+
+    if (!Object.values(payload).every(isValidThreshold)) {
+      toast.error("Ngưỡng cảnh báo phải là số nguyên từ 1 đến 100.");
+      return;
+    }
+
+    setIsSavingThresholds(true);
+    try {
+      const res = await axiosClient.put(`${API}/thresholds`, payload);
+      const saved = (res.data?.data as Thresholds | undefined) ?? payload;
+      setThresholds(saved);
+      setDraftThresholds(toDraft(saved));
+      setIsEditingThresholds(false);
+      toast.success("Đã lưu ngưỡng cảnh báo.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Không thể lưu ngưỡng cảnh báo."));
+    } finally {
+      setIsSavingThresholds(false);
     }
   };
 
   const runHealthCheck = async () => {
     if (!canViewSystem) {
-      return toast.error("Bạn không có quyền thực thi hệ thống.");
+      toast.error("Bạn không có quyền xem giám sát hệ thống.");
+      return;
     }
-    setToastMessage("Đang kiểm tra toàn diện hệ thống...");
+    setIsCheckingHealth(true);
     try {
-      await axiosClient.get("/admin/system-monitoring/health");
+      await axiosClient.get(`${API}/health`);
       await fetchSystemData();
-      setToastMessage("Hoàn tất kiểm tra. Hệ thống hoạt động ổn định.");
+      toast.success("Hoàn tất kiểm tra: Database và bộ nhớ hoạt động ổn định.");
     } catch {
-      setToastMessage(
-        "Hoàn tất kiểm tra. Phát hiện một số dịch vụ phản hồi chậm.",
+      toast.warning(
+        "Hoàn tất kiểm tra: phát hiện dịch vụ không ổn định (Database hoặc bộ nhớ).",
       );
     } finally {
-      setTimeout(() => setToastMessage(null), 3000);
+      setIsCheckingHealth(false);
     }
   };
 
   return {
     state: {
       visibleSections,
-      serverNode,
       timeframe,
       refreshRate,
       activeDropdown,
       thresholds,
+      draftThresholds,
       isEditingThresholds,
-      toastMessage,
+      isSavingThresholds,
+      isCheckingHealth,
+      canUpdateThresholds,
+      canViewMonitoring: canViewSystem,
+      canViewAudit,
+      canExportAudit,
     },
     data: {
       status: systemStatus,
-      miniLatency: networkData,
+      avgLatency,
       overview: {
         gauge: gaugeData,
-        pageLoad: pageLoadData,
+        pageLoad: latencyData,
         logs: incidentLogs,
+        thresholds,
       },
       cpuHistory,
       ramHistory,
-      networkData,
+      networkData: latencyData,
       errorRateData,
       apiStatusList,
       paymentLogs,
+      failedPaymentsToday,
       securityLogs,
     },
     actions: {
       toggleSection,
-      setServerNode,
       setTimeframe,
       setRefreshRate,
       toggleDropdown,
-      setIsEditingThresholds,
-      updateThreshold,
+      startEditThresholds,
+      cancelEditThresholds,
+      updateThresholdDraft,
+      saveThresholds,
       runHealthCheck,
     },
-    permissions: { canViewSystem },
+    permissions: { canViewSystem, canUpdateThresholds },
   };
 }

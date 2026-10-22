@@ -34,7 +34,10 @@ const PORTAL_ROUTES: Array<{ path: string; resources: string[] }> = [
   { path: "/portal/banner-management", resources: [Resource.CONTENT_BANNERS] },
   { path: "/portal/blog-news", resources: [Resource.CONTENT_POSTS] },
   { path: "/portal/content-config", resources: [Resource.CONTENT_CONFIG] },
-  { path: "/portal/system", resources: [Resource.SYSTEM_MONITORING] },
+  {
+    path: "/portal/system",
+    resources: [Resource.SYSTEM_MONITORING, Resource.SYSTEM_AUDIT],
+  },
 ];
 
 /** Trang Portal đầu tiên user được phép vào; null nếu không có trang nào */

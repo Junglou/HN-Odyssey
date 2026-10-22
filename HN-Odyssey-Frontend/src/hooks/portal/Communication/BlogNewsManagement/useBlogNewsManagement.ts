@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
 import type { UserPayload } from "../../../../types/auth";
 import { Action, Resource } from "../../../../types/permissions";
+import { USER_KEY } from "../../../../utils/tokenStorage";
 
 // interfaces and types
 export type BlogNewsStatus = "Published" | "Draft" | "Hidden";
@@ -222,7 +223,7 @@ const flattenCategories = (
 const useLocalAuth = () => {
   const [user] = useState(() => {
     try {
-      const stored = localStorage.getItem("user");
+      const stored = localStorage.getItem(USER_KEY);
       if (stored) return JSON.parse(stored) as UserPayload;
     } catch (error) {
       console.warn("Không thể parse dữ liệu user từ localStorage:", error);

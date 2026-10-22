@@ -1,4 +1,4 @@
-.cc-card {
+.chc-card {
   position: relative;
   background-color: #ffffff;
   border: 1px solid #cbd5e1;
@@ -8,7 +8,7 @@
 }
 
 /* Nút Xuất PDF — nằm ngoài vùng chụp */
-.cc-pdf-btn {
+.chc-pdf-btn {
   position: absolute;
   top: 12px;
   right: 16px;
@@ -24,62 +24,63 @@
   cursor: pointer;
 }
 
-.cc-pdf-btn:hover:not(:disabled) {
+.chc-pdf-btn:hover:not(:disabled) {
   background-color: #dc2626;
 }
 
-.cc-pdf-btn:disabled {
+.chc-pdf-btn:disabled {
   background-color: #94a3b8;
   cursor: not-allowed;
 }
 
 /* Vùng được chụp vào PDF */
-.cc-capture {
+.chc-capture {
   display: flex;
   flex-direction: column;
   gap: 10px;
   background-color: #ffffff;
 }
 
-.cc-header {
+.chc-header {
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding-right: 110px; /* chừa chỗ cho nút Xuất PDF */
 }
 
-.cc-title {
+.chc-title {
   font-size: 0.95rem;
   font-weight: 600;
   color: #334155;
 }
 
-.cc-period {
+.chc-period {
   font-size: 0.8rem;
   color: #64748b;
 }
 
-.cc-subtitle {
+.chc-subtitle {
   font-size: 0.78rem;
   font-style: italic;
   color: #64748b;
 }
 
-.cc-body {
+.chc-body {
   width: 100%;
   min-width: 0;
 }
-.cc-skeleton {
+
+.chc-skeleton {
   width: 100%;
   height: 260px;
   border-radius: 8px;
 }
 
-.cc-body-enter {
-  animation: cc-body-in 0.4s ease-out;
+.chc-body-enter {
+  animation: chc-body-in 0.4s ease-out;
 }
 
-@keyframes cc-body-in {
+@keyframes chc-body-in {
   from {
     opacity: 0;
   }
@@ -89,7 +90,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cc-body-enter {
+  .chc-body-enter {
     animation: none;
   }
 }

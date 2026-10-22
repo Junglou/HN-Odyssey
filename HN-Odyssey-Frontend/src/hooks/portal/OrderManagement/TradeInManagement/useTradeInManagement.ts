@@ -4,6 +4,7 @@ import { io } from "socket.io-client";
 import axiosClient from "../../../../api/axiosClient";
 import type { UserPayload } from "../../../../types/auth";
 import { Action, Resource } from "../../../../types/permissions";
+import { USER_KEY } from "../../../../utils/tokenStorage";
 
 // types
 export type TradeInStatus =
@@ -109,7 +110,7 @@ const formatStatusToFE = (beStatus: string): TradeInStatus => {
 const useLocalAuth = () => {
   const [user] = useState(() => {
     try {
-      const stored = localStorage.getItem("user");
+      const stored = localStorage.getItem(USER_KEY);
       if (stored) return JSON.parse(stored) as UserPayload;
     } catch (error) {
       console.warn("Không thể parse dữ liệu user từ localStorage:", error);

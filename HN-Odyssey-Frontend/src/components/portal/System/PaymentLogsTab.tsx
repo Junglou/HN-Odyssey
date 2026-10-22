@@ -12,9 +12,9 @@ interface PaymentLogsTabProps {
 }
 
 export default function PaymentLogsTab({ data }: PaymentLogsTabProps) {
-  const { paymentLogs } = data;
+  const { paymentLogs, failedPaymentsToday } = data;
 
-  const failedTransactionsToday = paymentLogs.length;
+  const failedTransactionsToday = failedPaymentsToday;
   const hasCriticalSpike = paymentLogs.some(
     (log) => log.status === "System Error" || log.status === "Critical",
   );

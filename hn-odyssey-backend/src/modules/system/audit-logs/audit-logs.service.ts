@@ -1,11 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types, FilterQuery } from 'mongoose';
+import { Model, Types, FilterQuery, mongo } from 'mongoose';
 import { AuditLog, AuditLogDocument } from './schemas/audit-log.schema';
 import { QueryAuditLogDto } from './dto/query-audit-log.dto';
 import { User, UserDocument } from 'src/modules/users/schemas/user.schema';
 import { Department } from 'src/common/enums/department.enum';
 import { Resource } from 'src/common/enums/resource.enum';
+import {
+  AUDIT_LOG_MAIN_COLLECTION,
+  findAuditViewByDepartment,
+} from 'src/common/constants/audit-log-views.constant';
 
 // Interface cục bộ hoặc import từ DTO
 export interface CreateAuditLogDto {
@@ -37,6 +41,44 @@ export class AuditLogsService {
     private readonly auditLogModel: Model<AuditLogDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
   ) {}
+
+  // Đọc trực tiếp MongoDB View bằng native driver (giống cách mongosh đọc).
+  // View chỉ đọc được nên không cần (và không nên) gắn Mongoose model vào.
+  private async findInView(
+    viewName: string,
+    filter: FilterQuery<AuditLog>,
+    skip: number,
+    limit: number,
+  ): Promise<[number, unknown[]]> {
+    // Dùng đúng kết nối của auditLogModel (kết nối đang đọc audit_logs ra đủ dữ liệu)
+    const db = this.auditLogModel.db.db;
+    if (!db) return [0, []];
+
+    const collection = db.collection(viewName);
+    // View đã lọc sẵn theo phòng ban → bỏ điều kiện department để kết quả
+    // không phụ thuộc vào việc $project của View có giữ field này hay không
+    const viewFilter: FilterQuery<AuditLog> = { ...filter };
+    delete viewFilter.department;
+    const nativeFilter = viewFilter as mongo.Filter<mongo.Document>;
+
+    const [total, docs] = await Promise.all([
+      collection.countDocuments(nativeFilter),
+      collection
+        .find(nativeFilter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .toArray(),
+    ]);
+
+    // Gắn thông tin người thao tác, giống hệt truy vấn trên bảng gốc
+    const populated = await this.auditLogModel.populate(docs, {
+      path: 'actor_id',
+      select: 'first_Name last_Name email fullName',
+    });
+
+    return [total, populated];
+  }
 
   private mapResourceToDepartment(resource: string): string {
     if (!resource) return Department.MANAGEMENT;
@@ -291,16 +333,21 @@ export class AuditLogsService {
       filter.actor_email = { $regex: actor_email, $options: 'i' };
     }
 
-    const [total, data] = await Promise.all([
-      this.auditLogModel.countDocuments(filter),
-      this.auditLogModel
-        .find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(Number(limit))
-        .populate('actor_id', 'first_Name last_Name email fullName')
-        .lean(),
-    ]);
+    // Chọn phòng ban → đọc thẳng MongoDB View tương ứng (view_audit_<department>)
+    const view = findAuditViewByDepartment(department);
+
+    const [total, data]: [number, unknown[]] = view
+      ? await this.findInView(view.name, filter, skip, Number(limit))
+      : await Promise.all([
+          this.auditLogModel.countDocuments(filter),
+          this.auditLogModel
+            .find(filter)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(Number(limit))
+            .populate('actor_id', 'first_Name last_Name email fullName')
+            .lean(),
+        ]);
 
     return {
       data,
@@ -309,6 +356,7 @@ export class AuditLogsService {
         page: Number(page),
         limit: Number(limit),
         total_pages: Math.ceil(total / Number(limit)),
+        source: view?.name ?? AUDIT_LOG_MAIN_COLLECTION, // nguồn dữ liệu đã đọc
       },
     };
   }

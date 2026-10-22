@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
 import type { UserPayload } from "../../../../types/auth";
 import { Action, Resource } from "../../../../types/permissions";
+import { USER_KEY } from "../../../../utils/tokenStorage";
 
 export type CouponStatus = "ACTIVE" | "INACTIVE" | "CANCELLED" | "DRAFT";
 export type DiscountType = "PERCENTAGE" | "FIXED_AMOUNT";
@@ -88,7 +89,7 @@ const extractErrorMessage = (error: unknown, defaultMsg: string): string => {
 const useLocalAuth = () => {
   const [user] = useState(() => {
     try {
-      const stored = localStorage.getItem("user");
+      const stored = localStorage.getItem(USER_KEY);
       if (stored) return JSON.parse(stored) as UserPayload;
     } catch {
       // Bỏ qua lỗi parse

@@ -97,15 +97,15 @@ export default function CpuRamTab({ data }: CpuRamTabProps) {
       </h2>
       <div className="cr-bottom-row">
         <ChartCard
-          title="CPU Usage History (Last 24h)"
+          title="CPU Usage History"
           history={cpuHistory}
-          label="Top Processes by CPU"
+          label="Current CPU Usage"
           percent={overview.gauge.cpu.current}
         />
         <ChartCard
-          title="RAM Usage History (Last 24h)"
+          title="RAM Usage History"
           history={ramHistory}
-          label="Top Processes by RAM"
+          label="Current RAM Usage"
           percent={overview.gauge.ram.percent}
         />
       </div>

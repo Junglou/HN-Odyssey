@@ -279,9 +279,25 @@ export function useRoleManagement() {
               if (sub.subId !== subId) return sub;
 
               const isGranted = sub.grantedActions.includes(action);
-              const newActions = isGranted
-                ? sub.grantedActions.filter((a) => a !== action)
-                : [...sub.grantedActions, action];
+              let newActions: string[];
+
+              if (isGranted) {
+                // Bỏ READ = mất quyền xem → gỡ luôn mọi action khác của resource này
+                newActions =
+                  action === "READ"
+                    ? []
+                    : sub.grantedActions.filter((a) => a !== action);
+              } else {
+                // Cấp bất kỳ action nào → tự động cấp kèm READ (phương án A)
+                newActions = [...sub.grantedActions, action];
+                if (
+                  action !== "READ" &&
+                  sub.availableActions.includes("READ") &&
+                  !newActions.includes("READ")
+                ) {
+                  newActions.push("READ");
+                }
+              }
 
               return { ...sub, grantedActions: newActions };
             }),

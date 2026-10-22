@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
 import { Action, Resource } from "../../../../types/permissions";
 import type { UserPayload } from "../../../../types/auth";
+import { USER_KEY } from "../../../../utils/tokenStorage";
 
 export type CustomerStatus = "Active" | "Inactive" | "Locked" | "Deleted";
 export type CustomerType = "Bronze" | "Silver" | "Gold" | "Platinum";
@@ -100,7 +101,7 @@ const mapBEToType = (beTier?: string): CustomerType => {
 const useLocalAuth = () => {
   const [user] = useState(() => {
     try {
-      const stored = localStorage.getItem("user");
+      const stored = localStorage.getItem(USER_KEY);
       if (stored) return JSON.parse(stored) as UserPayload;
     } catch (error) {
       console.warn("Không thể parse dữ liệu user từ localStorage:", error);

@@ -1,7 +1,10 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
-import { Department } from 'src/common/enums/department.enum';
+import {
+  AUDIT_LOG_MAIN_COLLECTION,
+  AUDIT_LOG_VIEWS,
+} from 'src/common/constants/audit-log-views.constant';
 
 @Injectable()
 export class AuditLogsViewSetup implements OnModuleInit {
@@ -25,33 +28,8 @@ export class AuditLogsViewSetup implements OnModuleInit {
       return;
     }
 
-    const mainCollection = 'audit_logs';
-    const viewsToCreate = [
-      {
-        name: 'view_audit_management',
-        department: Department.MANAGEMENT,
-      },
-      {
-        name: 'view_audit_sales',
-        department: Department.SALES,
-      },
-      {
-        name: 'view_audit_warehouse',
-        department: Department.WAREHOUSE,
-      },
-      {
-        name: 'view_audit_marketing',
-        department: Department.MARKETING,
-      },
-      {
-        name: 'view_audit_accounting',
-        department: Department.ACCOUNTING,
-      },
-      {
-        name: 'view_audit_support',
-        department: Department.SUPPORT,
-      },
-    ];
+    const mainCollection = AUDIT_LOG_MAIN_COLLECTION;
+    const viewsToCreate = AUDIT_LOG_VIEWS;
 
     try {
       const existingCollections = await db.listCollections().toArray();

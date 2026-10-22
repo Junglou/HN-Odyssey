@@ -306,6 +306,13 @@ export class AuthController {
     return this.authService.recoverAccount(dto, ip, userAgent);
   }
 
+  //15. THÔNG TIN & QUYỀN HIỆN TẠI (không @Public → bắt buộc đăng nhập)
+  @Get('me')
+  @ApiOperation({ summary: 'Lấy thông tin và quyền mới nhất của tài khoản' })
+  async getMe(@CurrentUser() user: IUser) {
+    return this.authService.getMe(user._id);
+  }
+
   //14. ĐĂNG XUẤT
   @Post('logout')
   @HttpCode(HttpStatus.OK)

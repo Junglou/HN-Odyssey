@@ -23,7 +23,7 @@ export default function StockMovementTrend({ data }: StockMovementTrendProps) {
             color: "#64748b",
           }}
         >
-          Không có dữ liệu giao dịch trong khoảng thời gian này
+          No transaction data found for this time range.
         </div>
       </div>
     );

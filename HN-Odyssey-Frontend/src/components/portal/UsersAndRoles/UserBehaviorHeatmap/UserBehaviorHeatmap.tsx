@@ -154,7 +154,7 @@ export default function UserBehaviorHeatmap({
                 marginBottom: "12px",
               }}
             >
-              Bản Đồ Nhiệt & Video Phiên Truy Cập
+              Heatmaps & Session Recordings
             </h3>
             <p
               style={{
@@ -164,8 +164,8 @@ export default function UserBehaviorHeatmap({
                 maxWidth: "400px",
               }}
             >
-              Dữ liệu đồ họa trực quan đang được theo dõi và xử lý độc lập bởi
-              hệ thống máy chủ của Microsoft Clarity để tối ưu hiệu suất.
+              Visual data is independently tracked and processed by Microsoft
+              Clarity servers for optimal performance.
             </p>
             <button
               onClick={() => window.open(clarityDashboardUrl, "_blank")}
@@ -181,7 +181,7 @@ export default function UserBehaviorHeatmap({
                 transition: "background-color 0.2s",
               }}
             >
-              Mở Microsoft Clarity Dashboard
+              Open Microsoft Clarity Dashboard
             </button>
           </div>
 
@@ -190,8 +190,8 @@ export default function UserBehaviorHeatmap({
             style={{ marginTop: "16px" }}
           >
             <p className="ubh-scale-desc">
-              * Dữ liệu thống kê bên phải đang được lấy trực tiếp từ{" "}
-              <strong>Database nội bộ</strong> dựa trên các bộ lọc tùy chọn.
+              * Statistical data on the right is retrieved directly from the{" "}
+              <strong>internal database</strong> based on the selected filters.
             </p>
           </div>
         </div>
