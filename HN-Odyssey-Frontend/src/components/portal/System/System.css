@@ -546,3 +546,44 @@
     padding-bottom: 8px;
   }
 }
+/* Threshold Settings: hàng nút Cancel / Save khi đang sửa */
+.sys-threshold-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.sys-threshold-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #374151;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sys-threshold-btn:hover:not(:disabled) {
+  background-color: #f3f4f6;
+  border-color: #111827;
+}
+
+.sys-threshold-btn.primary {
+  background-color: #111827;
+  border-color: #111827;
+  color: #ffffff;
+}
+
+.sys-threshold-btn.primary:hover:not(:disabled) {
+  background-color: #374151;
+  border-color: #374151;
+}
+
+.sys-threshold-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
 import { Action, Resource } from "../../../../types/permissions";
 import type { UserPayload } from "../../../../types/auth";
+import { USER_KEY } from "../../../../utils/tokenStorage";
 
 export type PromotionStatus =
   | "Active"
@@ -146,7 +147,7 @@ const flattenCategories = (
 const useLocalAuth = () => {
   const [user] = useState<UserPayload | null>(() => {
     try {
-      const stored = localStorage.getItem("user");
+      const stored = localStorage.getItem(USER_KEY);
       if (stored) return JSON.parse(stored) as UserPayload;
     } catch {
       // Bỏ qua lỗi parse

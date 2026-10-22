@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useId } from "react";
 import {
   AreaChart,
   Area,
@@ -31,11 +31,13 @@ function GradientGauge({
   const strokeDashoffset = circumference - (safeValue / 100) * circumference;
   const angle = (safeValue / 100) * 180 - 180;
   const thresholdAngle = (threshold / 100) * 180 - 180;
+  // Mỗi gauge 1 id gradient riêng, tránh 3 gauge dùng chung 1 ngưỡng màu
+  const gradientId = `gauge-${useId().replace(/:/g, "")}`;
 
   return (
     <svg viewBox="0 0 200 120" width="100%" height="100%">
       <defs>
-        <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stopColor="#3b82f6" />
           <stop offset={`${threshold}%`} stopColor="#3b82f6" />
           <stop offset={`${threshold}%`} stopColor="#ef4444" />
@@ -56,7 +58,7 @@ function GradientGauge({
       <path
         d="M 20 100 A 80 80 0 0 1 180 100"
         fill="none"
-        stroke="url(#gaugeGradient)"
+        stroke={`url(#${gradientId})`}
         strokeWidth="16"
         strokeLinecap="butt"
         strokeDasharray={circumference}
@@ -159,7 +161,7 @@ export default function OverviewTab({ data }: OverviewTabProps) {
             <div className="ov-gauge-svg">
               <GradientGauge
                 value={overview.gauge.cpu.current}
-                threshold={65}
+                threshold={overview.thresholds.cpu}
               />
             </div>
             <div className="ov-gauge-label">
@@ -174,7 +176,7 @@ export default function OverviewTab({ data }: OverviewTabProps) {
             <div className="ov-gauge-svg">
               <GradientGauge
                 value={overview.gauge.ram.percent}
-                threshold={65}
+                threshold={overview.thresholds.ram}
               />
             </div>
             <div className="ov-gauge-label">
@@ -187,7 +189,7 @@ export default function OverviewTab({ data }: OverviewTabProps) {
             <div className="ov-gauge-svg">
               <GradientGauge
                 value={overview.gauge.disk.percent}
-                threshold={65}
+                threshold={overview.thresholds.disk}
               />
             </div>
             <div className="ov-gauge-label">
@@ -204,7 +206,7 @@ export default function OverviewTab({ data }: OverviewTabProps) {
         {/* Biểu đồ Page Load */}
         <div className="ov-chart-card">
           <h3 className="ov-section-title sys-mb-0">
-            Avg. Page Load Time (ms)
+            Avg. Server Response Time (ms)
           </h3>
           <div
             className="ov-chart-container"

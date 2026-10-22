@@ -10,12 +10,38 @@ import {
   IntegrationLogDocument,
 } from './schemas/integration-log.schema';
 import {
+  DEFAULT_THRESHOLDS,
+  SystemThreshold,
+  SystemThresholdDocument,
+} from './schemas/system-threshold.schema';
+import {
   AuditLog,
   AuditLogDocument,
 } from '../audit-logs/schemas/audit-log.schema';
-import * as fs from 'fs';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import {
+  NotificationLog,
+  NotificationPriority,
+  NotificationType,
+} from 'src/modules/notifications/schemas/notification-log.schema';
+import { Department } from 'src/common/enums/department.enum';
+import { UpdateThresholdsDto } from './dto/update-thresholds.dto';
+import {
+  getCpuUsagePercent,
+  getDiskUsage,
+  getRamUsage,
+} from './system-usage.util';
 
-// Định nghĩa các interface cho Aggregate và Lean Query
+export const TIMEFRAME_LAST_HOUR = 'Last Hour (Real-time)';
+export const TIMEFRAME_LAST_7_DAYS = 'Last 7 Days';
+
+const VN_TIMEZONE = 'Asia/Ho_Chi_Minh';
+const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+// Metric chỉ được giữ 7 ngày (TTL trong system-metric.schema) nên uptime tối đa tính được 7 ngày
+const UPTIME_WINDOW_DAYS = 7;
+
+// Interface cho Aggregate và Lean Query
 interface PerformanceStatResult {
   _id: null;
   avgLatency: number;
@@ -23,11 +49,23 @@ interface PerformanceStatResult {
   totalCount: number;
 }
 
-interface PerformanceHistoryAggResult {
-  _id: number;
+interface UptimeStatResult {
+  _id: null;
+  totalCount: number;
+  errorCount: number;
+}
+
+interface BucketPerfAggResult {
+  _id: string;
   avgLatency: number;
   errorCount: number;
   totalCount: number;
+}
+
+interface BucketResourceAggResult {
+  _id: string;
+  avgCpu: number;
+  avgRam: number;
 }
 
 interface PartnerStatResult {
@@ -35,41 +73,34 @@ interface PartnerStatResult {
   total: number;
   errCount: number;
   avgLatency: number;
+  lastCheck: Date;
 }
 
-interface ResourceHistoryAggResult {
-  _id: number;
-  avgCpu: number;
-  avgRam: number;
-}
-
-// Bổ sung interface cho widget uptime
-interface UptimeStatResult {
+interface PeakCpuResult {
   _id: null;
-  totalCount: number;
-  errorCount: number;
+  peak: number | null;
 }
 
-// Bổ sung interface cho log bảo mật
 interface SecurityLogAggResult {
   _id: { ip: string; target: string };
   attempts: number;
   lastTime: Date;
 }
 
-export interface SystemStatusWidget {
-  status: 'GREEN' | 'YELLOW' | 'RED';
-  database: 'UP' | 'DOWN';
-  avg_latency: number;
-  error_rate: number;
-  uptime: string; // Thêm thuộc tính uptime vào interface
+interface IncidentAggResult {
+  _id: { title: string; message: string };
+  type: NotificationType;
+  priority: NotificationPriority;
+  lastTime: Date;
+  metadata?: Record<string, unknown>;
 }
 
-export interface PerformanceHistoryPoint {
-  hour: string;
-  avg_latency: number;
-  error_rate: number;
-}
+// Mã lỗi tài nguyên do CronMonitorService phát ra → tên tài nguyên hiển thị
+const RESOURCE_ALERT_LABELS: Record<string, string> = {
+  HIGH_CPU_USAGE: 'CPU',
+  HIGH_RESOURCE_USAGE: 'RAM',
+  HIGH_DISK_USAGE: 'Disk',
+};
 
 interface PaymentIntegrationLog {
   _id: Types.ObjectId;
@@ -85,6 +116,26 @@ interface PaymentIntegrationLog {
   };
 }
 
+export interface SystemStatusWidget {
+  status: 'GREEN' | 'YELLOW' | 'RED';
+  database: 'UP' | 'DOWN';
+  avg_latency: number;
+  error_rate: number;
+  uptime: string;
+}
+
+export interface PerformanceHistoryPoint {
+  hour: string;
+  avg_latency: number;
+  error_rate: number;
+}
+
+export interface ThresholdValues {
+  cpu: number;
+  ram: number;
+  disk: number;
+}
+
 @Injectable()
 export class MonitoringService {
   constructor(
@@ -94,32 +145,59 @@ export class MonitoringService {
     private readonly integrationModel: Model<IntegrationLogDocument>,
     @InjectModel(AuditLog.name)
     private readonly auditLogModel: Model<AuditLogDocument>,
+    @InjectModel(SystemThreshold.name)
+    private readonly thresholdModel: Model<SystemThresholdDocument>,
+    @InjectModel(NotificationLog.name)
+    private readonly notificationModel: Model<NotificationLog>,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
-  // Hàm tính toán khung thời gian
+  // HELPERS
+
   private getStartDateFromTimeframe(timeframe?: string): Date {
     const now = Date.now();
-    if (timeframe === 'Last Hour (Real-time)') {
+    if (timeframe === TIMEFRAME_LAST_HOUR)
       return new Date(now - 60 * 60 * 1000);
-    } else if (timeframe === 'Last 7 Days') {
-      return new Date(now - 7 * 24 * 60 * 60 * 1000);
+    if (timeframe === TIMEFRAME_LAST_7_DAYS) return new Date(now - 7 * DAY_MS);
+    return new Date(now - DAY_MS); // Mặc định: Last 24 Hours
+  }
+
+  // Gom nhóm theo chuỗi ngày-giờ đầy đủ để sort đúng thứ tự thời gian (qua nửa đêm không bị đảo)
+  private getBucketConfig(timeframe?: string): {
+    format: string;
+    toLabel: (key: string) => string;
+  } {
+    if (timeframe === TIMEFRAME_LAST_HOUR) {
+      return { format: '%Y-%m-%d %H:%M', toLabel: (key) => key.slice(11) }; // "14:05"
     }
-    // Mặc định là Last 24 Hours
-    return new Date(now - 24 * 60 * 60 * 1000);
+    if (timeframe === TIMEFRAME_LAST_7_DAYS) {
+      return {
+        format: '%Y-%m-%d',
+        toLabel: (key) => `${key.slice(8, 10)}/${key.slice(5, 7)}`, // "21/10"
+      };
+    }
+    return { format: '%Y-%m-%d %H:00', toLabel: (key) => key.slice(11) }; // "14:00"
   }
 
-  // Hàm tạo query filter MongoDB cho Node
-  private buildNodeFilter(node?: string) {
-    if (!node || node === 'All Nodes') return {};
-    return { node };
+  private buildBucketId(format: string) {
+    return {
+      $dateToString: { format, date: '$createdAt', timezone: VN_TIMEZONE },
+    };
   }
 
-  async getPerformanceStats(timeframe?: string, node?: string) {
+  // 00:00 hôm nay theo giờ Việt Nam
+  private getStartOfTodayVN(): Date {
+    const vnNow = new Date(Date.now() + VN_OFFSET_MS);
+    vnNow.setUTCHours(0, 0, 0, 0);
+    return new Date(vnNow.getTime() - VN_OFFSET_MS);
+  }
+
+  // US2 - Hiệu năng Server
+  async getPerformanceStats(timeframe?: string) {
     const fromDate = this.getStartDateFromTimeframe(timeframe);
-    const nodeFilter = this.buildNodeFilter(node);
 
     const stats = await this.metricModel.aggregate<PerformanceStatResult>([
-      { $match: { createdAt: { $gte: fromDate }, ...nodeFilter } },
+      { $match: { createdAt: { $gte: fromDate } } },
       {
         $group: {
           _id: null,
@@ -139,30 +217,37 @@ export class MonitoringService {
     const slowRequestsCount = await this.metricModel.countDocuments({
       is_slow: true,
       createdAt: { $gte: fromDate },
-      ...nodeFilter,
     });
 
     return {
-      avg_latency_ms: Number(result.avgLatency.toFixed(0)),
+      avg_latency_ms: Number((result.avgLatency || 0).toFixed(0)),
       error_rate_percent: Number(errorRate.toFixed(2)),
       slow_requests: slowRequestsCount,
     };
   }
 
+  // US5 - Trạng thái API đối tác
   async getThirdPartyStatus(timeframe?: string) {
     const fromDate = this.getStartDateFromTimeframe(timeframe);
 
     const partnerStats =
       await this.integrationModel.aggregate<PartnerStatResult>([
-        { $match: { createdAt: { $gte: fromDate } } },
+        {
+          $match: {
+            createdAt: { $gte: fromDate },
+            provider: { $ne: 'UNKNOWN' },
+          },
+        },
         {
           $group: {
             _id: '$provider',
             total: { $sum: 1 },
             errCount: { $sum: { $cond: [{ $eq: ['$is_error', true] }, 1, 0] } },
             avgLatency: { $avg: '$duration_ms' },
+            lastCheck: { $max: '$createdAt' },
           },
         },
+        { $sort: { _id: 1 } },
       ]);
 
     return partnerStats.map((p) => {
@@ -174,25 +259,22 @@ export class MonitoringService {
 
       return {
         provider: p._id,
-        status: status,
+        status,
         error_rate: Number(errRate.toFixed(2)),
-        avg_latency: Number(p.avgLatency.toFixed(0)),
+        avg_latency: Number((p.avgLatency || 0).toFixed(0)),
+        last_check: p.lastCheck,
       };
     });
   }
 
-  // Khử lỗi unsafe bằng cách thêm generic type cho hàm aggregate
-  async getSystemStatusWidget(
-    timeframe?: string,
-    node?: string,
-  ): Promise<SystemStatusWidget> {
+  // US1 - AC2: Đèn trạng thái tổng quan
+  async getSystemStatusWidget(timeframe?: string): Promise<SystemStatusWidget> {
     const fromDate = this.getStartDateFromTimeframe(timeframe);
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const nodeFilter = this.buildNodeFilter(node);
+    const uptimeFrom = new Date(Date.now() - UPTIME_WINDOW_DAYS * DAY_MS);
 
     const [stats, uptimeStats] = await Promise.all([
       this.metricModel.aggregate<PerformanceStatResult>([
-        { $match: { createdAt: { $gte: fromDate }, ...nodeFilter } },
+        { $match: { createdAt: { $gte: fromDate } } },
         {
           $group: {
             _id: null,
@@ -205,7 +287,7 @@ export class MonitoringService {
         },
       ]),
       this.metricModel.aggregate<UptimeStatResult>([
-        { $match: { createdAt: { $gte: thirtyDaysAgo }, ...nodeFilter } },
+        { $match: { createdAt: { $gte: uptimeFrom } } },
         {
           $group: {
             _id: null,
@@ -221,6 +303,7 @@ export class MonitoringService {
     const result = stats[0] || { avgLatency: 0, errorCount: 0, totalCount: 0 };
     const errorRate =
       result.totalCount > 0 ? (result.errorCount / result.totalCount) * 100 : 0;
+
     const uptimeData = uptimeStats[0] || { totalCount: 0, errorCount: 0 };
     const uptime =
       uptimeData.totalCount > 0
@@ -241,50 +324,43 @@ export class MonitoringService {
     let status: 'GREEN' | 'YELLOW' | 'RED' = 'GREEN';
     if (dbStatus === 'DOWN' || errorRate > 10) {
       status = 'RED';
-    } else if (result.avgLatency > 2000) {
+    } else if ((result.avgLatency || 0) > 2000) {
       status = 'YELLOW';
     }
 
     return {
       status,
       database: dbStatus,
-      avg_latency: Number(result.avgLatency.toFixed(0)),
+      avg_latency: Number((result.avgLatency || 0).toFixed(0)),
       error_rate: Number(errorRate.toFixed(2)),
-      uptime: uptime,
+      uptime,
     };
   }
 
-  async getPerformanceHistory24h(
+  // US1-AC6 & US2-AC6: Lịch sử hiệu năng vẽ biểu đồ
+  async getPerformanceHistory(
     timeframe?: string,
-    node?: string,
   ): Promise<PerformanceHistoryPoint[]> {
     const fromDate = this.getStartDateFromTimeframe(timeframe);
-    const nodeFilter = this.buildNodeFilter(node);
+    const { format, toLabel } = this.getBucketConfig(timeframe);
 
-    // Dynamic grouping: Group theo Phút nếu là Real-time, Group theo Giờ nếu là 24h hoặc 7 days
-    const isRealTime = timeframe === 'Last Hour (Real-time)';
-    const groupId = isRealTime
-      ? { $minute: { date: '$createdAt', timezone: 'Asia/Ho_Chi_Minh' } }
-      : { $hour: { date: '$createdAt', timezone: 'Asia/Ho_Chi_Minh' } };
-
-    const history =
-      await this.metricModel.aggregate<PerformanceHistoryAggResult>([
-        { $match: { createdAt: { $gte: fromDate }, ...nodeFilter } },
-        {
-          $group: {
-            _id: groupId,
-            avgLatency: { $avg: '$duration_ms' },
-            errorCount: {
-              $sum: { $cond: [{ $gte: ['$status_code', 500] }, 1, 0] },
-            },
-            totalCount: { $sum: 1 },
+    const history = await this.metricModel.aggregate<BucketPerfAggResult>([
+      { $match: { createdAt: { $gte: fromDate } } },
+      {
+        $group: {
+          _id: this.buildBucketId(format),
+          avgLatency: { $avg: '$duration_ms' },
+          errorCount: {
+            $sum: { $cond: [{ $gte: ['$status_code', 500] }, 1, 0] },
           },
+          totalCount: { $sum: 1 },
         },
-        { $sort: { _id: 1 } },
-      ]);
+      },
+      { $sort: { _id: 1 } },
+    ]);
 
     return history.map((h) => ({
-      hour: isRealTime ? `Min ${h._id}` : `${h._id}:00`,
+      hour: toLabel(h._id),
       avg_latency: Number((h.avgLatency || 0).toFixed(0)),
       error_rate:
         h.totalCount > 0
@@ -293,6 +369,7 @@ export class MonitoringService {
     }));
   }
 
+  // US3 - AC6: Lịch sử lỗi giao dịch thanh toán
   async getPaymentErrorLogs(
     page: number = 1,
     limit: number = 20,
@@ -302,26 +379,34 @@ export class MonitoringService {
     const skip = (page - 1) * limit;
     const fromDate = this.getStartDateFromTimeframe(timeframe);
 
-    const query: FilterQuery<IntegrationLogDocument> = {
+    const baseQuery: FilterQuery<IntegrationLogDocument> = {
       provider: { $in: ['VNPAY', 'MOMO'] },
       is_error: true,
-      createdAt: { $gte: fromDate },
     };
-
     if (provider) {
-      query.provider = provider.toUpperCase();
+      baseQuery.provider = provider.toUpperCase();
     }
 
-    const [items, totalItems] = await Promise.all([
+    const listQuery: FilterQuery<IntegrationLogDocument> = {
+      ...baseQuery,
+      createdAt: { $gte: fromDate },
+    };
+    const todayQuery: FilterQuery<IntegrationLogDocument> = {
+      ...baseQuery,
+      createdAt: { $gte: this.getStartOfTodayVN() },
+    };
+
+    const [items, totalItems, todayCount] = await Promise.all([
       this.integrationModel
-        .find(query)
+        .find(listQuery)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .select('provider createdAt request_data response_data')
         .lean<PaymentIntegrationLog[]>()
         .exec(),
-      this.integrationModel.countDocuments(query).exec(),
+      this.integrationModel.countDocuments(listQuery).exec(),
+      this.integrationModel.countDocuments(todayQuery).exec(),
     ]);
 
     const formattedItems = items.map((item) => ({
@@ -340,64 +425,42 @@ export class MonitoringService {
       items: formattedItems,
       meta: {
         totalItems,
+        todayCount,
         currentPage: page,
         totalPages: Math.ceil(totalItems / limit),
       },
     };
   }
 
-  async getCurrentResources(node?: string) {
-    const nodeFilter = this.buildNodeFilter(node);
-    const latestMetric = await this.metricModel
-      .findOne(nodeFilter)
-      .sort({ createdAt: -1 })
-      .lean();
+  // Gauge overview: đo trực tiếp tài nguyên máy chủ tại thời điểm gọi
+  async getCurrentResources(timeframe?: string) {
+    const fromDate = this.getStartDateFromTimeframe(timeframe);
 
-    let diskPercent = 0;
-    let diskText = 'N/A';
-    try {
-      const stat = fs.statfsSync(process.cwd());
-      const totalBytes = stat.blocks * stat.bsize;
-      const freeBytes = stat.bfree * stat.bsize;
-      const usedBytes = totalBytes - freeBytes;
+    const [peakResult] = await this.metricModel.aggregate<PeakCpuResult>([
+      { $match: { createdAt: { $gte: fromDate } } },
+      { $group: { _id: null, peak: { $max: '$cpu_usage_percent' } } },
+    ]);
 
-      diskPercent = (usedBytes / totalBytes) * 100;
-      diskText = `${(usedBytes / 1024 ** 3).toFixed(1)}GB / ${(totalBytes / 1024 ** 3).toFixed(1)}GB`;
-    } catch {
-      diskPercent = 0;
-      diskText = 'Không thể đọc ổ đĩa';
-    }
+    const currentCpu = getCpuUsagePercent();
+    const peakCpu = Math.min(Math.max(currentCpu, peakResult?.peak ?? 0), 100);
 
     return {
-      cpu: {
-        current: latestMetric?.cpu_usage_percent || 0,
-        peak: Math.max((latestMetric?.cpu_usage_percent || 0) + 15, 100),
-      },
-      ram: {
-        percent: latestMetric?.ram_usage_percent || 0,
-        text: 'Dữ liệu thực tế',
-      },
-      disk: {
-        percent: Number(diskPercent.toFixed(1)),
-        text: diskText,
-      },
+      cpu: { current: currentCpu, peak: Number(peakCpu.toFixed(1)) },
+      ram: getRamUsage(),
+      disk: getDiskUsage(),
     };
   }
 
-  async getResourceHistory24h(timeframe?: string, node?: string) {
+  // Biểu đồ LineChart CPU/RAM
+  async getResourceHistory(timeframe?: string) {
     const fromDate = this.getStartDateFromTimeframe(timeframe);
-    const nodeFilter = this.buildNodeFilter(node);
+    const { format, toLabel } = this.getBucketConfig(timeframe);
 
-    const isRealTime = timeframe === 'Last Hour (Real-time)';
-    const groupId = isRealTime
-      ? { $minute: { date: '$createdAt', timezone: 'Asia/Ho_Chi_Minh' } }
-      : { $hour: { date: '$createdAt', timezone: 'Asia/Ho_Chi_Minh' } };
-
-    const history = await this.metricModel.aggregate<ResourceHistoryAggResult>([
-      { $match: { createdAt: { $gte: fromDate }, ...nodeFilter } },
+    const history = await this.metricModel.aggregate<BucketResourceAggResult>([
+      { $match: { createdAt: { $gte: fromDate } } },
       {
         $group: {
-          _id: groupId,
+          _id: this.buildBucketId(format),
           avgCpu: { $avg: '$cpu_usage_percent' },
           avgRam: { $avg: '$ram_usage_percent' },
         },
@@ -406,23 +469,18 @@ export class MonitoringService {
     ]);
 
     return history.map((h) => ({
-      time: isRealTime ? `${h._id}m` : `${h._id}h`,
-      cpu: Number((h.avgCpu || 0).toFixed(1)),
-      ram: Number((h.avgRam || 0).toFixed(1)),
+      time: toLabel(h._id),
+      cpu: Number(Math.min(h.avgCpu || 0, 100).toFixed(1)),
+      ram: Number(Math.min(h.avgRam || 0, 100).toFixed(1)),
     }));
   }
 
-  // Khử lỗi unsafe bằng cách sử dụng generic SecurityLogAggResult
+  // US4 - Log bảo mật đã gom nhóm số lần vi phạm
   async getAggregatedSecurityLogs(timeframe?: string) {
     const fromDate = this.getStartDateFromTimeframe(timeframe);
 
     const logs = await this.auditLogModel.aggregate<SecurityLogAggResult>([
-      {
-        $match: {
-          createdAt: { $gte: fromDate },
-          is_success: false,
-        },
-      },
+      { $match: { createdAt: { $gte: fromDate }, is_success: false } },
       {
         $group: {
           _id: { ip: '$ip', target: '$actor_email' },
@@ -442,5 +500,165 @@ export class MonitoringService {
       attempts: log.attempts,
       status: log.attempts >= 5 ? 'IP Blocked' : 'Warning',
     }));
+  }
+
+  // Sự cố thật: lấy từ thông báo SYSTEM/SECURITY mà hệ thống đã phát ra
+  async getRecentIncidents(timeframe?: string) {
+    const fromDate = this.getStartDateFromTimeframe(timeframe);
+
+    // 1 sự cố được gửi cho nhiều người nhận -> gom theo title + message để không bị lặp
+    const rows = await this.notificationModel.aggregate<IncidentAggResult>([
+      {
+        $match: {
+          type: { $in: [NotificationType.SYSTEM, NotificationType.SECURITY] },
+          createdAt: { $gte: fromDate },
+        },
+      },
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: { title: '$title', message: '$message' },
+          type: { $first: '$type' },
+          priority: { $first: '$priority' },
+          lastTime: { $first: '$createdAt' },
+          metadata: { $first: '$metadata' },
+        },
+      },
+      { $sort: { lastTime: -1 } },
+      { $limit: 20 },
+    ]);
+
+    const isSevere = (p: NotificationPriority) =>
+      p === NotificationPriority.CRITICAL || p === NotificationPriority.HIGH;
+
+    return {
+      active_count: rows.filter((r) => isSevere(r.priority)).length,
+      items: rows.slice(0, 10).map((r, index) => ({
+        id: `${new Date(r.lastTime).getTime()}-${index}`,
+        time: r.lastTime,
+        severity:
+          r.priority === NotificationPriority.CRITICAL ? 'Critical' : 'Warning',
+        component: r.type === NotificationType.SYSTEM ? 'System' : 'Security',
+        message: this.toEnglishIncidentMessage(
+          r.type,
+          r._id.message,
+          r.metadata,
+        ),
+      })),
+    };
+  }
+
+  // Dựng câu tiếng Anh cho Recent Incident Log từ error_code + số liệu trong câu gốc.
+  // Áp dụng được cho cả thông báo cũ lẫn mới, không sửa dữ liệu trong DB.
+  private toEnglishIncidentMessage(
+    type: NotificationType,
+    message: string,
+    metadata?: Record<string, unknown>,
+  ): string {
+    const code =
+      typeof metadata?.error_code === 'string' ? metadata.error_code : '';
+    const ip = typeof metadata?.ip === 'string' ? metadata.ip : '';
+
+    // 1. Cảnh báo tài nguyên: "... ở mức 86.7%, vượt ngưỡng 85%."
+    const resource = RESOURCE_ALERT_LABELS[code];
+    if (resource) {
+      const percents = message.match(/\d+(?:\.\d+)?%/g) ?? [];
+      if (percents.length >= 2) {
+        return `${resource} usage is at ${percents[0]}, exceeding the ${percents[1]} threshold.`;
+      }
+      if (percents.length === 1) {
+        return `${resource} usage is at ${percents[0]}, above the alert threshold.`;
+      }
+      return `${resource} usage exceeded the configured alert threshold.`;
+    }
+
+    // 2. Lỗi đối tác: 3RD_PARTY_FAIL_<PROVIDER>
+    if (code.startsWith('3RD_PARTY_FAIL_')) {
+      const provider = code.replace('3RD_PARTY_FAIL_', '');
+      const httpStatus = message.match(/HTTP (\d{3})/)?.[1];
+      const latency = message.match(/(\d+)ms/)?.[1];
+      return `Third-party service ${provider} is not responding properly${
+        httpStatus ? ` (HTTP ${httpStatus})` : ''
+      }${latency ? `, response time ${latency}ms` : ''}.`;
+    }
+
+    // 3. Tác vụ ngầm không chạy đúng lịch: "Tác vụ ngầm [JOB_NAME] ..."
+    if (code === 'SCHEDULED_JOB_FAILURE') {
+      const job = message.match(/\[([^\]]+)\]/)?.[1];
+      return `Background job ${job ?? '(unknown)'} has not run on schedule for over 1 hour.`;
+    }
+
+    // 4. Cảnh báo bảo mật
+    if (type === NotificationType.SECURITY) {
+      const account = message.match(/[\w.+-]+@[\w-]+\.[\w.]+/)?.[0];
+      const from = ip ? ` from IP ${ip}` : '';
+      if (/brute-?force/i.test(message)) {
+        return `Brute-force attack detected${
+          account ? ` on account ${account}` : ''
+        }${from}. The account has been temporarily locked.`;
+      }
+      return `Security alert: suspicious activity detected${from}.`;
+    }
+
+    // 5. Lỗi hệ thống khác có mã lỗi
+    if (code) return `System error reported (${code}).`;
+
+    return message;
+  }
+
+  // NGƯỠNG CẢNH BÁO
+  async getThresholds(): Promise<ThresholdValues> {
+    const doc = await this.thresholdModel
+      .findOne({ key: 'default' })
+      .lean<ThresholdValues>()
+      .exec();
+
+    return {
+      cpu: doc?.cpu ?? DEFAULT_THRESHOLDS.cpu,
+      ram: doc?.ram ?? DEFAULT_THRESHOLDS.ram,
+      disk: doc?.disk ?? DEFAULT_THRESHOLDS.disk,
+    };
+  }
+
+  async updateThresholds(
+    dto: UpdateThresholdsDto,
+    actorId: string,
+    ip: string,
+    userAgent: string,
+  ): Promise<ThresholdValues> {
+    const before = await this.getThresholds();
+    const after: ThresholdValues = {
+      cpu: dto.cpu,
+      ram: dto.ram,
+      disk: dto.disk,
+    };
+
+    await this.thresholdModel
+      .findOneAndUpdate(
+        { key: 'default' },
+        {
+          $set: {
+            ...after,
+            updated_by: Types.ObjectId.isValid(actorId)
+              ? new Types.ObjectId(actorId)
+              : null,
+          },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      )
+      .exec();
+
+    await this.auditLogsService.log({
+      action: 'UPDATE_SYSTEM_THRESHOLDS',
+      collection_name: 'system_thresholds',
+      actor_id: actorId,
+      target_id: null,
+      department: Department.MANAGEMENT,
+      detail: { before, after },
+      ip,
+      user_agent: userAgent,
+    });
+
+    return after;
   }
 }

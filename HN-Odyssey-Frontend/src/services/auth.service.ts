@@ -52,6 +52,30 @@ const authService = {
     }
   },
 
+  // Đồng bộ thông tin + quyền mới nhất của tài khoản (gọi mỗi lần tải lại trang)
+  async syncCurrentUser(): Promise<void> {
+    if (!tokenStorage.getToken()) return;
+    try {
+      const response = await axiosClient.get("/auth/me");
+      const body = response.data as Record<string, unknown> | undefined;
+      // Phòng trường hợp Backend bọc dữ liệu trong { data: ... }
+      const freshUser = (body?.data ?? body) as
+        | Record<string, unknown>
+        | undefined;
+      if (freshUser && typeof freshUser === "object") {
+        // Gộp để giữ lại các field khác mà trang Profile có thể đã lưu thêm
+        const cachedUser =
+          tokenStorage.getUser<Record<string, unknown>>() ?? {};
+        tokenStorage.setUser({ ...cachedUser, ...freshUser });
+      }
+    } catch (error) {
+      // 403: tài khoản đã bị khóa → xóa phiên. Lỗi mạng: giữ dữ liệu cũ để không chặn người dùng
+      if ((error as { status?: number })?.status === 403) {
+        tokenStorage.clearAuth();
+      }
+    }
+  },
+
   // Refresh Token (BỔ SUNG)
   async refreshToken(
     refreshToken: string,

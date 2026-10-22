@@ -30,7 +30,7 @@ export default function NetworkApiTab({ data }: NetworkApiTabProps) {
         <div className="na-chart-card na-chart-flex">
           {/* Cột 1: Biểu đồ Line */}
           <div className="na-chart-col">
-            <h3 className="na-section-title">Network Throughput (Mbps)</h3>
+            <h3 className="na-section-title">API Response Time (ms)</h3>
             <div
               className="na-chart-container small"
               style={{ width: "100%", height: 240, minHeight: 240 }}
@@ -70,7 +70,7 @@ export default function NetworkApiTab({ data }: NetworkApiTabProps) {
 
           {/* Cột 2: Biểu đồ Bar */}
           <div className="na-chart-col">
-            <h3 className="na-section-title">API Error Rate</h3>
+            <h3 className="na-section-title">API Error Rate (%)</h3>
             <div
               className="na-chart-container small"
               style={{ width: "100%", height: 240, minHeight: 240 }}

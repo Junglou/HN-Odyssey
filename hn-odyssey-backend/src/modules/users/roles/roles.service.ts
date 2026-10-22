@@ -14,6 +14,7 @@ import { CreateRoleDto } from './dto/create-role.dto';
 import { AuditLogsService } from '../../system/audit-logs/audit-logs.service';
 import { Department } from 'src/common/enums/department.enum';
 import { isReservedRoleKey } from 'src/common/constants/system-roles.constant';
+import { Action, Resource } from 'src/common/enums/resource.enum';
 
 @Injectable()
 export class RolesService {
@@ -22,6 +23,26 @@ export class RolesService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private readonly auditLogsService: AuditLogsService,
   ) {}
+
+  // Phương án A: READ là quyền tiên quyết. Có bất kỳ action nào trên resource thì luôn kèm READ.
+  // Đồng thời gộp resource trùng lặp và bỏ resource không còn action nào.
+  private normalizePermissions(
+    permissions: { resource: Resource; actions: Action[] }[] = [],
+  ): { resource: Resource; actions: Action[] }[] {
+    const merged = new Map<Resource, Set<Action>>();
+
+    permissions.forEach((p) => {
+      if (!merged.has(p.resource)) merged.set(p.resource, new Set<Action>());
+      (p.actions ?? []).forEach((a) => merged.get(p.resource)!.add(a));
+    });
+
+    return Array.from(merged.entries())
+      .filter(([, actions]) => actions.size > 0)
+      .map(([resource, actions]) => {
+        if (!actions.has(Action.MANAGE)) actions.add(Action.READ);
+        return { resource, actions: Array.from(actions) };
+      });
+  }
 
   // 1. TẠO ROLE MỚI
   async create(
@@ -46,6 +67,7 @@ export class RolesService {
 
     const newRole = new this.roleModel({
       ...dto,
+      permissions: this.normalizePermissions(dto.permissions),
       slug,
       is_system: false,
       is_active: dto.is_active !== undefined ? dto.is_active : true,
@@ -134,7 +156,8 @@ export class RolesService {
     if (dto.name) role.name = dto.name;
     if (dto.description) role.description = dto.description;
     if (typeof dto.is_active !== 'undefined') role.is_active = dto.is_active;
-    if (dto.permissions) role.permissions = dto.permissions;
+    if (dto.permissions)
+      role.permissions = this.normalizePermissions(dto.permissions);
 
     await role.save();
 

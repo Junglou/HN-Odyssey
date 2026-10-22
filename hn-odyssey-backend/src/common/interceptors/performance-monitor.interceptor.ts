@@ -9,12 +9,14 @@ import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import * as os from 'os';
+import {
+  getCpuUsagePercent,
+  getRamUsage,
+} from '../../modules/system/monitoring/system-usage.util';
 import {
   SystemMetric,
   SystemMetricDocument,
 } from '../../modules/system/monitoring/schemas/system-metric.schema';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // 1. ĐỊNH NGHĨA INTERFACE ĐỂ KHỬ HOÀN TOÀN 'ANY' TỪ NESTJS
 interface IHttpRequest {
@@ -34,7 +36,6 @@ export class PerformanceMonitorInterceptor implements NestInterceptor {
   constructor(
     @InjectModel(SystemMetric.name)
     private readonly metricModel: Model<SystemMetricDocument>,
-    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -59,25 +60,11 @@ export class PerformanceMonitorInterceptor implements NestInterceptor {
     const duration = Date.now() - startTime;
     const isSlow = duration > this.SLOW_THRESHOLD;
 
-    // AC4: Đo lường tài nguyên CPU & RAM
-    const totalMem = os.totalmem();
-    const freeMem = os.freemem();
-    const ramUsagePercent = ((totalMem - freeMem) / totalMem) * 100;
+    // AC4: Đo lường tài nguyên CPU & RAM (dùng chung bộ đo với trang System)
+    const ramUsagePercent = getRamUsage().percent;
+    const cpuUsagePercent = getCpuUsagePercent();
 
-    const cpuLoad = os.loadavg()[0]; // Load trung bình 1 phút
-    const cpuUsagePercent = (cpuLoad / os.cpus().length) * 100;
-
-    // [BỔ SUNG 4]: LOGIC CẢNH BÁO TÀI NGUYÊN (US2 - AC4)
-    // if (ramUsagePercent > 90 || cpuUsagePercent > 90) {
-    //   this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
-    //     severity: 'CRITICAL',
-    //     error_code: 'SYS_RESOURCE_OVERLOAD',
-    //     message: `Máy chủ đang quá tải! CPU: ${cpuUsagePercent.toFixed(1)}%, RAM: ${ramUsagePercent.toFixed(1)}%. Có nguy cơ sập hệ thống.`,
-    //   });
-    //   this.logger.error(
-    //     `[CẢNH BÁO] Tài nguyên cạn kiệt! CPU: ${cpuUsagePercent.toFixed(1)}%, RAM: ${ramUsagePercent.toFixed(1)}%`,
-    //   );
-    // } // tat đi để tránh spam log khi đang phát triển, sẽ bật lại khi deploy sản phẩm
+    // Cảnh báo vượt ngưỡng CPU/RAM/Disk do CronMonitorService xử lý (mỗi phút, có chống spam)
 
     const metric = new this.metricModel({
       path: req.url, // Không còn lỗi unsafe-member-access

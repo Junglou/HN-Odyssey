@@ -1,17 +1,21 @@
-import { Controller, Get, UseGuards, Query } from '@nestjs/common';
+import { Body, Controller, Get, Ip, Put, Query } from '@nestjs/common';
 import {
   HealthCheck,
   HealthCheckService,
   MongooseHealthIndicator,
   MemoryHealthIndicator,
 } from '@nestjs/terminus';
-import { RolesGuard } from 'src/common/guards/roles.guard';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { BaseResponse } from 'src/common/dtos/base-response.dto';
 import { MonitoringService } from './monitoring.service';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
+import { Public } from 'src/common/decorators/public.decorator';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { UserAgent } from 'src/common/decorators/user-agent.decorator';
+import type { IUser } from 'src/common/interfaces/user.interface';
 import { Action, Resource } from 'src/common/enums/resource.enum';
+import { UpdateThresholdsDto } from './dto/update-thresholds.dto';
 
+// Guard JWT → Roles → Permissions đã đăng ký global ở app.module, không cần @UseGuards lại
 @Controller('admin/system-monitoring')
 export class MonitoringController {
   constructor(
@@ -21,9 +25,9 @@ export class MonitoringController {
     private readonly monitoringService: MonitoringService,
   ) {}
 
-  // US1 - AC1: Public Health Check Endpoint
-  // Terminus tự quản lý logic bên dưới nên không cần đẩy vào MonitoringService
+  // US1 - AC1: Public Health Check Endpoint (dùng được cho cả công cụ uptime bên ngoài)
   @Get('health')
+  @Public()
   @HealthCheck()
   checkHealth() {
     return this.health.check([
@@ -34,22 +38,14 @@ export class MonitoringController {
 
   // US2 - Hiệu năng Server
   @Get('performance-stats')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
-  async getPerformanceStats(
-    @Query('timeframe') timeframe?: string,
-    @Query('node') node?: string,
-  ) {
-    const data = await this.monitoringService.getPerformanceStats(
-      timeframe,
-      node,
-    );
+  async getPerformanceStats(@Query('timeframe') timeframe?: string) {
+    const data = await this.monitoringService.getPerformanceStats(timeframe);
     return new BaseResponse(true, 'Lấy hiệu năng hệ thống thành công', data);
   }
 
   // US5 - Trạng thái API đối tác
   @Get('third-party-status')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
   async getThirdPartyStatus(@Query('timeframe') timeframe?: string) {
     const data = await this.monitoringService.getThirdPartyStatus(timeframe);
@@ -58,37 +54,22 @@ export class MonitoringController {
 
   // US1 - AC2: Đèn trạng thái tổng quan
   @Get('status-widget')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
-  async getSystemStatusWidget(
-    @Query('timeframe') timeframe?: string,
-    @Query('node') node?: string,
-  ) {
-    const data = await this.monitoringService.getSystemStatusWidget(
-      timeframe,
-      node,
-    );
+  async getSystemStatusWidget(@Query('timeframe') timeframe?: string) {
+    const data = await this.monitoringService.getSystemStatusWidget(timeframe);
     return new BaseResponse(true, 'Lấy trạng thái hệ thống thành công', data);
   }
 
   // US1-AC6 & US2-AC6: Lịch sử hiệu năng vẽ biểu đồ
   @Get('performance-history-24h')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
-  async getPerformanceHistory(
-    @Query('timeframe') timeframe?: string,
-    @Query('node') node?: string,
-  ) {
-    const data = await this.monitoringService.getPerformanceHistory24h(
-      timeframe,
-      node,
-    );
+  async getPerformanceHistory(@Query('timeframe') timeframe?: string) {
+    const data = await this.monitoringService.getPerformanceHistory(timeframe);
     return new BaseResponse(true, 'Lấy lịch sử hiệu năng thành công', data);
   }
 
-  // US3 - AC6: Lấy lịch sử lỗi giao dịch thanh toán
+  // US3 - AC6: Lịch sử lỗi giao dịch thanh toán
   @Get('payment-errors')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
   async getPaymentErrors(
     @Query('page') page?: string,
@@ -111,37 +92,61 @@ export class MonitoringController {
     );
   }
 
-  // Cung cấp dữ liệu cho Gauge overview
+  // Gauge overview
   @Get('resources-current')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
-  async getCurrentResources(@Query('node') node?: string) {
-    const data = await this.monitoringService.getCurrentResources(node);
+  async getCurrentResources(@Query('timeframe') timeframe?: string) {
+    const data = await this.monitoringService.getCurrentResources(timeframe);
     return new BaseResponse(true, 'Lấy tài nguyên hiện tại thành công', data);
   }
 
-  // Cung cấp dữ liệu cho biểu đồ LineChart CPU/RAM
+  // Biểu đồ LineChart CPU/RAM
   @Get('resources-history-24h')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
-  async getResourceHistory(
-    @Query('timeframe') timeframe?: string,
-    @Query('node') node?: string,
-  ) {
-    const data = await this.monitoringService.getResourceHistory24h(
-      timeframe,
-      node,
-    );
+  async getResourceHistory(@Query('timeframe') timeframe?: string) {
+    const data = await this.monitoringService.getResourceHistory(timeframe);
     return new BaseResponse(true, 'Lấy lịch sử tài nguyên thành công', data);
   }
 
-  // US4 - Lấy log bảo mật đã được gom nhóm số lần vi phạm
+  // US4 - Log bảo mật đã gom nhóm số lần vi phạm
   @Get('security-logs-recent')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
   async getSecurityLogsRecent(@Query('timeframe') timeframe?: string) {
     const data =
       await this.monitoringService.getAggregatedSecurityLogs(timeframe);
     return new BaseResponse(true, 'Lấy log bảo mật thành công', data);
+  }
+
+  // Sự cố hệ thống & bảo mật gần đây
+  @Get('incidents')
+  @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
+  async getIncidents(@Query('timeframe') timeframe?: string) {
+    const data = await this.monitoringService.getRecentIncidents(timeframe);
+    return new BaseResponse(true, 'Lấy danh sách sự cố thành công', data);
+  }
+
+  // Ngưỡng cảnh báo CPU/RAM/Disk
+  @Get('thresholds')
+  @RequirePermissions(Resource.SYSTEM_MONITORING, Action.READ)
+  async getThresholds() {
+    const data = await this.monitoringService.getThresholds();
+    return new BaseResponse(true, 'Lấy ngưỡng cảnh báo thành công', data);
+  }
+
+  @Put('thresholds')
+  @RequirePermissions(Resource.SYSTEM_MONITORING, Action.UPDATE)
+  async updateThresholds(
+    @Body() dto: UpdateThresholdsDto,
+    @CurrentUser() user: IUser,
+    @Ip() ip: string,
+    @UserAgent() userAgent: string,
+  ) {
+    const data = await this.monitoringService.updateThresholds(
+      dto,
+      user._id,
+      ip,
+      userAgent,
+    );
+    return new BaseResponse(true, 'Cập nhật ngưỡng cảnh báo thành công', data);
   }
 }

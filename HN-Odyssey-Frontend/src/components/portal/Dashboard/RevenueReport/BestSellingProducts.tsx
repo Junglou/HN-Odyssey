@@ -37,7 +37,7 @@ export default function BestSellingProducts({
       <div className="bsp-table-wrapper">
         {!products || products.length === 0 ? (
           <div className="bsp-empty-state">
-            không tìm thấy sản phẩm nào trong khoảng thời gian này
+            No products found for this time range.
           </div>
         ) : (
           <>

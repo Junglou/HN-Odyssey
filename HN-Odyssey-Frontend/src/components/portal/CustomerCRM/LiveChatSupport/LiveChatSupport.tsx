@@ -566,7 +566,7 @@ export default function LiveChatSupport({
                       display: "block",
                     }}
                   >
-                    Tải thêm hội thoại...
+                    Load more conversations....
                   </button>
                 )}
               </>

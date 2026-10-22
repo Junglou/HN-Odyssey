@@ -871,6 +871,32 @@ export class AuthService {
     };
   }
 
+  // 15. LẤY THÔNG TIN & QUYỀN MỚI NHẤT (Frontend gọi mỗi lần tải lại trang)
+  async getMe(userId: string) {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User không tồn tại');
+
+    // Dùng 403 (không phải 401) để Frontend không cố refresh token vô ích
+    if (user.status !== UserStatus.ACTIVE) {
+      throw new ForbiddenException('Tài khoản của bạn đã bị khóa.');
+    }
+
+    const mergedRoles = Array.from(new Set([...user.roles, 'CUSTOMER']));
+    const { permissions, is_portal_access } =
+      await this.resolveUserPermissions(mergedRoles);
+
+    return {
+      _id: user._id,
+      email: user.email,
+      full_name: user.fullName || user.last_Name + ' ' + user.first_Name,
+      roles: mergedRoles,
+      avatar: user.avatar,
+      status: user.status,
+      permissions,
+      is_portal_access,
+    };
+  }
+
   async logout(
     userId: string,
     ip: string,

@@ -1,6 +1,6 @@
 const ACCESS_TOKEN_KEY = "access_token";
 const REFRESH_TOKEN_KEY = "refreshToken";
-const USER_KEY = "user_info";
+export const USER_KEY = "user_info";
 
 const tokenStorage = {
   setToken: (JWT_SECRET: string): void => {

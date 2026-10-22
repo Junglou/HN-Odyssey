@@ -402,17 +402,12 @@ export const PERMISSION_METADATA: IPermissionGroupMeta[] = [
       {
         code: Resource.SYSTEM_MONITORING,
         name: "System Overview & Security",
-        availableActions: [Action.READ],
+        availableActions: [Action.READ, Action.UPDATE],
       },
       {
         code: Resource.SYSTEM_AUDIT,
         name: "Audit Logs",
         availableActions: [Action.READ, Action.EXPORT],
-      },
-      {
-        code: Resource.SYSTEM_NOTIFICATIONS,
-        name: "Notification Management",
-        availableActions: [Action.READ],
       },
     ],
   },

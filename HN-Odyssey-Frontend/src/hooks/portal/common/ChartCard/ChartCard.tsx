@@ -30,11 +30,11 @@ export default function ChartCard({
   const disabled = !canExport || isExporting || isLoading;
 
   return (
-    <div className="cc-card">
+    <div className="chc-card">
       {/* US.95 AC2: nút Xuất PDF đặt TẠI biểu đồ, nằm ngoài vùng chụp */}
       <button
         type="button"
-        className="cc-pdf-btn"
+        className="chc-pdf-btn"
         disabled={disabled}
         title={
           canExport
@@ -53,17 +53,17 @@ export default function ChartCard({
       </button>
 
       {/* Chỉ vùng này được chụp vào PDF */}
-      <div ref={captureRef} className="cc-capture">
-        <div className="cc-header">
-          <div className="cc-title">{title}</div>
-          {period && <div className="cc-period">{period}</div>}
+      <div ref={captureRef} className="chc-capture">
+        <div className="chc-header">
+          <div className="chc-title">{title}</div>
+          {period && <div className="chc-period">{period}</div>}
         </div>
-        {subtitle && <div className="cc-subtitle">{subtitle}</div>}
-        {legend && <div className="cc-legend">{legend}</div>}
+        {subtitle && <div className="chc-subtitle">{subtitle}</div>}
+        {legend && <div className="chc-legend">{legend}</div>}
         {isLoading ? (
-          <div className="portal-skel cc-skeleton" aria-busy="true" />
+          <div className="portal-skel chc-skeleton" aria-busy="true" />
         ) : (
-          <div className="cc-body cc-body-enter">{children}</div>
+          <div className="chc-body chc-body-enter">{children}</div>
         )}
       </div>
     </div>
