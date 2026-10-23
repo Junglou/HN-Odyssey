@@ -8,6 +8,7 @@ import "./VariantManagementPage.css";
 export default function VariantManagementPage() {
   const {
     attributes,
+    pagination,
     isLoading,
     search,
     drawerConfig,
@@ -44,6 +45,7 @@ export default function VariantManagementPage() {
         data={attributes}
         isLoading={isLoading}
         search={search}
+        pagination={pagination}
         actions={actions}
       />
 

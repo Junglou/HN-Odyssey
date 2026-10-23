@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import "./ManageAdSpendDrawer.css";
+import PortalPagination from "../../common/Pagination/PortalPagination";
 import {
   NO_SPEND_TOOLTIP,
   calcRoi,
@@ -632,25 +633,12 @@ export default function ManageAdSpendDrawer({
 
             {totalPages > 1 && (
               <div className="masd-pagination">
-                <button
-                  type="button"
-                  className="masd-btn masd-btn-secondary masd-btn-sm"
-                  disabled={page <= 1 || isListLoading}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  Previous
-                </button>
-                <span>
-                  Page {page} of {totalPages}
-                </span>
-                <button
-                  type="button"
-                  className="masd-btn masd-btn-secondary masd-btn-sm"
-                  disabled={page >= totalPages || isListLoading}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Next
-                </button>
+                <PortalPagination
+                  page={page}
+                  totalPages={totalPages}
+                  onPageChange={setPage}
+                  disabled={isListLoading}
+                />
               </div>
             )}
           </div>

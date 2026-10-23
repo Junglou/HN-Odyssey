@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import "./BlogNewsManagement.css";
 import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
+import PortalPagination from "../../common/Pagination/PortalPagination";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 import {
   SearchIcon,
@@ -71,18 +72,14 @@ export default function BlogNewsManagement({
     Action.UNPUBLISH,
   );
 
-  // quản lý trạng thái đóng mở cho bộ lọc và phân trang
+  // quản lý trạng thái đóng mở cho bộ lọc
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [hasStatusOpened, setHasStatusOpened] = useState(false);
-  const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
-  const [hasLimitOpened, setHasLimitOpened] = useState(false);
 
   const statusRef = useRef<HTMLDivElement>(null);
-  const limitRef = useRef<HTMLDivElement>(null);
 
-  // theo dõi hành động click chuột ra ngoài để đóng các dropdown
+  // theo dõi hành động click chuột ra ngoài để đóng dropdown
   useClickOutside(statusRef, () => setIsStatusOpen(false));
-  useClickOutside(limitRef, () => setIsLimitDropdownOpen(false));
 
   const isAllSelected = data.length > 0 && selectedIds.size === data.length;
 
@@ -284,81 +281,16 @@ export default function BlogNewsManagement({
           </table>
         </div>
 
-        <div className="ban-pagination">
-          <span className="ban-pagination-info">
-            Showing{" "}
-            {pagination.totalFiltered === 0 ? 0 : pagination.startIndex + 1} to{" "}
-            {Math.min(
-              pagination.startIndex + pagination.limit,
-              pagination.totalFiltered,
-            )}{" "}
-            of {pagination.totalFiltered} articles
-          </span>
-          <div className="ban-page-numbers">
-            <button
-              className="ban-page-num"
-              disabled={pagination.page === 1}
-              onClick={() => actions.changePage(pagination.page - 1)}
-            >
-              &lt;
-            </button>
-
-            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(
-              (num) => (
-                <button
-                  key={num}
-                  className={`ban-page-num ${pagination.page === num ? "active" : ""}`}
-                  onClick={() => actions.changePage(num)}
-                >
-                  {num}
-                </button>
-              ),
-            )}
-
-            <button
-              className="ban-page-num"
-              disabled={
-                pagination.page === pagination.totalPages ||
-                pagination.totalPages === 0
-              }
-              onClick={() => actions.changePage(pagination.page + 1)}
-            >
-              &gt;
-            </button>
-
-            <div className="ban-limit-dropdown" ref={limitRef}>
-              <div
-                className={`ban-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}
-                onClick={() => {
-                  setIsLimitDropdownOpen(!isLimitDropdownOpen);
-                  if (!hasLimitOpened) setHasLimitOpened(true); // Sửa ở đây
-                }}
-              >
-                <span>{pagination.limit} / page</span>
-                <ChevronDownIcon
-                  className={`ban-dropdown-arrow ${isLimitDropdownOpen ? "open" : ""}`}
-                />
-              </div>
-
-              <div
-                className={`ban-limit-options ${isLimitDropdownOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
-              >
-                {[10, 20, 50].map((val) => (
-                  <div
-                    key={val}
-                    className={`ban-limit-option ${pagination.limit === val ? "active" : ""}`}
-                    onClick={() => {
-                      actions.changeLimit(val);
-                      setIsLimitDropdownOpen(false);
-                    }}
-                  >
-                    {val} / page
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <PortalPagination
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalFiltered}
+          pageSize={pagination.limit}
+          onPageChange={actions.changePage}
+          onPageSizeChange={actions.changeLimit}
+          itemLabel="articles"
+          disabled={isLoading}
+        />
       </div>
     </div>
   );

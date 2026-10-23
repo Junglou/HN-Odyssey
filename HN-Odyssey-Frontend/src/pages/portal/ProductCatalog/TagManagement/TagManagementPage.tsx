@@ -7,7 +7,8 @@ import "./TagManagementPage.css";
 // container gọi hook và truyền data xuống view
 export default function TagManagementPage() {
   const {
-    filteredTags,
+    currentTags,
+    pagination,
     isLoading,
     search,
     drawerConfig,
@@ -22,9 +23,10 @@ export default function TagManagementPage() {
     <div className="tm-page-container">
       {/* component chính hiển thị danh sách tag */}
       <TagManagement
-        data={filteredTags}
+        data={currentTags}
         isLoading={isLoading}
         search={search}
+        pagination={pagination}
         actions={actions}
       />
 

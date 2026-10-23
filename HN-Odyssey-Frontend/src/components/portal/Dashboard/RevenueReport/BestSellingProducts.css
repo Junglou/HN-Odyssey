@@ -92,47 +92,9 @@
   color: #b45309;
 }
 
-/* phân trang */
+/* phân trang (nội dung do PortalPagination render) */
 .bsp-pagination-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 16px;
+  padding: 6px 16px 16px;
   background-color: #ffffff;
   border-top: 1px solid #e2e8f0;
-}
-
-.bsp-page-numbers {
-  display: flex;
-  gap: 8px;
-}
-
-.bsp-page-nav-btn,
-.bsp-page-num-btn {
-  padding: 6px 12px;
-  border: 1px solid #cbd5e1;
-  background-color: #ffffff;
-  border-radius: 4px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #475569;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.bsp-page-num-btn.bsp-active {
-  background-color: #1e293b;
-  color: #ffffff;
-  border-color: #1e293b;
-}
-
-.bsp-page-nav-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.bsp-page-nav-btn:not(:disabled):hover,
-.bsp-page-num-btn:not(.bsp-active):hover {
-  background-color: #f1f5f9;
 }

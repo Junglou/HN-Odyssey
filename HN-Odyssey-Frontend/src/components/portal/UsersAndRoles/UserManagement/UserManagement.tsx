@@ -1,8 +1,9 @@
 // imports
 import { useState, useRef, useEffect } from "react";
 import "./UserManagement.css";
-import { useClickOutside } from "../../../../hooks/common/useClickOutside";
+
 import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
+import PortalPagination from "../../common/Pagination/PortalPagination";
 import { getCurrentUser, hasPermission } from "../../../../utils/permission";
 import { Action, Resource } from "../../../../types/permissions";
 import {
@@ -145,17 +146,8 @@ export default function UserManagement({
     Record<string, boolean>
   >({});
 
-  const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
-  const [hasLimitOpened, setHasLimitOpened] = useState(false);
-  const limitRef = useRef<HTMLDivElement>(null);
-  useClickOutside(limitRef, () => setIsLimitDropdownOpen(false));
-
   const isAllSelected = data.length > 0 && data.every((user) => user.selected);
   const hasSelection = data.some((user) => user.selected);
-  const pageNumbers = Array.from(
-    { length: pagination.totalPages },
-    (_, i) => i + 1,
-  );
 
   // render
   return (
@@ -404,98 +396,17 @@ export default function UserManagement({
           </table>
         </div>
 
-        <div className="um-pagination">
-          <span>
-            Showing{" "}
-            {pagination.totalFiltered === 0 ? 0 : pagination.startIndex + 1} -{" "}
-            {Math.min(pagination.endIndex, pagination.totalFiltered)} of{" "}
-            {pagination.totalFiltered} users
-          </span>
-
-          <div className="um-page-numbers">
-            <button
-              type="button"
-              className="um-page-num"
-              style={{
-                opacity: pagination.page === 1 ? 0.4 : 1,
-                pointerEvents: pagination.page === 1 ? "none" : "auto",
-              }}
-              onClick={() =>
-                actions.changePage(Math.max(pagination.page - 1, 1))
-              }
-            >
-              &lt;
-            </button>
-
-            {pageNumbers.map((num) => (
-              <button
-                type="button"
-                key={num}
-                className={`um-page-num ${pagination.page === num ? "active" : ""}`}
-                onClick={() => actions.changePage(num)}
-              >
-                {num}
-              </button>
-            ))}
-
-            <button
-              type="button"
-              className="um-page-num"
-              style={{
-                opacity:
-                  pagination.page === pagination.totalPages ||
-                  pagination.totalPages === 0
-                    ? 0.4
-                    : 1,
-                pointerEvents:
-                  pagination.page === pagination.totalPages ||
-                  pagination.totalPages === 0
-                    ? "none"
-                    : "auto",
-              }}
-              onClick={() =>
-                actions.changePage(
-                  Math.min(pagination.page + 1, pagination.totalPages),
-                )
-              }
-            >
-              &gt;
-            </button>
-
-            <div className="um-limit-dropdown" ref={limitRef}>
-              <div
-                className={`um-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}
-                onClick={() => {
-                  setIsLimitDropdownOpen(!isLimitDropdownOpen);
-                  if (!hasLimitOpened) setHasLimitOpened(true);
-                }}
-              >
-                <span>{pagination.limit} / page</span>
-                <div
-                  className={`um-limit-icon ${isLimitDropdownOpen ? "open" : ""}`}
-                >
-                  <ChevronDownSmallIcon />
-                </div>
-              </div>
-              <div
-                className={`um-limit-options ${isLimitDropdownOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
-              >
-                {[5, 10, 20, 50].map((val) => (
-                  <div
-                    key={val}
-                    className={`um-limit-option ${pagination.limit === val ? "active" : ""}`}
-                    onClick={() => {
-                      actions.changeLimit(val);
-                      setIsLimitDropdownOpen(false);
-                    }}
-                  >
-                    {val} / page
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <PortalPagination
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalFiltered}
+          pageSize={pagination.limit}
+          onPageChange={actions.changePage}
+          onPageSizeChange={actions.changeLimit}
+          pageSizeOptions={[5, 10, 20, 50]}
+          itemLabel="users"
+          disabled={isLoading}
+        />
       </div>
     </div>
   );

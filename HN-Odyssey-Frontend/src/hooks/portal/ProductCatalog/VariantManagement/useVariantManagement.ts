@@ -49,6 +49,7 @@ interface ApiError {
 export function useVariantManagement() {
   const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [search, setSearch] = useState("");
+  const [pagination, setPagination] = useState({ page: 1, limit: 10 });
   const [accessError, setAccessError] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -156,8 +157,25 @@ export function useVariantManagement() {
     );
   }, [search, attributes]);
 
+  // Phân trang phía FE (BE trả toàn bộ thuộc tính)
+  const totalPages = Math.max(
+    Math.ceil(filteredAttributes.length / pagination.limit),
+    1,
+  );
+  // Xoá dòng cuối của trang cuối thì lùi về trang trước, không để trang trống
+  const safePage = Math.min(pagination.page, totalPages);
+  const currentAttributes = useMemo(() => {
+    const start = (safePage - 1) * pagination.limit;
+    return filteredAttributes.slice(start, start + pagination.limit);
+  }, [filteredAttributes, safePage, pagination.limit]);
+
   const actions = {
-    changeSearch: (val: string) => setSearch(val),
+    changeSearch: (val: string) => {
+      setSearch(val);
+      setPagination((p) => ({ ...p, page: 1 }));
+    },
+    changePage: (page: number) => setPagination((p) => ({ ...p, page })),
+    changeLimit: (limit: number) => setPagination({ page: 1, limit }),
     openDrawer: (mode: "add" | "edit", attribute?: Attribute) => {
       setDrawerConfig({
         isOpen: true,
@@ -221,6 +239,9 @@ export function useVariantManagement() {
       } else {
         toast.success(baseMsg);
       }
+      if (drawerConfig.mode === "add") {
+        setPagination((p) => ({ ...p, page: 1 }));
+      }
       refreshData();
       actions.closeDrawer();
     } catch (error: unknown) {
@@ -258,7 +279,13 @@ export function useVariantManagement() {
   };
 
   return {
-    attributes: filteredAttributes,
+    attributes: currentAttributes,
+    pagination: {
+      page: safePage,
+      limit: pagination.limit,
+      totalPages,
+      totalFiltered: filteredAttributes.length,
+    },
     isLoading,
     search,
     drawerConfig,

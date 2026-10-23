@@ -18,6 +18,7 @@ export interface QueryCouponDto {
   limit?: number | string;
   status?: CouponStatus;
   search?: string;
+  discount_type?: DiscountType;
 }
 
 const ONGOING_ORDER_STATUSES = [
@@ -112,6 +113,14 @@ export class CouponsService {
     if (query.search && typeof query.search === 'string') {
       const searchRegex = new RegExp(query.search.trim(), 'i');
       filter.code = { $regex: searchRegex };
+    }
+
+    // Lọc theo loại giảm giá; chỉ nhận đúng giá trị enum
+    if (
+      typeof query.discount_type === 'string' &&
+      Object.values(DiscountType).includes(query.discount_type)
+    ) {
+      filter.discount_type = query.discount_type;
     }
 
     const [rawData, total] = await Promise.all([

@@ -1,6 +1,6 @@
 import "./TopCouponsTable.css";
 import type { CouponData } from "../../../../hooks/portal/Dashboard/MarketingAndPromotion/useMarketingAndPromotion";
-import { getPageItems } from "../../../../utils/pagination";
+import PortalPagination from "../../common/Pagination/PortalPagination";
 
 interface TopCouponsTableProps {
   coupons: CouponData[];
@@ -66,43 +66,13 @@ export default function TopCouponsTable({
               </tbody>
             </table>
 
-            {totalPages > 1 && (
-              <div className="tc-pagination-container">
-                <button
-                  className="tc-page-nav-btn"
-                  disabled={currentPage <= 1}
-                  onClick={() => onPageChange(currentPage - 1)}
-                >
-                  Previous
-                </button>
-
-                <div className="tc-page-numbers">
-                  {getPageItems(currentPage, totalPages).map((item, idx) =>
-                    item === "..." ? (
-                      <span key={`dots-${idx}`} className="tc-page-ellipsis">
-                        …
-                      </span>
-                    ) : (
-                      <button
-                        key={item}
-                        className={`tc-page-num-btn ${currentPage === item ? "tc-active" : ""}`}
-                        onClick={() => onPageChange(item)}
-                      >
-                        {item}
-                      </button>
-                    ),
-                  )}
-                </div>
-
-                <button
-                  className="tc-page-nav-btn"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => onPageChange(currentPage + 1)}
-                >
-                  Next
-                </button>
-              </div>
-            )}
+            <div className="tc-pagination-container">
+              <PortalPagination
+                page={currentPage}
+                totalPages={totalPages}
+                onPageChange={onPageChange}
+              />
+            </div>
           </>
         )}
       </div>

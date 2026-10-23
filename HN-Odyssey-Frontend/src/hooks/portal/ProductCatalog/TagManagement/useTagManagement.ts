@@ -29,6 +29,7 @@ export function useTagManagement() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [search, setSearch] = useState("");
+  const [pagination, setPagination] = useState({ page: 1, limit: 10 });
   const [drawerConfig, setDrawerConfig] = useState<{
     isOpen: boolean;
     mode: "add" | "edit";
@@ -66,8 +67,25 @@ export function useTagManagement() {
     );
   }, [tags, search]);
 
+  // Phân trang phía FE (BE trả toàn bộ tag kèm usage_count)
+  const totalPages = Math.max(
+    Math.ceil(filteredTags.length / pagination.limit),
+    1,
+  );
+  // Xoá tag cuối của trang cuối thì lùi về trang trước, không để trang trống
+  const safePage = Math.min(pagination.page, totalPages);
+  const currentTags = useMemo(() => {
+    const start = (safePage - 1) * pagination.limit;
+    return filteredTags.slice(start, start + pagination.limit);
+  }, [filteredTags, safePage, pagination.limit]);
+
   const actions = {
-    changeSearch: (val: string) => setSearch(val),
+    changeSearch: (val: string) => {
+      setSearch(val);
+      setPagination((p) => ({ ...p, page: 1 }));
+    },
+    changePage: (page: number) => setPagination((p) => ({ ...p, page })),
+    changeLimit: (limit: number) => setPagination({ page: 1, limit }),
     openDrawer: (mode: "add" | "edit", tag?: Tag) => {
       setDrawerConfig({ isOpen: true, mode, editingTag: tag || null });
     },
@@ -85,6 +103,7 @@ export function useTagManagement() {
         const res = await axiosClient.post("/tags", data);
         if (res.data) {
           setTags((prev) => [res.data, ...prev]);
+          setPagination((p) => ({ ...p, page: 1 }));
           toast.success("thêm thẻ thành công!");
         }
       } else if (drawerConfig.mode === "edit" && drawerConfig.editingTag) {
@@ -129,6 +148,13 @@ export function useTagManagement() {
   return {
     tags,
     filteredTags,
+    currentTags,
+    pagination: {
+      page: safePage,
+      limit: pagination.limit,
+      totalPages,
+      totalFiltered: filteredTags.length,
+    },
     isLoading,
     search,
     drawerConfig,

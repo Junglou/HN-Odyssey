@@ -1,6 +1,7 @@
 import { useState, useRef, type DragEvent, type ChangeEvent } from "react";
 import "./MediaManagement.css";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
+import PortalPagination from "../../common/Pagination/PortalPagination";
 import {
   SearchIcon,
   ChevronDownSmallIcon,
@@ -60,14 +61,11 @@ export default function MediaManagement({
   const [hasStatusOpened, setHasStatusOpened] = useState(false);
   const [isTypeOpen, setIsTypeOpen] = useState(false);
   const [hasTypeOpened, setHasTypeOpened] = useState(false);
-  const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
-  const [hasLimitOpened, setHasLimitOpened] = useState(false);
 
   const [isDragging, setIsDragging] = useState(false);
 
   const statusRef = useRef<HTMLDivElement>(null);
   const typeRef = useRef<HTMLDivElement>(null);
-  const limitRef = useRef<HTMLDivElement>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const replaceFileInputRef = useRef<HTMLInputElement>(null);
@@ -76,7 +74,6 @@ export default function MediaManagement({
 
   useClickOutside(statusRef, () => setIsStatusOpen(false));
   useClickOutside(typeRef, () => setIsTypeOpen(false));
-  useClickOutside(limitRef, () => setIsLimitDropdownOpen(false));
 
   const triggerFileInput = () => {
     if (fileInputRef.current) {
@@ -436,80 +433,16 @@ export default function MediaManagement({
           )}
         </div>
 
-        <div className="mm-pagination">
-          <span className="mm-pagination-info">
-            Showing{" "}
-            {pagination.totalFiltered === 0 ? 0 : pagination.startIndex + 1} to{" "}
-            {Math.min(
-              pagination.startIndex + pagination.limit,
-              pagination.totalFiltered,
-            )}{" "}
-            of {pagination.totalFiltered} files
-          </span>
-          <div className="mm-page-numbers">
-            <button
-              className="mm-page-num"
-              disabled={pagination.page === 1}
-              onClick={() => actions.changePage(pagination.page - 1)}
-            >
-              &lt;
-            </button>
-            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(
-              (num) => (
-                <button
-                  key={num}
-                  className={`mm-page-num ${pagination.page === num ? "active" : ""}`}
-                  onClick={() => actions.changePage(num)}
-                >
-                  {num}
-                </button>
-              ),
-            )}
-            <button
-              className="mm-page-num"
-              disabled={
-                pagination.page === pagination.totalPages ||
-                pagination.totalPages === 0
-              }
-              onClick={() => actions.changePage(pagination.page + 1)}
-            >
-              &gt;
-            </button>
-
-            <div className="mm-limit-dropdown" ref={limitRef}>
-              <div
-                className={`mm-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}
-                onClick={() => {
-                  setIsLimitDropdownOpen(!isLimitDropdownOpen);
-                  if (!hasLimitOpened) setHasLimitOpened(true);
-                }}
-              >
-                <span>{pagination.limit} / page</span>
-                <div
-                  className={`mm-limit-icon ${isLimitDropdownOpen ? "open" : ""}`}
-                >
-                  <ChevronDownSmallIcon />
-                </div>
-              </div>
-              <div
-                className={`mm-limit-options ${isLimitDropdownOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
-              >
-                {[10, 20, 50].map((val) => (
-                  <div
-                    key={val}
-                    className={`mm-limit-option ${pagination.limit === val ? "active" : ""}`}
-                    onClick={() => {
-                      actions.changeLimit(val);
-                      setIsLimitDropdownOpen(false);
-                    }}
-                  >
-                    {val} / page
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <PortalPagination
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalFiltered}
+          pageSize={pagination.limit}
+          onPageChange={actions.changePage}
+          onPageSizeChange={actions.changeLimit}
+          itemLabel="files"
+          disabled={isLoading}
+        />
       </div>
     </div>
   );

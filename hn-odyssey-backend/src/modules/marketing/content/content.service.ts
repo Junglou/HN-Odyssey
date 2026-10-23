@@ -44,6 +44,7 @@ export interface QueryBannerDto {
   limit?: number | string;
   position?: string;
   status?: BannerStatus;
+  search?: string;
 }
 
 export interface ProcessedFileResult {
@@ -456,6 +457,14 @@ export class ContentService {
 
     if (query.position) filter.position = query.position;
     if (query.status) filter.status = query.status;
+
+    // Tìm theo tên banner; escape ký tự đặc biệt để regex không lỗi khi gõ "(" hay "*"
+    if (typeof query.search === 'string' && query.search.trim()) {
+      const escaped = query.search
+        .trim()
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.title = { $regex: escaped, $options: 'i' };
+    }
 
     const [data, total] = await Promise.all([
       this.bannerModel

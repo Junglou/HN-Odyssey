@@ -8,6 +8,7 @@ import {
 } from "../../../../assets/icons/StockManagementIcons";
 import "./StockOverviewTab.css";
 import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
+import PortalPagination from "../../common/Pagination/PortalPagination";
 import SmartImage from "../../../common/SmartImage/SmartImage";
 
 // Options lọc đã được khôi phục 3 trạng thái tốt nhất
@@ -157,9 +158,6 @@ export default function StockOverviewTab({
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [closingRows, setClosingRows] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isLimitOpen, setIsLimitOpen] = useState(false);
-  const [hasLimitOpened, setHasLimitOpened] = useState(false);
-  const limitRef = useRef<HTMLDivElement>(null);
 
   const toggleRow = (id: string) => {
     if (expandedRows.has(id)) {
@@ -187,19 +185,6 @@ export default function StockOverviewTab({
     actions.refreshData();
     setTimeout(() => setIsRefreshing(false), 500);
   };
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        limitRef.current &&
-        !limitRef.current.contains(event.target as Node)
-      ) {
-        setIsLimitOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   return (
     <div className="sot-filters-card">
@@ -424,93 +409,16 @@ export default function StockOverviewTab({
         </table>
       </div>
 
-      <div className="sot-pagination">
-        <div>
-          Showing{" "}
-          {pagination.total === 0
-            ? 0
-            : (pagination.page - 1) * pagination.limit + 1}
-          - {Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
-          {pagination.total} items
-        </div>
-        <div className="sot-page-numbers">
-          <button
-            type="button"
-            className="sot-page-num"
-            onClick={(e) => {
-              actions.changePage(Math.max(pagination.page - 1, 1));
-              e.currentTarget.blur();
-            }}
-            disabled={pagination.page === 1}
-          >
-            &lt;
-          </button>
-
-          {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(
-            (num) => (
-              <button
-                key={num}
-                type="button"
-                className={`sot-page-num ${pagination.page === num ? "active" : ""}`}
-                onClick={(e) => {
-                  actions.changePage(num);
-                  e.currentTarget.blur();
-                }}
-              >
-                {num}
-              </button>
-            ),
-          )}
-
-          <button
-            type="button"
-            className="sot-page-num"
-            onClick={(e) => {
-              actions.changePage(
-                Math.min(pagination.page + 1, pagination.totalPages),
-              );
-              e.currentTarget.blur();
-            }}
-            disabled={
-              pagination.page === pagination.totalPages ||
-              pagination.totalPages === 0
-            }
-          >
-            &gt;
-          </button>
-
-          <div className="sot-limit-dropdown" ref={limitRef}>
-            <div
-              className={`sot-limit-trigger ${isLimitOpen ? "active" : ""}`}
-              onClick={() => {
-                setIsLimitOpen(!isLimitOpen);
-                if (!hasLimitOpened) setHasLimitOpened(true);
-              }}
-            >
-              <span>{pagination.limit} / page</span>
-              <ChevronDownIcon
-                className={`sot-limit-icon ${isLimitOpen ? "open" : ""}`}
-              />
-            </div>
-            <div
-              className={`sot-limit-options ${isLimitOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
-            >
-              {[10, 20, 50].map((val) => (
-                <div
-                  key={val}
-                  className={`sot-limit-option ${pagination.limit === val ? "active" : ""}`}
-                  onClick={() => {
-                    actions.changeLimit(val);
-                    setIsLimitOpen(false);
-                  }}
-                >
-                  {val} / page
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+      <PortalPagination
+        page={pagination.page}
+        totalPages={pagination.totalPages}
+        totalItems={pagination.total}
+        pageSize={pagination.limit}
+        onPageChange={actions.changePage}
+        onPageSizeChange={actions.changeLimit}
+        itemLabel="products"
+        disabled={isLoading}
+      />
     </div>
   );
 }

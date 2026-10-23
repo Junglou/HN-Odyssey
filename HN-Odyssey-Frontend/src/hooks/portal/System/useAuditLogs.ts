@@ -76,7 +76,7 @@ interface RawAuditResponse {
 
 // 3. HẰNG SỐ & HELPER
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 20;
 const EXPORT_PAGE_SIZE = 100;
 const EXPORT_MAX_ROWS = 5000; // chặn trên để không tải quá nặng khi xuất file
 const MAIN_SOURCE = "audit_logs";
@@ -153,6 +153,7 @@ export function useAuditLogs(canExport: boolean) {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [views, setViews] = useState<AuditViewOption[]>([]);
@@ -192,7 +193,7 @@ export function useAuditLogs(canExport: boolean) {
     setIsLoading(true);
     try {
       const res = await axiosClient.get("/audit-logs", {
-        params: buildParams(appliedFilters, page, PAGE_SIZE),
+        params: buildParams(appliedFilters, page, pageSize),
       });
       const body = res.data as RawAuditResponse;
       setRecords((body.data ?? []).map(mapRecord));
@@ -204,7 +205,7 @@ export function useAuditLogs(canExport: boolean) {
     } finally {
       setIsLoading(false);
     }
-  }, [appliedFilters, page]);
+  }, [appliedFilters, page, pageSize]);
 
   useEffect(() => {
     void fetchLogs();
@@ -222,6 +223,13 @@ export function useAuditLogs(canExport: boolean) {
   const changePage = (next: number) => {
     if (next < 1 || (totalPages > 0 && next > totalPages)) return;
     setPage(next);
+  };
+
+  // đổi số dòng mỗi trang -> quay về trang 1
+  const changeLimit = (next: number) => {
+    if (next === pageSize) return;
+    setPageSize(next);
+    setPage(1);
   };
 
   // Xuất Excel toàn bộ kết quả theo bộ lọc hiện tại; chọn phòng ban thì đọc từ View tương ứng
@@ -302,9 +310,15 @@ export function useAuditLogs(canExport: boolean) {
       page,
       totalPages,
       total,
-      startIndex: (page - 1) * PAGE_SIZE,
-      pageSize: PAGE_SIZE,
+      startIndex: (page - 1) * pageSize,
+      pageSize,
     },
-    actions: { changeFilter, clearFilters, changePage, exportExcel },
+    actions: {
+      changeFilter,
+      clearFilters,
+      changePage,
+      changeLimit,
+      exportExcel,
+    },
   };
 }

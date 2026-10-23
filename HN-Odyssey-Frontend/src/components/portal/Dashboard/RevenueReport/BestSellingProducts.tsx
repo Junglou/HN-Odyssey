@@ -1,4 +1,5 @@
 import "./BestSellingProducts.css";
+import PortalPagination from "../../common/Pagination/PortalPagination";
 import type { TopProduct } from "../../../../hooks/portal/Dashboard/RevenueReport/useRevenueReport";
 
 interface BestSellingProductsProps {
@@ -79,35 +80,11 @@ export default function BestSellingProducts({
 
             {/* điều khiển phân trang */}
             <div className="bsp-pagination-container">
-              <button
-                className="bsp-page-nav-btn"
-                disabled={currentPage === 1}
-                onClick={() => onPageChange(currentPage - 1)}
-              >
-                Previous
-              </button>
-
-              <div className="bsp-page-numbers">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                  (page) => (
-                    <button
-                      key={page}
-                      className={`bsp-page-num-btn ${currentPage === page ? "bsp-active" : ""}`}
-                      onClick={() => onPageChange(page)}
-                    >
-                      {page}
-                    </button>
-                  ),
-                )}
-              </div>
-
-              <button
-                className="bsp-page-nav-btn"
-                disabled={currentPage === totalPages}
-                onClick={() => onPageChange(currentPage + 1)}
-              >
-                Next
-              </button>
+              <PortalPagination
+                page={currentPage}
+                totalPages={totalPages}
+                onPageChange={onPageChange}
+              />
             </div>
           </>
         )}

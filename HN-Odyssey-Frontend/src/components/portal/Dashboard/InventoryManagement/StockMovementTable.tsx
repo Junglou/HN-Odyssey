@@ -1,6 +1,6 @@
 import "./StockMovementTable.css";
 import type { StockMovementRow } from "../../../../hooks/portal/Dashboard/InventoryManagement/useInventoryManagement";
-import { getPageItems } from "../../../../utils/pagination";
+import PortalPagination from "../../common/Pagination/PortalPagination";
 
 interface StockMovementTableProps {
   data: StockMovementRow[];
@@ -105,42 +105,14 @@ export default function StockMovementTable({
               </table>
             </div>
 
-            {totalPages > 1 && (
-              <div className="smtab-pagination">
-                <button
-                  className="smtab-btn"
-                  disabled={currentPage <= 1 || isLoading}
-                  onClick={() => onPageChange(currentPage - 1)}
-                >
-                  Previous
-                </button>
-
-                {getPageItems(currentPage, totalPages).map((item, idx) =>
-                  item === "..." ? (
-                    <span key={`dots-${idx}`} className="smtab-ellipsis">
-                      …
-                    </span>
-                  ) : (
-                    <button
-                      key={item}
-                      className={`smtab-num ${item === currentPage ? "active" : ""}`}
-                      disabled={isLoading}
-                      onClick={() => onPageChange(item)}
-                    >
-                      {item}
-                    </button>
-                  ),
-                )}
-
-                <button
-                  className="smtab-btn"
-                  disabled={currentPage >= totalPages || isLoading}
-                  onClick={() => onPageChange(currentPage + 1)}
-                >
-                  Next
-                </button>
-              </div>
-            )}
+            <div className="smtab-pagination">
+              <PortalPagination
+                page={currentPage}
+                totalPages={totalPages}
+                onPageChange={onPageChange}
+                disabled={isLoading}
+              />
+            </div>
           </>
         )}
       </div>

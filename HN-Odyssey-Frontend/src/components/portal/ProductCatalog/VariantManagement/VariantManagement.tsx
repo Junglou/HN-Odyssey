@@ -1,5 +1,6 @@
 import "./VariantManagement.css";
 import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
+import PortalPagination from "../../common/Pagination/PortalPagination";
 import { CleanTrashIcon } from "../../../../assets/icons/VariantManagementIcons";
 import { EditPenIcon } from "../../../../assets/icons/ProductManagementIcons";
 
@@ -9,8 +10,16 @@ interface VariantManagementProps {
   data: Attribute[];
   isLoading?: boolean;
   search: string;
+  pagination: {
+    page: number;
+    limit: number;
+    totalPages: number;
+    totalFiltered: number;
+  };
   actions: {
     changeSearch: (val: string) => void;
+    changePage: (page: number) => void;
+    changeLimit: (limit: number) => void;
     openDrawer: (mode: "add" | "edit", attribute?: Attribute) => void;
     openDeleteModal: (id: string) => void;
   };
@@ -20,6 +29,7 @@ export default function VariantManagement({
   data,
   isLoading = false,
   search,
+  pagination,
   actions,
 }: VariantManagementProps) {
   return (
@@ -128,6 +138,17 @@ export default function VariantManagement({
             </tbody>
           </table>
         </div>
+
+        <PortalPagination
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalFiltered}
+          pageSize={pagination.limit}
+          onPageChange={actions.changePage}
+          onPageSizeChange={actions.changeLimit}
+          itemLabel="attributes"
+          disabled={isLoading}
+        />
       </div>
     </div>
   );

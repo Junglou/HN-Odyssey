@@ -5,7 +5,7 @@ import {
   type AdCampaign,
   type AdSpendLedgerApi,
 } from "../../../../hooks/portal/Dashboard/MarketingAndPromotion/useMarketingAndPromotion";
-import { getPageItems } from "../../../../utils/pagination";
+import PortalPagination from "../../common/Pagination/PortalPagination";
 import ManageAdSpendDrawer from "./ManageAdSpendDrawer";
 
 interface TopCampaignsTableProps {
@@ -158,41 +158,13 @@ export default function TopCampaignsTable({
               </tbody>
             </table>
 
-            {totalPages > 1 && (
-              <div className="tct-pagination-container">
-                <button
-                  className="tct-page-nav-btn"
-                  disabled={currentPage <= 1}
-                  onClick={() => onPageChange(currentPage - 1)}
-                >
-                  Previous
-                </button>
-                <div className="tct-page-numbers">
-                  {getPageItems(currentPage, totalPages).map((item, idx) =>
-                    item === "..." ? (
-                      <span key={`dots-${idx}`} className="tct-page-ellipsis">
-                        …
-                      </span>
-                    ) : (
-                      <button
-                        key={item}
-                        className={`tct-page-num-btn ${currentPage === item ? "tct-active" : ""}`}
-                        onClick={() => onPageChange(item)}
-                      >
-                        {item}
-                      </button>
-                    ),
-                  )}
-                </div>
-                <button
-                  className="tct-page-nav-btn"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => onPageChange(currentPage + 1)}
-                >
-                  Next
-                </button>
-              </div>
-            )}
+            <div className="tct-pagination-container">
+              <PortalPagination
+                page={currentPage}
+                totalPages={totalPages}
+                onPageChange={onPageChange}
+              />
+            </div>
           </>
         )}
       </div>

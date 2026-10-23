@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import "./TagManagement.css";
 import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
+import PortalPagination from "../../common/Pagination/PortalPagination";
 
 import { DotsIcon } from "../../../../assets/icons/UserManagementIcons";
 import { CleanTrashIcon } from "../../../../assets/icons/VariantManagementIcons";
@@ -14,8 +15,16 @@ interface TagManagementProps {
   data: Tag[];
   isLoading?: boolean;
   search: string;
+  pagination: {
+    page: number;
+    limit: number;
+    totalPages: number;
+    totalFiltered: number;
+  };
   actions: {
     changeSearch: (val: string) => void;
+    changePage: (page: number) => void;
+    changeLimit: (limit: number) => void;
     openDrawer: (mode: "add" | "edit", tag?: Tag) => void;
     deleteSingle: (id: string) => void;
   };
@@ -25,6 +34,7 @@ export default function TagManagement({
   data,
   isLoading = false,
   search,
+  pagination,
   actions,
 }: TagManagementProps) {
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
@@ -179,6 +189,17 @@ export default function TagManagement({
             </tbody>
           </table>
         </div>
+
+        <PortalPagination
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalFiltered}
+          pageSize={pagination.limit}
+          onPageChange={actions.changePage}
+          onPageSizeChange={actions.changeLimit}
+          itemLabel="tags"
+          disabled={isLoading}
+        />
       </div>
     </div>
   );

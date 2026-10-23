@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import "./CustomerManagement.css";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
+import PortalPagination from "../../common/Pagination/PortalPagination";
 import { getCurrentUser, hasPermission } from "../../../../utils/permission";
 import { Action, Resource } from "../../../../types/permissions";
 import {
@@ -83,14 +84,9 @@ export default function CustomerManagement({
   const typeRef = useRef<HTMLDivElement>(null);
   const actionMenuRef = useRef<HTMLDivElement>(null);
 
-  const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
-  const [hasLimitOpened, setHasLimitOpened] = useState(false);
-  const limitRef = useRef<HTMLDivElement>(null);
-
   useClickOutside(statusRef, () => setIsStatusOpen(false));
   useClickOutside(typeRef, () => setIsTypeOpen(false));
   useClickOutside(actionMenuRef, () => setOpenActionId(null));
-  useClickOutside(limitRef, () => setIsLimitDropdownOpen(false));
 
   const isAllSelected =
     data.length > 0 && data.every((r) => selectedIds.has(r.id));
@@ -448,80 +444,16 @@ export default function CustomerManagement({
           </table>
         </div>
 
-        <div className="crm-pagination">
-          <span className="crm-pagination-info">
-            Showing{" "}
-            {pagination.totalFiltered === 0 ? 0 : pagination.startIndex + 1} to{" "}
-            {Math.min(
-              pagination.startIndex + pagination.limit,
-              pagination.totalFiltered,
-            )}{" "}
-            of {pagination.totalFiltered} users
-          </span>
-          <div className="crm-page-numbers">
-            <button
-              className="crm-page-num"
-              disabled={pagination.page === 1}
-              onClick={() => actions.changePage(pagination.page - 1)}
-            >
-              &lt;
-            </button>
-            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(
-              (num) => (
-                <button
-                  key={num}
-                  className={`crm-page-num ${pagination.page === num ? "active" : ""}`}
-                  onClick={() => actions.changePage(num)}
-                >
-                  {num}
-                </button>
-              ),
-            )}
-            <button
-              className="crm-page-num"
-              disabled={
-                pagination.page === pagination.totalPages ||
-                pagination.totalPages === 0
-              }
-              onClick={() => actions.changePage(pagination.page + 1)}
-            >
-              &gt;
-            </button>
-
-            <div className="crm-limit-dropdown" ref={limitRef}>
-              <div
-                className={`crm-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}
-                onClick={() => {
-                  setIsLimitDropdownOpen(!isLimitDropdownOpen);
-                  if (!hasLimitOpened) setHasLimitOpened(true);
-                }}
-              >
-                <span>{pagination.limit} / page</span>
-                <div
-                  className={`crm-limit-icon ${isLimitDropdownOpen ? "open" : ""}`}
-                >
-                  <ChevronDownSmallIcon />
-                </div>
-              </div>
-              <div
-                className={`crm-limit-options ${isLimitDropdownOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
-              >
-                {[10, 20, 50].map((val) => (
-                  <div
-                    key={val}
-                    className={`crm-limit-option ${pagination.limit === val ? "active" : ""}`}
-                    onClick={() => {
-                      actions.changeLimit(val);
-                      setIsLimitDropdownOpen(false);
-                    }}
-                  >
-                    {val} / page
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <PortalPagination
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalFiltered}
+          pageSize={pagination.limit}
+          onPageChange={actions.changePage}
+          onPageSizeChange={actions.changeLimit}
+          itemLabel="customers"
+          disabled={isLoading}
+        />
       </div>
     </div>
   );
