@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import "./PriceManagement.css";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
+import PortalPagination from "../../common/Pagination/PortalPagination";
 import {
   CheckCircleIcon,
   XCircleIcon,
@@ -78,10 +79,6 @@ export default function PriceManagement({
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
   useClickOutside(sortRef, () => setIsSortDropdownOpen(false));
-
-  const [isLimitDropdownOpen, setIsLimitDropdownOpen] = useState(false);
-  const limitRef = useRef<HTMLDivElement>(null);
-  useClickOutside(limitRef, () => setIsLimitDropdownOpen(false));
 
   const isAllSelected =
     data.length > 0 && data.every((item) => selectedIds.has(item.id));
@@ -403,78 +400,16 @@ export default function PriceManagement({
             </tbody>
           </table>
         </div>
-        <div className="prm-pagination">
-          <span className="prm-pagination-info">
-            Showing{" "}
-            {pagination.totalFiltered === 0 ? 0 : pagination.startIndex + 1} to{" "}
-            {Math.min(
-              pagination.startIndex + pagination.limit,
-              pagination.totalFiltered,
-            )}{" "}
-            of {pagination.totalFiltered} items
-          </span>
-          <div className="prm-pagination-controls">
-            <button
-              className="prm-page-btn"
-              disabled={pagination.page === 1}
-              onClick={() => actions.changePage(pagination.page - 1)}
-            >
-              &lt;
-            </button>
-            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(
-              (num) => (
-                <button
-                  key={num}
-                  className={`prm-page-btn ${pagination.page === num ? "active" : ""}`}
-                  onClick={() => actions.changePage(num)}
-                >
-                  {num}
-                </button>
-              ),
-            )}
-            <button
-              className="prm-page-btn"
-              disabled={
-                pagination.page === pagination.totalPages ||
-                pagination.totalPages === 0
-              }
-              onClick={() => actions.changePage(pagination.page + 1)}
-            >
-              &gt;
-            </button>
-
-            {/* pagination limit dropdown */}
-            <div className="prm-limit-dropdown" ref={limitRef}>
-              <div
-                className={`prm-limit-trigger ${isLimitDropdownOpen ? "active" : ""}`}
-                onClick={() => setIsLimitDropdownOpen(!isLimitDropdownOpen)}
-              >
-                <span>{pagination.limit} / page</span>
-                <div
-                  className={`prm-limit-icon ${isLimitDropdownOpen ? "open" : ""}`}
-                >
-                  <ChevronDownSmallIcon />
-                </div>
-              </div>
-              {isLimitDropdownOpen && (
-                <div className="prm-limit-options">
-                  {[10, 20, 50].map((val) => (
-                    <div
-                      key={val}
-                      className={`prm-limit-option ${pagination.limit === val ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changeLimit(val);
-                        setIsLimitDropdownOpen(false);
-                      }}
-                    >
-                      {val} / page
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <PortalPagination
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalFiltered}
+          pageSize={pagination.limit}
+          onPageChange={actions.changePage}
+          onPageSizeChange={actions.changeLimit}
+          itemLabel="items"
+          disabled={isLoading}
+        />
       </div>
     </div>
   );

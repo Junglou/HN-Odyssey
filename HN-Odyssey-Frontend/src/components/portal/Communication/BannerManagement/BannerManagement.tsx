@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import "./BannerManagement.css";
 import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
+import PortalPagination from "../../common/Pagination/PortalPagination";
 import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 import {
   SearchIcon,
@@ -67,8 +68,6 @@ export default function BannerManagement({
   const [hasStatusOpened, setHasStatusOpened] = useState(false);
   const [isPositionOpen, setIsPositionOpen] = useState(false);
   const [hasPositionOpened, setHasPositionOpened] = useState(false);
-  const [isLimitOpen, setIsLimitOpen] = useState(false);
-  const [hasLimitOpened, setHasLimitOpened] = useState(false);
 
   const canChangeStatus = hasPermission(
     getCurrentUser(),
@@ -80,12 +79,12 @@ export default function BannerManagement({
   // clickoutside
   const statusRef = useRef<HTMLDivElement>(null);
   const positionRef = useRef<HTMLDivElement>(null);
-  const limitRef = useRef<HTMLDivElement>(null);
+
   const actionMenuRef = useRef<HTMLDivElement>(null);
 
   useClickOutside(statusRef, () => setIsStatusOpen(false));
   useClickOutside(positionRef, () => setIsPositionOpen(false));
-  useClickOutside(limitRef, () => setIsLimitOpen(false));
+
   useClickOutside(actionMenuRef, () => setOpenActionId(null));
 
   // kiểm tra trạng thái checkbox của bảng
@@ -439,79 +438,16 @@ export default function BannerManagement({
           </table>
         </div>
 
-        <div className="bm-pagination">
-          <span className="bm-pagination-info">
-            Showing{" "}
-            {pagination.totalFiltered === 0 ? 0 : pagination.startIndex + 1} to{" "}
-            {Math.min(
-              pagination.startIndex + pagination.limit,
-              pagination.totalFiltered,
-            )}{" "}
-            of {pagination.totalFiltered} banners
-          </span>
-          <div className="bm-page-numbers">
-            <button
-              className="bm-page-num"
-              disabled={pagination.page === 1}
-              onClick={() => actions.changePage(pagination.page - 1)}
-            >
-              &lt;
-            </button>
-            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(
-              (num) => (
-                <button
-                  key={num}
-                  className={`bm-page-num ${pagination.page === num ? "active" : ""}`}
-                  onClick={() => actions.changePage(num)}
-                >
-                  {num}
-                </button>
-              ),
-            )}
-            <button
-              className="bm-page-num"
-              disabled={
-                pagination.page === pagination.totalPages ||
-                pagination.totalPages === 0
-              }
-              onClick={() => actions.changePage(pagination.page + 1)}
-            >
-              &gt;
-            </button>
-
-            {/* pagination */}
-            <div className="bm-limit-dropdown" ref={limitRef}>
-              <div
-                className={`bm-limit-trigger ${isLimitOpen ? "active" : ""}`}
-                onClick={() => {
-                  setIsLimitOpen(!isLimitOpen);
-                  if (!hasLimitOpened) setHasLimitOpened(true);
-                }}
-              >
-                <span>{pagination.limit} / page</span>
-                <ChevronDownSmallIcon
-                  className={isLimitOpen ? "rotated" : ""}
-                />
-              </div>
-              <div
-                className={`bm-limit-options ${isLimitOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
-              >
-                {[10, 20, 50].map((val) => (
-                  <div
-                    key={val}
-                    className={`bm-limit-option ${pagination.limit === val ? "active" : ""}`}
-                    onClick={() => {
-                      actions.changeLimit(val);
-                      setIsLimitOpen(false);
-                    }}
-                  >
-                    {val} / page
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <PortalPagination
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalFiltered}
+          pageSize={pagination.limit}
+          onPageChange={actions.changePage}
+          onPageSizeChange={actions.changeLimit}
+          itemLabel="banners"
+          disabled={isLoading}
+        />
       </div>
     </div>
   );

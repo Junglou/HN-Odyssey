@@ -285,24 +285,6 @@
   color: #6b7280;
 }
 
-/* phân trang */
-.sal-pagination {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: #374151;
-}
-
-.sal-page-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 @keyframes sal-slideFadeDown {
   from {
     opacity: 0;
@@ -322,11 +304,5 @@
   to {
     opacity: 0;
     transform: translateY(-10px);
-  }
-}
-
-@media (max-width: 767px) {
-  .sal-pagination {
-    flex-direction: column;
   }
 }

@@ -12,6 +12,7 @@ import {
 } from "../../../../assets/icons/StockManagementIcons";
 import "./StockTicketsTab.css";
 import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
+import PortalPagination from "../../common/Pagination/PortalPagination";
 
 // options
 const TYPE_OPTIONS = [
@@ -108,10 +109,6 @@ export default function StockTicketsTab({
   const [closingRows, setClosingRows] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const [isLimitOpen, setIsLimitOpen] = useState(false);
-  const [hasLimitOpened, setHasLimitOpened] = useState(false);
-  const limitRef = useRef<HTMLDivElement>(null);
-
   const [completeModal, setCompleteModal] = useState<{
     isOpen: boolean;
     ticketId: string;
@@ -121,20 +118,6 @@ export default function StockTicketsTab({
     ticketId: string;
     reason: string;
   }>({ isOpen: false, ticketId: "", reason: "" });
-
-  // hooks
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        limitRef.current &&
-        !limitRef.current.contains(event.target as Node)
-      ) {
-        setIsLimitOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   // handlers
   const toggleRow = (id: string) => {
@@ -490,106 +473,16 @@ export default function StockTicketsTab({
       </div>
 
       {/* pagination */}
-      <div className="stt-pagination">
-        <div>
-          Showing{" "}
-          {pagination.total === 0
-            ? 0
-            : (pagination.page - 1) * pagination.limit + 1}
-          -{Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
-          {pagination.total} items
-        </div>
-
-        <div className="stt-page-numbers">
-          <button
-            type="button"
-            className="stt-page-num"
-            style={{
-              opacity: pagination.page === 1 ? 0.4 : 1,
-              pointerEvents: pagination.page === 1 ? "none" : "auto",
-            }}
-            onClick={(e) => {
-              actions.changePage(Math.max(pagination.page - 1, 1));
-              e.currentTarget.blur();
-            }}
-          >
-            &lt;
-          </button>
-
-          {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(
-            (num) => (
-              <button
-                key={num}
-                type="button"
-                className={`stt-page-num ${pagination.page === num ? "active" : ""}`}
-                onClick={(e) => {
-                  actions.changePage(num);
-                  e.currentTarget.blur();
-                }}
-              >
-                {num}
-              </button>
-            ),
-          )}
-
-          <button
-            type="button"
-            className="stt-page-num"
-            style={{
-              opacity:
-                pagination.page === pagination.totalPages ||
-                pagination.totalPages === 0
-                  ? 0.4
-                  : 1,
-              pointerEvents:
-                pagination.page === pagination.totalPages ||
-                pagination.totalPages === 0
-                  ? "none"
-                  : "auto",
-            }}
-            onClick={(e) => {
-              actions.changePage(
-                Math.min(pagination.page + 1, pagination.totalPages),
-              );
-              e.currentTarget.blur();
-            }}
-          >
-            &gt;
-          </button>
-
-          <div className="stt-limit-dropdown" ref={limitRef}>
-            <div
-              className={`stt-limit-trigger ${isLimitOpen ? "active" : ""}`}
-              onClick={() => {
-                setIsLimitOpen(!isLimitOpen);
-                if (!hasLimitOpened) setHasLimitOpened(true);
-              }}
-            >
-              <span>{pagination.limit} / page</span>
-              <ChevronDownIcon
-                className={`stt-limit-icon ${isLimitOpen ? "open" : ""}`}
-              />
-            </div>
-
-            <div
-              className={`stt-limit-options ${isLimitOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
-            >
-              {[10, 20, 50].map((val) => (
-                <div
-                  key={val}
-                  className={`stt-limit-option ${pagination.limit === val ? "active" : ""}`}
-                  onClick={() => {
-                    actions.changeLimit?.(val);
-                    setIsLimitOpen(false);
-                  }}
-                >
-                  {val} / page
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+      <PortalPagination
+        page={pagination.page}
+        totalPages={pagination.totalPages}
+        totalItems={pagination.total}
+        pageSize={pagination.limit}
+        onPageChange={actions.changePage}
+        onPageSizeChange={actions.changeLimit}
+        itemLabel="tickets"
+        disabled={isLoading}
+      />
 
       {/* Complete Modal */}
       {completeModal.isOpen && (

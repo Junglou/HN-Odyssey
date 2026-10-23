@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import "./TradeInManagement.css";
 import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
+import PortalPagination from "../../common/Pagination/PortalPagination";
 import {
   ChevronDownSmallIcon,
   RefreshIcon,
@@ -135,33 +136,17 @@ export default function TradeInManagement({
   actions,
 }: TradeInManagementProps) {
   // states
-  const [isLimitOpen, setIsLimitOpen] = useState(false);
-  const [hasLimitOpened, setHasLimitOpened] = useState(false);
+
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [prevData, setPrevData] = useState<TradeInRow[]>(data);
-  const limitRef = useRef<HTMLDivElement>(null);
 
   // logic: reset Data
   if (data !== prevData) {
     setPrevData(data);
     setSelectedIds([]);
   }
-
-  // effects
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        limitRef.current &&
-        !limitRef.current.contains(event.target as Node)
-      ) {
-        setIsLimitOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   // handlers
   const handleRefresh = () => {
@@ -475,91 +460,16 @@ export default function TradeInManagement({
         </div>
 
         {/* pagination */}
-        <div className="tim-pagination">
-          <span>
-            Showing {pagination.startIndex} - {pagination.endIndex} of{" "}
-            {pagination.total} records
-          </span>
-
-          <div className="tim-page-controls">
-            <button
-              type="button"
-              className="tim-btn-page"
-              disabled={pagination.page === 1}
-              onClick={(e) => {
-                actions.changePage(Math.max(1, pagination.page - 1));
-                e.currentTarget.blur();
-              }}
-            >
-              &lt;
-            </button>
-
-            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(
-              (num) => (
-                <button
-                  type="button"
-                  key={num}
-                  className={`tim-btn-page ${pagination.page === num ? "active" : ""}`}
-                  onClick={(e) => {
-                    actions.changePage(num);
-                    e.currentTarget.blur();
-                  }}
-                >
-                  {num}
-                </button>
-              ),
-            )}
-
-            <button
-              type="button"
-              className="tim-btn-page"
-              disabled={
-                pagination.page === pagination.totalPages ||
-                pagination.totalPages === 0
-              }
-              onClick={(e) => {
-                actions.changePage(
-                  Math.min(pagination.totalPages, pagination.page + 1),
-                );
-                e.currentTarget.blur();
-              }}
-            >
-              &gt;
-            </button>
-
-            <div className="tim-limit-dropdown" ref={limitRef}>
-              <div
-                className={`tim-limit-trigger ${isLimitOpen ? "active" : ""}`}
-                onClick={() => {
-                  setIsLimitOpen(!isLimitOpen);
-                  if (!hasLimitOpened) setHasLimitOpened(true);
-                }}
-              >
-                <span>{pagination.limit} / page</span>
-                <div className={`tim-limit-icon ${isLimitOpen ? "open" : ""}`}>
-                  <ChevronDownSmallIcon />
-                </div>
-              </div>
-
-              <div
-                className={`tim-limit-options ${isLimitOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
-              >
-                {[10, 20, 50].map((val) => (
-                  <div
-                    key={val}
-                    className={`tim-limit-option ${pagination.limit === val ? "active" : ""}`}
-                    onClick={() => {
-                      actions.changeLimit(val);
-                      setIsLimitOpen(false);
-                    }}
-                  >
-                    {val} / page
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <PortalPagination
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.total}
+          pageSize={pagination.limit}
+          onPageChange={actions.changePage}
+          onPageSizeChange={actions.changeLimit}
+          itemLabel="requests"
+          disabled={isLoading}
+        />
       </div>
     </div>
   );

@@ -218,15 +218,24 @@ export function usePriceManagement() {
       setSearch(val);
       setPagination((p) => ({ ...p, page: 1 }));
     },
-    changeStatusFilter: (status: PriceStatus | "All") =>
-      setStatusFilter(status),
-    changeCurrencyFilter: (currency: string) => setCurrencyFilter(currency),
-    changePriceSort: (sort: "none" | "asc" | "desc") => setPriceSort(sort),
+    changeStatusFilter: (status: PriceStatus | "All") => {
+      setStatusFilter(status);
+      setPagination((p) => ({ ...p, page: 1 }));
+    },
+    changeCurrencyFilter: (currency: string) => {
+      setCurrencyFilter(currency);
+      setPagination((p) => ({ ...p, page: 1 }));
+    },
+    changePriceSort: (sort: "none" | "asc" | "desc") => {
+      setPriceSort(sort);
+      setPagination((p) => ({ ...p, page: 1 }));
+    },
     clearFilters: () => {
       setSearch("");
       setStatusFilter("All");
       setCurrencyFilter("All");
       setPriceSort("none");
+      setPagination((p) => ({ ...p, page: 1 }));
     },
     toggleSelection: (id: string) => {
       setSelectedIds((prev) => {

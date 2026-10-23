@@ -7,6 +7,7 @@ import {
 } from "../../../../assets/icons/StockManagementIcons";
 import "./RequestTab.css";
 import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
+import PortalPagination from "../../common/Pagination/PortalPagination";
 
 // options
 const TYPE_OPTIONS = [
@@ -111,24 +112,6 @@ export default function RequestTab({
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const [isLimitOpen, setIsLimitOpen] = useState(false);
-  const [hasLimitOpened, setHasLimitOpened] = useState(false);
-  const limitRef = useRef<HTMLDivElement>(null);
-
-  // Pagination
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        limitRef.current &&
-        !limitRef.current.contains(event.target as Node)
-      ) {
-        setIsLimitOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   const [rejectModal, setRejectModal] = useState({
     isOpen: false,
     id: "",
@@ -179,28 +162,6 @@ export default function RequestTab({
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return "N/A";
     return date.toLocaleString("vi-VN");
-  };
-
-  // Thuật toán hiển thị phân trang thông minh (1 2 3 ... 122)
-  const getPaginationGroup = () => {
-    const { page, totalPages } = pagination;
-    if (totalPages <= 7) {
-      return Array.from({ length: totalPages }, (_, i) => i + 1);
-    }
-    if (page <= 3) {
-      return [1, 2, 3, 4, "...", totalPages];
-    }
-    if (page >= totalPages - 2) {
-      return [
-        1,
-        "...",
-        totalPages - 3,
-        totalPages - 2,
-        totalPages - 1,
-        totalPages,
-      ];
-    }
-    return [1, "...", page - 1, page, page + 1, "...", totalPages];
   };
 
   // main render
@@ -373,120 +334,17 @@ export default function RequestTab({
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* pagination */}
-      <div className="rt-pagination">
-        <div>
-          Showing{" "}
-          {pagination.total === 0
-            ? 0
-            : (pagination.page - 1) * pagination.limit + 1}
-          -{Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
-          {pagination.total} items
-        </div>
-
-        <div className="rt-page-numbers">
-          <button
-            type="button"
-            className="rt-page-num"
-            style={{
-              opacity: pagination.page === 1 ? 0.4 : 1,
-              pointerEvents: pagination.page === 1 ? "none" : "auto",
-            }}
-            onClick={(e) => {
-              e.currentTarget.blur();
-              actions.changePage(Math.max(pagination.page - 1, 1));
-            }}
-          >
-            &lt;
-          </button>
-
-          {getPaginationGroup().map((item, idx) =>
-            item === "..." ? (
-              <span
-                key={`ellipsis-${idx}`}
-                style={{
-                  padding: "0 8px",
-                  color: "#6b7280",
-                  cursor: "default",
-                  fontWeight: 600,
-                }}
-              >
-                ...
-              </span>
-            ) : (
-              <button
-                key={item}
-                type="button"
-                className={`rt-page-num ${pagination.page === item ? "active" : ""}`}
-                onClick={(e) => {
-                  e.currentTarget.blur();
-                  actions.changePage(Number(item));
-                }}
-              >
-                {item}
-              </button>
-            ),
-          )}
-
-          <button
-            type="button"
-            className="rt-page-num"
-            style={{
-              opacity:
-                pagination.page === pagination.totalPages ||
-                pagination.totalPages === 0
-                  ? 0.4
-                  : 1,
-              pointerEvents:
-                pagination.page === pagination.totalPages ||
-                pagination.totalPages === 0
-                  ? "none"
-                  : "auto",
-            }}
-            onClick={(e) => {
-              e.currentTarget.blur();
-              actions.changePage(
-                Math.min(pagination.page + 1, pagination.totalPages),
-              );
-            }}
-          >
-            &gt;
-          </button>
-
-          <div className="rt-limit-dropdown" ref={limitRef}>
-            <div
-              className={`rt-limit-trigger ${isLimitOpen ? "active" : ""}`}
-              onClick={() => {
-                setIsLimitOpen(!isLimitOpen);
-                if (!hasLimitOpened) setHasLimitOpened(true);
-              }}
-            >
-              <span>{pagination.limit} / page</span>
-              <ChevronDownIcon
-                className={`rt-limit-icon ${isLimitOpen ? "open" : ""}`}
-              />
-            </div>
-
-            <div
-              className={`rt-limit-options ${isLimitOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
-            >
-              {[10, 20, 50].map((val) => (
-                <div
-                  key={val}
-                  className={`rt-limit-option ${pagination.limit === val ? "active" : ""}`}
-                  onClick={() => {
-                    actions.changeLimit?.(val);
-                    setIsLimitOpen(false);
-                  }}
-                >
-                  {val} / page
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <PortalPagination
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.total}
+          pageSize={pagination.limit}
+          onPageChange={actions.changePage}
+          onPageSizeChange={actions.changeLimit}
+          itemLabel="requests"
+          disabled={isLoading}
+        />
       </div>
 
       {/* reject modal */}

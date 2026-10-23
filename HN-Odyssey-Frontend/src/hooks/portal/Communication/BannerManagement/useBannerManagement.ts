@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
 import { getCurrentUser, hasPermission } from "../../../../utils/permission";
@@ -62,6 +62,7 @@ export interface FetchBannersParams {
   limit: number;
   position?: string;
   status?: string;
+  search?: string;
 }
 
 // Interface thay thế cho "any" ở dòng 296
@@ -138,6 +139,7 @@ export function useBannerManagement() {
   const [isLoading, setIsLoading] = useState(true);
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<BannerStatus | "All">("All");
   const [positionFilter, setPositionFilter] = useState<BannerPosition | "All">(
     "All",
@@ -168,6 +170,17 @@ export function useBannerManagement() {
 
   const getTodayString = () => new Date().toISOString().split("T")[0];
 
+  // Chờ người dùng ngừng gõ 400ms mới gọi API, đồng thời về trang 1
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (debouncedSearch !== search) {
+        setDebouncedSearch(search);
+        setPagination((p) => ({ ...p, page: 1 }));
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search, debouncedSearch]);
+
   const fetchBanners = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -177,6 +190,7 @@ export function useBannerManagement() {
       };
 
       if (positionFilter !== "All") params.position = positionFilter;
+      if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
       if (statusFilter !== "All") {
         params.status =
           statusFilter === "Active"
@@ -228,19 +242,19 @@ export function useBannerManagement() {
     } finally {
       setIsLoading(false);
     }
-  }, [pagination.page, pagination.limit, positionFilter, statusFilter]);
+  }, [
+    pagination.page,
+    pagination.limit,
+    positionFilter,
+    statusFilter,
+    debouncedSearch,
+  ]);
 
   useEffect(() => {
     fetchBanners();
   }, [fetchBanners]);
 
-  const currentRecords = useMemo(() => {
-    if (!search.trim()) return records;
-    const normalizedSearch = search.trim().toLowerCase();
-    return records.filter((r) =>
-      r.name.toLowerCase().includes(normalizedSearch),
-    );
-  }, [records, search]);
+  const currentRecords = records;
 
   const startIndex = (pagination.page - 1) * pagination.limit;
 
@@ -258,6 +272,7 @@ export function useBannerManagement() {
     },
     clearFilters: () => {
       setSearch("");
+      setDebouncedSearch("");
       setStatusFilter("All");
       setPositionFilter("All");
       setPagination((p) => ({ ...p, page: 1 }));

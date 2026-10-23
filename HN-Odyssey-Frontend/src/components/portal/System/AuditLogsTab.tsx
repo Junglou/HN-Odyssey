@@ -1,6 +1,7 @@
 import { Fragment, useRef, useState } from "react";
 import "./AuditLogsTab.css";
 import { ChevronDownIcon } from "../../../assets/icons/SystemIcons";
+import PortalPagination from "../common/Pagination/PortalPagination";
 import { useClickOutside } from "../../../hooks/common/useClickOutside";
 import {
   useAuditLogs,
@@ -99,12 +100,6 @@ export default function AuditLogsTab({ canExport }: AuditLogsTabProps) {
     { value: "", label: "All Departments" },
     ...views.map((v) => ({ value: v.department, label: v.label })),
   ];
-
-  const from = pagination.total === 0 ? 0 : pagination.startIndex + 1;
-  const to = Math.min(
-    pagination.startIndex + pagination.pageSize,
-    pagination.total,
-  );
 
   return (
     <div className="sys-card sal-container">
@@ -260,33 +255,16 @@ export default function AuditLogsTab({ canExport }: AuditLogsTabProps) {
         </table>
       </div>
 
-      <div className="sal-pagination">
-        <span>
-          Showing {from} to {to} of {pagination.total} logs
-        </span>
-        <div className="sal-page-controls">
-          <button
-            type="button"
-            className="sal-btn"
-            disabled={pagination.page <= 1 || isLoading}
-            onClick={() => actions.changePage(pagination.page - 1)}
-          >
-            &lt; Prev
-          </button>
-          <span>
-            Page {pagination.totalPages === 0 ? 0 : pagination.page} /{" "}
-            {pagination.totalPages}
-          </span>
-          <button
-            type="button"
-            className="sal-btn"
-            disabled={pagination.page >= pagination.totalPages || isLoading}
-            onClick={() => actions.changePage(pagination.page + 1)}
-          >
-            Next &gt;
-          </button>
-        </div>
-      </div>
+      <PortalPagination
+        page={pagination.page}
+        totalPages={pagination.totalPages}
+        totalItems={pagination.total}
+        pageSize={pagination.pageSize}
+        onPageChange={actions.changePage}
+        onPageSizeChange={actions.changeLimit}
+        itemLabel="logs"
+        disabled={isLoading}
+      />
     </div>
   );
 }

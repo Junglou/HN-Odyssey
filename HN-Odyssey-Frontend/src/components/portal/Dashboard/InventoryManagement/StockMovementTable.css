@@ -94,50 +94,11 @@
   color: #1e3a8a;
 }
 
-/* pagination */
+/* pagination (nội dung do PortalPagination render) */
 .smtab-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 16px 24px;
+  padding: 6px 24px 16px;
   background-color: #ffffff;
   border-top: 1px solid #e5e7eb;
-  margin: 0;
-}
-.smtab-btn,
-.smtab-num {
-  padding: 6px 12px;
-  border: 1px solid #e5e7eb;
-  background-color: #ffffff;
-  border-radius: 4px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  color: #475569;
-  transition: all 0.2s ease;
-}
-.smtab-btn:hover:not(:disabled),
-.smtab-num:hover:not(.active) {
-  background-color: #1e293b;
-  color: #ffffff;
-  border-color: #1e293b;
-}
-.smtab-num.active {
-  background-color: #1e293b;
-  color: #ffffff;
-  border-color: #1e293b;
-}
-.smtab-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-.smtab-ellipsis {
-  padding: 0 4px;
-  color: #94a3b8;
-  font-weight: 600;
-  user-select: none;
 }
 
 .smtab-empty {

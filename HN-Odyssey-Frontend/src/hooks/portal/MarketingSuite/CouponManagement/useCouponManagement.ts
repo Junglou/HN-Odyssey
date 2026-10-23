@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
 import type { UserPayload } from "../../../../types/auth";
@@ -170,6 +170,8 @@ export function useCouponManagement() {
       };
       if (search) params.search = search;
       if (statusFilter !== "All") params.status = statusFilter;
+      if (discountTypeFilter !== "All")
+        params.discount_type = discountTypeFilter;
 
       const res = await axiosClient.get("/promotions/coupons", { params });
 
@@ -218,12 +220,13 @@ export function useCouponManagement() {
     } finally {
       setIsLoading(false);
     }
-  }, [pagination.page, pagination.limit, search, statusFilter]);
-
-  const displayRecords = useMemo(() => {
-    if (discountTypeFilter === "All") return records;
-    return records.filter((r) => r.discountType === discountTypeFilter);
-  }, [records, discountTypeFilter]);
+  }, [
+    pagination.page,
+    pagination.limit,
+    search,
+    statusFilter,
+    discountTypeFilter,
+  ]);
 
   useEffect(() => {
     fetchCoupons();
@@ -261,7 +264,7 @@ export function useCouponManagement() {
     },
     toggleSelectAll: (isSelectAll: boolean) => {
       setSelectedIds(
-        isSelectAll ? new Set(displayRecords.map((r) => r.id)) : new Set(),
+        isSelectAll ? new Set(records.map((r) => r.id)) : new Set(),
       );
     },
     changePage: (page: number) =>
@@ -473,7 +476,7 @@ export function useCouponManagement() {
   };
 
   return {
-    currentRecords: displayRecords,
+    currentRecords: records,
     pagination: {
       ...pagination,
       startIndex: (pagination.page - 1) * pagination.limit,

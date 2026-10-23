@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import "./OrderManagement.css";
 import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
+import PortalPagination from "../../common/Pagination/PortalPagination";
 import {
   EyeIcon,
   ChevronDownSmallIcon,
@@ -129,42 +130,6 @@ interface OrderManagementProps {
   };
 }
 
-// helpers
-const getPageNumbers = (
-  currentPage: number,
-  totalPages: number,
-): (number | string)[] => {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, i) => i + 1);
-  }
-
-  if (currentPage <= 4) {
-    return [1, 2, 3, 4, 5, "...", totalPages];
-  }
-
-  if (currentPage >= totalPages - 3) {
-    return [
-      1,
-      "...",
-      totalPages - 4,
-      totalPages - 3,
-      totalPages - 2,
-      totalPages - 1,
-      totalPages,
-    ];
-  }
-
-  return [
-    1,
-    "...",
-    currentPage - 1,
-    currentPage,
-    currentPage + 1,
-    "...",
-    totalPages,
-  ];
-};
-
 // component
 export default function OrderManagement({
   data,
@@ -174,12 +139,10 @@ export default function OrderManagement({
   actions,
 }: OrderManagementProps) {
   // states
-  const [isLimitOpen, setIsLimitOpen] = useState(false);
-  const [hasLimitOpened, setHasLimitOpened] = useState(false);
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [localSearch, setLocalSearch] = useState(filters.search);
-  const limitRef = useRef<HTMLDivElement>(null);
 
   const [prevData, setPrevData] = useState<OrderRow[]>(data);
   const [prevSearch, setPrevSearch] = useState(filters.search);
@@ -216,19 +179,6 @@ export default function OrderManagement({
     }, 500);
     return () => clearTimeout(timer);
   }, [localSearch, filters.search, actions]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        limitRef.current &&
-        !limitRef.current.contains(event.target as Node)
-      ) {
-        setIsLimitOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   // handlers
   const handleRefresh = () => {
@@ -609,109 +559,16 @@ export default function OrderManagement({
           </table>
         </div>
 
-        <div className="om-pagination">
-          <span>
-            Showing {pagination.startIndex} - {pagination.endIndex} of{" "}
-            {pagination.total} records
-          </span>
-
-          <div className="om-page-controls">
-            <button
-              type="button"
-              className="om-btn-page"
-              disabled={pagination.page === 1}
-              onClick={(e) => {
-                actions.changePage(Math.max(1, pagination.page - 1));
-                e.currentTarget.blur();
-              }}
-            >
-              &lt;
-            </button>
-
-            {getPageNumbers(pagination.page, pagination.totalPages).map(
-              (item, index) => {
-                if (item === "...") {
-                  return (
-                    <span
-                      key={`ellipsis-${index}`}
-                      style={{
-                        padding: "0 4px",
-                        color: "#6b7280",
-                        alignSelf: "center",
-                      }}
-                    >
-                      ...
-                    </span>
-                  );
-                }
-
-                const num = item as number;
-                return (
-                  <button
-                    type="button"
-                    key={`page-${num}`}
-                    className={`om-btn-page ${pagination.page === num ? "active" : ""}`}
-                    onClick={(e) => {
-                      actions.changePage(num);
-                      e.currentTarget.blur();
-                    }}
-                  >
-                    {num}
-                  </button>
-                );
-              },
-            )}
-
-            <button
-              type="button"
-              className="om-btn-page"
-              disabled={
-                pagination.page === pagination.totalPages ||
-                pagination.totalPages === 0
-              }
-              onClick={(e) => {
-                actions.changePage(
-                  Math.min(pagination.totalPages, pagination.page + 1),
-                );
-                e.currentTarget.blur();
-              }}
-            >
-              &gt;
-            </button>
-
-            <div className="om-limit-dropdown" ref={limitRef}>
-              <div
-                className={`om-limit-trigger ${isLimitOpen ? "active" : ""}`}
-                onClick={() => {
-                  setIsLimitOpen(!isLimitOpen);
-                  if (!hasLimitOpened) setHasLimitOpened(true);
-                }}
-              >
-                <span>{pagination.limit} / page</span>
-                <div className={`om-limit-icon ${isLimitOpen ? "open" : ""}`}>
-                  <ChevronDownSmallIcon />
-                </div>
-              </div>
-
-              <div
-                className={`om-limit-options ${isLimitOpen ? "open" : hasLimitOpened ? "closed" : ""}`}
-              >
-                {[10, 20, 50].map((val) => (
-                  <div
-                    key={val}
-                    className={`om-limit-option ${pagination.limit === val ? "active" : ""}`}
-                    onClick={() => {
-                      actions.changeLimit(val);
-                      setIsLimitOpen(false);
-                    }}
-                  >
-                    {val} / page
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <PortalPagination
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.total}
+          pageSize={pagination.limit}
+          onPageChange={actions.changePage}
+          onPageSizeChange={actions.changeLimit}
+          itemLabel="orders"
+          disabled={isLoading}
+        />
       </div>
     </div>
   );

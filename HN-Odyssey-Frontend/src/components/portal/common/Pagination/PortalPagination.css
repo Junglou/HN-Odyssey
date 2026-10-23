@@ -1,0 +1,250 @@
+/* phân trang dùng chung cho toàn bộ portal */
+.pp-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding-top: 10px;
+  box-sizing: border-box;
+  font-family: "Lexend Exa", sans-serif;
+  font-size: clamp(0.8rem, 1vw, 0.9rem);
+  font-weight: 500;
+  color: #374151;
+}
+
+/* chế độ gọn: không có dòng "Showing ..." -> cụm nút dạt phải */
+.pp-pagination.no-info {
+  justify-content: flex-end;
+}
+
+.pp-pagination.is-disabled .pp-pages,
+.pp-pagination.is-disabled .pp-limit {
+  pointer-events: none;
+}
+
+.pp-info {
+  white-space: nowrap;
+}
+
+.pp-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pp-pages {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: clamp(4px, 0.8vw, 6px);
+}
+
+/* nút số trang + mũi tên (reset style button toàn cục ở index.css) */
+.pp-page-btn {
+  box-sizing: border-box;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #374151;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pp-page-btn:hover:not(:disabled):not(.active) {
+  background-color: #f3f4f6;
+  border-color: #111827;
+  color: #111827;
+}
+
+.pp-page-btn.active {
+  background-color: #edd2b6;
+  border-color: #d9b896;
+  color: #1a1a1a;
+  font-weight: 700;
+  cursor: default;
+}
+
+.pp-page-btn:disabled {
+  opacity: 0.4;
+  border-color: #d1d5db;
+  cursor: not-allowed;
+}
+
+.pp-page-btn:focus {
+  outline: none;
+}
+
+.pp-page-btn:focus-visible {
+  outline: 2px solid #111827;
+  outline-offset: 2px;
+}
+
+.pp-arrow svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.pp-ellipsis {
+  min-width: 20px;
+  text-align: center;
+  color: #9ca3af;
+  user-select: none;
+}
+
+/* dropdown số dòng mỗi trang */
+.pp-limit {
+  position: relative;
+  user-select: none;
+}
+
+.pp-limit-trigger {
+  box-sizing: border-box;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #374151;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.pp-limit-trigger:hover,
+.pp-limit-trigger.active {
+  border-color: #111827;
+  background-color: #f9fafb;
+  color: #111827;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.pp-limit-trigger:focus {
+  outline: none;
+}
+
+.pp-limit-icon {
+  display: flex;
+  align-items: center;
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.pp-limit-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.pp-limit-icon.open {
+  transform: rotate(180deg);
+}
+
+.pp-limit-options {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 100%;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+  transform-origin: top center;
+}
+
+.pp-limit-options:not(.open):not(.closed) {
+  display: none;
+}
+
+.pp-limit-options.open {
+  pointer-events: auto;
+  animation: pp-slideFadeDown 0.2s ease-out forwards;
+}
+
+.pp-limit-options.closed {
+  pointer-events: none;
+  animation: pp-slideFadeUp 0.15s ease-out forwards;
+}
+
+.pp-limit-option {
+  padding: 10px 16px;
+  color: #4b5563;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pp-limit-option:hover {
+  background-color: #f3f4f6;
+  color: #111827;
+  padding-left: 20px;
+}
+
+.pp-limit-option.active {
+  background-color: #e9e9e9;
+  color: #000000;
+  font-weight: 700;
+}
+
+@keyframes pp-slideFadeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pp-slideFadeUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+@media (max-width: 767px) {
+  .pp-pagination {
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+  }
+  .pp-info {
+    white-space: normal;
+  }
+  .pp-controls {
+    justify-content: center;
+    width: 100%;
+  }
+  .pp-pages {
+    justify-content: center;
+  }
+}

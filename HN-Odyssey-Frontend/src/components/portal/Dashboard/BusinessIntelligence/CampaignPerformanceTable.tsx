@@ -1,6 +1,6 @@
 import { useState } from "react";
 import "./CampaignPerformanceTable.css";
-import { getPageItems } from "../../../../utils/pagination";
+import PortalPagination from "../../common/Pagination/PortalPagination";
 import { NO_SPEND_TOOLTIP } from "../../../../hooks/portal/Dashboard/MarketingAndPromotion/useMarketingAndPromotion";
 
 export interface CampaignData {
@@ -97,41 +97,13 @@ export default function CampaignPerformanceTable({
           </table>
         </div>
 
-        {totalPages > 1 && (
+        {safeData.length > 0 && (
           <div className="cpt-pagination-container">
-            <button
-              className="cpt-page-nav-btn"
-              disabled={safePage <= 1}
-              onClick={() => setCurrentPage(safePage - 1)}
-            >
-              Previous
-            </button>
-
-            <div className="cpt-page-numbers">
-              {getPageItems(safePage, totalPages).map((item, idx) =>
-                item === "..." ? (
-                  <span key={`dots-${idx}`} className="cpt-page-ellipsis">
-                    …
-                  </span>
-                ) : (
-                  <button
-                    key={item}
-                    className={`cpt-page-num-btn ${safePage === item ? "cpt-active" : ""}`}
-                    onClick={() => setCurrentPage(item)}
-                  >
-                    {item}
-                  </button>
-                ),
-              )}
-            </div>
-
-            <button
-              className="cpt-page-nav-btn"
-              disabled={safePage >= totalPages}
-              onClick={() => setCurrentPage(safePage + 1)}
-            >
-              Next
-            </button>
+            <PortalPagination
+              page={safePage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
           </div>
         )}
       </div>
