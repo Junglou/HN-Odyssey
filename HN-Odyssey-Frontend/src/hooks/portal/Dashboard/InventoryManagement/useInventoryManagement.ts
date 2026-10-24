@@ -352,7 +352,7 @@ export function useInventoryManagement() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      alert("Lỗi khi xuất báo cáo Excel.");
+      toast.error("Lỗi khi xuất báo cáo Excel.");
       console.error(err);
     }
   };
@@ -382,7 +382,7 @@ export function useInventoryManagement() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      alert("Lỗi khi xuất báo cáo PDF.");
+      toast.error("Lỗi khi xuất báo cáo PDF.");
       console.error(err);
     }
   };

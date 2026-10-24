@@ -15,6 +15,7 @@ import { useChatSupport } from "../../../hooks/common/useChatSupport";
 import axiosClient from "../../../api/axiosClient";
 import ChatProductCarousel from "./ChatProductCarousel";
 import "./ChatWidget.css";
+import { toast } from "react-toastify";
 
 // THÊM HÀM NÀY ĐỂ FIX LỖI LINK KÉP TỪ DB CŨ
 const getValidMediaUrl = (url: string) => {
@@ -105,7 +106,7 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
         setShowEmoji(false);
       } catch (error) {
         console.error(error);
-        window.alert("Couldn't send the image. Please try again.");
+        toast.error("Couldn't send the image. Please try again.");
       } finally {
         setIsSending(false);
       }
@@ -138,7 +139,7 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
     // Ảnh: chưa gửi ngay, hiện xem trước để khách gõ thêm câu hỏi
     if (file.type.startsWith("image/")) {
       if (file.size > MAX_CHAT_IMAGE_MB * 1024 * 1024) {
-        window.alert(
+        toast.error(
           `Images must be ${MAX_CHAT_IMAGE_MB}MB or smaller. Please choose a smaller image.`,
         );
         return;

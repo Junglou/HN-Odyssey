@@ -17,6 +17,7 @@ export default function RoleManagementPage() {
     actions,
     handleModalSubmit,
     executeDelete,
+    pendingRoleId,
   } = useRoleManagement();
 
   return (
@@ -46,6 +47,16 @@ export default function RoleManagementPage() {
         message="Are you sure you want to delete this role?"
         onClose={() => setDeleteConfig({ isOpen: false, roleId: null })}
         onConfirm={executeDelete}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={pendingRoleId !== null}
+        title="Unsaved Changes"
+        message="You have unsaved permission changes. Switch to another role and discard them?"
+        confirmLabel="Discard changes"
+        cancelLabel="Keep editing"
+        onClose={actions.cancelLeaveRole}
+        onConfirm={actions.confirmLeaveRole}
       />
     </div>
   );

@@ -7,10 +7,7 @@ import {
   LoyaltyHistoryDocument,
 } from 'src/modules/marketing/loyalty/schemas/loyalty-history.schema';
 import { NotificationsService } from 'src/modules/notifications/notifications.service';
-import {
-  NotificationType,
-  NotificationPriority,
-} from 'src/modules/notifications/schemas/notification-log.schema';
+import { NotificationEvent } from 'src/modules/notifications/notification-policy.constant';
 import {
   Customer,
   CustomerDocument,
@@ -20,10 +17,9 @@ import {
 export class LoyaltyFraudListener {
   private readonly logger = new Logger(LoyaltyFraudListener.name);
 
-  // Ngưỡng gian lận cấu hình
   // Hệ USD (1$ = 1 điểm): 1 lần ≥ 5.000 điểm ≈ đơn ≥ $3.300 ở hạng Platinum (x1.5)
   private readonly FRAUD_THRESHOLD_AMOUNT = 5000;
-  private readonly FRAUD_FREQUENCY_LIMIT = 5; // > 5 lần tích điểm trong 1 giờ
+  private readonly FRAUD_FREQUENCY_LIMIT = 5; // ≥ 5 lần tích điểm trong 1 giờ
 
   constructor(
     @InjectModel(LoyaltyHistory.name)
@@ -46,7 +42,6 @@ export class LoyaltyFraudListener {
 
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
-      // 1. Kiểm tra tích điểm đột biến (Huge Amount)
       if (amount >= this.FRAUD_THRESHOLD_AMOUNT) {
         await this.flagFraudUser(
           customer_id,
@@ -55,7 +50,6 @@ export class LoyaltyFraudListener {
         return;
       }
 
-      // 2. Kiểm tra tần suất (High Frequency)
       const recentTransactionsCount = await this.loyaltyModel.countDocuments({
         customer_id: new Types.ObjectId(customer_id),
         type: 'EARN',
@@ -76,27 +70,33 @@ export class LoyaltyFraudListener {
   private async flagFraudUser(customerId: string, reason: string) {
     this.logger.warn(`[FRAUD ALERT] User ${customerId} - Lý do: ${reason}`);
 
-    // Gắn thẻ User và khóa tạm quyền đánh giá/mua sắm nếu cần thiết (dựa vào trường review_access ở User)
-    await this.customerModel.findByIdAndUpdate(customerId, {
-      $set: {
-        internal_note: `[CẢNH BÁO GIAN LẬN HỆ THỐNG]: ${reason}`,
-        status_reason: 'Tạm khóa do nghi ngờ gian lận Loyalty',
-      },
-    });
+    // new: true + select email: lấy email để trang Customers tìm đúng người
+    const customer = await this.customerModel
+      .findByIdAndUpdate(
+        customerId,
+        {
+          $set: {
+            internal_note: `[CẢNH BÁO GIAN LẬN HỆ THỐNG]: ${reason}`,
+            status_reason: 'Tạm khóa do nghi ngờ gian lận Loyalty',
+          },
+        },
+        { new: true },
+      )
+      .select('email')
+      .lean<{ email?: string }>();
 
-    // Bắn Notification cho Quản trị viên
-    await this.notificationsService.createAndSendToMultipleRoles({
-      roles: ['SUPER_ADMIN', 'MARKETING_MANAGER'],
-      warehouse_id: undefined,
-      title: '⚠️ Cảnh báo Gian lận Điểm thưởng',
-      message: `Phát hiện hành vi tích điểm bất thường từ khách hàng ID: ${customerId}. Lý do: ${reason}. Vui lòng kiểm tra đối soát!`,
-      type: NotificationType.SECURITY,
-      priority: NotificationPriority.CRITICAL,
-      metadata: {
-        user_id: customerId,
-        error_code: 'LOYALTY_FRAUD_DETECTED',
-        target_url: '/portal/customers',
-      },
+    const email = customer?.email;
+
+    await this.notificationsService.notify(NotificationEvent.LOYALTY_FRAUD, {
+      title: 'Nghi gian lận điểm thưởng',
+      message: `Khách hàng ${email ?? `ID ${customerId}`}: ${reason}. Cần đối soát lịch sử tích điểm.`,
+      dedupeKey: `${NotificationEvent.LOYALTY_FRAUD}:${customerId}`,
+      targetUrl: email
+        ? `/portal/customers?search=${encodeURIComponent(email)}`
+        : undefined,
+      // Dùng customer_id (không dùng user_id) để không bị đóng nhầm
+      // bởi sự kiện resolve cảnh báo bảo mật theo user_id
+      metadata: { customer_id: customerId, reason },
     });
   }
 }

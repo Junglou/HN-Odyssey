@@ -166,6 +166,14 @@ export class TradeInService {
       ],
     });
 
+    // Báo nhân sự có quyền Trade-in + gửi xác nhận cho khách
+    this.eventEmitter.emit('notify.trade_in.created', {
+      request_id: String(newRequest._id),
+      request_code: newRequest.request_code,
+      customer_id: customerId,
+      product_name: newRequest.product_name || 'Thiết bị',
+    });
+
     return new BaseResponse(true, 'Gửi yêu cầu thành công', newRequest);
   }
 

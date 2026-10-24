@@ -24,4 +24,10 @@ export class UpdateOrderStatusDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  // Trạng thái (gốc của BE) mà người thao tác đang thấy trên màn hình.
+  // Khác với DB → 409: đơn đã được người khác cập nhật.
+  @IsOptional()
+  @IsString()
+  expected_status?: string;
 }

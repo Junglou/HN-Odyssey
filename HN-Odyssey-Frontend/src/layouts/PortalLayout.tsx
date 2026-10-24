@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import "./PortalLayout.css";
+import "./PortalLayout.notifications.css";
 import {
   usePortalNotifications,
   type PortalNotification,
@@ -28,17 +29,22 @@ import {
 import { getCurrentUser } from "../utils/permission";
 
 const getRelativeTime = (dateString: string) => {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-  if (diffInSeconds < 60) return "vừa xong";
+  const diffInSeconds = Math.floor(
+    (Date.now() - new Date(dateString).getTime()) / 1000,
+  );
+  if (diffInSeconds < 60) return "Just now";
   const diffInMinutes = Math.floor(diffInSeconds / 60);
-  if (diffInMinutes < 60) return `(${diffInMinutes}m ago)`;
+  if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
   const diffInHours = Math.floor(diffInMinutes / 60);
-  if (diffInHours < 24) return `(${diffInHours}h ago)`;
-  const diffInDays = Math.floor(diffInHours / 24);
-  return `(${diffInDays}d ago)`;
+  if (diffInHours < 24) return `${diffInHours}h ago`;
+  return `${Math.floor(diffInHours / 24)}d ago`;
+};
+
+const PRIORITY_LABEL: Record<PortalNotification["priority"], string> = {
+  CRITICAL: "Critical",
+  HIGH: "High",
+  MEDIUM: "Medium",
+  LOW: "Low",
 };
 
 const getNotificationIcon = (type: string) => {
@@ -50,6 +56,9 @@ const getNotificationIcon = (type: string) => {
     case "SYSTEM":
     case "SECURITY":
       return <SystemIcon />;
+    case "SUPPORT":
+      return <CRMIcon />;
+    case "REVIEW":
     case "LOYALTY":
     case "PROMOTION":
       return <MarketingIcon />;
@@ -118,9 +127,12 @@ const PortalLayout = () => {
     notifications,
     unreadCount,
     markAsReadAndNavigate,
+    markAllAsRead,
     hasMore,
     isLoading,
     loadMore,
+    filter: notiFilter,
+    changeFilter: changeNotiFilter,
   } = usePortalNotifications();
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -810,41 +822,93 @@ const PortalLayout = () => {
             ✕
           </button>
         </div>
-        <div className="p-noti-body" onScroll={handleScroll}>
-          {notifications.length === 0 ? (
-            <div
-              style={{ textAlign: "center", padding: "20px", color: "#666" }}
+
+        <div className="p-noti-toolbar">
+          <div className="p-noti-tabs">
+            <button
+              type="button"
+              className={`p-noti-tab ${notiFilter === "all" ? "active" : ""}`}
+              onClick={() => changeNotiFilter("all")}
             >
-              Bạn không có thông báo nào.
+              All
+            </button>
+            <button
+              type="button"
+              className={`p-noti-tab ${notiFilter === "unread" ? "active" : ""}`}
+              onClick={() => changeNotiFilter("unread")}
+            >
+              Unread{unreadCount > 0 ? ` (${unreadCount})` : ""}
+            </button>
+          </div>
+          <button
+            type="button"
+            className="p-noti-readall"
+            disabled={unreadCount === 0}
+            onClick={() => void markAllAsRead()}
+          >
+            Mark all as read
+          </button>
+        </div>
+
+        <div className="p-noti-body" onScroll={handleScroll}>
+          {notifications.length === 0 && !isLoading ? (
+            <div className="p-noti-empty">
+              {notiFilter === "unread"
+                ? "You're all caught up."
+                : "No notifications yet."}
             </div>
           ) : (
-            notifications.map((noti: PortalNotification) => (
-              <div
-                key={noti._id}
-                className={`p-noti-item ${!noti.is_read ? "unread" : ""}`}
-                onClick={() => {
-                  const targetUrl = noti.metadata?.target_url;
-                  if (!noti.is_read) {
-                    markAsReadAndNavigate(noti._id, targetUrl);
-                  } else if (targetUrl) {
-                    navigate(targetUrl);
-                  }
-                  setIsNotiOpen(false);
-                }}
-              >
-                <div className="p-noti-icon-wrapper">
-                  {getNotificationIcon(noti.type)}
+            notifications.map((noti: PortalNotification) => {
+              const isResolved = noti.status === "RESOLVED";
+              const isUnread = !noti.is_read && !isResolved;
+              return (
+                <div
+                  key={noti._id}
+                  role="button"
+                  tabIndex={0}
+                  className={`p-noti-item p-noti-prio-${noti.priority.toLowerCase()} ${isUnread ? "unread" : ""} ${isResolved ? "resolved" : ""}`}
+                  onClick={() => {
+                    void markAsReadAndNavigate(noti);
+                    setIsNotiOpen(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      void markAsReadAndNavigate(noti);
+                      setIsNotiOpen(false);
+                    }
+                  }}
+                >
+                  <div className="p-noti-icon-wrapper">
+                    {getNotificationIcon(noti.type)}
+                  </div>
+                  <div className="p-noti-content">
+                    <div className="p-noti-item-head">
+                      <span
+                        className={`p-noti-badge p-noti-badge-${noti.priority.toLowerCase()}`}
+                      >
+                        {PRIORITY_LABEL[noti.priority]}
+                      </span>
+                      {noti.occurrence_count > 1 && (
+                        <span className="p-noti-count">
+                          ×{noti.occurrence_count}
+                        </span>
+                      )}
+                      {isResolved && (
+                        <span className="p-noti-resolved">Resolved</span>
+                      )}
+                    </div>
+                    <p className="p-noti-item-title">{noti.title}</p>
+                    <p className="p-noti-item-message">{noti.message}</p>
+                    <p className="p-noti-item-time">
+                      {getRelativeTime(noti.last_occurred_at)}
+                    </p>
+                  </div>
+                  {isUnread && <div className="p-noti-dot"></div>}
                 </div>
-                <div className="p-noti-content">
-                  <p className="p-noti-item-title">{noti.title}</p>
-                  <p className="p-noti-item-time">
-                    {getRelativeTime(noti.createdAt)}
-                  </p>
-                </div>
-                <div className="p-noti-dot"></div>
-              </div>
-            ))
+              );
+            })
           )}
+          {isLoading && <div className="p-noti-empty">Loading…</div>}
         </div>
       </div>
 

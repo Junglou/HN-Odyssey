@@ -1,5 +1,12 @@
 import { useState } from "react";
 import "./SetPriceModal.css";
+import CustomSelect from "../../../common/CustomSelect/CustomSelect";
+
+// Giá luôn được lưu bằng USD; nhập VND sẽ được backend quy đổi theo tỷ giá hệ thống
+const CURRENCY_OPTIONS = [
+  { value: "USD", label: "USD" },
+  { value: "VND", label: "VND" },
+];
 
 // Khai báo interface chuẩn thay cho any
 export interface PriceSubmitData {
@@ -118,15 +125,17 @@ function SetPriceModalContent({
           </div>
           <div className="spm-input-group">
             <label>Currency</label>
-            <select
+            <CustomSelect
               value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
+              options={CURRENCY_OPTIONS}
+              onChange={setCurrency}
               disabled={isSubmitting}
-            >
-              <option value="VND">VND</option>
-              <option value="USD">USD</option>
-              <option value="EUR">EUR</option>
-            </select>
+            />
+            {currency !== "USD" && (
+              <span className="spm-currency-hint">
+                Saved in USD at the system exchange rate.
+              </span>
+            )}
           </div>
           <div className="spm-input-group">
             <label>

@@ -17,31 +17,41 @@ export default function StockManagementPage() {
   const overviewHook = useStockOverview();
   const ticketsHook = useStockTickets();
 
-  // [CẬP NHẬT QUAN TRỌNG]: Logic đón thông điệp từ Dashboard
+  // Deep link vào trang Kho:
+  //  - Từ Dashboard:  ?sku=XXX&action=PO|TRANSFER → mở phiếu Nhập/Xuất ở tab Ticket History
+  //  - Từ thông báo:  ?sku=XXX (không có action)  → tab Total Stock Overview, lọc sẵn theo SKU
   const [searchParams, setSearchParams] = useSearchParams();
 
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
   useEffect(() => {
     const sku = searchParams.get("sku");
+    if (!sku) return;
     const action = searchParams.get("action");
 
-    if (sku && action) {
-      // 1. Tự động nhảy sang tab "Ticket History"
+    if (action === "PO" || action === "TRANSFER") {
       setActiveTab("tickets");
-
-      // 2. Mở Drawer Tạo phiếu Nhập/Xuất và bơm SKU vào
-      if (action === "PO") {
-        ticketsHook.actions.openCreateDrawer("import", sku);
-      } else if (action === "TRANSFER") {
-        ticketsHook.actions.openCreateDrawer("export", sku);
-      }
-
-      // 3. Xoá param trên URL để nếu người dùng F5 thì không bị tự động mở lại
-      searchParams.delete("sku");
-      searchParams.delete("action");
-      setSearchParams(searchParams, { replace: true });
+      ticketsHook.actions.openCreateDrawer(
+        action === "PO" ? "import" : "export",
+        sku,
+      );
+    } else {
+      setActiveTab("overview");
+      overviewHook.actions.changeFilter("search", sku);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Chỉ chạy 1 lần khi component mount
+
+    // Xóa tham số để F5 không mở lại
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("sku");
+        next.delete("action");
+        return next;
+      },
+      { replace: true },
+    );
+    // Chạy lại mỗi khi URL đổi: bấm thông báo khi đang đứng sẵn ở trang Kho vẫn hoạt động
+  }, [searchParams]);
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   return (
     <div className="sm-page-container">

@@ -27,3 +27,25 @@
   font-size: 0.95rem;
   width: auto;
 }
+/* CustomSelect trong form địa chỉ: khớp với .um-form-group input */
+.um-form-group .cs-trigger {
+  padding: 12px 16px;
+  font-family: "Lexend Exa", sans-serif;
+  color: #333333;
+}
+
+.um-form-group .cs-disabled .cs-trigger {
+  color: #6b7280;
+}
+
+.um-form-group .cs-option,
+.um-form-group .cs-search input {
+  font-family: "Lexend Exa", sans-serif;
+}
+
+@media (max-width: 480px) {
+  .um-form-group .cs-trigger {
+    padding: 10px 14px;
+    font-size: 0.9rem;
+  }
+}

@@ -21,11 +21,12 @@ interface NotificationTrend {
   count: number;
 }
 
+// Khớp với giá trị JwtStrategy.validate() trả về
 interface RequestUser {
-  userId: string;
+  _id: string;
   email: string;
   roles: string[];
-  warehouseId?: string;
+  fullName?: string;
 }
 
 interface RequestWithUser extends Request {
@@ -37,64 +38,53 @@ interface RequestWithUser extends Request {
 export class NotificationsController {
   constructor(private readonly service: NotificationsService) {}
 
-  // AC11: Lấy danh sách thông báo cá nhân/theo role (Cơ chế Offline Queue)
-  // [ĐÃ SỬA]: Xóa RequirePermissions để cho phép MỌI USER lấy thông báo cá nhân của mình
+  // Danh sách thông báo của người đang đăng nhập (đã lọc theo quyền)
+  // ?unread=true để chỉ lấy thông báo chưa đọc
   @Get('my-notifications')
   async getMyNotifications(
     @Req() req: RequestWithUser,
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 10,
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
+    @Query('unread') unread?: string,
   ) {
+    const safePage = Math.max(1, Number(page) || 1);
+    const safeLimit = Math.min(50, Math.max(1, Number(limit) || 20));
+
     const { items, meta } = await this.service.getNotificationsForUser(
-      req.user.userId,
-      req.user.roles,
-      req.user.warehouseId,
-      Number(page),
-      Number(limit),
+      String(req.user._id),
+      safePage,
+      safeLimit,
+      unread === 'true',
     );
     return new BaseResponse(true, 'Lấy thông báo thành công', items, meta);
   }
 
-  // AC7: Đánh dấu đã đọc & AC12: Đồng bộ thiết bị
-  // [ĐÃ SỬA]: Xóa RequirePermissions để cho phép MỌI USER đánh dấu đọc thông báo cá nhân của mình
-  @Patch(':id/read')
-  async markAsRead(@Param('id') id: string, @Req() req: RequestWithUser) {
-    const result = await this.service.markAsRead(id, req.user.userId);
-    if (!result) return new BaseResponse(false, 'Không tìm thấy thông báo');
-    return new BaseResponse(true, 'Đã đánh dấu đã đọc', result);
-  }
-
-  // AC7: Đánh dấu đã đọc tất cả
-  // [ĐÃ SỬA]: Xóa RequirePermissions
   @Patch('read-all')
   async markAllAsRead(@Req() req: RequestWithUser) {
-    const ip = req.ip;
-    const userAgent = req.headers['user-agent'];
     const result = await this.service.markAllAsRead(
-      req.user.userId,
-      req.user.roles,
-      ip,
-      userAgent,
+      String(req.user._id),
+      req.ip,
+      req.headers['user-agent'],
     );
     return new BaseResponse(true, 'Đã đánh dấu đọc tất cả', result);
   }
 
-  // Lấy số lượng chưa đọc cho Badge (AC2)
-  // [ĐÃ SỬA]: Xóa RequirePermissions (Đây là nguyên nhân chính gây spam log lỗi)
+  @Patch(':id/read')
+  async markAsRead(@Param('id') id: string, @Req() req: RequestWithUser) {
+    const result = await this.service.markAsRead(id, String(req.user._id));
+    if (!result) return new BaseResponse(false, 'Không tìm thấy thông báo');
+    return new BaseResponse(true, 'Đã đánh dấu đã đọc', result);
+  }
+
   @Get('unread-count')
   async getUnreadCount(@Req() req: RequestWithUser) {
-    const count = await this.service.getUnreadCount(
-      req.user.userId,
-      req.user.roles,
-      req.user.warehouseId,
-    );
+    const count = await this.service.getUnreadCount(String(req.user._id));
     return new BaseResponse(true, 'Lấy số lượng chưa đọc thành công', {
       count,
     });
   }
 
-  // Lấy dữ liệu biểu đồ cho Dashboard (AC12 - US.19)
-  // [GIỮ NGUYÊN]: API thống kê hệ thống VẪN BẮT BUỘC PHẢI PHÂN QUYỀN
+  // API thống kê hệ thống VẪN BẮT BUỘC PHÂN QUYỀN
   @Get('stats/trend')
   @RequirePermissions(Resource.SYSTEM_NOTIFICATIONS, Action.READ)
   async getTrend(): Promise<BaseResponse<NotificationTrend[]>> {

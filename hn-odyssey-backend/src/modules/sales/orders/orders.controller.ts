@@ -128,6 +128,18 @@ export class OrdersController {
     await this.ordersService.exportExcel(adminId, query, res);
   }
 
+  // Người đang đăng nhập có được ép trạng thái đơn không (FE dùng để ẩn/hiện ô "Force")
+  @Get('meta/can-override')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @RequirePermissions(Resource.SALES_ORDERS, Action.READ)
+  async canOverride(@CurrentUser() user: IUser) {
+    return {
+      canOverride: await this.ordersService.canOverrideStatus(
+        user._id.toString(),
+      ),
+    };
+  }
+
   // NHÓM 2: CÁC ROUTE ĐỘNG (CÓ :id)
 
   // 8. CHI TIẾT ĐƠN HÀNG
@@ -249,9 +261,14 @@ export class OrdersController {
   }
 
   // 13. NHẬN WEBHOOK TỪ ĐƠN VỊ VẬN CHUYỂN
+  // KHÔNG còn công khai: endpoint này nhận trạng thái tùy ý theo mã đơn → chỉ dùng nội bộ / kiểm thử
+  // với tài khoản có quyền sửa đơn. Webhook thật của GHN/GHTK nằm ở /shipping/webhook/*.
   @Post('webhook/shipping')
-  @Public()
-  @ApiOperation({ summary: 'Webhook nhận cập nhật trạng thái từ ĐVVC' })
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @RequirePermissions(Resource.SALES_ORDERS, Action.UPDATE)
+  @ApiOperation({
+    summary: 'Cập nhật trạng thái theo mã vận đơn (nội bộ / kiểm thử)',
+  })
   async handleShippingWebhook(
     @Body('waybill_code') waybillCode: string,
     @Body('status') status: OrderStatus,

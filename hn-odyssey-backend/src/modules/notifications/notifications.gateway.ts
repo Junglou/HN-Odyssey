@@ -10,12 +10,9 @@ import { JwtService } from '@nestjs/jwt';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { TradeInSocketPayload } from './listeners/notification.listener';
 
-// Định nghĩa Interface cho Payload để tránh dùng 'any'
 interface JwtPayload {
   sub?: string;
   userId?: string;
-  roles: string[];
-  warehouseId?: string;
 }
 
 @WebSocketGateway({
@@ -32,45 +29,29 @@ export class NotificationsGateway
 
   async handleConnection(client: Socket) {
     try {
-      // 1. Trích xuất và kiểm tra Token (Fix lỗi unsafe-argument)
-      const authHeader = client.handshake.auth.token as string | undefined;
-      const queryToken = client.handshake.query.token as string | undefined;
-      const token = authHeader || queryToken;
+      const auth = client.handshake.auth as { token?: string };
+      const query = client.handshake.query as { token?: string };
+      const token = auth.token || query.token;
 
       if (!token) {
         client.disconnect();
         return;
       }
 
-      // 2. Xác thực với kiểu dữ liệu rõ ràng (Fix lỗi unsafe-member-access)
       const payload = this.jwtService.verify<JwtPayload>(token);
-
       const userId = payload.sub || payload.userId;
-      const roles = payload.roles || [];
-      const warehouseId = payload.warehouseId;
 
       if (!userId) {
         client.disconnect();
         return;
       }
 
-      // 3. Thực hiện Join Room với await (Fix lỗi no-floating-promises)
-      // AC12: Join room cá nhân
+      // CHỈ join phòng cá nhân. Ai nhận thông báo nào do server tính theo
+      // quyền (Role Management) tại thời điểm gửi — không phụ thuộc nội dung JWT,
+      // đổi quyền có hiệu lực ngay mà không cần đăng nhập lại.
       await client.join(`user_${userId}`);
 
-      // AC10: Join room theo Role và Khu vực
-      if (Array.isArray(roles)) {
-        for (const role of roles) {
-          await client.join(`role_${role}`);
-          if (warehouseId) {
-            await client.join(`role_${role}_area_${warehouseId}`);
-          }
-        }
-      }
-
-      this.logger.log(
-        `Client connected: ${userId} joined rooms: ${Array.from(client.rooms).join(', ')}`, // Fix lỗi restrict-template-expressions
-      );
+      this.logger.log(`Client connected: ${userId}`);
     } catch (error) {
       this.logger.error(
         'Socket connection error:',
@@ -84,9 +65,19 @@ export class NotificationsGateway
     this.logger.log(`Client disconnected: ${client.id}`);
   }
 
-  // AC8: Gửi tin nhắn tới room cụ thể
+  /** Gửi tới 1 phòng bất kỳ (giữ cho các nơi gọi cũ) */
   sendToRoom(room: string, event: string, data: unknown) {
     this.server.to(room).emit(event, data);
+  }
+
+  /**
+   * Gửi tới nhiều người trong MỘT lần emit.
+   * Socket.IO tự loại trùng: 1 client chỉ nhận đúng 1 lần dù khớp nhiều phòng.
+   */
+  sendToUsers(userIds: string[], event: string, data: unknown) {
+    const rooms = Array.from(new Set(userIds)).map((id) => `user_${id}`);
+    if (rooms.length === 0) return;
+    this.server.to(rooms).emit(event, data);
   }
 
   @OnEvent('trade_in.status_updated', { async: true })

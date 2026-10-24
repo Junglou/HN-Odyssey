@@ -4,6 +4,13 @@ import axiosClient from "../../../../api/axiosClient";
 
 export const STANDARD_ACTIONS = ["READ", "CREATE", "UPDATE", "DELETE"];
 
+// Đồng bộ với RoleLevel ở Backend (role-level.enum.ts): số càng nhỏ cấp càng cao
+export const ROLE_LEVEL = {
+  BOARD: 1,
+  MANAGEMENT: 2,
+  STAFF: 3,
+} as const;
+
 // Lấy message Backend trả về (ForbiddenException, BadRequest...), không có thì dùng fallback
 const getErrorMessage = (error: unknown, fallback: string): string => {
   const msg = (error as { response?: { data?: { message?: unknown } } })
@@ -21,6 +28,7 @@ export interface BackendPermission {
 export interface BackendRole {
   _id: string;
   name: string;
+  level?: number;
   is_active?: boolean;
   is_system?: boolean;
   permissions?: BackendPermission[];
@@ -40,6 +48,7 @@ export interface BackendGroupMeta {
 export interface Role {
   id: string;
   name: string;
+  level: number;
   status: "Active" | "Inactive";
   isLocked: boolean;
   permissions: BackendPermission[];
@@ -63,6 +72,7 @@ export interface ModulePermission {
 
 export interface RoleFormData {
   name: string;
+  level: number;
   status: "Active" | "Inactive";
 }
 
@@ -80,6 +90,8 @@ export function useRoleManagement() {
     ModulePermission[]
   >([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+  // Role đang chờ chuyển sang khi còn thay đổi chưa lưu (hiện modal xác nhận của Portal)
+  const [pendingRoleId, setPendingRoleId] = useState<string | null>(null);
 
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
@@ -139,7 +151,7 @@ export function useRoleManagement() {
       const mappedRoles: Role[] = rawRolesList.map((r: BackendRole) => ({
         id: r._id,
         name: r.name,
-        // Ánh xạ is_active dạng boolean của hệ thống thành status dạng chuỗi cho giao diện
+        level: r.level ?? ROLE_LEVEL.STAFF,
         status: r.is_active === false ? "Inactive" : "Active",
         isLocked: r.is_system || false,
         permissions: r.permissions || [],
@@ -178,19 +190,23 @@ export function useRoleManagement() {
       if (modalConfig.mode === "add") {
         await axiosClient.post(`/admin/roles`, {
           name: data.name,
+          level: data.level,
           is_active: data.status === "Active",
           permissions: [],
         });
         toast.success("Thêm vai trò mới thành công!");
       } else if (modalConfig.mode === "edit" && modalConfig.editingRole) {
-        const roleId = modalConfig.editingRole.id;
+        const editing = modalConfig.editingRole;
 
-        // 1. Sửa thông tin (quyền UPDATE) — KHÔNG gửi is_active
-        await axiosClient.patch(`/admin/roles/${roleId}`, { name: data.name });
+        // 1. Sửa thông tin (quyền UPDATE) — KHÔNG gửi is_active; chỉ gửi level khi có đổi
+        await axiosClient.patch(`/admin/roles/${editing.id}`, {
+          name: data.name,
+          ...(data.level !== editing.level ? { level: data.level } : {}),
+        });
 
         // 2. Đổi trạng thái (quyền CHANGE_STATUS) — chỉ gọi khi có thay đổi
-        if (data.status !== modalConfig.editingRole.status) {
-          await axiosClient.patch(`/admin/roles/${roleId}/status`, {
+        if (data.status !== editing.status) {
+          await axiosClient.patch(`/admin/roles/${editing.id}/status`, {
             is_active: data.status === "Active",
           });
         }
@@ -229,12 +245,11 @@ export function useRoleManagement() {
   const actions = {
     changeSearch: (val: string) => setSearchTerm(val),
 
-    selectRole: (id: string) => {
-      if (hasUnsavedChanges) {
-        const confirmLeave = window.confirm(
-          "Bạn có thay đổi chưa lưu. Bạn có chắc muốn chuyển trang không?",
-        );
-        if (!confirmLeave) return;
+    selectRole: (id: string, skipConfirm = false) => {
+      // Còn thay đổi chưa lưu → hỏi bằng modal của Portal thay cho window.confirm
+      if (hasUnsavedChanges && !skipConfirm) {
+        setPendingRoleId(id);
+        return;
       }
 
       setSelectedRoleId(id);
@@ -255,9 +270,7 @@ export function useRoleManagement() {
 
           let granted: string[] = [];
           if (bePerm) {
-            // [CẬP NHẬT]: Nếu backend lỡ trả về MANAGE do dữ liệu cũ,
-            // ta sẽ check và chuyển nó lại thành full quyền có sẵn của Resource đó
-            // để UI có thể hiện tick xanh.
+            // Dữ liệu cũ có MANAGE → hiển thị như full quyền của resource
             if (bePerm.actions.includes("MANAGE")) {
               granted = [...sub.availableActions];
             } else {
@@ -332,7 +345,6 @@ export function useRoleManagement() {
         permissions.forEach((mod) => {
           mod.subModules.forEach((sub) => {
             if (sub.grantedActions.length > 0) {
-              // [ĐÃ SỬA]: Gửi ĐÚNG NHỮNG QUYỀN ĐƯỢC TICK. Không tự ý gom thành MANAGE nữa.
               bePermissionsPayload.push({
                 resource: sub.subId,
                 actions: sub.grantedActions,
@@ -355,6 +367,14 @@ export function useRoleManagement() {
         );
       }
     },
+
+    confirmLeaveRole: () => {
+      const target = pendingRoleId;
+      setPendingRoleId(null);
+      if (target) actions.selectRole(target, true);
+    },
+
+    cancelLeaveRole: () => setPendingRoleId(null),
 
     cancelChanges: () => {
       setPermissions(JSON.parse(JSON.stringify(originalPermissions)));
@@ -387,5 +407,6 @@ export function useRoleManagement() {
     actions,
     handleModalSubmit,
     executeDelete,
+    pendingRoleId,
   };
 }

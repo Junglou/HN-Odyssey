@@ -14,6 +14,7 @@ export default function OrderManagementPage() {
     selectedOrder,
     statusModal,
     actions,
+    permissions,
   } = useOrderManagement();
 
   return (
@@ -36,9 +37,13 @@ export default function OrderManagementPage() {
 
       {/* Modal cập nhật trạng thái đơn hàng */}
       <UpdateStatusModal
+        // Mỗi lần mở là một form mới (không giữ lý do / lựa chọn / Force của lần trước)
+        key={statusModal.isOpen ? (statusModal.orderId ?? "open") : "closed"}
         isOpen={statusModal.isOpen}
         orderId={statusModal.orderId}
         currentStatus={statusModal.currentStatus}
+        rawStatus={statusModal.rawStatus ?? null}
+        canOverride={permissions.canOverride}
         onClose={actions.closeStatusModal}
         onConfirm={actions.confirmUpdateStatus}
       />

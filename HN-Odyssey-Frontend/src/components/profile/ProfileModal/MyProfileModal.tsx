@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import "./MyProfileModal.css";
 import { ProfileModalPortal } from "./ProfileModalPortal";
 import type { UserProfile } from "../../../types/user";
+import { toast } from "react-toastify";
 
 export type { UserProfile };
 
@@ -89,7 +90,7 @@ export default function MyProfileModal({
     };
 
     if (!data.firstName.trim() || !data.lastName.trim()) {
-      alert("Please fill in all required fields (*)");
+      toast.warning("Please fill in all required fields (*)");
       return;
     }
 

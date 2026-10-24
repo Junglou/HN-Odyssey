@@ -12,7 +12,6 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Request } from 'express';
 import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
 
-// Mở rộng interface để hỗ trợ các định dạng payload khác nhau
 interface RequestUser {
   userId?: string;
   _id?: string | { toString: () => string };
@@ -38,7 +37,6 @@ export class UebaMonitorInterceptor implements NestInterceptor {
     const url = request.url;
     const method = request.method;
 
-    // Lấy thông tin user dựa trên interface đã định nghĩa thay vì dùng any
     const user = request.user;
     let userId = 'anonymous';
 
@@ -52,13 +50,17 @@ export class UebaMonitorInterceptor implements NestInterceptor {
       }
     }
 
+    // Chuẩn hóa IP giống SecurityMonitorInterceptor (lấy IP đầu chuỗi proxy, bỏ ::ffff:)
     const forwardedFor = request.headers['x-forwarded-for'];
-    const ip =
+    const rawIp =
       (Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor) ||
       request.socket.remoteAddress ||
       'unknown';
+    const ip = String(rawIp)
+      .split(',')[0]
+      .trim()
+      .replace(/^::ffff:/, '');
 
-    // Đẩy task đếm tần suất vào background, không dùng await để tránh làm chậm response
     void this.monitorBehavior(userId, ip, url, method);
 
     return next.handle();
@@ -73,27 +75,28 @@ export class UebaMonitorInterceptor implements NestInterceptor {
     try {
       const currentMin = new Date().getMinutes();
 
-      // Kiểm tra tần suất request lệch chuẩn ueba
-      const rateKey = `ueba:rate:${userId}:${currentMin}`;
-      const reqCount = await this.redis.incr(rateKey);
+      // Đếm theo TỪNG danh tính: user đã đăng nhập theo userId, khách vãng lai theo IP.
+      // Trước đây mọi khách vãng lai dùng chung khóa 'anonymous' nên chỉ cần web có
+      // chút lưu lượng là cứ mỗi phút lại phát 1 cảnh báo giả.
+      const identity = userId === 'anonymous' ? `ip:${ip}` : userId;
 
-      // Reset bộ đếm sau 60 giây
+      const rateKey = `ueba:rate:${identity}:${currentMin}`;
+      const reqCount = await this.redis.incr(rateKey);
       if (reqCount === 1) {
         await this.redis.expire(rateKey, 60);
       }
 
-      // Ngưỡng cảnh báo: 200 request mỗi phút
+      // Ngưỡng: 200 request / phút / danh tính
       if (reqCount === 200) {
         this.eventEmitter.emit(NOTIFY_EVENTS.SECURITY_ALERT, {
           severity: 'HIGH',
-          message: `[Hành vi lệch chuẩn UEBA]: Phát hiện tần suất cao bất thường (${reqCount} requests/phút).`,
+          message: `[UEBA] Tần suất truy cập cao bất thường: ${reqCount} request/phút.`,
           user_id: userId !== 'anonymous' ? userId : undefined,
           ip: ip,
         });
       }
 
-      // Phát hiện truy cập dữ liệu nhạy cảm hoặc tải file lớn
-      // Thu hẹp phạm vi các endpoint nhạy cảm để tránh báo cáo sai từ dashboard
+      // Truy xuất dữ liệu nhạy cảm (export / download)
       const sensitivePatterns = [
         '/export',
         '/download',
@@ -107,18 +110,17 @@ export class UebaMonitorInterceptor implements NestInterceptor {
       );
 
       if (isSensitive && method === 'GET') {
-        const sensitiveKey = `ueba:sensitive:${userId}:${currentMin}`;
+        const sensitiveKey = `ueba:sensitive:${identity}:${currentMin}`;
         const sensitiveCount = await this.redis.incr(sensitiveKey);
 
         if (sensitiveCount === 1) {
           await this.redis.expire(sensitiveKey, 60);
         }
 
-        // Ngưỡng cảnh báo truy cập dữ liệu nhạy cảm: 5 lần mỗi phút
         if (sensitiveCount === 5) {
           this.eventEmitter.emit(NOTIFY_EVENTS.SECURITY_ALERT, {
             severity: 'CRITICAL',
-            message: `[Truy cập nhạy cảm]: Tải/Truy xuất lượng lớn dữ liệu quan trọng liên tục tại đường dẫn ${url}.`,
+            message: `[UEBA] Tải/truy xuất dữ liệu quan trọng liên tục tại ${url}.`,
             user_id: userId !== 'anonymous' ? userId : undefined,
             ip: ip,
           });

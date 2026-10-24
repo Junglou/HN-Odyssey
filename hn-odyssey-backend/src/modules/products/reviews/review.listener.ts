@@ -7,6 +7,7 @@ import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant
 import {
   NotificationType,
   NotificationPriority,
+  NotificationScope,
 } from 'src/modules/notifications/schemas/notification-log.schema';
 
 interface ReviewPublishedPayload {
@@ -100,19 +101,16 @@ export class ReviewEventListener {
         updatedAt: new Date(),
       });
 
-      await this.notificationsService.createAndSend({
-        recipient_role: 'CUSTOMER',
-        recipient_id: payload.userId,
+      await this.notificationsService.notifyUser(payload.userId, {
+        scope: NotificationScope.CUSTOMER,
+        type: NotificationType.REVIEW,
+        priority: NotificationPriority.LOW,
         title: 'Đánh giá của bạn đã được đăng!',
         message: existingReward
           ? `Đánh giá của bạn về sản phẩm đã được công khai. Cảm ơn bạn đã chia sẻ!`
           : `Đánh giá của bạn đã được công khai. Bạn nhận được ${this.REVIEW_REWARD_POINTS} điểm thưởng.`,
-        type: NotificationType.LOYALTY,
-        priority: NotificationPriority.LOW,
-        metadata: {
-          target_url: `/product/${payload.productId}#reviews`,
-          review_id: payload.reviewId,
-        },
+        targetUrl: `/product/${payload.productId}#reviews`,
+        metadata: { review_id: payload.reviewId },
       });
 
       this.logger.log(
@@ -195,17 +193,14 @@ export class ReviewEventListener {
   @OnEvent('review.replied_by_admin', { async: true })
   async handleAdminReply(payload: ReviewRepliedPayload) {
     try {
-      await this.notificationsService.createAndSend({
-        recipient_role: 'CUSTOMER',
-        recipient_id: payload.userId,
+      await this.notificationsService.notifyUser(payload.userId, {
+        scope: NotificationScope.CUSTOMER,
+        type: NotificationType.REVIEW,
+        priority: NotificationPriority.MEDIUM,
         title: 'Cửa hàng đã phản hồi đánh giá của bạn',
         message: `Quản trị viên vừa trả lời đánh giá của bạn: "${payload.replyContent.substring(0, 50)}..."`,
-        type: NotificationType.ORDER, // Hoặc type SYSTEM tùy bạn
-        priority: NotificationPriority.MEDIUM,
-        metadata: {
-          target_url: `/products/${payload.productId}`,
-          review_id: payload.reviewId,
-        },
+        targetUrl: `/products/${payload.productId}`,
+        metadata: { review_id: payload.reviewId },
       });
     } catch (error: unknown) {
       const errorMessage =

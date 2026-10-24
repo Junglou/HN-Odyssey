@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { toast } from "react-toastify";
+import { useSearchParams } from "react-router-dom";
 import { io, Socket } from "socket.io-client";
 import axiosClient from "../../../../api/axiosClient";
 import tokenStorage from "../../../../utils/tokenStorage";
@@ -196,6 +197,13 @@ export function useLiveChatSupport() {
   // Các room đã join -> join lại khi socket reconnect
   const joinedRoomsRef = useRef<Set<string>>(new Set());
 
+  // Deep link từ thông báo: ?conversationId=XXX
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pendingConversationRef = useRef<string | null>(null);
+  const pendingSinceRef = useRef(0);
+  const [listLoadedAt, setListLoadedAt] = useState(0);
+  const [reloadKey, setReloadKey] = useState(0);
+
   const joinRoom = useCallback((conversationId: string) => {
     joinedRoomsRef.current.add(conversationId);
     socketRef.current?.emit("join_room", { conversationId });
@@ -347,6 +355,49 @@ export function useLiveChatSupport() {
     }, 500); // Đợi 500ms sau khi ngừng gõ
     return () => clearTimeout(handler);
   }, [searchQuery, debouncedSearch]);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const conversationId = searchParams.get("conversationId");
+    if (!conversationId) return;
+
+    pendingConversationRef.current = conversationId;
+    pendingSinceRef.current = Date.now();
+
+    // Khách đang chờ nhân viên luôn nằm ở tab Waitlist → về tab đó, trang 1, bỏ tìm kiếm
+    setActiveTab("Waitlist");
+    setSearchQuery("");
+    setDebouncedSearch("");
+    setPage(1);
+    setHasMore(true);
+    fetchedSessionIds.current.clear();
+    setReloadKey((k) => k + 1); // ép tải lại kể cả khi đang đứng sẵn ở Waitlist
+
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("conversationId");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams]);
+
+  // Danh sách tải xong → chọn đúng hội thoại, hoặc báo nếu đã có người nhận / đã đóng
+  useEffect(() => {
+    const pending = pendingConversationRef.current;
+    if (!pending || listLoadedAt < pendingSinceRef.current) return;
+    pendingConversationRef.current = null;
+
+    if (sessions.some((s) => s.id === pending)) {
+      setActiveSessionId(pending);
+    } else {
+      toast.info(
+        "Hội thoại này đã được nhân viên khác tiếp nhận hoặc đã kết thúc.",
+      );
+    }
+  }, [listLoadedAt, sessions]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // 1. KHỞI TẠO SOCKET.IO
   useEffect(() => {
@@ -645,6 +696,7 @@ export function useLiveChatSupport() {
           setActiveSessionId(null);
           fetchedSessionIds.current.clear();
         }
+        setListLoadedAt(Date.now());
       } catch (error) {
         console.error("Error fetching conversations:", error);
         toast.error("Không thể tải danh sách hội thoại.");
@@ -652,7 +704,7 @@ export function useLiveChatSupport() {
     };
 
     fetchConversations();
-  }, [activeTab, page, debouncedSearch, joinRoom]);
+  }, [activeTab, page, debouncedSearch, joinRoom, reloadKey]);
 
   // 3.1. ĐÁNH DẤU ĐÃ ĐỌC KHI MỞ HỘI THOẠI
   useEffect(() => {

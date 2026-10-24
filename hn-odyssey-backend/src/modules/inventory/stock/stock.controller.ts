@@ -14,14 +14,13 @@ import { ManualAdjustDto } from './dto/manual-adjust.dto';
 import { AcceptOrderDto } from './dto/accept-order.dto';
 import { UpdateThresholdsDto } from './dto/update-thresholds.dto';
 import { ReportIssueDto } from './dto/report-issue.dto';
-import { AdjustStockDto } from './dto/adjust-stock.dto';
 
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { Action, Resource } from 'src/common/enums/resource.enum';
-import { Public } from 'src/common/decorators/public.decorator';
+
 import { BaseResponse } from 'src/common/dtos/base-response.dto';
 import { GetPendingRequestsDto } from './dto/get-pending-requests.dto';
 
@@ -93,25 +92,6 @@ export class StockController {
   ) {
     const userId = req.user?.userId || 'SYSTEM';
     return this.stockService.reportOrderIssue(dto, userId);
-  }
-
-  // API NỘI BỘ HỆ THỐNG
-  @Public()
-  @Post('hold')
-  async holdStock(@Body() dto: AdjustStockDto) {
-    return this.stockService.holdStock(dto);
-  }
-
-  @Public()
-  @Post('deduct')
-  async deductStock(@Body() dto: AdjustStockDto) {
-    return this.stockService.finalizeDeduction(dto);
-  }
-
-  @Public()
-  @Post('restock')
-  async restock(@Body() dto: AdjustStockDto) {
-    return this.stockService.restock(dto);
   }
 
   // Lấy danh sách yêu cầu chờ duyệt (API dành riêng cho RequestTab ở FE)

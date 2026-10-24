@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { io } from "socket.io-client";
 import axiosClient from "../../../../api/axiosClient";
@@ -184,6 +185,30 @@ export function useTradeInManagement() {
   const rawApiUrl = import.meta.env.VITE_API_URL || "http://localhost:8080/api";
   const serverBaseUrl = rawApiUrl.replace(/\/api\/?$/, "");
 
+  // Deep link từ thông báo: ?search=<mã yêu cầu>
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pendingTradeInCodeRef = useRef<string | null>(null);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const code = searchParams.get("search");
+    if (!code) return;
+
+    pendingTradeInCodeRef.current = code;
+    setFilters({ search: code, status: "all", fromDate: "", toDate: "" });
+    setPagination((prev) => ({ ...prev, page: 1 }));
+
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("search");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   // callbacks
   const fetchTradeIns = useCallback(async () => {
     setIsLoading(true);
@@ -254,6 +279,18 @@ export function useTradeInManagement() {
 
       setData(mappedData);
       setPagination((prev) => ({ ...prev, totalItems: meta.totalItems }));
+
+      // Mở đúng yêu cầu được trỏ tới từ thông báo
+      const pendingCode = pendingTradeInCodeRef.current;
+      if (pendingCode && filters.search === pendingCode) {
+        pendingTradeInCodeRef.current = null;
+        const match = mappedData.find((r) => r.tradeInCode === pendingCode);
+        if (match) {
+          setDetailDrawer({ isOpen: true, tradeInId: match.id });
+        } else {
+          toast.info(`Không tìm thấy yêu cầu ${pendingCode}.`);
+        }
+      }
     } catch (error: unknown) {
       console.error("Fetch trade-ins error:", error);
       toast.error("Không thể tải danh sách Trade-in.");

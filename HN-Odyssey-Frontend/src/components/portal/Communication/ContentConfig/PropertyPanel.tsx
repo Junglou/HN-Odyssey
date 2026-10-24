@@ -13,6 +13,7 @@ import {
   SendToBackIcon,
 } from "../../../../assets/icons/ContentConfigIcons";
 import axiosClient from "../../../../api/axiosClient";
+import { toast } from "react-toastify";
 
 // helpers
 function CustomSelect({
@@ -135,7 +136,7 @@ export default function PropertyPanel({
         actions.updateSectionBackground(url);
       } catch (err) {
         console.error("Upload background error", err);
-        alert("Có lỗi xảy ra khi Upload Background.");
+        toast.error("Có lỗi xảy ra khi Upload Background.");
       }
       if (bgInputRef.current) bgInputRef.current.value = "";
     }

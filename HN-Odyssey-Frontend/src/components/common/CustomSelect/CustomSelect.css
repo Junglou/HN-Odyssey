@@ -1,0 +1,181 @@
+/* Dropdown dùng chung — cùng ngôn ngữ với usm-/rm-/om-custom-dropdown của Portal */
+.cs-root {
+  position: relative;
+  width: 100%;
+  font-family: inherit;
+}
+
+.cs-trigger {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #111827;
+  font-size: 0.95rem;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+/* Cỡ gọn cho bộ lọc trên thanh tiêu đề */
+.cs-sm .cs-trigger {
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}
+
+.cs-trigger:hover {
+  border-color: #9ca3af;
+}
+
+.cs-trigger.active,
+.cs-trigger:focus-visible {
+  border-color: #000000;
+}
+
+.cs-disabled .cs-trigger {
+  background-color: #f9fafb;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.cs-value,
+.cs-placeholder {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs-placeholder {
+  color: #9ca3af;
+}
+
+.cs-arrow {
+  flex-shrink: 0;
+  color: #6b7280;
+  transition: transform 0.2s ease;
+}
+
+.cs-arrow.open {
+  transform: rotate(180deg);
+}
+
+/* Ô ẩn giữ validation `required` — đặt dưới đáy để thông báo của form hiện đúng vị trí */
+.cs-native-proxy {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cs-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  z-index: 50;
+  overflow: hidden;
+  transform-origin: top;
+  animation: cs-in 0.2s ease-out forwards;
+}
+
+.cs-search {
+  padding: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.cs-search input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.cs-search input:focus {
+  border-color: #000000;
+}
+
+.cs-list {
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.cs-option {
+  padding: 9px 14px;
+  font-size: 0.9rem;
+  color: #374151;
+  cursor: pointer;
+}
+
+.cs-option.highlighted {
+  background-color: #f3f4f6;
+}
+
+.cs-option.selected {
+  color: #111827;
+  font-weight: 600;
+}
+
+.cs-empty {
+  padding: 12px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+@keyframes cs-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Mở lên trên khi phía dưới không đủ chỗ */
+.cs-panel.up {
+  top: auto;
+  bottom: calc(100% + 4px);
+  transform-origin: bottom;
+  animation-name: cs-in-up;
+}
+
+@keyframes cs-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cs-panel {
+    animation: none;
+  }
+}

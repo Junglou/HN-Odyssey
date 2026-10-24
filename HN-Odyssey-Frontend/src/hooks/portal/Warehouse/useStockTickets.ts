@@ -99,7 +99,7 @@ export function useStockTickets() {
   const user = tokenStorage.getUser() as UserPayload | null;
   const hasPermission = (resourceCode: Resource, actionCode: Action) => {
     if (!user || !user.permissions) return false;
-    if (user.roles && user.roles.includes("Super Admin")) return true;
+    if (user.roles && user.roles.includes("SUPER_ADMIN")) return true;
     const perm = user.permissions.find((p) => p.resource === resourceCode);
     if (!perm) return false;
     return (

@@ -8,18 +8,13 @@ import {
 } from '../schemas/integration-log.schema';
 import { EmailService } from 'src/modules/notifications/channels/email.service';
 import { NotificationsService } from 'src/modules/notifications/notifications.service';
-import {
-  NotificationType,
-  NotificationPriority,
-} from 'src/modules/notifications/schemas/notification-log.schema';
-import { InjectRedis } from '@nestjs-modules/ioredis';
-import Redis from 'ioredis';
+import { NotificationEvent } from 'src/modules/notifications/notification-policy.constant';
 
 // Payload chuẩn bắn ra từ IPN Handler của VNPAY/MOMO
 export interface PaymentFailurePayload {
   provider: 'VNPAY' | 'MOMO';
   order_code: string;
-  amount: number;
+  amount: number; // VNĐ — số tiền gửi sang cổng thanh toán
   error_code: string;
   error_message: string;
   raw_data: Record<string, any>;
@@ -29,8 +24,7 @@ export interface PaymentFailurePayload {
 export class PaymentMonitorListener {
   private readonly logger = new Logger(PaymentMonitorListener.name);
 
-  // Danh sách mã lỗi KỸ THUẬT (Ví dụ với VNPAY)
-  // 99: Lỗi ngoại lệ, 11: Timeout, 07: Trừ tiền thành công nhưng gd bị nghi ngờ
+  // Mã lỗi KỸ THUẬT (VNPAY): 99 ngoại lệ, 11 timeout, 07 trừ tiền nhưng giao dịch bị nghi ngờ
   private readonly TECH_ERRORS = ['99', '11', '07'];
 
   constructor(
@@ -38,7 +32,6 @@ export class PaymentMonitorListener {
     private readonly integrationLogModel: Model<IntegrationLogDocument>,
     private readonly emailService: EmailService,
     private readonly notificationsService: NotificationsService,
-    @InjectRedis() private readonly redis: Redis,
   ) {}
 
   @OnEvent('payment.failed')
@@ -47,11 +40,10 @@ export class PaymentMonitorListener {
       `[PAYMENT FAILED] Đơn ${payload.order_code} - Lỗi: ${payload.error_message}`,
     );
 
-    // US3-AC1: PHÂN LOẠI LỖI NGƯỜI DÙNG vs KỸ THUẬT
+    // US3-AC1: Phân loại lỗi người dùng vs kỹ thuật
     const isTechError = this.TECH_ERRORS.includes(payload.error_code);
     const errorType = isTechError ? 'TECHNICAL_ERROR' : 'USER_ERROR';
 
-    // Lưu Log chi tiết
     await this.integrationLogModel.create({
       provider: payload.provider,
       url: 'Webhook/IPN',
@@ -65,52 +57,33 @@ export class PaymentMonitorListener {
       response_data: payload.raw_data,
     });
 
-    // US3-AC2 & AC3: GỬI THÔNG BÁO VÀ EMAIL ĐÚNG ĐỐI TƯỢNG
-    if (isTechError) {
-      // 1. Gửi Notification lên Dashboard
-      await this.notificationsService.createAndSendToMultipleRoles({
-        roles: ['SUPER_ADMIN', 'ADMIN'],
-        title: `Lỗi kỹ thuật thanh toán ${payload.provider}`,
-        message: `Đơn hàng #${payload.order_code} (${payload.amount.toLocaleString()}đ) gặp sự cố: ${payload.error_message}.`,
-        type: NotificationType.SYSTEM,
-        priority: NotificationPriority.HIGH,
-        metadata: {
-          order_code: payload.order_code,
-          target_url: `/portal/orders`,
-        },
-      });
+    // Lỗi do người dùng (hủy, sai OTP, thiếu số dư...) không cần báo nhân sự
+    if (!isTechError) return;
 
-      // 2. Gửi Email cho Admin (Chỉ gửi khi lỗi kỹ thuật)
+    // US3-AC2 & AC3: Lỗi kỹ thuật — gộp theo cổng thanh toán trong 30 phút
+    const { isNew } = await this.notificationsService.notify(
+      NotificationEvent.SYSTEM_ERROR,
+      {
+        title: `Lỗi kỹ thuật thanh toán ${payload.provider}`,
+        message: `Đơn #${payload.order_code} (${payload.amount.toLocaleString('vi-VN')} VND) gặp sự cố: ${payload.error_message}`,
+        dedupeKey: `${NotificationEvent.SYSTEM_ERROR}:PAYMENT_TECH_${payload.provider}`,
+        metadata: {
+          provider: payload.provider,
+          order_code: payload.order_code,
+          gateway_error_code: payload.error_code,
+        },
+      },
+    );
+
+    if (isNew) {
       await this.emailService.sendRaw(
-        'admin@hn-odyssey.com', // Cấu hình lấy từ .env
+        'admin@hn-odyssey.com',
         `[KHẨN] Sự cố thanh toán ${payload.provider}`,
-        `Hệ thống ghi nhận lỗi kỹ thuật từ cổng thanh toán. \nMã đơn: ${payload.order_code}\nLý do: ${payload.error_message}\nMã lỗi: ${payload.error_code}`,
+        `Hệ thống ghi nhận lỗi kỹ thuật từ cổng thanh toán.\nMã đơn: ${payload.order_code}\nLý do: ${payload.error_message}\nMã lỗi: ${payload.error_code}`,
       );
     }
 
-    // US3-AC4: KIỂM TRA SPIKE ALERT (Ngưỡng thất bại cao)
-    await this.checkPaymentSpike(payload.provider);
-  }
-
-  private async checkPaymentSpike(provider: string) {
-    const redisKey = `spike:payment_fail:${provider}`;
-    const failCount = await this.redis.incr(redisKey);
-
-    if (failCount === 1) {
-      await this.redis.expire(redisKey, 600); // Reset sau 10 phút
-    }
-
-    if (failCount === 5) {
-      await this.notificationsService.createAndSendToMultipleRoles({
-        roles: ['SUPER_ADMIN'],
-        title: `🔥 CẢNH BÁO KHẨN: Cổng ${provider} lỗi liên tục`,
-        message: `Hệ thống ghi nhận 5 giao dịch thất bại liên tiếp trong 10 phút qua từ ${provider}. Có thể đối tác đang bảo trì hoặc sai cấu hình!`,
-        type: NotificationType.SYSTEM,
-        priority: NotificationPriority.CRITICAL,
-        metadata: {
-          target_url: `/portal/system`,
-        },
-      });
-    }
+    // Spike (5 lỗi / 10 phút) do SecurityMonitorListener đếm từ sự kiện SYSTEM_ERROR.
+    // Không đếm thêm ở đây để tránh 2 nơi cùng tăng một khóa Redis.
   }
 }

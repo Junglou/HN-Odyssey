@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "react-toastify";
+import { useSearchParams } from "react-router-dom";
 import axiosClient from "../../../../api/axiosClient";
 import { Action, Resource } from "../../../../types/permissions";
 import type { UserPayload } from "../../../../types/auth";
@@ -178,6 +179,33 @@ export function useCustomerManagement() {
     isSubmitting: boolean;
   }>({ isOpen: false, mode: "add", editingRecord: null, isSubmitting: false });
 
+  // Deep link từ thông báo: ?search=<email>
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pendingCustomerRef = useRef<string | null>(null);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const keyword = searchParams.get("search");
+    if (!keyword) return;
+
+    pendingCustomerRef.current = keyword;
+    setSearch(keyword);
+    setDebouncedSearch(keyword); // bỏ qua debounce, tìm ngay
+    setStatusFilter("All");
+    setTypeFilter("All");
+    setPagination((p) => ({ ...p, page: 1 }));
+
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("search");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   const fetchCustomers = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -225,6 +253,23 @@ export function useCustomerManagement() {
 
       setRecords(mappedRecords);
       setTotalFiltered(meta.total);
+
+      // Mở hồ sơ khách được trỏ tới từ thông báo (chế độ xem)
+      const pendingKeyword = pendingCustomerRef.current;
+      if (pendingKeyword && debouncedSearch.trim() === pendingKeyword) {
+        pendingCustomerRef.current = null;
+        const match = mappedRecords.find(
+          (r) => r.email.toLowerCase() === pendingKeyword.toLowerCase(),
+        );
+        if (match) {
+          setModalConfig({
+            isOpen: true,
+            mode: "view",
+            editingRecord: match,
+            isSubmitting: false,
+          });
+        }
+      }
     } catch (error) {
       toast.error("Không thể tải danh sách khách hàng từ hệ thống.");
       console.error("Fetch Error:", error);

@@ -30,6 +30,7 @@ import {
   toVnDate,
 } from "../../../../utils/reportFormat";
 import ChartCard from "../../../../hooks/portal/common/ChartCard/ChartCard";
+import CustomSelect from "../../../common/CustomSelect/CustomSelect";
 
 // US.82 AC3: Xanh = lãi, Vàng = hòa vốn, Đỏ = lỗ
 const ROI_COLORS: Record<ProfitStatus, string> = {
@@ -251,17 +252,18 @@ export function CampaignTrendSection({
         {campaignOptions.length > 0 && (
           <label className="mkc-select-label">
             Campaign:
-            <select
-              className="mkc-select"
+            <CustomSelect
+              size="sm"
+              style={{ minWidth: 220 }}
               value={selectedCampaignId}
-              onChange={(e) => onSelectCampaign(e.target.value)}
-            >
-              {campaignOptions.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              options={campaignOptions.map((c) => ({
+                value: c.id,
+                label: c.name,
+              }))}
+              onChange={onSelectCampaign}
+              searchable={campaignOptions.length > 8}
+              searchPlaceholder="Search campaign..."
+            />
           </label>
         )}
       </div>

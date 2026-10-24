@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import "./AvatarModal.css";
 import { ProfileModalPortal } from "./ProfileModalPortal";
 import type { UserProfile } from "../../../types/user";
+import { toast } from "react-toastify";
 
 export type { UserProfile };
 
@@ -74,7 +75,7 @@ export default function AvatarModal({
         file.type.toLowerCase(),
       )
     ) {
-      alert("Please choose a JPG or PNG image.");
+      toast.warning("Please choose a JPG or PNG image.");
       e.target.value = "";
       setSelectedFile(null);
       setObjectPreviewUrl(null);
@@ -82,7 +83,7 @@ export default function AvatarModal({
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert("Image must be 5 MB or smaller.");
+      toast.warning("Image must be 5 MB or smaller.");
       e.target.value = "";
       setSelectedFile(null);
       setObjectPreviewUrl(null);
@@ -97,7 +98,7 @@ export default function AvatarModal({
     e.preventDefault();
 
     if (!selectedFile) {
-      alert("Please select an avatar image from your computer.");
+      toast.warning("Please select an avatar image from your computer.");
       return;
     }
 

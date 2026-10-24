@@ -4,21 +4,18 @@ import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import * as crypto from 'crypto';
 import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
 import { NotificationsService } from 'src/modules/notifications/notifications.service';
+import { NotificationEvent } from 'src/modules/notifications/notification-policy.constant';
+import { NotificationPriority } from 'src/modules/notifications/schemas/notification-log.schema';
+import { EmailService } from 'src/modules/notifications/channels/email.service';
 import {
   AuthSession,
   AuthSessionDocument,
 } from '../schemas/auth-session.schema';
-import {
-  NotificationType,
-  NotificationPriority,
-} from 'src/modules/notifications/schemas/notification-log.schema';
-import * as crypto from 'crypto';
-import { EmailService } from 'src/modules/notifications/channels/email.service';
 import { IntegrationLogDocument } from '../schemas/integration-log.schema';
 
-// BƯỚC 1: ĐỊNH NGHĨA INTERFACE ĐỂ KHỬ 'ANY'
 export interface IntegrationApiCallPayload {
   provider: string;
   url: string;
@@ -40,10 +37,11 @@ export class SecurityMonitorListener {
     @InjectModel(AuthSession.name)
     private sessionModel: Model<AuthSessionDocument>,
     @InjectModel('IntegrationLog')
-    private integrationLogModel: Model<IntegrationLogDocument>, // Thêm dòng này
+    private integrationLogModel: Model<IntegrationLogDocument>,
   ) {}
 
-  // US3 - AC4: Bắt Spike Alert Thanh Toán (5 lỗi / 10 phút)
+  // US3 - AC4: Spike Alert thanh toán (5 lỗi / 10 phút / cổng)
+  // Đây là nơi DUY NHẤT đếm spike thanh toán (đã bỏ bộ đếm trùng ở PaymentMonitorListener)
   @OnEvent(NOTIFY_EVENTS.SYSTEM_ERROR)
   async handlePaymentFailureSpike(payload: {
     severity: string;
@@ -55,11 +53,9 @@ export class SecurityMonitorListener {
     const provider = payload.error_code.replace('PAYMENT_FAILED_', '');
     const redisKey = `spike:payment_fail:${provider}`;
 
-    // Tăng biến đếm
     const failCount = await this.redis.incr(redisKey);
-
     if (failCount === 1) {
-      await this.redis.expire(redisKey, 600); // Reset bộ đếm sau 10 phút
+      await this.redis.expire(redisKey, 600);
     }
 
     if (failCount === 5) {
@@ -67,23 +63,20 @@ export class SecurityMonitorListener {
         `[SPIKE ALERT] Cổng ${provider} đang có tỷ lệ lỗi bất thường!`,
       );
 
-      // AC5: Kèm Actionable Link
-      await this.notificationsService.createAndSendToMultipleRoles({
-        roles: ['SUPER_ADMIN'],
-        title: `🔥 CẢNH BÁO KHẨN CẤP: Lỗi cổng thanh toán ${provider}`,
-        message: `Hệ thống ghi nhận 5 giao dịch thất bại liên tiếp trong 10 phút qua từ ${provider}. Vui lòng kiểm tra lại cấu hình.`,
-        type: NotificationType.SYSTEM,
-        priority: NotificationPriority.CRITICAL,
-        metadata: {
-          error_code: payload.error_code,
-          target_url: `/portal/system`,
+      await this.notificationsService.notify(
+        NotificationEvent.PAYMENT_GATEWAY_DOWN,
+        {
+          title: `Cổng thanh toán ${provider} lỗi liên tục`,
+          message: `5 giao dịch thất bại trong 10 phút qua từ ${provider}. Kiểm tra cấu hình hoặc trạng thái bảo trì của đối tác.`,
+          dedupeKey: `${NotificationEvent.PAYMENT_GATEWAY_DOWN}:${provider}`,
+          metadata: { provider, gateway_error_code: payload.error_code },
         },
-      });
+      );
     }
   }
 
-  // US4 - AC3 & AC4: Giám sát đăng nhập từ thiết bị lạ & Concurrent Sessions
-  @OnEvent('user.logged_in') // (Bạn cần bắn event này ở hàm Login trong AuthService)
+  // US4 - AC3 & AC4: Đăng nhập từ thiết bị lạ & phiên đồng thời (không tạo thông báo Portal)
+  @OnEvent('user.logged_in')
   async handleUserLogin(payload: {
     userId: string;
     email: string;
@@ -101,7 +94,6 @@ export class SecurityMonitorListener {
     });
 
     if (!existingSession) {
-      // AC3: Báo thiết bị lạ
       await this.emailService.sendRaw(
         payload.email,
         '[Cảnh Báo Bảo Mật] Đăng nhập từ thiết bị lạ',
@@ -109,7 +101,6 @@ export class SecurityMonitorListener {
       );
     }
 
-    // AC4: Quản lý phiên đăng nhập đồng thời (Xóa phiên cũ)
     await this.sessionModel.updateMany(
       {
         user_id: new Types.ObjectId(payload.userId),
@@ -118,7 +109,6 @@ export class SecurityMonitorListener {
       { $set: { is_active: false } },
     );
 
-    // Lưu session mới
     await this.sessionModel.findOneAndUpdate(
       {
         user_id: new Types.ObjectId(payload.userId),
@@ -134,86 +124,58 @@ export class SecurityMonitorListener {
     );
   }
 
-  // BỔ SUNG CHO US4 - AC6: Bắt DDoS Login diện rộng
-  @OnEvent('user.login_failed') // Cần bắn sự kiện này ở AuthService khi sai pass
+  // US4 - AC6: Đăng nhập thất bại hàng loạt (> 100 lần / phút trên toàn hệ thống)
+  @OnEvent('user.login_failed')
   async handleDDoSLoginSpike() {
     const redisKey = 'spike:ddos_login_fail';
     const failCount = await this.redis.incr(redisKey);
 
     if (failCount === 1) {
-      await this.redis.expire(redisKey, 60); // Đo trong 1 phút (60s)
+      await this.redis.expire(redisKey, 60);
     }
 
     if (failCount === 100) {
-      // AC6: > 100 lần thất bại/phút
-      this.logger.error(
-        '🚨 [CRITICAL] PHÁT HIỆN TẤN CÔNG DDOS VÀO CỔNG ĐĂNG NHẬP!',
-      );
+      this.logger.error('[CRITICAL] Đăng nhập thất bại hàng loạt!');
 
-      await this.notificationsService.createAndSendToMultipleRoles({
-        roles: ['SUPER_ADMIN'],
-        warehouse_id: null as unknown as string,
-        title: '🚨 Cảnh báo Tấn công DDoS',
+      await this.notificationsService.notify(NotificationEvent.LOGIN_ATTACK, {
+        title: 'Đăng nhập thất bại hàng loạt',
         message:
-          'Hệ thống ghi nhận hơn 100 lượt đăng nhập thất bại trên toàn hệ thống trong 1 phút qua. Khả năng cao đang bị tấn công.',
-        type: NotificationType.SECURITY,
-        priority: NotificationPriority.CRITICAL,
-        metadata: {
-          target_url: '/portal/system',
-        },
+          'Hơn 100 lượt đăng nhập thất bại trên toàn hệ thống trong 1 phút qua. Khả năng cao đang bị dò mật khẩu.',
       });
     }
   }
 
-  // US5 - AC4 & AC5: GHI LOG VÀ GIÁM SÁT HẠN MỨC (QUOTA) CỦA TWILIO SMS
-
+  // US5 - AC4 & AC5: Ghi log tích hợp và giám sát hạn mức Twilio SMS
   @OnEvent('integration.api.called')
   async handleIntegrationApiCalled(payload: IntegrationApiCallPayload) {
-    // BƯỚC 2: THAY THẾ 'ANY' BẰNG INTERFACE
-    // 1. Ghi log chi tiết (Thỏa mãn US5-AC5)
     await this.integrationLogModel.create(payload).catch(() => {});
 
-    // 2. Đếm Quota nếu đây là dịch vụ TWILIO_SMS và gửi thành công (Thỏa mãn US5-AC4)
-    if (payload.provider === 'TWILIO_SMS' && !payload.is_error) {
-      const QUOTA_LIMIT = 500; // Giả sử giới hạn ngân sách là 500 tin nhắn/tháng (bạn có thể đưa vào .env)
-      const currentMonth = new Date().toISOString().slice(0, 7); // VD: "2025-11"
-      const quotaKey = `quota:twilio_sms:${currentMonth}`;
+    if (payload.provider !== 'TWILIO_SMS' || payload.is_error) return;
 
-      const currentUsage = await this.redis.incr(quotaKey);
+    const QUOTA_LIMIT = 500;
+    const currentMonth = new Date().toISOString().slice(0, 7); // VD: "2026-10"
+    const quotaKey = `quota:twilio_sms:${currentMonth}`;
+    const currentUsage = await this.redis.incr(quotaKey);
 
-      // Cảnh báo AC4: Đạt mốc 80%, 90%, 100%
-      if (currentUsage === Math.floor(QUOTA_LIMIT * 0.8)) {
-        await this.notificationsService.createAndSendToMultipleRoles({
-          roles: ['SUPER_ADMIN', 'ADMIN'],
-          title: '⚠️ Cảnh báo: Hạn mức SMS sắp hết (80%)',
-          message: `Hệ thống đã gửi ${currentUsage}/${QUOTA_LIMIT} tin nhắn Twilio trong tháng này. Vui lòng nạp thêm tiền.`,
-          type: NotificationType.SYSTEM,
-          priority: NotificationPriority.HIGH,
-          metadata: {
-            provider: 'TWILIO',
-            current_usage: currentUsage,
-            target_url: '/portal/system',
-          },
-        });
-      } else if (currentUsage === Math.floor(QUOTA_LIMIT * 0.9)) {
-        await this.notificationsService.createAndSendToMultipleRoles({
-          roles: ['SUPER_ADMIN', 'ADMIN'],
-          title: '🚨 Cảnh báo Khẩn: Hạn mức SMS đạt 90%',
-          message: `Hệ thống đã gửi ${currentUsage}/${QUOTA_LIMIT} tin nhắn Twilio. Tính năng đăng ký/quên mật khẩu qua SĐT sắp bị gián đoạn!`,
-          type: NotificationType.SYSTEM,
-          priority: NotificationPriority.CRITICAL,
-          metadata: {
-            provider: 'TWILIO',
-            current_usage: currentUsage,
-            target_url: '/portal/system',
-          },
-        });
-      } else if (currentUsage >= QUOTA_LIMIT && currentUsage % 50 === 0) {
-        // Vượt 100%, cứ lố 50 tin nhắn báo lại 1 lần
-        this.logger.error(
-          `[QUOTA EXCEEDED] Twilio SMS đã vượt hạn mức: ${currentUsage}/${QUOTA_LIMIT}`,
-        );
-      }
+    const at80 = currentUsage === Math.floor(QUOTA_LIMIT * 0.8);
+    const at90 = currentUsage === Math.floor(QUOTA_LIMIT * 0.9);
+
+    if (at80 || at90) {
+      // Cùng 1 khóa theo tháng: mốc 90% "leo thang" thông báo 80% thành CRITICAL,
+      // không tạo thêm dòng mới trong chuông.
+      await this.notificationsService.notify(NotificationEvent.SMS_QUOTA, {
+        title: `Hạn mức SMS tháng ${currentMonth} đã dùng ${at90 ? '90' : '80'}%`,
+        message: `Đã gửi ${currentUsage}/${QUOTA_LIMIT} tin nhắn Twilio. ${at90 ? 'Đăng ký / quên mật khẩu qua SĐT sắp bị gián đoạn.' : 'Cần nạp thêm hạn mức.'}`,
+        priority: at90
+          ? NotificationPriority.CRITICAL
+          : NotificationPriority.HIGH,
+        dedupeKey: `${NotificationEvent.SMS_QUOTA}:${currentMonth}`,
+        metadata: { provider: 'TWILIO', current_usage: currentUsage },
+      });
+    } else if (currentUsage >= QUOTA_LIMIT && currentUsage % 50 === 0) {
+      this.logger.error(
+        `[QUOTA EXCEEDED] Twilio SMS đã vượt hạn mức: ${currentUsage}/${QUOTA_LIMIT}`,
+      );
     }
   }
 }
