@@ -21,7 +21,7 @@
   max-width: 95%;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
   font-family: inherit;
-  overflow: hidden;
+  overflow: visible;
   padding: 24px;
   box-sizing: border-box;
   animation: spm-slideUp 0.3s ease-out;
@@ -211,4 +211,9 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+.spm-currency-hint {
+  font-size: 0.75rem;
+  color: #6b7280;
+  line-height: 1.3;
 }

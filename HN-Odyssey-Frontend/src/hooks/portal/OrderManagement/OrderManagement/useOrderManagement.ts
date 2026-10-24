@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
 import { Action, Resource } from "../../../../types/permissions";
@@ -54,6 +55,7 @@ export interface OrderRow {
   totalAmount: number;
   paymentStatus: PaymentStatus;
   orderStatus: OrderStatus;
+  rawStatus: string; // Trạng thái gốc từ BE, dùng để chống xử lý trùng
   createdBy: "Customer" | "Sales Staff";
   items: OrderItem[];
   timeline: OrderTimeline[];
@@ -173,6 +175,10 @@ const useLocalAuth = () => {
   return { user };
 };
 
+// 409 = người khác vừa xử lý đơn này
+const isConflictError = (error: unknown): boolean =>
+  (error as { response?: { status?: number } })?.response?.status === 409;
+
 // 4. MAIN HOOK
 
 export function useOrderManagement() {
@@ -197,6 +203,28 @@ export function useOrderManagement() {
   const canUpdate = hasPermission(Resource.SALES_ORDERS, Action.UPDATE);
   const canPrint = hasPermission(Resource.SALES_ORDERS, Action.PRINT);
   const canExport = hasPermission(Resource.SALES_ORDERS, Action.EXPORT);
+
+  // Chỉ Ban giám đốc / Super Admin được ép trạng thái — backend quyết định, FE chỉ ẩn/hiện ô "Force"
+  const [canOverride, setCanOverride] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    axiosClient
+      .get("/orders/meta/can-override")
+      .then((res) => {
+        const body = res.data as {
+          canOverride?: boolean;
+          data?: { canOverride?: boolean };
+        };
+        if (alive)
+          setCanOverride(Boolean(body?.data?.canOverride ?? body?.canOverride));
+      })
+      .catch(() => {
+        if (alive) setCanOverride(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const [filters, setFilters] = useState({
     search: "",
@@ -224,11 +252,53 @@ export function useOrderManagement() {
     isOpen: boolean;
     orderId: string | null;
     currentStatus: OrderStatus | null;
+    rawStatus?: string | null; // Trạng thái gốc BE, để modal lọc bước hợp lệ
   }>({
     isOpen: false,
     orderId: null,
     currentStatus: null,
   });
+
+  // Deep link từ thông báo: ?orderCode=XXX (1 đơn) hoặc ?status=Pending (nhiều đơn)
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pendingOrderCodeRef = useRef<string | null>(null);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const orderCode = searchParams.get("orderCode");
+    const status = searchParams.get("status");
+    if (!orderCode && !status) return;
+
+    if (orderCode) {
+      pendingOrderCodeRef.current = orderCode;
+      setFilters({
+        search: orderCode,
+        status: "all",
+        fromDate: "",
+        toDate: "",
+      });
+    } else if (status) {
+      setFilters({
+        search: "",
+        status: status as OrderStatus,
+        fromDate: "",
+        toDate: "",
+      });
+    }
+    setPagination((prev) => ({ ...prev, page: 1 }));
+
+    // Xóa tham số để F5 không mở lại
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("orderCode");
+        next.delete("status");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const fetchOrders = useCallback(async () => {
     setIsLoading(true);
@@ -304,6 +374,7 @@ export function useOrderManagement() {
           totalAmount: totalAmountUsd, // Gán chuẩn số USD
           paymentStatus: mapPaymentStatus(order.payment?.status),
           orderStatus: mapBeToFeStatus(order.status),
+          rawStatus: order.status,
           createdBy: creatorRole,
           note: order.internal_note,
           waybillCode:
@@ -334,6 +405,20 @@ export function useOrderManagement() {
         total: meta.total,
         totalPages: meta.last_page || 1,
       }));
+
+      // Mở đúng đơn được trỏ tới từ thông báo
+      const pendingCode = pendingOrderCodeRef.current;
+      if (pendingCode && filters.search === pendingCode) {
+        pendingOrderCodeRef.current = null;
+        const match = mappedData.find((o) => o.orderCode === pendingCode);
+        if (match) {
+          setDetailDrawer({ isOpen: true, orderId: match.id });
+        } else {
+          toast.info(
+            `Không tìm thấy đơn ${pendingCode}, có thể đơn đã bị xóa.`,
+          );
+        }
+      }
     } catch (error) {
       console.error("Lỗi khi fetch đơn hàng:", error);
       // Hiển thị thông báo khi không lấy được dữ liệu
@@ -377,7 +462,8 @@ export function useOrderManagement() {
 
     // Update Status Modal
     openStatusModal: (orderId: string, currentStatus: OrderStatus) => {
-      setStatusModal({ isOpen: true, orderId, currentStatus });
+      const rawStatus = data.find((o) => o.id === orderId)?.rawStatus ?? null;
+      setStatusModal({ isOpen: true, orderId, currentStatus, rawStatus });
     },
     closeStatusModal: () => {
       setStatusModal({ isOpen: false, orderId: null, currentStatus: null });
@@ -387,6 +473,7 @@ export function useOrderManagement() {
       orderId: string,
       newStatus: OrderStatus,
       reason: string,
+      force = false,
     ): Promise<void> => {
       if (!canUpdate) {
         toast.error(
@@ -401,8 +488,10 @@ export function useOrderManagement() {
         await axiosClient.patch(`/orders/${orderId}/status-advanced`, {
           status: beStatus,
           reason: reason,
-          // [QUAN TRỌNG]: Bật true để bypass Rule lùi/chuyển trạng thái của State Machine BE
-          is_override: true,
+          // Mặc định đi đúng quy trình; chỉ ép trạng thái khi người có quyền tick "Force"
+          is_override: force && canOverride,
+          // Chống ghi đè: BE trả 409 nếu đơn đã bị người khác đổi trạng thái
+          expected_status: data.find((o) => o.id === orderId)?.rawStatus,
         });
 
         toast.success(
@@ -416,7 +505,14 @@ export function useOrderManagement() {
         const errMsg =
           (error as { response?: { data?: { message?: string } } }).response
             ?.data?.message || "Lỗi cập nhật trạng thái!";
-        toast.error(errMsg);
+        if (isConflictError(error)) {
+          // Người khác vừa xử lý: báo, đóng modal, tải lại trạng thái mới
+          toast.warning(errMsg);
+          setStatusModal({ isOpen: false, orderId: null, currentStatus: null });
+          fetchOrders();
+        } else {
+          toast.error(errMsg);
+        }
       } finally {
         setIsProcessingAction(false);
       }
@@ -437,6 +533,7 @@ export function useOrderManagement() {
         await axiosClient.patch(`/orders/${orderId}/status-advanced`, {
           status: beStatus,
           note: `Staff auto advanced to ${beStatus}`,
+          expected_status: data.find((o) => o.id === orderId)?.rawStatus,
         });
 
         if (nextStatus === "READY_TO_SHIP") {
@@ -453,7 +550,12 @@ export function useOrderManagement() {
         const errMsg =
           (error as { response?: { data?: { message?: string } } }).response
             ?.data?.message || "Không thể chuyển tiếp trạng thái.";
-        toast.error(errMsg);
+        if (isConflictError(error)) {
+          toast.warning(errMsg);
+          fetchOrders();
+        } else {
+          toast.error(errMsg);
+        }
       } finally {
         setIsProcessingAction(false);
       }
@@ -611,6 +713,6 @@ export function useOrderManagement() {
     selectedOrder: data.find((o) => o.id === detailDrawer.orderId) || null,
     statusModal,
     actions,
-    permissions: { canUpdate, canPrint, canExport },
+    permissions: { canUpdate, canPrint, canExport, canOverride },
   };
 }

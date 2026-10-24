@@ -16,6 +16,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { NotificationsService } from 'src/modules/notifications/notifications.service';
 import {
   NotificationPriority,
+  NotificationScope,
   NotificationType,
 } from 'src/modules/notifications/schemas/notification-log.schema';
 
@@ -293,7 +294,7 @@ export class NewArrivalsService {
           emailHtml += `<div style="display: flex; margin-bottom: 10px;"><img src="${item.thumbnail}" width="50" style="margin-right: 10px;"/><span>${item.name}</span></div>`;
         });
 
-        emailHtml += `<a href="https://hnodyssey.id.vn/new-arrivals" style="display: inline-block; padding: 10px 20px; background: black; color: white; text-decoration: none; margin-top: 20px;">KHÁM PHÁ NGAY</a></div>`;
+        emailHtml += `<a href="https://hnodyssey.id.vn/products" style="display: inline-block; padding: 10px 20px; background: black; color: white; text-decoration: none; margin-top: 20px;">KHÁM PHÁ NGAY</a></div>`;
 
         try {
           // Chạy song song Email và Push cho cùng 1 user
@@ -303,14 +304,13 @@ export class NewArrivalsService {
               'Sản phẩm mới tuần này đã có mặt!',
               emailHtml,
             ),
-            this.notificationsService.createAndSend({
-              recipient_role: 'CUSTOMER',
-              recipient_id: userData._id.toString(),
+            this.notificationsService.notifyUser(userData._id.toString(), {
+              scope: NotificationScope.CUSTOMER,
+              type: NotificationType.PROMOTION,
+              priority: NotificationPriority.LOW,
               title: 'Sản phẩm mới đã lên kệ! 🔥',
               message: `Hệ thống vừa cập nhật ${newProducts.length} sản phẩm mới. Khám phá ngay!`,
-              type: NotificationType.PROMOTION,
-              priority: NotificationPriority.HIGH,
-              metadata: { target_url: '/new-arrivals' },
+              targetUrl: '/products',
             }),
           ]);
         } catch (error: unknown) {

@@ -78,15 +78,30 @@ export class ShippingController {
   }
 
   // AC3: Cập nhật trạng thái tự động qua Webhook GHN
+  // Webhook là API công khai → KHÔNG tin trạng thái trong payload: hỏi lại GHN trạng thái thật.
+  // Môi trường demo muốn giả lập bằng Postman: đặt SHIPPING_WEBHOOK_TRUST_PAYLOAD=true trong .env
   @Post('webhook/ghn')
   @Public()
   async handleGhnWebhook(@Body() payload: IGhnWebhookPayload) {
-    const { OrderCode, Status } = payload;
+    const { OrderCode } = payload;
+    if (!OrderCode) return { success: true };
 
-    const statusKey = (Status || '').toLowerCase();
+    let statusKey = (payload.Status || '').toLowerCase();
+    if (process.env.SHIPPING_WEBHOOK_TRUST_PAYLOAD !== 'true') {
+      try {
+        const latest = (await this.ghnService.getOrderInfo(OrderCode)) as {
+          status?: string;
+        };
+        statusKey = (latest?.status || '').toLowerCase();
+      } catch {
+        this.logger.warn(
+          `[Webhook GHN] Không xác minh được vận đơn ${OrderCode} với GHN — bỏ qua`,
+        );
+        return { success: true };
+      }
+    }
+
     const internalStatus = GHN_INTERNAL_MAP[statusKey];
-
-    // 3. Xóa bỏ 'as OrderStatus' vì GHN_INTERNAL_MAP đã được định nghĩa kiểu OrderStatus
     if (internalStatus) {
       await this.ordersService.updateStatusByWaybill(OrderCode, internalStatus);
     } else {
@@ -99,19 +114,29 @@ export class ShippingController {
   }
 
   @Post('webhook/ghtk')
-  @Public() // Đảm bảo GHTK có thể gọi vào API này không bị chặn bởi JWT Token
+  @Public() // GHTK gọi vào không kèm JWT — nên cũng không tin payload, hỏi lại GHTK
   async handleGhtkWebhook(@Body() payload: IGhtkWebhookPayload) {
-    const { label_id, status_id } = payload;
+    const { label_id } = payload;
+    if (!label_id) return { success: true };
 
-    // GHTK trả status_id là số (VD: 2, 3, 4, 45), cần ép kiểu sang chuỗi để map với GHTK_INTERNAL_MAP
-    const statusKey = String(status_id);
+    let statusKey = String(payload.status_id ?? '');
+    if (process.env.SHIPPING_WEBHOOK_TRUST_PAYLOAD !== 'true') {
+      try {
+        const latest = (await this.ghtkService.getOrderInfo(label_id)) as {
+          order?: { status?: string | number };
+        };
+        statusKey = latest?.order?.status?.toString() || '';
+      } catch {
+        this.logger.warn(
+          `[Webhook GHTK] Không xác minh được vận đơn ${label_id} với GHTK — bỏ qua`,
+        );
+        return { success: true };
+      }
+    }
+
     const internalStatus = GHTK_INTERNAL_MAP[statusKey];
-
     if (internalStatus) {
-      await this.ordersService.updateStatusByWaybill(
-        label_id, // Truyền mã vận đơn để tìm đúng đơn hàng
-        internalStatus,
-      );
+      await this.ordersService.updateStatusByWaybill(label_id, internalStatus);
       this.logger.log(
         `[Webhook GHTK] Đã cập nhật đơn ${label_id} -> ${internalStatus}`,
       );
@@ -121,7 +146,7 @@ export class ShippingController {
       );
     }
 
-    // GHTK yêu cầu trả về HTTP Status 200 kèm JSON có thuộc tính success: true
+    // GHTK yêu cầu trả về HTTP 200 kèm JSON có success: true
     return { success: true };
   }
 
@@ -197,7 +222,8 @@ export class ShippingController {
   }
 
   @Post('seed-locations')
-  @Public() // Đặt public để bạn test luôn, sau khi chạy xong nhớ XÓA API này đi cho an toàn
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @RequirePermissions(Resource.SYSTEM_MONITORING, Action.UPDATE)
   @ApiOperation({ summary: 'Seeder: Đồng bộ dữ liệu Tỉnh/Huyện/Xã từ GHN' })
   async seedLocations() {
     // Chạy ngầm để không bị timeout (tác vụ mất khoảng 20-40 giây)

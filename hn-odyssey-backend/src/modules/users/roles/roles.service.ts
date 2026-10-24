@@ -52,7 +52,6 @@ export class RolesService {
     ip: string,
     userAgent: string,
   ) {
-    //Thêm tham số log
     const slug = dto.slug
       ? dto.slug.toUpperCase()
       : dto.name.toUpperCase().replace(/\s+/g, '_');
@@ -66,8 +65,13 @@ export class RolesService {
     const exist = await this.roleModel.findOne({ slug });
     if (exist) throw new ConflictException(`Vai trò '${slug}' đã tồn tại.`);
 
+    // Cấp bậc quyết định ai nhận thông báo dành cho Quản lý và ai được bật/tắt role nào
+    const level = dto.level ?? RoleLevel.STAFF;
+    await this.assertCanAssignLevel(actorId, level);
+
     const newRole = new this.roleModel({
       ...dto,
+      level,
       permissions: this.normalizePermissions(dto.permissions),
       slug,
       is_system: false,
@@ -75,7 +79,6 @@ export class RolesService {
     });
     const savedRole = await newRole.save();
 
-    //Ghi Log
     await this.auditLogsService.log({
       action: 'CREATE_ROLE',
       collection_name: 'roles',
@@ -85,6 +88,7 @@ export class RolesService {
       detail: {
         name: savedRole.name,
         slug: savedRole.slug,
+        level: savedRole.level,
         permissions: savedRole.permissions,
       },
       ip,
@@ -126,7 +130,6 @@ export class RolesService {
     const role = await this.roleModel.findById(id);
     if (!role) throw new NotFoundException('Role không tồn tại');
 
-    //Không cho phép sửa Role hệ thống
     if (role.is_system) {
       if (dto.slug || dto.permissions) {
         throw new ForbiddenException(
@@ -138,14 +141,12 @@ export class RolesService {
       }
     }
 
-    // Không cho đổi slug sang slug dành riêng
     if (dto.slug && !role.is_system && isReservedRoleKey(dto.slug)) {
       throw new ForbiddenException(
         `Slug '${dto.slug}' được dành riêng cho hệ thống.`,
       );
     }
 
-    // Check trùng Slug
     if (dto.slug && dto.slug.toUpperCase() !== role.slug) {
       const newSlug = dto.slug.toUpperCase();
       const existSlug = await this.roleModel.findOne({ slug: newSlug });
@@ -154,8 +155,6 @@ export class RolesService {
       role.slug = newSlug;
     }
 
-    // Trạng thái chỉ được đổi qua PATCH :id/status (quyền CHANGE_STATUS).
-    // Gửi is_active KHÁC trạng thái hiện tại qua API sửa → chặn.
     if (
       typeof dto.is_active !== 'undefined' &&
       dto.is_active !== (role.is_active !== false)
@@ -165,6 +164,18 @@ export class RolesService {
       );
     }
 
+    // Đổi cấp bậc — dto dùng enum RoleLevel, schema lưu number → đưa về number rồi mới so sánh
+    const newLevel: number | undefined = dto.level;
+    if (newLevel !== undefined && newLevel !== role.level) {
+      if (role.is_system) {
+        throw new ForbiddenException(
+          'Không thể đổi cấp bậc của Role hệ thống.',
+        );
+      }
+      await this.assertCanAssignLevel(actorId, newLevel, role.level);
+      role.level = newLevel;
+    }
+
     if (dto.name) role.name = dto.name;
     if (dto.description) role.description = dto.description;
     if (dto.permissions)
@@ -172,7 +183,6 @@ export class RolesService {
 
     await role.save();
 
-    // Ghi Log Update
     await this.auditLogsService.log({
       action: 'UPDATE_ROLE',
       collection_name: 'roles',
@@ -199,6 +209,36 @@ export class RolesService {
       .lean<Array<{ level?: number }>>();
     if (roles.length === 0) return RoleLevel.STAFF;
     return Math.min(...roles.map((r) => r.level ?? RoleLevel.STAFF));
+  }
+
+  /**
+   * Chống tự nâng cấp: chỉ được đặt cấp BẰNG hoặc THẤP HƠN cấp của chính mình,
+   * và không được sửa cấp của role đang CAO HƠN mình. Super Admin bỏ qua.
+   * (RoleLevel: số càng nhỏ cấp càng cao — 1 BOARD, 2 MANAGEMENT, 3 STAFF)
+   */
+  private async assertCanAssignLevel(
+    actorId: string,
+    targetLevel: number,
+    currentLevel?: number,
+  ) {
+    const actor = await this.userModel
+      .findById(actorId)
+      .select('roles')
+      .lean<{ roles?: string[] }>();
+    const actorRoles = actor?.roles ?? [];
+
+    if (actorRoles.some((r) => isReservedRoleKey(r))) return;
+
+    const actorLevel = await this.getHighestLevel(actorRoles);
+    const raisesAboveSelf = targetLevel < actorLevel;
+    const touchesHigherRole =
+      currentLevel !== undefined && currentLevel < actorLevel;
+
+    if (raisesAboveSelf || touchesHigherRole) {
+      throw new ForbiddenException(
+        'Bạn chỉ được đặt cấp bậc bằng hoặc thấp hơn cấp của chính mình.',
+      );
+    }
   }
 
   // 4b. BẬT/TẮT TRẠNG THÁI VAI TRÒ
@@ -237,7 +277,6 @@ export class RolesService {
     role.is_active = isActive;
     await role.save();
 
-    // Tắt role = mọi nhân sự giữ role này mất quyền tương ứng ngay lập tức
     const affectedUsers = await this.userModel.countDocuments({
       roles: role.slug,
     });
@@ -268,7 +307,6 @@ export class RolesService {
 
   // 5. XÓA (AC4, AC5)
   async remove(id: string, actorId: string, ip: string, userAgent: string) {
-    //Thêm tham số log
     const role = await this.roleModel.findById(id);
     if (!role) throw new NotFoundException('Vai trò không tồn tại.');
 
@@ -287,7 +325,6 @@ export class RolesService {
 
     await this.roleModel.findByIdAndDelete(id);
 
-    //Ghi Log Delete
     await this.auditLogsService.log({
       action: 'DELETE_ROLE',
       collection_name: 'roles',
@@ -302,7 +339,7 @@ export class RolesService {
     return { message: 'Đã xóa vai trò thành công' };
   }
 
-  // 6. LẤY DROPDOWN CHO QUẢN LÝ USER (Chỉ lấy Name và Slug)
+  // 6. DROPDOWN CHO QUẢN LÝ USER (chỉ lấy Name và Slug)
   async getDropdownOptions() {
     return this.roleModel
       .find({ is_active: true })

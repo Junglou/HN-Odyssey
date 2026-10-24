@@ -5,6 +5,7 @@ import type {
   LocationItem,
   AddressFormState,
 } from "../../../../hooks/profile/useAddressManagement";
+import CustomSelect from "../../../common/CustomSelect/CustomSelect";
 
 interface AddressModalProps {
   isOpen: boolean;
@@ -94,57 +95,57 @@ export default function AddressModal({
             <label>
               Province / City <span className="req">*</span>
             </label>
-            <select
-              value={formData.provinceCode}
-              onChange={(e) => onChange("provinceCode", e.target.value)}
+            <CustomSelect
+              value={String(formData.provinceCode ?? "")}
+              options={provinces.map((p) => ({
+                value: String(p.code),
+                label: p.name,
+              }))}
+              onChange={(v) => onChange("provinceCode", v)}
+              placeholder="Select Province / City"
+              searchable
+              searchPlaceholder="Search province / city..."
               disabled={mode === "view"}
               required
-            >
-              <option value="">Select Province / City</option>
-              {provinces.map((p) => (
-                <option key={p.code} value={p.code}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           <div className="um-form-group">
             <label>
               District <span className="req">*</span>
             </label>
-            <select
-              value={formData.districtCode}
-              onChange={(e) => onChange("districtCode", e.target.value)}
+            <CustomSelect
+              value={String(formData.districtCode ?? "")}
+              options={districts.map((d) => ({
+                value: String(d.code),
+                label: d.name,
+              }))}
+              onChange={(v) => onChange("districtCode", v)}
+              placeholder="Select District"
+              searchable
+              searchPlaceholder="Search district..."
               disabled={mode === "view" || !formData.provinceCode}
               required
-            >
-              <option value="">Select District</option>
-              {districts.map((d) => (
-                <option key={d.code} value={d.code}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           <div className="um-form-group">
             <label>
               Ward / Commune <span className="req">*</span>
             </label>
-            <select
-              value={formData.wardCode}
-              onChange={(e) => onChange("wardCode", e.target.value)}
+            <CustomSelect
+              value={String(formData.wardCode ?? "")}
+              options={wards.map((w) => ({
+                value: String(w.code),
+                label: w.name,
+              }))}
+              onChange={(v) => onChange("wardCode", v)}
+              placeholder="Select Ward / Commune"
+              searchable
+              searchPlaceholder="Search ward / commune..."
               disabled={mode === "view" || !formData.districtCode}
               required
-            >
-              <option value="">Select Ward / Commune</option>
-              {wards.map((w) => (
-                <option key={w.code} value={w.code}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           {/* Cụm Checkbox đã gỡ bỏ inline-style */}

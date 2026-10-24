@@ -9,6 +9,7 @@ import { NotificationsService } from 'src/modules/notifications/notifications.se
 import { EmailService } from 'src/modules/notifications/channels/email.service';
 import {
   NotificationPriority,
+  NotificationScope,
   NotificationType,
 } from 'src/modules/notifications/schemas/notification-log.schema';
 
@@ -109,17 +110,14 @@ export class WarrantyListener {
       // 4. GỬI IN-APP NOTIFICATION (Nếu khách hàng có tài khoản ID)
       if (customerId) {
         try {
-          await this.notificationsService.createAndSend({
-            recipient_role: 'CUSTOMER',
-            recipient_id: customerId.toString(),
-            title: 'Sắp hết hạn bảo hành!',
-            message: message,
+          await this.notificationsService.notifyUser(customerId.toString(), {
+            scope: NotificationScope.CUSTOMER,
             type: NotificationType.ORDER,
             priority: NotificationPriority.MEDIUM,
-            metadata: {
-              order_code: item.order_code,
-              target_url: `/profile/orders`,
-            },
+            title: 'Sắp hết hạn bảo hành!',
+            message,
+            targetUrl: '/profile/orders',
+            metadata: { order_code: item.order_code },
           });
         } catch (error) {
           this.logger.error(

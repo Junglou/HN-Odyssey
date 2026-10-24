@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import "./ProductForm.css";
 import TagModal from "../ProductManagementModal/TagModal";
 import VariantModal from "../ProductManagementModal/VariantModal";
-import SetPriceModal from "../ProductManagementModal/SetPriceModal";
+import SetPriceModal from "../../PriceManagement/SetPriceModal";
 import { ChevronDownIcon } from "../../../../../assets/icons/HeaderIcons";
 import { EditPenIcon } from "../../../../../assets/icons/ProductManagementIcons";
 

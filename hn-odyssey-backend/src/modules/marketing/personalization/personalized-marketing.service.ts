@@ -26,6 +26,7 @@ import { NotificationsService } from 'src/modules/notifications/notifications.se
 import {
   NotificationPriority,
   NotificationType,
+  NotificationScope,
 } from 'src/modules/notifications/schemas/notification-log.schema';
 import {
   Product,
@@ -255,17 +256,14 @@ export class PersonalizedMarketingService {
   async handleCouponAssignedEvent(payload: ICouponAssignedEvent) {
     try {
       // 1. Gửi Push Notification / Cập nhật Badge đỏ trên Icon (Bắt buộc theo AC7)
-      await this.notificationsService.createAndSend({
-        recipient_role: 'CUSTOMER',
-        recipient_id: payload.user_id.toString(),
-        title: 'Bạn có 1 mã giảm giá mới chưa dùng! 🎁',
-        message: `H&N Odyssey gửi tặng bạn mã ${payload.coupon_code} nhân dịp ${payload.reason}. Lưu mã và sử dụng ngay nhé!`,
+      await this.notificationsService.notifyUser(payload.user_id.toString(), {
+        scope: NotificationScope.CUSTOMER,
         type: NotificationType.PROMOTION,
         priority: NotificationPriority.HIGH,
-        metadata: {
-          target_url: '/wallet/vouchers',
-          coupon_code: payload.coupon_code,
-        },
+        title: 'Bạn có 1 mã giảm giá mới chưa dùng! 🎁',
+        message: `H&N Odyssey gửi tặng bạn mã ${payload.coupon_code} nhân dịp ${payload.reason}. Lưu mã và sử dụng ngay nhé!`,
+        targetUrl: '/profile/coupon',
+        metadata: { coupon_code: payload.coupon_code },
       });
 
       // 2. Gửi Email thông báo (Bổ sung để tăng trải nghiệm đa kênh)
@@ -286,7 +284,7 @@ export class PersonalizedMarketingService {
           </div>
           
           <div style="text-align: center; margin-top: 30px;">
-            <a href="https://hnodyssey.id.vn/wallet/vouchers" style="padding: 12px 25px; background: #000; color: #fff; text-decoration: none; border-radius: 4px; font-weight: bold;">KIỂM TRA VÍ VOUCHER</a>
+            <a href="https://hnodyssey.id.vn/profile/coupon" style="padding: 12px 25px; background: #000; color: #fff; text-decoration: none; border-radius: 4px; font-weight: bold;">KIỂM TRA VÍ VOUCHER</a>
           </div>
         </div>
       `;
@@ -412,14 +410,14 @@ export class PersonalizedMarketingService {
         htmlContent,
       );
 
-      await this.notificationsService.createAndSend({
-        recipient_role: 'CUSTOMER',
-        recipient_id: customer._id.toString(),
+      await this.notificationsService.notifyUser(customer._id.toString(), {
+        scope: NotificationScope.CUSTOMER,
+        type: NotificationType.PROMOTION,
+        priority: NotificationPriority.HIGH,
         title: 'Bạn có 1 mã giảm giá mới chưa dùng!',
         message: `Mã ${uniqueCode} giảm 50.000đ dành riêng cho bạn đã được thêm vào Kho Voucher.`,
-        type: NotificationType.LOYALTY, // Hoặc tạo type PROMOTION
-        priority: NotificationPriority.HIGH,
-        metadata: { target_url: '/wallet/vouchers', coupon_code: uniqueCode },
+        targetUrl: '/profile/coupon',
+        metadata: { coupon_code: uniqueCode },
       });
     }
 

@@ -86,8 +86,6 @@
   height: 100%;
   object-fit: cover;
   display: block;
-  opacity: 0;
-  animation: imageFadeIn 0.1s linear 0.7s forwards;
   transition: transform 0.8s ease;
 }
 
@@ -138,12 +136,6 @@
   100% {
     transform: scaleY(1) scaleX(0);
     transform-origin: right;
-  }
-}
-
-@keyframes imageFadeIn {
-  to {
-    opacity: 1;
   }
 }
 

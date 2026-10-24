@@ -61,6 +61,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { AlgoliaService } from 'src/modules/search/algolia.service';
 import { MediaService } from 'src/modules/marketing/content/media.service';
 import { UploadService } from 'src/modules/system/upload/upload.service';
+import { vndToUsd } from 'src/common/constants/money.constant';
 
 // Escape ký tự đặc biệt để từ khóa không phá regex
 const escapeRegex = (text: string) =>
@@ -1205,6 +1206,19 @@ export class ProductsService {
       }
     }
 
+    // Quy tắc tiền tệ: giá lưu trong hệ thống LUÔN là USD.
+    // Nhập bằng VND thì quy đổi theo VND_PER_USD; loại tiền chưa có tỷ giá thì từ chối.
+    const inputCurrency = (dto.currency || 'USD').toUpperCase();
+    const toUsd = (amount: number): number => {
+      if (inputCurrency === 'USD') return amount;
+      if (inputCurrency === 'VND') {
+        return Math.round(vndToUsd(amount) * 100) / 100;
+      }
+      throw new BadRequestException(
+        `Chưa cấu hình tỷ giá cho ${inputCurrency}. Vui lòng nhập giá bằng USD hoặc VND.`,
+      );
+    };
+
     const currentRequest = product.price_request;
     if (
       currentRequest &&
@@ -1228,7 +1242,7 @@ export class ProductsService {
     const newVariants = dto.variants
       ? dto.variants.map((v) => ({
           sku: v.sku,
-          price: v.price,
+          price: toUsd(v.price),
           sale_price: 0,
           status: PriceRequestStatus.DRAFT,
         }))
@@ -1246,8 +1260,8 @@ export class ProductsService {
     });
 
     product.price_request = {
-      price: dto.price,
-      currency: dto.currency || currentRequest?.currency || 'VND',
+      price: toUsd(dto.price),
+      currency: 'USD',
       variants: mergedVariants,
       effective_date: effectiveDate,
       status: PriceRequestStatus.DRAFT,
@@ -1263,7 +1277,14 @@ export class ProductsService {
       actor_id: userId,
       target_id: id,
       department: Department.WAREHOUSE,
-      detail: { new_price: dto.price, effective_date: effectiveDate },
+      // Lưu cả giá gốc người nhập để đối soát khi có quy đổi
+      detail: {
+        new_price: toUsd(dto.price),
+        currency: 'USD',
+        input_price: dto.price,
+        input_currency: inputCurrency,
+        effective_date: effectiveDate,
+      },
       ip,
       user_agent: userAgent,
     });

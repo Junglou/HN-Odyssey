@@ -160,11 +160,15 @@ export class PaymentService {
       }
 
       if (responseCode === '00' || responseCode === '0') {
-        if (
-          order.status === 'CANCELLED' &&
-          String(order.cancel_reason).includes('timeout')
-        ) {
-          return this.processRecovery(order);
+        // Tiền về cho một đơn ĐÃ BỊ HỦY (thường: hết hạn 15 phút rồi khách mới thanh toán xong).
+        // Trước đây chỉ bắt chuỗi 'timeout' — không khớp lý do hủy thật nên luồng này không bao giờ chạy.
+        if (order.status === 'CANCELLED') {
+          return this.processRecovery(
+            order,
+            provider,
+            rawData,
+            transactionCode,
+          );
         }
 
         await this.ordersService.updateStatusAdvanced(
@@ -240,40 +244,98 @@ export class PaymentService {
     }
   }
 
-  private async processRecovery(order: OrderDocument) {
-    const session = await this.connection.startSession();
-    session.startTransaction();
-    try {
-      let allItemsAvailable = true;
-      for (const item of order.items) {
-        const product = await this.productModel
-          .findById(item.product_id)
-          .session(session);
-        const variant = product?.variants.find((v) => v.sku === item.sku);
-        if (!variant || variant.stock < item.quantity) {
-          allItemsAvailable = false;
-          break;
-        }
-      }
+  /**
+   * Tiền về cho đơn đã bị hủy:
+   *  - Hủy do HẾT HẠN thanh toán và còn hàng → khôi phục đơn, GIỮ HÀNG LẠI, xác nhận.
+   *  - Hết hàng, hoặc đơn bị hủy chủ động → đánh dấu CẦN HOÀN TIỀN và báo ngay cho nhân sự.
+   * Không bọc transaction ngoài: updateStatusAdvanced tự chạy transaction riêng,
+   * lồng thêm một transaction ở đây sẽ gây xung đột ghi (WriteConflict) trên cùng đơn.
+   */
+  private async processRecovery(
+    order: OrderDocument,
+    provider: string,
+    rawData: Record<string, unknown>,
+    transactionCode: string,
+  ) {
+    const orderId = String(order._id);
+    const cancelledByExpiry = /hết hạn|timeout/i.test(
+      String(order.cancel_reason ?? ''),
+    );
 
-      if (allItemsAvailable) {
+    if (cancelledByExpiry) {
+      let restored = false;
+      try {
+        // 1. Gỡ hạn 15 phút trước, để cron không hủy lại đơn giữa chừng
+        await this.orderModel.updateOne(
+          { _id: order._id },
+          { $unset: { hold_expires_at: 1 } },
+        );
+
+        // 2. CANCELLED → PENDING (override): updateStatusAdvanced GIỮ HÀNG LẠI ở bước này.
+        //    Hết hàng thì holdStock báo lỗi → rơi xuống nhánh cần hoàn tiền.
         await this.ordersService.updateStatusAdvanced(
-          String(order._id),
+          orderId,
           {
-            status: OrderStatus.CONFIRMED,
-            reason: 'Khôi phục đơn hàng thành công do tiền về muộn.',
+            status: OrderStatus.PENDING,
+            reason: 'Tiền về muộn: khôi phục đơn và giữ hàng lại.',
             is_override: true,
           },
           'SYSTEM_RECOVERY',
           'PAYMENT_RECOVERY_SERVICE',
           '127.0.0.1',
           'RECOVERY_AGENT',
+          true, // lệnh hệ thống
+        );
+        restored = true;
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `Không khôi phục được đơn ${order.order_code} (${msg}). Chuyển sang cần hoàn tiền.`,
+        );
+      }
+
+      if (restored) {
+        // 3. Ghi nhận đã thanh toán
+        await this.orderModel.updateOne(
+          { _id: order._id },
+          {
+            $set: {
+              'payment.status': 'PAID',
+              'payment.transaction_id': transactionCode,
+            },
+            $unset: { cancel_reason: 1 },
+          },
         );
 
-        order.payment.status = 'PAID';
-        order.cancel_reason = undefined;
-        await order.save({ session });
-        await session.commitTransaction();
+        // 4. PENDING → CONFIRMED theo đúng quy trình (không override)
+        try {
+          await this.ordersService.updateStatusAdvanced(
+            orderId,
+            {
+              status: OrderStatus.CONFIRMED,
+              note: `Thanh toán thành công qua ${provider} (tiền về muộn). Mã GD: ${transactionCode}`,
+            },
+            'SYSTEM_PAYMENT',
+            `${provider}_GATEWAY`,
+            '127.0.0.1',
+            'IPN_HANDLER',
+            true,
+          );
+        } catch (error: unknown) {
+          // Đơn đã giữ hàng + đã PAID, chỉ chưa tự xác nhận → Sales xác nhận tay, không mất gì
+          const msg = error instanceof Error ? error.message : String(error);
+          this.logger.error(
+            `Đơn ${order.order_code} đã khôi phục và thanh toán nhưng chưa tự xác nhận được: ${msg}`,
+          );
+        }
+
+        await this.logTransaction(
+          order,
+          provider,
+          rawData,
+          'SUCCESS',
+          'Payment Success (recovered after expiry)',
+        );
 
         const email = order.guest_info?.email || order.shipping_info?.email;
         if (email) {
@@ -283,32 +345,55 @@ export class PaymentService {
           );
         }
         return { RspCode: '00', Message: 'Order Recovered' };
-      } else {
-        // SỬA LẠI ĐOẠN NÀY:
-        await this.ordersService.updateStatusAdvanced(
-          String(order._id),
-          {
-            status: OrderStatus.REFUND_NEEDED,
-            reason:
-              'Khách thanh toán thành công nhưng hàng đã hết trong lúc chờ. Cần hoàn tiền ngay.',
-            is_override: true,
-          },
-          'SYSTEM_PAYMENT',
-          'PAYMENT_RECOVERY_SERVICE',
-          '127.0.0.1',
-          'RECOVERY_AGENT',
-        );
-
-        order.payment.status = 'REFUND_NEEDED';
-        await order.save({ session });
-        return { RspCode: '00', Message: 'Out of stock. Marked for Refund.' };
       }
-    } catch (e) {
-      await session.abortTransaction();
-      throw e;
-    } finally {
-      await session.endSession();
     }
+
+    // NHÁNH CẦN HOÀN TIỀN: hết hàng, hoặc đơn đã bị hủy chủ động trước khi tiền về
+    await this.ordersService.updateStatusAdvanced(
+      orderId,
+      {
+        status: OrderStatus.REFUND_NEEDED,
+        reason: cancelledByExpiry
+          ? 'Khách thanh toán thành công sau khi đơn hết hạn nhưng hàng đã hết. Cần hoàn tiền.'
+          : 'Khách thanh toán thành công cho đơn đã bị hủy. Cần hoàn tiền.',
+        is_override: true,
+      },
+      'SYSTEM_PAYMENT',
+      'PAYMENT_RECOVERY_SERVICE',
+      '127.0.0.1',
+      'RECOVERY_AGENT',
+      true, // lệnh hệ thống
+    );
+
+    await this.orderModel.updateOne(
+      { _id: order._id },
+      {
+        $set: {
+          'payment.status': 'REFUND_NEEDED',
+          'payment.transaction_id': transactionCode,
+        },
+      },
+    );
+
+    await this.logTransaction(
+      order,
+      provider,
+      rawData,
+      'SUCCESS',
+      'Payment received for cancelled order — refund needed',
+    );
+
+    // Tiền của khách đang nằm trên đơn đã hủy → báo ngay (CRITICAL: popup + email + Slack)
+    this.eventEmitter.emit(NOTIFY_EVENTS.SYSTEM_ERROR, {
+      severity: 'CRITICAL',
+      error_code: `PAYMENT_REFUND_NEEDED_${order.order_code}`,
+      message: `Đơn ${order.order_code} đã bị hủy nhưng khách vừa thanh toán thành công qua ${provider}. Cần hoàn tiền cho khách.`,
+    });
+
+    return {
+      RspCode: '00',
+      Message: 'Cancelled order paid. Marked for Refund.',
+    };
   }
 
   private async logTransaction(
@@ -465,6 +550,8 @@ export class PaymentService {
           'ADMIN_REFUND',
           '127.0.0.1',
           'REFUND_AGENT',
+          // Hoàn tiền đã được kiểm soát bằng quyền REFUND riêng → không đòi thêm cấp Board
+          true,
         );
 
         order.payment.status = 'REFUNDED';

@@ -908,39 +908,76 @@ export class StockService {
     return { success: true, message: 'Đã trừ kho chính thức' };
   }
 
-  // [AC2] BƯỚC 3: HOÀN KHO (RESTOCK)
-  async restock(dto: AdjustStockDto, session?: ClientSession) {
+  /**
+   * NHẢ HÀNG ĐANG GIỮ — dùng khi hủy đơn CHƯA qua bước PROCESSING.
+   * holdStock chỉ tăng stock_on_hold (không trừ stock) nên khi hủy chỉ giảm lại stock_on_hold.
+   */
+  async releaseHold(dto: AdjustStockDto, session?: ClientSession) {
     const { product_id, sku, quantity } = dto;
 
     const product = await this.productModel
       .findById(product_id)
       .select('has_variants')
       .session(session || null);
-
     if (!product) return;
 
     const filter: FilterQuery<ProductDocument> = {
       _id: new Types.ObjectId(product_id),
     };
-
-    let update: UpdateQuery<ProductDocument> = {};
+    let update: UpdateQuery<ProductDocument>;
 
     if (product.has_variants) {
       filter['variants.sku'] = sku;
-      update = {
-        $inc: {
-          'variants.$.stock': quantity,
-          'variants.$.stock_on_hold': -quantity,
-          stock: quantity,
-        },
-      };
+      update = { $inc: { 'variants.$.stock_on_hold': -quantity } };
     } else {
-      update = {
-        $inc: {
-          stock: quantity,
-          stock_on_hold: -quantity,
-        },
-      };
+      update = { $inc: { stock_on_hold: -quantity } };
+    }
+
+    const result = await this.productModel.findOneAndUpdate(filter, update, {
+      new: true,
+      session,
+    });
+
+    // Tồn khả dụng (stock - stock_on_hold) thay đổi → báo màn hình Kho tải lại
+    if (result) {
+      let currentStock = result.stock;
+      if (result.has_variants && sku) {
+        const v = result.variants.find((x) => x.sku === sku);
+        if (v) currentStock = v.stock;
+      }
+      this.stockGateway.emitStockUpdate(
+        result._id.toString(),
+        sku || result.sku,
+        currentStock,
+      );
+    }
+
+    return { success: true, message: 'Đã nhả hàng tạm giữ' };
+  }
+
+  /**
+   * TRẢ HÀNG VỀ KHO — dùng khi hủy đơn ĐÃ trừ kho chính thức (PROCESSING / READY_TO_SHIP)
+   * mà hàng vẫn còn trong kho. Đảo ngược finalizeDeduction: chỉ cộng lại stock.
+   */
+  async returnToStock(dto: AdjustStockDto, session?: ClientSession) {
+    const { product_id, sku, quantity } = dto;
+
+    const product = await this.productModel
+      .findById(product_id)
+      .select('has_variants')
+      .session(session || null);
+    if (!product) return;
+
+    const filter: FilterQuery<ProductDocument> = {
+      _id: new Types.ObjectId(product_id),
+    };
+    let update: UpdateQuery<ProductDocument>;
+
+    if (product.has_variants) {
+      filter['variants.sku'] = sku;
+      update = { $inc: { 'variants.$.stock': quantity, stock: quantity } };
+    } else {
+      update = { $inc: { stock: quantity } };
     }
 
     const result = await this.productModel.findOneAndUpdate(filter, update, {
@@ -963,7 +1000,7 @@ export class StockService {
       );
     }
 
-    return { success: true, message: 'Đã hoàn kho' };
+    return { success: true, message: 'Đã trả hàng về kho' };
   }
 
   // [AC4] KIỂM TRA TRẠNG THÁI

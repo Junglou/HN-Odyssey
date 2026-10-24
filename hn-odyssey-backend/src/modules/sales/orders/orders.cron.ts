@@ -30,6 +30,21 @@ export class OrdersCronService {
       .limit(50);
 
     for (const order of expiredOrders) {
+      // Bản nháp của khách vãng lai (chưa phải đơn thật): nhả hàng giữ rồi xóa hẳn,
+      // không để thành đơn "Cancelled" rác trong danh sách Orders
+      if (String(order.status) === String(OrderStatus.TEMPORARY)) {
+        try {
+          await this.ordersService.discardExpiredTemporaryOrder(
+            String(order._id),
+          );
+        } catch (e: unknown) {
+          this.logger.error(
+            `Lỗi xóa đơn nháp hết hạn ${order.order_code}: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        }
+        continue;
+      }
+
       const MAX_RETRIES = 3;
       let attempt = 0;
       let success = false;
@@ -122,7 +137,8 @@ export class OrdersCronService {
           {
             status: OrderStatus.COMPLETED,
             note: 'Hệ thống tự động hoàn thành sau 7 ngày giao hàng thành công.',
-            is_override: true, // Bật cờ này lên để vượt qua runGuards
+            // Không cần override: DELIVERED → COMPLETED là bước hợp lệ, và câu truy vấn
+            // đã lọc sẵn đơn DELIVERED + PAID nên runGuards luôn qua.
             reason:
               'Hệ thống tự động hoàn thành và ghi nhận dòng tiền đơn COD.',
           },

@@ -165,9 +165,9 @@ export default function OrderManagement({
 
   if (filters.search !== prevSearch) {
     setPrevSearch(filters.search);
-    if (filters.search === "") {
-      setLocalSearch("");
-    }
+    // Đồng bộ ô tìm kiếm mỗi khi filter đổi từ bên ngoài
+    // (Clear Filters, hoặc mở từ thông báo với mã đơn)
+    setLocalSearch(filters.search);
   }
 
   // effects

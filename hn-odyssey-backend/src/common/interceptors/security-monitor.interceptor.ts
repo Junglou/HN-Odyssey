@@ -58,7 +58,7 @@ export class SecurityMonitorInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const url = request.url;
 
-    // [FIX SPAM 1] - Lấy chuẩn IP gốc từ chuỗi Proxy/LoadBalancer và loại bỏ IPv6 mapping
+    // Lấy IP gốc từ chuỗi Proxy/LoadBalancer và bỏ tiền tố IPv6 mapping
     const forwardedFor = request.headers['x-forwarded-for'];
     let rawIp =
       (Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor) ||
@@ -114,6 +114,11 @@ export class SecurityMonitorInterceptor implements NestInterceptor {
         return;
       }
 
+      // Tài khoản nhân sự = có ít nhất 1 role khác CUSTOMER
+      const isStaff = user.roles.some(
+        (r) => String(r).toUpperCase() !== 'CUSTOMER',
+      );
+
       const redisKey = `user_device:${user.userId}`;
       const lastDeviceInfoJson = await this.redis.get(redisKey);
       const currentTimestamp = Date.now();
@@ -124,6 +129,7 @@ export class SecurityMonitorInterceptor implements NestInterceptor {
         const geoOld = geoip.lookup(lastData.lastIp);
         const geoNew = geoip.lookup(ip);
 
+        // Impossible Travel: áp dụng cho MỌI tài khoản, mức CRITICAL
         if (geoOld && geoNew) {
           const distance = this.calculateDistance(geoOld.ll, geoNew.ll);
           const timeDiffHours =
@@ -136,7 +142,7 @@ export class SecurityMonitorInterceptor implements NestInterceptor {
           ) {
             this.eventEmitter.emit(NOTIFY_EVENTS.SECURITY_ALERT, {
               severity: 'CRITICAL',
-              message: `Cảnh báo Impossible Travel: Đăng nhập từ ${geoNew.city} cách vị trí cũ ${distance.toFixed(1)}km chỉ sau ${timeDiffHours.toFixed(2)}h`,
+              message: `Impossible Travel: đăng nhập từ ${geoNew.city} cách vị trí cũ ${distance.toFixed(1)}km chỉ sau ${timeDiffHours.toFixed(2)}h`,
               user_id: user.userId,
               ip: ip,
             });
@@ -160,15 +166,8 @@ export class SecurityMonitorInterceptor implements NestInterceptor {
           }
         }
 
-        // Kiểm tra IP lạ (Bây giờ ip đã chuẩn, sẽ không bị rác)
         if (lastData.lastIp !== ip || lastData.lastUA !== userAgent) {
-          this.eventEmitter.emit(NOTIFY_EVENTS.SECURITY_ALERT, {
-            severity: 'HIGH',
-            message: `Đăng nhập lạ từ thiết bị hoặc IP mới: ${ip}`,
-            user_id: user.userId,
-            ip: ip,
-          });
-
+          // Audit log: ghi cho MỌI tài khoản
           await this.auditLogsService.log({
             action: 'NEW_DEVICE_LOGIN',
             collection_name: Resource.SYSTEM_MONITORING,
@@ -178,6 +177,18 @@ export class SecurityMonitorInterceptor implements NestInterceptor {
             ip,
             user_agent: userAgent,
           });
+
+          // Thông báo Portal: CHỈ tài khoản nhân sự, mức MEDIUM (không popup).
+          // Khách hàng đăng nhập máy mới đã được email riêng (SecurityMonitorListener),
+          // không đẩy vào chuông của Admin — đây từng là nguồn spam lớn.
+          if (isStaff) {
+            this.eventEmitter.emit(NOTIFY_EVENTS.SECURITY_ALERT, {
+              severity: 'MEDIUM',
+              message: `Tài khoản nhân sự đăng nhập từ thiết bị hoặc IP mới: ${ip}`,
+              user_id: user.userId,
+              ip: ip,
+            });
+          }
         }
       }
 

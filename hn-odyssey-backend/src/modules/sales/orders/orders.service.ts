@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -79,6 +81,8 @@ import {
 } from 'src/modules/marketing/promotions/schemas/coupon.schema';
 import { DEFAULT_TIER_CODE } from 'src/common/constants/loyalty.constant';
 import { ChatRefDto } from 'src/modules/support/chat/dto/chat-ref.dto';
+import { isReservedRoleKey } from 'src/common/constants/system-roles.constant';
+import { RoleLevel } from 'src/common/enums/role-level.enum';
 
 // Khớp schema Coupon (modules/marketing/promotions/schemas/coupon.schema.ts).
 // Interface Voucher cũ dùng type/value nên mọi mã đều bị tính giảm 0.
@@ -948,9 +952,9 @@ export class OrdersService {
         .session(session);
 
       if (oldOrder) {
-        // Hoàn kho cho đơn cũ
+        // Đơn tạm cũ mới chỉ GIỮ hàng (chưa trừ kho) → chỉ nhả phần giữ, không cộng tồn
         for (const item of oldOrder.items) {
-          await this.stockService.restock(
+          await this.stockService.releaseHold(
             {
               product_id: item.product_id.toString(),
               sku: item.sku,
@@ -1865,6 +1869,62 @@ export class OrdersService {
     }
   }
 
+  /**
+   * Ai được ép trạng thái (override, bỏ qua quy trình): Super Admin / role hệ thống,
+   * hoặc có role cấp BOARD (Ban giám đốc). Đọc trực tiếp từ DB, không tin dữ liệu từ client.
+   */
+  async canOverrideStatus(actorId: string): Promise<boolean> {
+    if (!Types.ObjectId.isValid(actorId)) return false;
+
+    const user = await this.connection.collection('users').findOne<{
+      roles?: unknown;
+    }>({ _id: new Types.ObjectId(actorId) }, { projection: { roles: 1 } });
+    const slugs = Array.isArray(user?.roles) ? user.roles.map(String) : [];
+    if (slugs.some((s) => isReservedRoleKey(s))) return true;
+
+    const boardRole = await this.connection.collection('roles').findOne({
+      slug: { $in: slugs },
+      is_active: { $ne: false },
+      $or: [{ is_system: true }, { level: RoleLevel.BOARD }],
+    });
+    return !!boardRole;
+  }
+
+  /** Đơn nháp TEMPORARY hết hạn: nhả hàng giữ rồi XÓA hẳn — bản nháp không phải đơn thật */
+  async discardExpiredTemporaryOrder(id: string): Promise<void> {
+    const session = await this.connection.startSession();
+    session.startTransaction();
+    try {
+      const order = await this.orderModel
+        .findOne({ _id: id, status: OrderStatus.TEMPORARY })
+        .session(session);
+      if (!order) {
+        await session.abortTransaction();
+        return;
+      }
+
+      for (const item of order.items) {
+        if (!item.product_id) continue;
+        await this.stockService.releaseHold(
+          {
+            product_id: item.product_id.toString(),
+            sku: item.sku,
+            quantity: item.quantity,
+          },
+          session,
+        );
+      }
+
+      await this.orderModel.deleteOne({ _id: order._id }).session(session);
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      await session.endSession();
+    }
+  }
+
   // US.123: CẬP NHẬT TRẠNG THÁI (STATE MACHINE) ĐÃ FIX BUG LINT
   async updateStatusAdvanced(
     id: string,
@@ -1873,6 +1933,9 @@ export class OrdersService {
     actorName: string,
     ip: string,
     userAgent: string,
+    // true = lệnh nội bộ của hệ thống (cron, IPN thanh toán, hoàn tiền...).
+    // Controller HTTP KHÔNG truyền tham số này nên người dùng không giả mạo được.
+    isSystemCall = false,
   ): Promise<OrderData> {
     const session = await this.connection.startSession();
     session.startTransaction();
@@ -1887,6 +1950,26 @@ export class OrdersService {
 
       oldStatus = order.status as OrderStatus;
       let finalStatusToSave = nextStatus;
+
+      // CHỐNG XỬ LÝ TRÙNG: màn hình người thao tác đã cũ (người khác vừa đổi trạng thái).
+      // Kiểm tra TRƯỚC state machine nên chặn được cả lệnh override.
+      if (dto.expected_status && dto.expected_status !== String(oldStatus)) {
+        throw new ConflictException(
+          `Đơn ${order.order_code} đã được người khác cập nhật sang [${oldStatus}]. Danh sách sẽ được tải lại.`,
+        );
+      }
+
+      // Ép trạng thái (bỏ qua quy trình) chỉ dành cho Ban giám đốc / Super Admin.
+      // Chặn ở backend nên gọi API trực tiếp cũng không vượt qua được.
+      if (
+        dto.is_override &&
+        !isSystemCall &&
+        !(await this.canOverrideStatus(actorId))
+      ) {
+        throw new ForbiddenException(
+          'Chỉ Ban giám đốc hoặc Super Admin được ép trạng thái bỏ qua quy trình.',
+        );
+      }
 
       // 1. VALIDATE TRẠNG THÁI
       await this.stateMachine.validateTransition(
@@ -1917,20 +2000,34 @@ export class OrdersService {
         nextStatus === OrderStatus.CANCELLED &&
         oldStatus !== OrderStatus.CANCELLED
       ) {
-        // Danh sách trạng thái "Hàng chưa ra khỏi cửa kho"
-        const canAutoRestock = [
+        // Kho xử lý theo việc đơn đã qua bước PROCESSING (trừ kho chính thức) hay chưa:
+        //  - Trước PROCESSING: hàng mới chỉ được GIỮ (stock_on_hold) → nhả giữ
+        //  - PROCESSING / READY_TO_SHIP: đã TRỪ HẲN nhưng hàng còn trong kho → cộng lại tồn
+        //  - Từ SHIPPING trở đi: hàng đã rời kho → không tự hoàn, cần kiểm tra thực tế
+        const HELD_ONLY: OrderStatus[] = [
           OrderStatus.TEMPORARY,
           OrderStatus.PENDING,
-          OrderStatus.CONFIRMED,
-          OrderStatus.READY_TO_SHIP,
           OrderStatus.PRIORITY,
+          OrderStatus.CONFIRMED,
+          OrderStatus.ON_HOLD,
           OrderStatus.TRADE_IN_REVIEW,
-        ].includes(oldStatus);
+        ];
+        const DEDUCTED_IN_WAREHOUSE: OrderStatus[] = [
+          OrderStatus.PROCESSING,
+          OrderStatus.READY_TO_SHIP,
+        ];
+        const LEFT_WAREHOUSE: OrderStatus[] = [
+          OrderStatus.SHIPPING,
+          OrderStatus.DELIVERY_FAILED,
+          OrderStatus.DELIVERED,
+        ];
 
-        if (canAutoRestock) {
-          // Dùng StockService để giải phóng cả stock_on_hold
-          for (const item of order.items) {
-            await this.stockService.restock(
+        // Dòng thu cũ (sku TRADE-IN, product_id null) không phải hàng trong kho → bỏ qua
+        const stockItems = order.items.filter((item) => item.product_id);
+
+        if (HELD_ONLY.includes(oldStatus)) {
+          for (const item of stockItems) {
+            await this.stockService.releaseHold(
               {
                 product_id: item.product_id.toString(),
                 sku: item.sku,
@@ -1939,12 +2036,33 @@ export class OrdersService {
               session,
             );
           }
-        } else {
-          order.internal_note = `[CẢNH BÁO]: Đơn hủy khi đang giao. Cần kiểm tra hàng thực tế trước khi hoàn kho.`;
+        } else if (DEDUCTED_IN_WAREHOUSE.includes(oldStatus)) {
+          for (const item of stockItems) {
+            await this.stockService.returnToStock(
+              {
+                product_id: item.product_id.toString(),
+                sku: item.sku,
+                quantity: item.quantity,
+              },
+              session,
+            );
+          }
+        } else if (LEFT_WAREHOUSE.includes(oldStatus)) {
+          order.internal_note = `[CẢNH BÁO]: Đơn hủy khi hàng đã rời kho (${oldStatus}). Cần kiểm tra hàng thực tế trước khi nhập lại kho.`;
         }
+        // REFUND_PENDING / REFUND_NEEDED: kho đã được xử lý ở lần hủy trước → không làm gì thêm
 
-        // Bẻ lái sang REFUND_PENDING nếu đã thanh toán Online
-        if (order.payment.status === 'PAID' && order.payment.method !== 'COD') {
+        // Bẻ lái sang REFUND_PENDING nếu đã thanh toán Online — TRỪ KHI đơn đang ở luồng hoàn tiền:
+        // REFUND_PENDING / REFUND_NEEDED → CANCELLED nghĩa là đã hoàn tiền xong, không bẻ lái lại.
+        const REFUND_FLOW: OrderStatus[] = [
+          OrderStatus.REFUND_PENDING,
+          OrderStatus.REFUND_NEEDED,
+        ];
+        if (
+          order.payment.status === 'PAID' &&
+          order.payment.method !== 'COD' &&
+          !REFUND_FLOW.includes(oldStatus)
+        ) {
           finalStatusToSave = OrderStatus.REFUND_PENDING;
         }
         order.cancel_reason = dto.reason || 'Hủy bởi Admin';
@@ -2092,9 +2210,17 @@ export class OrdersService {
         }
       });
 
-      await this.orderModel.updateOne({ _id: order._id }, updatePayload, {
-        session,
-      });
+      // Chỉ ghi nếu trạng thái trong DB vẫn đúng như lúc đọc (khóa lạc quan, lớp thứ hai)
+      const writeResult = await this.orderModel.updateOne(
+        { _id: order._id, status: oldStatus },
+        updatePayload,
+        { session },
+      );
+      if (writeResult.matchedCount === 0) {
+        throw new ConflictException(
+          `Đơn ${order.order_code} vừa được người khác cập nhật. Danh sách sẽ được tải lại.`,
+        );
+      }
       await session.commitTransaction();
 
       orderDoc = order.toObject() as unknown as OrderData;
@@ -2115,10 +2241,32 @@ export class OrdersService {
 
       this.handleOrderEvents(finalStatusToSave, orderDoc);
 
+      // Cho module Thông báo biết để đóng thông báo "đơn mới" khi đơn đã được xử lý
+      this.eventEmitter.emit('order.status_changed', {
+        orderId: String(order._id),
+        oldStatus,
+        newStatus: finalStatusToSave,
+      });
+
       return orderDoc;
     } catch (error: unknown) {
       // 1. Luôn abort transaction trước
       await session.abortTransaction();
+
+      // Giữ nguyên mã 409 cho trường hợp 2 người cùng xử lý
+      if (
+        error instanceof ConflictException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+
+      // MongoDB WriteConflict (code 112): 2 giao dịch ghi cùng lúc vào 1 đơn
+      if ((error as { code?: number })?.code === 112) {
+        throw new ConflictException(
+          'Đơn hàng đang được người khác cập nhật cùng lúc. Danh sách sẽ được tải lại, vui lòng thử lại.',
+        );
+      }
 
       // 2. Kiểm tra kiểu dữ liệu của error để lấy message an toàn
       const finalErrorMsg =
