@@ -4,6 +4,7 @@ import axiosClient from "../../api/axiosClient";
 import type { ProductDetailState } from "./useProductDetail";
 import { useTracking, BehaviorAction } from "../common/useTracking";
 import { buildBuyNowCheckoutUrl } from "../../utils/buyNow";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 interface INormalizedError {
   status?: number;
@@ -49,6 +50,13 @@ export function useProductDetailMain() {
 
       if (err?.status === 401) {
         toast.warning("Vui lòng đăng nhập để lưu sản phẩm!");
+      } else {
+        toast.error(
+          getApiErrorMessage(
+            error,
+            "Có lỗi xảy ra khi cập nhật danh sách yêu thích.",
+          ),
+        );
       }
     }
   };

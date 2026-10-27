@@ -4,6 +4,7 @@ import type { UserFormData } from "../../../../components/portal/UsersAndRoles/U
 import axiosClient from "../../../../api/axiosClient";
 import { getCurrentUser, hasPermission } from "../../../../utils/permission";
 import { Action, Resource } from "../../../../types/permissions";
+import { getApiErrorMessage } from "../../../../utils/apiError";
 
 export type BulkAction = "activate" | "deactivate" | "delete";
 
@@ -156,8 +157,13 @@ export function useUserManagement() {
         }));
         setDepartmentOptions(dynamicDepts);
       }
-    } catch {
-      toast.error("Không thể tải danh sách phòng ban và vai trò.");
+    } catch (error) {
+      toast.error(
+        getApiErrorMessage(
+          error,
+          "Không thể tải danh sách phòng ban và vai trò.",
+        ),
+      );
     }
   }, []);
 
@@ -209,8 +215,10 @@ export function useUserManagement() {
       setUsers(mappedUsers);
       setTotalPages(rawMeta.total_pages || 1);
       setTotalFiltered(rawMeta.total_docs || 0);
-    } catch {
-      toast.error("Không thể tải danh sách người dùng.");
+    } catch (error) {
+      toast.error(
+        getApiErrorMessage(error, "Không thể tải danh sách người dùng."),
+      );
     } finally {
       setIsLoading(false);
     }
@@ -239,10 +247,8 @@ export function useUserManagement() {
         if (res?.data)
           toast.success(res.data.message || "Đã xóa nhân viên thành công!");
         void fetchList();
-      } catch {
-        toast.error(
-          "Không thể xóa người dùng này do dữ liệu đang được ràng buộc.",
-        );
+      } catch (error) {
+        toast.error(getApiErrorMessage(error, "Không thể xóa người dùng này."));
       }
     } else if (deleteConfig.type === "bulk") {
       try {
@@ -257,9 +263,9 @@ export function useUserManagement() {
             res.data.message || "Đã xóa danh sách người dùng được chọn.",
           );
         void fetchList();
-      } catch {
+      } catch (error) {
         toast.error(
-          "Không thể xóa hàng loạt. Một số người dùng đang có dữ liệu ràng buộc.",
+          getApiErrorMessage(error, "Không thể xóa hàng loạt người dùng."),
         );
       }
     }
@@ -312,9 +318,9 @@ export function useUserManagement() {
 
       setModalConfig((prev) => ({ ...prev, isOpen: false }));
       void fetchList();
-    } catch {
+    } catch (error) {
       toast.error(
-        "Không thể lưu thông tin. Email hoặc Số điện thoại có thể đã tồn tại.",
+        getApiErrorMessage(error, "Không thể lưu thông tin người dùng."),
       );
     }
   };
@@ -347,6 +353,12 @@ export function useUserManagement() {
         return;
       }
       if (action === "delete") {
+        if (
+          !hasPermission(getCurrentUser(), Resource.SYSTEM_USERS, Action.DELETE)
+        ) {
+          toast.error("Bạn không có quyền xóa người dùng.");
+          return;
+        }
         setDeleteConfig({ isOpen: true, type: "bulk", userId: null });
         return;
       }
@@ -365,8 +377,10 @@ export function useUserManagement() {
           `Đã ${is_active ? "kích hoạt" : "khóa"} tài khoản hàng loạt!`,
         );
         void fetchList();
-      } catch {
-        toast.error("Không thể cập nhật trạng thái hàng loạt.");
+      } catch (error) {
+        toast.error(
+          getApiErrorMessage(error, "Không thể cập nhật trạng thái hàng loạt."),
+        );
       }
     },
 
@@ -384,8 +398,10 @@ export function useUserManagement() {
         });
         toast.success("Đã đổi trạng thái thành công!");
         void fetchList();
-      } catch {
-        toast.error("Không thể cập nhật trạng thái hoạt động.");
+      } catch (error) {
+        toast.error(
+          getApiErrorMessage(error, "Không thể cập nhật trạng thái hoạt động."),
+        );
       }
     },
 
@@ -403,8 +419,13 @@ export function useUserManagement() {
           });
           toast.success("Cập nhật trạng thái thành công!");
           void fetchList();
-        } catch {
-          toast.error("Không thể thực hiện khóa/mở khóa người dùng.");
+        } catch (error) {
+          toast.error(
+            getApiErrorMessage(
+              error,
+              "Không thể thực hiện khóa/mở khóa người dùng.",
+            ),
+          );
         }
       };
       void runLockUnlock();

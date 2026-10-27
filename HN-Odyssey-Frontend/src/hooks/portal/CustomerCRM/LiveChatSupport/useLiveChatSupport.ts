@@ -8,6 +8,10 @@ import { Action, Resource } from "../../../../types/permissions";
 import type { UserPayload } from "../../../../types/auth";
 import { getCurrentUser, hasPermission } from "../../../../utils/permission";
 import type { ChatProductCard } from "../../../../types/chatbot";
+import {
+  getApiErrorMessage,
+  getApiErrorStatus,
+} from "../../../../utils/apiError";
 
 export type ChatStatus = "Waitlist" | "Ongoing" | "Complete";
 export type MessageType = "text" | "image" | "product" | "file";
@@ -699,7 +703,9 @@ export function useLiveChatSupport() {
         setListLoadedAt(Date.now());
       } catch (error) {
         console.error("Error fetching conversations:", error);
-        toast.error("Không thể tải danh sách hội thoại.");
+        toast.error(
+          getApiErrorMessage(error, "Không thể tải danh sách hội thoại."),
+        );
       }
     };
 
@@ -740,7 +746,9 @@ export function useLiveChatSupport() {
         );
       } catch (error) {
         console.error("Error fetching messages:", error);
-        toast.error("Lỗi khi tải nội dung tin nhắn.");
+        toast.error(
+          getApiErrorMessage(error, "Lỗi khi tải nội dung tin nhắn."),
+        );
       }
     };
 
@@ -809,8 +817,8 @@ export function useLiveChatSupport() {
         actions.changeTab("Ongoing"); // reset page + cache tin nhắn giống bấm tab thủ công
       } catch (error) {
         console.error("Error accepting consultant:", error);
-        const status = (error as { response?: { status?: number } })?.response
-          ?.status;
+        // axiosClient trả lỗi dạng { status, message, data }, không có error.response
+        const status = getApiErrorStatus(error);
         if (status === 409) {
           toast.warning("Hội thoại này đã được nhân viên khác tiếp nhận.");
           setSessions((prev) => prev.filter((s) => s.id !== sessionId));
@@ -818,7 +826,7 @@ export function useLiveChatSupport() {
           setCountsVersion((v) => v + 1);
           return;
         }
-        toast.error("Lỗi khi nhận tư vấn.");
+        toast.error(getApiErrorMessage(error, "Lỗi khi nhận tư vấn."));
       }
     },
 
@@ -831,7 +839,9 @@ export function useLiveChatSupport() {
         actions.changeTab("Complete");
       } catch (error) {
         console.error("Error completing consultant:", error);
-        toast.error("Lỗi khi hoàn thành phiên chat.");
+        toast.error(
+          getApiErrorMessage(error, "Lỗi khi hoàn thành phiên chat."),
+        );
       }
     },
 

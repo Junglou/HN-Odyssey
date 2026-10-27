@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
+import {
+  buildInvoiceTotals,
+  formatUsd,
+  formatVnd,
+  usdToVnd,
+} from 'src/common/constants/money.constant';
 
 // 1. Định nghĩa Interface
 interface InvoiceItem {
@@ -14,6 +20,7 @@ interface InvoiceOrder {
   items: InvoiceItem[];
   total_amount: number;
   discount_amount?: number;
+  shipping_fee?: number;
   createdAt?: Date | string;
   shipping_info?: {
     name?: string;
@@ -86,6 +93,8 @@ export class EmailService {
   // HELPER METHODS
 
   private generateInvoiceHtml(order: InvoiceOrder): string {
+    const totals = buildInvoiceTotals(order);
+
     // 1. Render rows
     const itemsHtml = order.items
       .map(
@@ -132,9 +141,10 @@ export class EmailService {
            </table>
 
            <div style="text-align: right; margin-top: 20px;">
-              <p>Thành tiền: ${this.formatCurrency(order.total_amount)}</p>
-              <p style="color: red;">Giảm giá: -${this.formatCurrency(order.discount_amount || 0)}</p>
-              <h3>Tổng cộng: ${this.formatCurrency(order.total_amount)}</h3>
+              <p>Tạm tính: ${this.formatCurrency(totals.subtotal)}</p>
+              <p>Phí vận chuyển: ${totals.shippingFee > 0 ? this.formatCurrency(totals.shippingFee) : 'Miễn phí'}</p>
+              ${totals.discount > 0 ? `<p style="color: red;">Giảm giá: -${this.formatCurrency(totals.discount)}</p>` : ''}
+              <h3>Tổng cộng: ${this.formatCurrency(totals.total)}</h3>
            </div>
         </div>
         
@@ -175,6 +185,7 @@ export class EmailService {
                 <td style="padding: 8px; border-bottom: 1px solid #eee;"><b>Số tiền cần hoàn:</b></td>
                 <td style="padding: 8px; border-bottom: 1px solid #eee; color: #dc3545; font-weight: bold;">
                   ${this.formatCurrency(refundData.amount)}
+                  <br/><small style="color: #666; font-weight: normal;">≈ ${formatVnd(usdToVnd(refundData.amount))} (quy đổi theo tỷ giá hệ thống)</small>
                 </td>
               </tr>
               <tr>
@@ -198,10 +209,7 @@ export class EmailService {
   }
 
   private formatCurrency(amount: number) {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-    }).format(amount);
+    return formatUsd(amount);
   }
 
   async sendRepaymentLink(

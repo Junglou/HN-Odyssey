@@ -59,3 +59,9 @@ setup-structure.js
 env
 node_modules
 
+
+# File tam tu cac lenh kiem tra
+gom-*.txt
+kiem-tra-*.txt
+audit-*.txt
+dem-*.txt

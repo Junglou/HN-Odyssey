@@ -23,6 +23,7 @@ import {
 } from "../../../../assets/icons/ContentConfigIcons";
 import type { ElementType } from "../../../../hooks/portal/Communication/ContentConfig/useContentConfig";
 import axiosClient from "../../../../api/axiosClient";
+import { getApiErrorMessage } from "../../../../utils/apiError";
 
 // Định nghĩa kiểu dữ liệu cho props
 interface SidebarModulesProps {
@@ -124,7 +125,12 @@ export default function SidebarModules({ actions }: SidebarModulesProps) {
         toast.success("Tải ảnh lên thành công!");
       } catch (err) {
         console.error("Upload error", err);
-        toast.error("Có lỗi xảy ra khi tải ảnh lên. Vui lòng thử lại sau.");
+        toast.error(
+          getApiErrorMessage(
+            err,
+            "Có lỗi xảy ra khi tải ảnh lên. Vui lòng thử lại sau.",
+          ),
+        );
       }
 
       // Xóa giá trị input để có thể chọn lại cùng một file trong lần tiếp theo
@@ -154,7 +160,12 @@ export default function SidebarModules({ actions }: SidebarModulesProps) {
         toast.success("Tải video lên thành công!");
       } catch (err) {
         console.error("Upload error", err);
-        toast.error("Có lỗi xảy ra khi tải video lên. Vui lòng thử lại sau.");
+        toast.error(
+          getApiErrorMessage(
+            err,
+            "Có lỗi xảy ra khi tải video lên. Vui lòng thử lại sau.",
+          ),
+        );
       }
 
       // Xóa giá trị input để tránh bị cache thao tác chọn file

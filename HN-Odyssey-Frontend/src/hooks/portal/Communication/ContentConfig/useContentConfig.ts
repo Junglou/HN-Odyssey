@@ -4,6 +4,7 @@ import axiosClient from "../../../../api/axiosClient";
 import type { UserPayload } from "../../../../types/auth";
 import { Action, Resource } from "../../../../types/permissions";
 import { USER_KEY } from "../../../../utils/tokenStorage";
+import { getApiErrorMessage } from "../../../../utils/apiError";
 
 export type PageType =
   | "homepage"
@@ -912,7 +913,12 @@ export function useContentConfig() {
         }
       } catch (error) {
         console.error("Lỗi lấy cấu hình từ API:", error);
-        toast.error("Không thể tải cấu hình giao diện từ Server!");
+        toast.error(
+          getApiErrorMessage(
+            error,
+            "Không thể tải cấu hình giao diện từ Server!",
+          ),
+        );
       }
     };
 
@@ -1252,7 +1258,12 @@ export function useContentConfig() {
       } catch (error: unknown) {
         const err = error as { response?: { data?: unknown } };
         console.error("Lỗi lưu JSON:", err.response?.data || error);
-        toast.error("Đã xảy ra lỗi khi lưu cấu hình. Vui lòng thử lại!");
+        toast.error(
+          getApiErrorMessage(
+            error,
+            "Đã xảy ra lỗi khi lưu cấu hình. Vui lòng thử lại!",
+          ),
+        );
       } finally {
         setIsSaving(false);
       }

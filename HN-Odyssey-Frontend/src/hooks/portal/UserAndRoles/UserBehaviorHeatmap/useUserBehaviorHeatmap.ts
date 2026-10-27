@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
+import { getApiErrorMessage } from "../../../../utils/apiError";
 
 export type DeviceType = "ALL" | "Desktop" | "Mobile" | "Tablet";
 export type InteractionType = string;
@@ -38,8 +39,13 @@ export function useUserBehaviorHeatmap() {
         if (data.interactions) {
           setInteractionOptions(["ALL", ...data.interactions]);
         }
-      } catch {
-        toast.error("Không thể tải danh sách bộ lọc bản đồ nhiệt.");
+      } catch (error) {
+        toast.error(
+          getApiErrorMessage(
+            error,
+            "Không thể tải danh sách bộ lọc bản đồ nhiệt.",
+          ),
+        );
       }
     };
     fetchFilters();
@@ -82,9 +88,14 @@ export function useUserBehaviorHeatmap() {
             ? `${Math.floor(data.avg_duration_seconds / 60)}m ${data.avg_duration_seconds % 60}s`
             : data?.avg_duration || "0s",
         });
-      } catch {
+      } catch (error) {
         setStats({ visits: "0", clicks: "0", duration: "0s" });
-        toast.error("Không thể tải dữ liệu thống kê bản đồ nhiệt.");
+        toast.error(
+          getApiErrorMessage(
+            error,
+            "Không thể tải dữ liệu thống kê bản đồ nhiệt.",
+          ),
+        );
       }
     };
 

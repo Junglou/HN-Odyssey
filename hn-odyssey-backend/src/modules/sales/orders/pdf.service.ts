@@ -3,6 +3,10 @@ import PDFDocument from 'pdfkit';
 import * as path from 'path';
 import * as bwipjs from 'bwip-js';
 import { OrderData, OrderItem } from 'src/common/interfaces/order.interface';
+import {
+  buildInvoiceTotals,
+  formatUsd,
+} from 'src/common/constants/money.constant';
 
 @Injectable()
 export class PdfService {
@@ -391,22 +395,35 @@ export class PdfService {
       doc.font('Roboto-Regular');
 
       if (!isTradeIn) {
+        const totals = buildInvoiceTotals(order);
+
         this.generateSummaryRow(
           doc,
           position,
           'Tạm tính:',
-          this.formatCurrency(
-            order.total_amount + (order.discount_amount || 0),
-          ),
+          this.formatCurrency(totals.subtotal),
         );
+        position += 22;
 
         this.generateSummaryRow(
           doc,
-          position + 22,
-          'Giảm giá:',
-          `- ${this.formatCurrency(order.discount_amount || 0)}`,
+          position,
+          'Phí vận chuyển:',
+          totals.shippingFee > 0
+            ? this.formatCurrency(totals.shippingFee)
+            : 'Miễn phí',
         );
-        position += 44;
+        position += 22;
+
+        if (totals.discount > 0) {
+          this.generateSummaryRow(
+            doc,
+            position,
+            'Giảm giá:',
+            `- ${this.formatCurrency(totals.discount)}`,
+          );
+          position += 22;
+        }
       }
 
       // Khối hiển thị tổng số tiền thanh toán cuối cùng
@@ -482,12 +499,9 @@ export class PdfService {
       .text(value, 445, y, { width: 90, align: 'right' });
   }
 
-  // Chuyển đổi định dạng số nguyên thành chuỗi tiền tệ VND
+  // Định dạng tiền USD (total_amount và giá sản phẩm lưu bằng USD)
   private formatCurrency(amount: number) {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-    }).format(amount);
+    return formatUsd(amount);
   }
 
   // Xử lý các quy tắc định dạng riêng biệt cho quy trình Thu Cũ Đổi Mới

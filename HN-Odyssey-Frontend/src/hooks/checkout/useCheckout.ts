@@ -5,6 +5,7 @@ import axiosClient from "../../api/axiosClient";
 import tokenStorage from "../../utils/tokenStorage";
 import { clearChatbotRef, getChatbotRef } from "../../utils/chatbotCommerce";
 import { getBuyNowItemFromSearch } from "../../utils/buyNow";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 export interface CheckoutItem {
   id: string;
@@ -541,8 +542,9 @@ export function useCheckout() {
       setOtpTimer(60);
       toast.success(`Mã xác thực đã được gửi đến hộp thư ${formData.email}`);
     } catch (error: unknown) {
-      const err = error as ApiError;
-      toast.error(err?.message || "Hệ thống gặp sự cố khi gửi mã xác thực.");
+      toast.error(
+        getApiErrorMessage(error, "Hệ thống gặp sự cố khi gửi mã xác thực."),
+      );
     } finally {
       setLoading(false);
     }
@@ -579,9 +581,11 @@ export function useCheckout() {
           setStep(2);
           window.scrollTo({ top: 0, behavior: "smooth" });
         } catch (error: unknown) {
-          const err = error as ApiError;
           toast.error(
-            err?.message || "Mã xác thực không hợp lệ, vui lòng kiểm tra lại.",
+            getApiErrorMessage(
+              error,
+              "Mã xác thực không hợp lệ, vui lòng kiểm tra lại.",
+            ),
           );
         } finally {
           setLoading(false);
@@ -618,9 +622,11 @@ export function useCheckout() {
           window.scrollTo({ top: 0, behavior: "smooth" });
         }
       } catch (error: unknown) {
-        const err = error as ApiError;
         toast.error(
-          err?.message || "Phát sinh lỗi trong quá trình khởi tạo đơn hàng.",
+          getApiErrorMessage(
+            error,
+            "Phát sinh lỗi trong quá trình khởi tạo đơn hàng.",
+          ),
         );
       } finally {
         setLoading(false);
@@ -650,10 +656,13 @@ export function useCheckout() {
           setVoucherDiscount(discountValue);
           setPromoCode(inputCode.trim());
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           setVoucherDiscount(0);
           toast.error(
-            "Thông tin nhập vào không trùng khớp với các mã giảm giá hiện có.",
+            getApiErrorMessage(
+              error,
+              "Thông tin nhập vào không trùng khớp với các mã giảm giá hiện có.",
+            ),
           );
         });
     }

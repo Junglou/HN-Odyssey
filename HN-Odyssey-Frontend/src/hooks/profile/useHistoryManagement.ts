@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
-import axios from "axios";
 import axiosClient from "../../api/axiosClient";
 import type { UserOrder } from "../../types/user";
 import type {
@@ -17,6 +16,7 @@ import {
   clampPaginationPage,
   useResponsiveProfilePagination,
 } from "./useResponsiveOrderPageLimit";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 /** Backend treats COMPLETED filter as COMPLETED + DELIVERED in DB */
 const COMPLETED_ORDER_STATUSES = new Set(["COMPLETED", "DELIVERED"]);
@@ -24,19 +24,9 @@ const COMPLETED_ORDER_STATUSES = new Set(["COMPLETED", "DELIVERED"]);
 const isCompletedOrder = (status?: string | null): boolean =>
   COMPLETED_ORDER_STATUSES.has(String(status ?? "").toUpperCase());
 
-const getErrorMessage = (error: unknown, fallback: string): string => {
-  if (axios.isAxiosError(error)) {
-    return (
-      (error.response?.data as { message?: string })?.message ||
-      error.message ||
-      fallback
-    );
-  }
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  return fallback;
-};
+// Dùng hàm chung: hàm cũ chỉ nhận lỗi axios gốc / Error nên bỏ sót lỗi từ axiosClient
+const getErrorMessage = (error: unknown, fallback: string): string =>
+  getApiErrorMessage(error, fallback);
 
 type HistoryOrdersLoadResult = {
   orders: UserOrder[];

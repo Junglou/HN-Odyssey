@@ -4,6 +4,7 @@ import axiosClient from "../../../../api/axiosClient";
 import { Action, Resource } from "../../../../types/permissions";
 import type { UserPayload } from "../../../../types/auth";
 import { USER_KEY } from "../../../../utils/tokenStorage";
+import { getApiErrorMessage } from "../../../../utils/apiError";
 
 export type PromotionStatus =
   | "Active"
@@ -89,18 +90,10 @@ interface ScopeOption {
   name: string;
 }
 
-interface APIErrorResponse {
-  response?: {
-    data?: {
-      message?: string | string[];
-    };
-  };
-}
-
 const extractErrorMessage = (error: unknown, defaultMsg: string): string => {
   try {
-    const err = error as APIErrorResponse;
-    const beMessage = err?.response?.data?.message;
+    // Dùng hàm chung: axiosClient trả lỗi dạng { status, message, data }, không có response
+    const beMessage: unknown = getApiErrorMessage(error, defaultMsg);
     if (Array.isArray(beMessage) && beMessage.length > 0) {
       return beMessage[0];
     }

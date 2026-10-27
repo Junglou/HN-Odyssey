@@ -277,14 +277,20 @@ export default function CouponManagement({
                 </button>
               </>
             )}
-            <button
-              type="button"
-              className="coupon-btn-bulk danger"
-              onClick={bulkActions.bulkDelete}
-              disabled={selectedIds.size === 0}
-            >
-              Bulk Delete
-            </button>
+            {hasPermission(
+              getCurrentUser(),
+              Resource.PROMO_COUPONS,
+              Action.DELETE,
+            ) && (
+              <button
+                type="button"
+                className="coupon-btn-bulk danger"
+                onClick={bulkActions.bulkDelete}
+                disabled={selectedIds.size === 0}
+              >
+                Bulk Delete
+              </button>
+            )}
           </div>
         </div>
 

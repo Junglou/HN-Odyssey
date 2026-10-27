@@ -4,6 +4,10 @@ import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
 import { Action, Resource } from "../../../../types/permissions";
 import { USER_KEY } from "../../../../utils/tokenStorage";
+import {
+  getApiErrorMessage,
+  getApiErrorStatus,
+} from "../../../../utils/apiError";
 
 // 1. FE TYPES
 
@@ -177,7 +181,7 @@ const useLocalAuth = () => {
 
 // 409 = người khác vừa xử lý đơn này
 const isConflictError = (error: unknown): boolean =>
-  (error as { response?: { status?: number } })?.response?.status === 409;
+  getApiErrorStatus(error) === 409;
 
 // 4. MAIN HOOK
 
@@ -422,7 +426,12 @@ export function useOrderManagement() {
     } catch (error) {
       console.error("Lỗi khi fetch đơn hàng:", error);
       // Hiển thị thông báo khi không lấy được dữ liệu
-      toast.error("Không thể tải danh sách đơn hàng từ hệ thống.");
+      toast.error(
+        getApiErrorMessage(
+          error,
+          "Không thể tải danh sách đơn hàng từ hệ thống.",
+        ),
+      );
     } finally {
       setIsLoading(false);
     }
@@ -598,7 +607,12 @@ export function useOrderManagement() {
         toast.success("Xuất dữ liệu Excel thành công!");
       } catch (error) {
         console.error("Lỗi xuất Excel:", error);
-        toast.error("Lỗi xuất dữ liệu Excel. Vui lòng thử lại.");
+        toast.error(
+          getApiErrorMessage(
+            error,
+            "Lỗi xuất dữ liệu Excel. Vui lòng thử lại.",
+          ),
+        );
       }
     },
 
@@ -643,7 +657,10 @@ export function useOrderManagement() {
       } catch (error) {
         console.error("Lỗi lấy tem vận chuyển:", error);
         toast.error(
-          "Không thể lấy tem giao hàng! Đơn hàng có thể chưa được đẩy sang ĐVVC (Chưa có mã vận đơn).",
+          getApiErrorMessage(
+            error,
+            "Không thể lấy tem giao hàng! Đơn hàng có thể chưa được đẩy sang ĐVVC (Chưa có mã vận đơn).",
+          ),
         );
       }
     },
@@ -688,7 +705,12 @@ export function useOrderManagement() {
       toast.success(`Tải file ${fileTypeName} thành công!`);
     } catch (error) {
       console.error(`Lỗi tải file ${type}:`, error);
-      toast.error("Đã xảy ra lỗi khi tải file PDF. Vui lòng thử lại!");
+      toast.error(
+        getApiErrorMessage(
+          error,
+          "Đã xảy ra lỗi khi tải file PDF. Vui lòng thử lại!",
+        ),
+      );
     }
   };
 

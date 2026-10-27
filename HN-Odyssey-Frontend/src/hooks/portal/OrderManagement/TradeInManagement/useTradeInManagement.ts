@@ -6,6 +6,7 @@ import axiosClient from "../../../../api/axiosClient";
 import type { UserPayload } from "../../../../types/auth";
 import { Action, Resource } from "../../../../types/permissions";
 import { USER_KEY } from "../../../../utils/tokenStorage";
+import { getApiErrorMessage } from "../../../../utils/apiError";
 
 // types
 export type TradeInStatus =
@@ -293,7 +294,9 @@ export function useTradeInManagement() {
       }
     } catch (error: unknown) {
       console.error("Fetch trade-ins error:", error);
-      toast.error("Không thể tải danh sách Trade-in.");
+      toast.error(
+        getApiErrorMessage(error, "Không thể tải danh sách Trade-in."),
+      );
     } finally {
       setIsLoading(false);
     }
@@ -416,7 +419,7 @@ export function useTradeInManagement() {
         fetchTradeIns();
       } catch (error: unknown) {
         console.error("Approve trade-in error:", error);
-        toast.error("Lỗi khi phê duyệt yêu cầu.");
+        toast.error(getApiErrorMessage(error, "Lỗi khi phê duyệt yêu cầu."));
       } finally {
         setIsMutating(false);
       }
@@ -432,7 +435,7 @@ export function useTradeInManagement() {
         fetchTradeIns();
       } catch (error: unknown) {
         console.error("Create order error:", error);
-        toast.error("Lỗi khi tạo vận đơn.");
+        toast.error(getApiErrorMessage(error, "Lỗi khi tạo vận đơn."));
       } finally {
         setIsMutating(false);
       }
@@ -449,7 +452,7 @@ export function useTradeInManagement() {
         fetchTradeIns();
       } catch (error: unknown) {
         console.error("Receive item error:", error);
-        toast.error("Lỗi khi xác nhận nhận hàng.");
+        toast.error(getApiErrorMessage(error, "Lỗi khi xác nhận nhận hàng."));
       } finally {
         setIsMutating(false);
       }
@@ -468,7 +471,9 @@ export function useTradeInManagement() {
         fetchTradeIns();
       } catch (error: unknown) {
         console.error("Sandbox receive error:", error);
-        toast.error("Lỗi khi cập nhật trạng thái Sandbox.");
+        toast.error(
+          getApiErrorMessage(error, "Lỗi khi cập nhật trạng thái Sandbox."),
+        );
       } finally {
         setIsMutating(false);
       }
@@ -486,7 +491,7 @@ export function useTradeInManagement() {
         fetchTradeIns();
       } catch (error: unknown) {
         console.error("Reject trade-in error:", error);
-        toast.error("Từ chối thất bại.");
+        toast.error(getApiErrorMessage(error, "Từ chối thất bại."));
       } finally {
         setIsMutating(false);
       }
@@ -512,7 +517,9 @@ export function useTradeInManagement() {
         fetchTradeIns();
       } catch (error: unknown) {
         console.error("Finalize trade-in error:", error);
-        toast.error("Lỗi khi lưu kết quả thẩm định.");
+        toast.error(
+          getApiErrorMessage(error, "Lỗi khi lưu kết quả thẩm định."),
+        );
       } finally {
         setIsMutating(false);
       }
@@ -552,7 +559,9 @@ export function useTradeInManagement() {
         toast.success("Xuất file Excel thành công!");
       } catch (error: unknown) {
         console.error("Export Excel error:", error);
-        toast.error("Lỗi khi kết xuất dữ liệu Excel.");
+        toast.error(
+          getApiErrorMessage(error, "Lỗi khi kết xuất dữ liệu Excel."),
+        );
       }
     },
 
@@ -576,7 +585,7 @@ export function useTradeInManagement() {
         window.open(url, "_blank");
       } catch (error: unknown) {
         console.error("Print Invoice error:", error);
-        toast.error("Lỗi khi xuất Hóa đơn PDF.");
+        toast.error(getApiErrorMessage(error, "Lỗi khi xuất Hóa đơn PDF."));
       }
     },
 
@@ -600,7 +609,9 @@ export function useTradeInManagement() {
         window.open(url, "_blank");
       } catch (error: unknown) {
         console.error("Print Delivery Slip error:", error);
-        toast.error("Lỗi khi xuất Phiếu giao hàng PDF.");
+        toast.error(
+          getApiErrorMessage(error, "Lỗi khi xuất Phiếu giao hàng PDF."),
+        );
       }
     },
 

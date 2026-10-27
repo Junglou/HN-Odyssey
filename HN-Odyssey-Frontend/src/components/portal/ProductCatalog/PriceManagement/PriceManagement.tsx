@@ -53,6 +53,7 @@ interface PriceManagementProps {
     bulkApprove: () => void;
     bulkReject: () => void;
   };
+  canApprove?: boolean;
 }
 
 export default function PriceManagement({
@@ -67,6 +68,7 @@ export default function PriceManagement({
   actions,
   rowActions,
   bulkActions,
+  canApprove = false,
 }: PriceManagementProps) {
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const statusRef = useRef<HTMLDivElement>(null);
@@ -254,22 +256,26 @@ export default function PriceManagement({
           </div>
 
           <div className="prm-bulk-actions">
-            <button
-              type="button"
-              className="prm-btn-bulk outline"
-              onClick={bulkActions.bulkApprove}
-              disabled={selectedIds.size === 0}
-            >
-              Bulk Approve
-            </button>
-            <button
-              type="button"
-              className="prm-btn-bulk outline"
-              onClick={bulkActions.bulkReject}
-              disabled={selectedIds.size === 0}
-            >
-              Bulk Reject
-            </button>
+            {canApprove && (
+              <>
+                <button
+                  type="button"
+                  className="prm-btn-bulk outline"
+                  onClick={bulkActions.bulkApprove}
+                  disabled={selectedIds.size === 0}
+                >
+                  Bulk Approve
+                </button>
+                <button
+                  type="button"
+                  className="prm-btn-bulk outline"
+                  onClick={bulkActions.bulkReject}
+                  disabled={selectedIds.size === 0}
+                >
+                  Bulk Reject
+                </button>
+              </>
+            )}
           </div>
         </div>
 

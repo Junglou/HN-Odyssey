@@ -18,6 +18,7 @@ export default function PriceManagementPage() {
     rowActions,
     bulkActions,
     handleSavePrice,
+    permissions,
   } = usePriceManagement();
 
   return (
@@ -35,6 +36,7 @@ export default function PriceManagementPage() {
         actions={actions}
         rowActions={rowActions}
         bulkActions={bulkActions}
+        canApprove={permissions.canApprove}
       />
 
       {/* Modal cập nhật giá */}

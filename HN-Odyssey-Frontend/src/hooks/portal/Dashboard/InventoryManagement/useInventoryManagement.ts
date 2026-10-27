@@ -4,6 +4,7 @@ import axiosClient from "../../../../api/axiosClient";
 import { Action, Resource } from "../../../../types/permissions";
 import { toast } from "react-toastify";
 import { getCurrentUser, hasPermission } from "../../../../utils/permission";
+import { getApiErrorMessage } from "../../../../utils/apiError";
 
 export interface InventoryKPI {
   title: string;
@@ -352,7 +353,7 @@ export function useInventoryManagement() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      toast.error("Lỗi khi xuất báo cáo Excel.");
+      toast.error(getApiErrorMessage(err, "Lỗi khi xuất báo cáo Excel."));
       console.error(err);
     }
   };
@@ -382,7 +383,7 @@ export function useInventoryManagement() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      toast.error("Lỗi khi xuất báo cáo PDF.");
+      toast.error(getApiErrorMessage(err, "Lỗi khi xuất báo cáo PDF."));
       console.error(err);
     }
   };

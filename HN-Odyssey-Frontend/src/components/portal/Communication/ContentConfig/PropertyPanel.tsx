@@ -14,6 +14,7 @@ import {
 } from "../../../../assets/icons/ContentConfigIcons";
 import axiosClient from "../../../../api/axiosClient";
 import { toast } from "react-toastify";
+import { getApiErrorMessage } from "../../../../utils/apiError";
 
 // helpers
 function CustomSelect({
@@ -136,7 +137,9 @@ export default function PropertyPanel({
         actions.updateSectionBackground(url);
       } catch (err) {
         console.error("Upload background error", err);
-        toast.error("Có lỗi xảy ra khi Upload Background.");
+        toast.error(
+          getApiErrorMessage(err, "Có lỗi xảy ra khi Upload Background."),
+        );
       }
       if (bgInputRef.current) bgInputRef.current.value = "";
     }

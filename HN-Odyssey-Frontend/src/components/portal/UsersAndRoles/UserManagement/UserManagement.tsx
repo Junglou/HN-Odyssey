@@ -226,17 +226,23 @@ export default function UserManagement({
               </button>
             </>
           )}
-          <button
-            type="button"
-            className="um-btn-bulk delete"
-            onClick={(e) => {
-              actions.bulk("delete");
-              e.currentTarget.blur();
-            }}
-            disabled={!hasSelection}
-          >
-            Bulk Delete
-          </button>
+          {hasPermission(
+            getCurrentUser(),
+            Resource.SYSTEM_USERS,
+            Action.DELETE,
+          ) && (
+            <button
+              type="button"
+              className="um-btn-bulk delete"
+              onClick={(e) => {
+                actions.bulk("delete");
+                e.currentTarget.blur();
+              }}
+              disabled={!hasSelection}
+            >
+              Bulk Delete
+            </button>
+          )}
         </div>
 
         <div className="um-table-wrapper">

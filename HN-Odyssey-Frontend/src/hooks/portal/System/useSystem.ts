@@ -4,6 +4,7 @@ import axiosClient from "../../../api/axiosClient";
 import type { UserProfile } from "../../../types/user";
 import { Action, Resource } from "../../../types/permissions";
 import { getCurrentUser, hasPermission } from "../../../utils/permission";
+import { getApiErrorMessage, getApiErrorStatus } from "../../../utils/apiError";
 
 // 1. CÁC INTERFACE GIAO TIẾP VỚI COMPONENT UI
 
@@ -499,10 +500,18 @@ export function useSystem() {
       await axiosClient.get(`${API}/health`);
       await fetchSystemData();
       toast.success("Hoàn tất kiểm tra: Database và bộ nhớ hoạt động ổn định.");
-    } catch {
-      toast.warning(
-        "Hoàn tất kiểm tra: phát hiện dịch vụ không ổn định (Database hoặc bộ nhớ).",
-      );
+    } catch (error) {
+      // /health trả 503 khi có dịch vụ lỗi → đúng nghĩa "không ổn định".
+      // Lỗi khác (không có quyền, mất mạng...) thì báo đúng nguyên nhân.
+      if (getApiErrorStatus(error) === 503) {
+        toast.warning(
+          "Hoàn tất kiểm tra: phát hiện dịch vụ không ổn định (Database hoặc bộ nhớ).",
+        );
+      } else {
+        toast.error(
+          getApiErrorMessage(error, "Không thể chạy kiểm tra hệ thống."),
+        );
+      }
     } finally {
       setIsCheckingHealth(false);
     }

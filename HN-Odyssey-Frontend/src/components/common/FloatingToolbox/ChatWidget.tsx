@@ -16,6 +16,7 @@ import axiosClient from "../../../api/axiosClient";
 import ChatProductCarousel from "./ChatProductCarousel";
 import "./ChatWidget.css";
 import { toast } from "react-toastify";
+import { getApiErrorMessage } from "../../../utils/apiError";
 
 // THÊM HÀM NÀY ĐỂ FIX LỖI LINK KÉP TỪ DB CŨ
 const getValidMediaUrl = (url: string) => {
@@ -106,7 +107,12 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
         setShowEmoji(false);
       } catch (error) {
         console.error(error);
-        toast.error("Couldn't send the image. Please try again.");
+        toast.error(
+          getApiErrorMessage(
+            error,
+            "Couldn't send the image. Please try again.",
+          ),
+        );
       } finally {
         setIsSending(false);
       }

@@ -174,12 +174,18 @@ export default function BlogNewsManagement({
                 Hide
               </button>
             )}
-            <button
-              className="ban-btn-bulk delete"
-              onClick={bulkActions.bulkDelete}
-            >
-              Delete
-            </button>
+            {hasPermission(
+              currentUser,
+              Resource.CONTENT_POSTS,
+              Action.DELETE,
+            ) && (
+              <button
+                className="ban-btn-bulk delete"
+                onClick={bulkActions.bulkDelete}
+              >
+                Delete
+              </button>
+            )}
           </div>
         )}
 

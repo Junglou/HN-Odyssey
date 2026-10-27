@@ -65,10 +65,11 @@ export class CreateProductVariantDto {
   @Min(0)
   sale_price?: number;
 
-  @IsNotEmpty()
+  // Tồn kho do module Kho quản lý: tạo mới mặc định 0, cập nhật luôn giữ số cũ
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  stock: number; // Tồn kho riêng từng biến thể
+  stock?: number;
 
   @IsOptional() @IsString() images: string[];
   @IsOptional() @IsNumber() image_index?: number; // Index ảnh trong mảng images cha

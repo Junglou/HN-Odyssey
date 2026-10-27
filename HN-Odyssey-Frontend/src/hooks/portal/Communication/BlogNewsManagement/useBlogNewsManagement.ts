@@ -4,6 +4,7 @@ import axiosClient from "../../../../api/axiosClient";
 import type { UserPayload } from "../../../../types/auth";
 import { Action, Resource } from "../../../../types/permissions";
 import { USER_KEY } from "../../../../utils/tokenStorage";
+import { getApiErrorMessage } from "../../../../utils/apiError";
 
 // interfaces and types
 export type BlogNewsStatus = "Published" | "Draft" | "Hidden";
@@ -407,7 +408,9 @@ export function useBlogNewsManagement() {
       }
     } catch (error) {
       console.error("Failed to fetch post detail:", error);
-      toast.error("Đã xảy ra lỗi khi tải chi tiết bài viết!");
+      toast.error(
+        getApiErrorMessage(error, "Đã xảy ra lỗi khi tải chi tiết bài viết!"),
+      );
     }
   };
 
@@ -428,7 +431,9 @@ export function useBlogNewsManagement() {
       }
     } catch (error) {
       console.error("Failed to fetch post detail:", error);
-      toast.error("Đã xảy ra lỗi khi tải chi tiết bài viết!");
+      toast.error(
+        getApiErrorMessage(error, "Đã xảy ra lỗi khi tải chi tiết bài viết!"),
+      );
     }
   };
 
@@ -510,7 +515,12 @@ export function useBlogNewsManagement() {
     } catch (error: unknown) {
       const err = error as { response?: { data?: unknown } };
       console.error("Submit failed", err.response?.data || error);
-      toast.error("Đã xảy ra lỗi khi lưu bài viết. Vui lòng thử lại!");
+      toast.error(
+        getApiErrorMessage(
+          error,
+          "Đã xảy ra lỗi khi lưu bài viết. Vui lòng thử lại!",
+        ),
+      );
     } finally {
       setDrawerConfig((prev) => ({ ...prev, isSubmitting: false }));
     }
@@ -543,7 +553,12 @@ export function useBlogNewsManagement() {
       await fetchPosts();
     } catch (error) {
       console.error("Delete failed", error);
-      toast.error("Đã xảy ra lỗi khi xóa bài viết. Vui lòng thử lại!");
+      toast.error(
+        getApiErrorMessage(
+          error,
+          "Đã xảy ra lỗi khi xóa bài viết. Vui lòng thử lại!",
+        ),
+      );
     } finally {
       closeDeleteModal();
     }
@@ -573,7 +588,12 @@ export function useBlogNewsManagement() {
       toast.success(`Đã cập nhật trạng thái thành ${targetStatus} thành công!`);
     } catch (error) {
       console.error("Bulk update failed", error);
-      toast.error("Đã xảy ra lỗi khi cập nhật trạng thái. Vui lòng thử lại!");
+      toast.error(
+        getApiErrorMessage(
+          error,
+          "Đã xảy ra lỗi khi cập nhật trạng thái. Vui lòng thử lại!",
+        ),
+      );
     }
   };
 
