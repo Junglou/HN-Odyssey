@@ -252,14 +252,25 @@ export default function PromotionManagement({
                 </button>
               </>
             )}
-            <button
-              type="button"
-              className="promo-btn-bulk danger"
-              onClick={bulkActions.bulkDelete}
-              disabled={selectedIds.size === 0}
-            >
-              Bulk Delete
-            </button>
+            {(hasPermission(
+              currentUser,
+              Resource.PROMO_FLASH_SALES,
+              Action.DELETE,
+            ) ||
+              hasPermission(
+                currentUser,
+                Resource.PROMO_COMBOS,
+                Action.DELETE,
+              )) && (
+              <button
+                type="button"
+                className="promo-btn-bulk danger"
+                onClick={bulkActions.bulkDelete}
+                disabled={selectedIds.size === 0}
+              >
+                Bulk Delete
+              </button>
+            )}
           </div>
         </div>
 

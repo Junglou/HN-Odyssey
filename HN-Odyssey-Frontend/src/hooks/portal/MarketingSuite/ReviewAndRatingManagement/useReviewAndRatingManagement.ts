@@ -4,6 +4,7 @@ import axiosClient from "../../../../api/axiosClient";
 import type { UserPayload } from "../../../../types/auth";
 import { Action, Resource } from "../../../../types/permissions";
 import { USER_KEY } from "../../../../utils/tokenStorage";
+import { getApiErrorMessage } from "../../../../utils/apiError";
 
 export const ReviewStatusEnum = {
   NEW: "NEW",
@@ -247,7 +248,7 @@ export function useReviewAndRatingManagement() {
       setTotalRecords(responseData.meta.total);
     } catch (error) {
       console.error(error);
-      toast.error("Lỗi khi tải danh sách đánh giá.");
+      toast.error(getApiErrorMessage(error, "Lỗi khi tải danh sách đánh giá."));
     } finally {
       setIsLoading(false);
     }
@@ -330,7 +331,9 @@ export function useReviewAndRatingManagement() {
         fetchReviews();
       } catch (error) {
         console.error(error);
-        toast.error("Có lỗi xảy ra khi xóa đánh giá.");
+        toast.error(
+          getApiErrorMessage(error, "Có lỗi xảy ra khi xóa đánh giá."),
+        );
       }
     },
 
@@ -361,7 +364,12 @@ export function useReviewAndRatingManagement() {
         fetchReviews();
       } catch (error) {
         console.error(error);
-        toast.error("Có lỗi xảy ra, không thể thay đổi trạng thái.");
+        toast.error(
+          getApiErrorMessage(
+            error,
+            "Có lỗi xảy ra, không thể thay đổi trạng thái.",
+          ),
+        );
       }
     },
 
@@ -429,7 +437,9 @@ export function useReviewAndRatingManagement() {
         fetchReviews();
       } catch (error) {
         console.error(error);
-        toast.error("Có lỗi xảy ra khi lưu thay đổi.");
+        toast.error(
+          getApiErrorMessage(error, "Có lỗi xảy ra khi lưu thay đổi."),
+        );
       }
     },
   };
@@ -448,7 +458,7 @@ export function useReviewAndRatingManagement() {
         fetchReviews();
       } catch (error) {
         console.error(error);
-        toast.error("Lỗi thao tác hàng loạt (Ẩn).");
+        toast.error(getApiErrorMessage(error, "Lỗi thao tác hàng loạt (Ẩn)."));
       }
     },
     bulkUnhide: async () => {
@@ -464,7 +474,9 @@ export function useReviewAndRatingManagement() {
         fetchReviews();
       } catch (error) {
         console.error(error);
-        toast.error("Lỗi thao tác hàng loạt (Hiển thị).");
+        toast.error(
+          getApiErrorMessage(error, "Lỗi thao tác hàng loạt (Hiển thị)."),
+        );
       }
     },
     bulkDelete: () => {

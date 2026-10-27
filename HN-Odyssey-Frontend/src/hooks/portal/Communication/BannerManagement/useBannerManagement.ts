@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
 import { getCurrentUser, hasPermission } from "../../../../utils/permission";
 import { Action, Resource } from "../../../../types/permissions";
+import { getApiErrorMessage } from "../../../../utils/apiError";
 
 export type BannerStatus = "Active" | "Inactive" | "Pending";
 export type BannerPosition =
@@ -229,10 +230,10 @@ export function useBannerManagement() {
           "Bạn không có quyền truy cập danh sách Banner (403 Forbidden).",
         );
       } else {
-        const errorMsg =
-          err?.data?.message ||
-          err?.message ||
-          "Không thể tải danh sách Banner!";
+        const errorMsg = getApiErrorMessage(
+          error,
+          "Không thể tải danh sách Banner!",
+        );
         toast.error(
           typeof errorMsg === "string"
             ? errorMsg
@@ -322,7 +323,7 @@ export function useBannerManagement() {
         fetchBanners();
       } catch (error) {
         console.error("Toggle status error:", error);
-        toast.error("Cập nhật trạng thái thất bại!");
+        toast.error(getApiErrorMessage(error, "Cập nhật trạng thái thất bại!"));
       }
     },
 
@@ -345,7 +346,9 @@ export function useBannerManagement() {
         fetchBanners();
       } catch (error) {
         console.error("Bulk activate error:", error);
-        toast.error("Có lỗi xảy ra khi kích hoạt hàng loạt!");
+        toast.error(
+          getApiErrorMessage(error, "Có lỗi xảy ra khi kích hoạt hàng loạt!"),
+        );
       } finally {
         setIsLoading(false);
       }
@@ -369,7 +372,9 @@ export function useBannerManagement() {
         fetchBanners(); // Tải lại danh sách
       } catch (error) {
         console.error("Bulk deactivate error:", error);
-        toast.error("Có lỗi xảy ra khi vô hiệu hóa hàng loạt!");
+        toast.error(
+          getApiErrorMessage(error, "Có lỗi xảy ra khi vô hiệu hóa hàng loạt!"),
+        );
       } finally {
         setIsLoading(false);
       }
@@ -396,7 +401,7 @@ export function useBannerManagement() {
         fetchBanners();
       } catch (error) {
         console.error("Delete error:", error); // Xử lý lỗi dòng 236
-        toast.error("Có lỗi xảy ra khi xóa banner!");
+        toast.error(getApiErrorMessage(error, "Có lỗi xảy ra khi xóa banner!"));
       }
     },
   };

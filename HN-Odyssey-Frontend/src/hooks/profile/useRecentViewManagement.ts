@@ -7,6 +7,7 @@ import {
   clampPaginationPage,
   useResponsiveProfilePagination,
 } from "./useResponsiveOrderPageLimit";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 const RECENT_VIEW_STORAGE_KEY = "hn_profile_recent_views_v1";
 const LAST_VIEWED_PRODUCT_KEY = "hn_last_viewed_product_id";
@@ -208,7 +209,7 @@ export function useRecentViewManagement() {
     } catch (err: unknown) {
       console.error("Lỗi xóa lịch sử xem:", err);
       toast.error(
-        "Không thể xóa lịch sử xem trên máy chủ, đã xóa trên thiết bị.",
+        `${getApiErrorMessage(err, "Không thể xóa lịch sử xem trên máy chủ.")} Đã xóa trên thiết bị.`,
       );
     }
   };

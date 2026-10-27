@@ -1,0 +1,121 @@
+﻿
+===== 1. FILE DUNG CHUNG apiError.ts =====
+[OK]        Co ham getApiErrorMessage
+[OK]        Co ham getApiErrorStatus
+
+===== 2. TAGS TRONG FORM SAN PHAM =====
+[OK]        Form san pham chi lay tag PRODUCT
+[OK]        Danh sach tag da chuan hoa chu thuong
+
+===== 3. NUT BULK DELETE AN THEO QUYEN DELETE =====
+[OK]        Product Management
+[OK]        Customer Management
+[OK]        Coupon Management
+[OK]        Promotion Management
+[OK]        Review & Rating
+[OK]        User Management
+[OK]        Static Page
+[OK]        Banner Management
+[OK]        Blog & News
+[OK]        Hook Product chan xoa khi khong co quyen
+[OK]        Hook User chan xoa khi khong co quyen
+
+===== 4. PRICE MANAGEMENT =====
+[OK]        Page truyen canApprove xuong
+[OK]        Component nhan prop canApprove
+[OK]        Bulk Approve/Reject an khi khong co quyen
+
+===== 5. THONG BAO LOI (35 FILE) =====
+[OK]        src/hooks/checkout/useCheckout.ts: import dung (../../utils/apiError)
+[OK]        src/hooks/checkout/useCheckout.ts: getApiErrorMessage 1 cho (can >= 1)
+[CANH BAO]  src/hooks/checkout/useCheckout.ts:223 con kieu doc loi cu: const err = error as ApiError;
+[CANH BAO]  src/hooks/checkout/useCheckout.ts:545 con kieu doc loi cu: const err = error as ApiError;
+[CANH BAO]  src/hooks/checkout/useCheckout.ts:583 con kieu doc loi cu: const err = error as ApiError;
+[CANH BAO]  src/hooks/checkout/useCheckout.ts:622 con kieu doc loi cu: const err = error as ApiError;
+[OK]        src/hooks/productDetail/useProductReviews.ts: import dung (../../utils/apiError)
+[OK]        src/hooks/productDetail/useProductReviews.ts: getApiErrorMessage 2 cho (can >= 2)
+[OK]        src/hooks/secondCharm/useTradeInForm.ts: import dung (../../utils/apiError)
+[OK]        src/hooks/secondCharm/useTradeInForm.ts: getApiErrorMessage 1 cho (can >= 1)
+[OK]        src/hooks/profile/useRecentViewManagement.ts: import dung (../../utils/apiError)
+[OK]        src/hooks/profile/useRecentViewManagement.ts: getApiErrorMessage 1 cho (can >= 1)
+[OK]        src/components/common/FloatingToolbox/ChatWidget.tsx: import dung (../../../utils/apiError)
+[OK]        src/components/common/FloatingToolbox/ChatWidget.tsx: getApiErrorMessage 1 cho (can >= 1)
+[OK]        src/hooks/productDetail/useProductDetailMain.ts: import dung (../../utils/apiError)
+[OK]        src/hooks/productDetail/useProductDetailMain.ts: getApiErrorMessage 1 cho (can >= 1)
+[OK]        src/hooks/products/useProductCard.ts: import dung (../../utils/apiError)
+[OK]        src/hooks/products/useProductCard.ts: getApiErrorMessage 1 cho (can >= 1)
+[OK]        src/hooks/portal/ProductCatalog/ProductManagement/useProductForm.ts: import dung (../../../../utils/apiError)
+[OK]        src/hooks/portal/ProductCatalog/ProductManagement/useProductForm.ts: getApiErrorMessage 2 cho (can >= 2)
+[CANH BAO]  src/hooks/portal/ProductCatalog/ProductManagement/useProductForm.ts:593 con kieu doc loi cu: const err = error as ApiError;
+[CANH BAO]  src/hooks/portal/ProductCatalog/ProductManagement/useProductForm.ts:622 con kieu doc loi cu: const err = error as ApiError;
+[CANH BAO]  src/hooks/portal/ProductCatalog/ProductManagement/useProductForm.ts:647 con kieu doc loi cu: const err = error as ApiError;
+[CANH BAO]  src/hooks/portal/ProductCatalog/ProductManagement/useProductForm.ts:736 con kieu doc loi cu: const err = statusError as ApiError;
+[CANH BAO]  src/hooks/portal/ProductCatalog/ProductManagement/useProductForm.ts:764 con kieu doc loi cu: const err = error as ApiError;
+[OK]        src/hooks/portal/ProductCatalog/ProductManagement/useProductManagement.ts: import dung (../../../../utils/apiError)
+[OK]        src/hooks/portal/ProductCatalog/ProductManagement/useProductManagement.ts: getApiErrorMessage 1 cho (can >= 1)
+[CANH BAO]  src/hooks/portal/ProductCatalog/ProductManagement/useProductManagement.ts:264 con kieu doc loi cu: const err = error as ApiErrorResponse;
+[CANH BAO]  src/hooks/portal/ProductCatalog/ProductManagement/useProductManagement.ts:348 con kieu doc loi cu: const err = error as ApiErrorResponse;
+[OK]        src/hooks/portal/ProductCatalog/VariantManagement/useVariantManagement.ts: import dung (../../../../utils/apiError)
+[OK]        src/hooks/portal/ProductCatalog/VariantManagement/useVariantManagement.ts: getApiErrorMessage 3 cho (can >= 3)
+[OK]        src/hooks/portal/ProductCatalog/VariantManagement/useVariantManagement.ts: getApiErrorStatus 3 cho (can >= 3)
+[OK]        src/hooks/portal/UserAndRoles/UserManagement/useUserManagement.ts: import dung (../../../../utils/apiError)
+[OK]        src/hooks/portal/UserAndRoles/UserManagement/useUserManagement.ts: getApiErrorMessage 8 cho (can >= 8)
+[OK]        src/hooks/portal/UserAndRoles/RoleManagement/useRoleManagement.ts: import dung (../../../../utils/apiError)
+[OK]        src/hooks/portal/UserAndRoles/RoleManagement/useRoleManagement.ts: getApiErrorMessage 1 cho (can >= 1)
+[OK]        src/hooks/portal/UserAndRoles/UserBehaviorHeatmap/useUserBehaviorHeatmap.ts: import dung (../../../../utils/apiError)
+[OK]        src/hooks/portal/UserAndRoles/UserBehaviorHeatmap/useUserBehaviorHeatmap.ts: getApiErrorMessage 2 cho (can >= 2)
+[OK]        src/hooks/portal/CustomerCRM/CustomerManagement/useCustomerManagement.ts: import dung (../../../../utils/apiError)
+[OK]        src/hooks/portal/CustomerCRM/CustomerManagement/useCustomerManagement.ts: getApiErrorMessage 2 cho (can >= 1)
+[OK]        src/components/portal/CustomerCRM/CustomerManagement/CustomerDetailModal.tsx: import dung (../../../../utils/apiError)
+[OK]        src/components/portal/CustomerCRM/CustomerManagement/CustomerDetailModal.tsx: getApiErrorMessage 3 cho (can >= 3)
+[OK]        src/hooks/portal/Communication/MediaManagement/useMediaManagement.ts: import dung (../../../../utils/apiError)
+[OK]        src/hooks/portal/Communication/MediaManagement/useMediaManagement.ts: getApiErrorMessage 1 cho (can >= 1)
+[OK]        src/hooks/portal/MarketingSuite/CouponManagement/useCouponManagement.ts: import dung (../../../../utils/apiError)
+[OK]        src/hooks/portal/MarketingSuite/CouponManagement/useCouponManagement.ts: getApiErrorMessage 1 cho (can >= 1)
+[OK]        src/hooks/portal/MarketingSuite/PromotionManagement/usePromotionManagement.ts: import dung (../../../../utils/apiError)
+[OK]        src/hooks/portal/MarketingSuite/PromotionManagement/usePromotionManagement.ts: getApiErrorMessage 1 cho (can >= 1)
+[OK]        src/hooks/profile/useHistoryManagement.ts: import dung (../../utils/apiError)
+[OK]        src/hooks/profile/useHistoryManagement.ts: getApiErrorMessage 1 cho (can >= 1)
+[OK]        src/hooks/portal/OrderManagement/TradeInManagement/useTradeInManagement.ts: import dung (../../../../utils/apiError)
+[OK]        src/hooks/portal/OrderManagement/TradeInManagement/useTradeInManagement.ts: getApiErrorMessage 10 cho (can >= 10)
+[OK]        src/hooks/portal/OrderManagement/OrderManagement/useOrderManagement.ts: import dung (../../../../utils/apiError)
+[OK]        src/hooks/portal/OrderManagement/OrderManagement/useOrderManagement.ts: getApiErrorMessage 4 cho (can >= 4)
+[CANH BAO]  src/hooks/portal/OrderManagement/OrderManagement/useOrderManagement.ts:181 con kieu doc loi cu: (error as { response?: { status?: number } })?.response?.status === 409;
+[OK]        src/hooks/portal/MarketingSuite/ReviewAndRatingManagement/useReviewAndRatingManagement.ts: import dung (../../../../utils/apiError)
+[OK]        src/hooks/portal/MarketingSuite/ReviewAndRatingManagement/useReviewAndRatingManagement.ts: getApiErrorMessage 6 cho (can >= 6)
+[OK]        src/hooks/portal/Communication/BannerManagement/useBannerManagement.ts: import dung (../../../../utils/apiError)
+[OK]        src/hooks/portal/Communication/BannerManagement/useBannerManagement.ts: getApiErrorMessage 5 cho (can >= 4)
+[OK]        src/hooks/portal/Communication/BlogNewsManagement/useBlogNewsManagement.ts: import dung (../../../../utils/apiError)
+[OK]        src/hooks/portal/Communication/BlogNewsManagement/useBlogNewsManagement.ts: getApiErrorMessage 5 cho (can >= 5)
+[OK]        src/hooks/portal/CustomerCRM/LiveChatSupport/useLiveChatSupport.ts: import dung (../../../../utils/apiError)
+[OK]        src/hooks/portal/CustomerCRM/LiveChatSupport/useLiveChatSupport.ts: getApiErrorMessage 4 cho (can >= 4)
+[OK]        src/hooks/portal/CustomerCRM/LiveChatSupport/useLiveChatSupport.ts: getApiErrorStatus 1 cho (can >= 1)
+[OK]        src/hooks/portal/Communication/ContentConfig/useContentConfig.ts: import dung (../../../../utils/apiError)
+[OK]        src/hooks/portal/Communication/ContentConfig/useContentConfig.ts: getApiErrorMessage 2 cho (can >= 2)
+[OK]        src/components/portal/Communication/ContentConfig/SidebarModules.tsx: import dung (../../../../utils/apiError)
+[OK]        src/components/portal/Communication/ContentConfig/SidebarModules.tsx: getApiErrorMessage 2 cho (can >= 2)
+[OK]        src/components/portal/Communication/ContentConfig/PropertyPanel.tsx: import dung (../../../../utils/apiError)
+[OK]        src/components/portal/Communication/ContentConfig/PropertyPanel.tsx: getApiErrorMessage 1 cho (can >= 1)
+[OK]        src/hooks/portal/Warehouse/useStockOverview.ts: import dung (../../../utils/apiError)
+[OK]        src/hooks/portal/Warehouse/useStockOverview.ts: getApiErrorMessage 2 cho (can >= 2)
+[OK]        src/hooks/portal/Warehouse/useStockTickets.ts: import dung (../../../utils/apiError)
+[OK]        src/hooks/portal/Warehouse/useStockTickets.ts: getApiErrorMessage 2 cho (can >= 2)
+[OK]        src/hooks/portal/Warehouse/useRequestTab.ts: import dung (../../../utils/apiError)
+[OK]        src/hooks/portal/Warehouse/useRequestTab.ts: getApiErrorMessage 1 cho (can >= 1)
+[OK]        src/components/portal/Warehouse/StockTicketsTab/CreateTicketDrawer.tsx: import dung (../../../../utils/apiError)
+[OK]        src/components/portal/Warehouse/StockTicketsTab/CreateTicketDrawer.tsx: getApiErrorMessage 2 cho (can >= 2)
+[OK]        src/hooks/portal/Dashboard/InventoryManagement/useInventoryManagement.ts: import dung (../../../../utils/apiError)
+[OK]        src/hooks/portal/Dashboard/InventoryManagement/useInventoryManagement.ts: getApiErrorMessage 2 cho (can >= 2)
+[OK]        src/hooks/portal/System/useSystem.ts: import dung (../../../utils/apiError)
+[OK]        src/hooks/portal/System/useSystem.ts: getApiErrorMessage 1 cho (can >= 1)
+[OK]        src/hooks/portal/System/useSystem.ts: getApiErrorStatus 1 cho (can >= 1)
+[OK]        src/hooks/portal/usePortalNotifications.ts: import dung (../../utils/apiError)
+[OK]        src/hooks/portal/usePortalNotifications.ts: getApiErrorMessage 1 cho (can >= 1)
+[OK]        Coupon: extractErrorMessage da dung ham chung
+[OK]        Promotion: extractErrorMessage da dung ham chung
+[OK]        Media: getErrorMessage da dung ham chung
+
+===== 6. BUILD FE =====
+[OK]        npm run build thanh cong
+
+TONG KET FE: OK = 95 | LOI = 0 | CANH BAO = 12

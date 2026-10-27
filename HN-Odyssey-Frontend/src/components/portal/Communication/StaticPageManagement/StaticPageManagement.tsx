@@ -237,14 +237,20 @@ export default function StaticPageManagement({
                   Bulk Activate
                 </button>
               )}
-              <button
-                type="button"
-                className="sp-btn-bulk danger"
-                onClick={bulkActions.bulkDelete}
-                disabled={selectedIds.size === 0}
-              >
-                Bulk Delete
-              </button>
+              {hasPermission(
+                getCurrentUser(),
+                Resource.CONTENT_PAGES,
+                Action.DELETE,
+              ) && (
+                <button
+                  type="button"
+                  className="sp-btn-bulk danger"
+                  onClick={bulkActions.bulkDelete}
+                  disabled={selectedIds.size === 0}
+                >
+                  Bulk Delete
+                </button>
+              )}
             </div>
           </div>
         </div>

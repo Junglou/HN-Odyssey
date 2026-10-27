@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../api/axiosClient";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 // interfaces
 interface TradeInPayload {
@@ -109,7 +110,9 @@ export function useTradeInForm() {
         setLocations((prev) => ({ ...prev, provinces: provData }));
       } catch (error) {
         console.error("Lỗi khi tải dữ liệu khởi tạo:", error);
-        toast.error("Không thể tải một số dữ liệu hệ thống.");
+        toast.error(
+          getApiErrorMessage(error, "Không thể tải một số dữ liệu hệ thống."),
+        );
       } finally {
         setIsLoadingCategories(false);
       }

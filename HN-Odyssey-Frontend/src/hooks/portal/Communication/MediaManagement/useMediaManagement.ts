@@ -1,10 +1,10 @@
 import { useState, useCallback, useEffect } from "react";
 import { toast } from "react-toastify";
-import { isAxiosError } from "axios";
 import axiosClient from "../../../../api/axiosClient";
 import type { UserPayload } from "../../../../types/auth";
 import { Action, Resource } from "../../../../types/permissions";
 import { USER_KEY } from "../../../../utils/tokenStorage";
+import { getApiErrorMessage } from "../../../../utils/apiError";
 
 // --- ĐỊNH NGHĨA CÁC INTERFACE NGHIÊM NGẶT ---
 export type MediaStatus = "Published" | "Draft" | "Hidden";
@@ -76,15 +76,9 @@ export interface TargetOption {
 }
 
 // Helper: Phân tích lỗi an toàn tuyệt đối không dùng any
-const getErrorMessage = (error: unknown): string => {
-  if (isAxiosError(error)) {
-    return error.response?.data?.message || error.message;
-  }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return "Đã xảy ra lỗi không xác định.";
-};
+// Dùng hàm chung: hàm cũ chỉ nhận lỗi axios gốc nên luôn trả "lỗi không xác định"
+const getErrorMessage = (error: unknown): string =>
+  getApiErrorMessage(error, "Đã xảy ra lỗi không xác định.");
 
 const getFullMediaUrl = (url: string): string => {
   if (!url) return "";

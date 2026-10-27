@@ -213,17 +213,23 @@ export default function ProductManagement({
               </button>
             </>
           )}
-          <button
-            type="button"
-            className="pm-btn-bulk delete"
-            onClick={(e) => {
-              actions.bulk("delete");
-              e.currentTarget.blur();
-            }}
-            disabled={!hasSelection}
-          >
-            Bulk Delete
-          </button>
+          {hasPermission(
+            getCurrentUser(),
+            Resource.CATALOG_PRODUCTS,
+            Action.DELETE,
+          ) && (
+            <button
+              type="button"
+              className="pm-btn-bulk delete"
+              onClick={(e) => {
+                actions.bulk("delete");
+                e.currentTarget.blur();
+              }}
+              disabled={!hasSelection}
+            >
+              Bulk Delete
+            </button>
+          )}
         </div>
 
         <div className="pm-table-wrapper">

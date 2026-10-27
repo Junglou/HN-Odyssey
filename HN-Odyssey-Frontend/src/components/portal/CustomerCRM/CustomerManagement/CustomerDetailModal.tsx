@@ -4,6 +4,7 @@ import { DefaultAvatarIcon } from "../../../../assets/icons/CustomerManagementIc
 import type { CustomerRecord } from "../../../../hooks/portal/CustomerCRM/CustomerManagement/useCustomerManagement";
 import axiosClient from "../../../../api/axiosClient";
 import { toast } from "react-toastify";
+import { getApiErrorMessage } from "../../../../utils/apiError";
 
 export interface CustomerDetailModalProps {
   isOpen: boolean;
@@ -65,8 +66,10 @@ export default function CustomerDetailModal({
         `/admin/customers/${customer.id}/activities?limit=50`,
       );
       setActivities(response.data.data);
-    } catch {
-      toast.error("Không thể tải lịch sử hoạt động.");
+    } catch (error) {
+      toast.error(
+        getApiErrorMessage(error, "Không thể tải lịch sử hoạt động."),
+      );
     } finally {
       setLoadingActivities(false);
     }
@@ -81,8 +84,8 @@ export default function CustomerDetailModal({
         `/orders?user_id=${customer.id}&sort=createdAt:desc&limit=20`,
       );
       setOrders(response.data.data);
-    } catch {
-      toast.error("Không thể tải lịch sử đơn hàng.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Không thể tải lịch sử đơn hàng."));
     } finally {
       setLoadingOrders(false);
     }
@@ -123,8 +126,8 @@ export default function CustomerDetailModal({
       link.click();
       link.remove();
       toast.success("Xuất lịch sử hoạt động thành công!");
-    } catch {
-      toast.error("Lỗi khi xuất file Excel.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Lỗi khi xuất file Excel."));
     } finally {
       setIsExporting(false);
     }

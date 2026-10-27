@@ -5,6 +5,7 @@ import axiosClient from "../../../../api/axiosClient";
 import { Action, Resource } from "../../../../types/permissions";
 import type { UserPayload } from "../../../../types/auth";
 import { USER_KEY } from "../../../../utils/tokenStorage";
+import { getApiErrorMessage } from "../../../../utils/apiError";
 
 export type CustomerStatus = "Active" | "Inactive" | "Locked" | "Deleted";
 export type CustomerType = "Bronze" | "Silver" | "Gold" | "Platinum";
@@ -271,7 +272,12 @@ export function useCustomerManagement() {
         }
       }
     } catch (error) {
-      toast.error("Không thể tải danh sách khách hàng từ hệ thống.");
+      toast.error(
+        getApiErrorMessage(
+          error,
+          "Không thể tải danh sách khách hàng từ hệ thống.",
+        ),
+      );
       console.error("Fetch Error:", error);
     } finally {
       setIsLoading(false);
@@ -531,16 +537,8 @@ export function useCustomerManagement() {
       actions.closeModal();
       fetchCustomers();
     } catch (error: unknown) {
-      const getErrorMessage = (err: unknown): string => {
-        if (typeof err === "string") return err;
-        if (typeof err === "object" && err !== null) {
-          const messageField = (err as { message?: unknown }).message;
-          if (Array.isArray(messageField))
-            return messageField[0] ?? "Lỗi hệ thống khi lưu dữ liệu.";
-          if (typeof messageField === "string") return messageField;
-        }
-        return "Lỗi hệ thống khi lưu dữ liệu.";
-      };
+      const getErrorMessage = (err: unknown): string =>
+        getApiErrorMessage(err, "Lỗi hệ thống khi lưu dữ liệu.");
 
       const errorMsg = getErrorMessage(error);
       toast.error(errorMsg);

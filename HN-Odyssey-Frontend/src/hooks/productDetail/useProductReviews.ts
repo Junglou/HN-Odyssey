@@ -4,6 +4,7 @@ import axiosClient from "../../api/axiosClient";
 import tokenStorage from "../../utils/tokenStorage";
 import { toast } from "react-toastify";
 import { useTracking, BehaviorAction } from "../common/useTracking"; // [BỔ SUNG] Import hook AI Tracking
+import { getApiErrorMessage } from "../../utils/apiError";
 
 export interface ReviewUser {
   _id: string;
@@ -302,7 +303,9 @@ export function useProductReviews() {
       setReviewMedia((prev) => [...prev, ...response.data.data]);
     } catch (error: unknown) {
       console.error(error);
-      toast.error("Tải tệp lên thất bại. Vui lòng thử lại.");
+      toast.error(
+        getApiErrorMessage(error, "Tải tệp lên thất bại. Vui lòng thử lại."),
+      );
     } finally {
       setIsUploadingMedia(false);
       event.target.value = "";
@@ -334,7 +337,9 @@ export function useProductReviews() {
       setReplyMedia((prev) => [...prev, ...response.data.data]);
     } catch (error: unknown) {
       console.error(error);
-      toast.error("Tải tệp lên thất bại. Vui lòng thử lại.");
+      toast.error(
+        getApiErrorMessage(error, "Tải tệp lên thất bại. Vui lòng thử lại."),
+      );
     } finally {
       setIsUploadingReplyMedia(false);
       event.target.value = "";

@@ -4,6 +4,7 @@ import axiosClient from "../../../../api/axiosClient";
 import type { UserPayload } from "../../../../types/auth";
 import { Action, Resource } from "../../../../types/permissions";
 import { USER_KEY } from "../../../../utils/tokenStorage";
+import { getApiErrorMessage } from "../../../../utils/apiError";
 
 export type CouponStatus = "ACTIVE" | "INACTIVE" | "CANCELLED" | "DRAFT";
 export type DiscountType = "PERCENTAGE" | "FIXED_AMOUNT";
@@ -61,18 +62,10 @@ interface BeCouponResponse {
   applicable_scope?: ApplicableScopeObj;
 }
 
-interface APIErrorResponse {
-  response?: {
-    data?: {
-      message?: string | string[];
-    };
-  };
-}
-
 const extractErrorMessage = (error: unknown, defaultMsg: string): string => {
   try {
-    const err = error as APIErrorResponse;
-    const beMessage = err?.response?.data?.message;
+    // Dùng hàm chung: axiosClient trả lỗi dạng { status, message, data }, không có response
+    const beMessage: unknown = getApiErrorMessage(error, defaultMsg);
     if (Array.isArray(beMessage) && beMessage.length > 0) {
       return beMessage[0];
     }

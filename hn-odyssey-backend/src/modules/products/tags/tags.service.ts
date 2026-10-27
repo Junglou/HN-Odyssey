@@ -75,9 +75,10 @@ export class TagsService {
   }
 
   async findActiveTags(scope?: TagScope) {
-    // Ép kiểu rõ ràng là FilterQuery của TagDocument
+    // Schema Tag không có field is_active → lọc is_active: true luôn rỗng.
+    // Dùng $ne: false để lấy mọi tag, vẫn đúng nếu sau này thêm field is_active.
     const filter: import('mongoose').FilterQuery<TagDocument> = {
-      is_active: true,
+      is_active: { $ne: false },
     };
 
     if (scope) {
@@ -150,7 +151,7 @@ export class TagsService {
 
     // KIỂM TRA RÀNG BUỘC: ĐANG ÁP DỤNG THÌ CẤM SỬA
     const usageCount = await this.productModel.countDocuments({
-      tags: tag.name,
+      tags: tag.name.toLowerCase().trim(),
       is_deleted: false,
     });
     if (usageCount > 0) {
@@ -205,7 +206,7 @@ export class TagsService {
 
     // KIỂM TRA RÀNG BUỘC: ĐANG ÁP DỤNG THÌ CẤM XÓA
     const usageCount = await this.productModel.countDocuments({
-      tags: tag.name,
+      tags: tag.name.toLowerCase().trim(),
       is_deleted: false,
     });
     if (usageCount > 0) {
@@ -252,19 +253,23 @@ export class TagsService {
       throw new BadRequestException('Chỉ có thể gộp 2 thẻ cùng phạm vi');
     }
 
+    // Tag trên sản phẩm luôn lưu chữ thường
+    const sourceKey = source.name.toLowerCase().trim();
+    const targetKey = target.name.toLowerCase().trim();
+
     const sourceUsageCount = await this.productModel.countDocuments({
-      tags: source.name,
+      tags: sourceKey,
       is_deleted: false,
     });
 
     // Cập nhật sản phẩm
     await this.productModel.updateMany(
-      { tags: source.name },
-      { $addToSet: { tags: target.name } },
+      { tags: sourceKey },
+      { $addToSet: { tags: targetKey } },
     );
     const result = await this.productModel.updateMany(
-      { tags: source.name },
-      { $pull: { tags: source.name } },
+      { tags: sourceKey },
+      { $pull: { tags: sourceKey } },
     );
 
     // Xóa source tag
@@ -298,9 +303,19 @@ export class TagsService {
 
   async validateTagsExist(tagNames: string[]): Promise<boolean> {
     if (!tagNames || tagNames.length === 0) return true;
-    const count = await this.tagModel.countDocuments({
-      name: { $in: tagNames },
-    });
-    return count === tagNames.length;
+
+    // Tag trên sản phẩm lưu chữ thường → so khớp không phân biệt hoa/thường, bỏ trùng
+    const wanted = Array.from(
+      new Set(tagNames.map((t) => t.toLowerCase().trim())),
+    );
+    const productTags = await this.tagModel
+      .find({ scope: TagScope.PRODUCT })
+      .select('name')
+      .lean();
+    const existing = new Set(
+      productTags.map((t) => t.name.toLowerCase().trim()),
+    );
+
+    return wanted.every((t) => existing.has(t));
   }
 }

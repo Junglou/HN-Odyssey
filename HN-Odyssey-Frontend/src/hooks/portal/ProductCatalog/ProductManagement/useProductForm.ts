@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
 import tokenStorage from "../../../../utils/tokenStorage";
 import { Resource, Action } from "../../../../types/permissions";
+import { getApiErrorMessage } from "../../../../utils/apiError";
 
 export interface ProductData {
   sku: string;
@@ -261,7 +262,9 @@ export function useProductForm() {
     const fetchDependencies = async () => {
       try {
         const [tagsRes, attrRes, catRes] = await Promise.all([
-          axiosClient.get("/tags/public/active").catch(() => ({ data: [] })),
+          axiosClient
+            .get("/tags/public/active", { params: { scope: "PRODUCT" } })
+            .catch(() => ({ data: [] })),
           axiosClient
             .get("/attributes/public/active")
             .catch(() => ({ data: [] })),
@@ -270,7 +273,12 @@ export function useProductForm() {
             .catch(() => ({ data: { data: [] } })),
         ]);
 
-        setAvailableTags(tagsRes.data.map((t: ApiTag) => t.name));
+        // Tag trên sản phẩm luôn lưu chữ thường (setter trong product.schema),
+        // nên danh sách chọn cũng dùng chữ thường để so khớp và tránh trùng
+        const tagNames: string[] = Array.isArray(tagsRes.data)
+          ? tagsRes.data.map((t: ApiTag) => t.name.toLowerCase().trim())
+          : [];
+        setAvailableTags(Array.from(new Set(tagNames)));
 
         const mappedAttrs = attrRes.data.map((a: ApiAttribute) => ({
           id: a.code || a._id || "",
@@ -441,7 +449,9 @@ export function useProductForm() {
           }
         } catch (error) {
           console.error(error);
-          toast.error("Không tìm thấy thông tin sản phẩm");
+          toast.error(
+            getApiErrorMessage(error, "Không tìm thấy thông tin sản phẩm"),
+          );
           navigate("/portal/products");
         }
       };
@@ -743,7 +753,7 @@ export function useProductForm() {
           } catch (tagError) {
             console.error("Lỗi cập nhật tags:", tagError);
             toast.warning(
-              "Lưu sản phẩm thành công nhưng cập nhật Tags thất bại.",
+              `Lưu sản phẩm thành công nhưng cập nhật Tags thất bại. ${getApiErrorMessage(tagError, "Vui lòng thử lại.")}`,
             );
           }
         }

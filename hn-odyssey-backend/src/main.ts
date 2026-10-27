@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
-import { MongoExceptionFilter } from './common/filters/mongo-exception.filter';
+
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { json, urlencoded } from 'express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -19,7 +19,6 @@ async function bootstrap() {
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));
 
-  app.useGlobalFilters(new MongoExceptionFilter());
   app.useGlobalFilters(new AllExceptionsFilter());
 
   app.useGlobalPipes(

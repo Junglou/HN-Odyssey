@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import axiosClient from "../../api/axiosClient";
 import tokenStorage from "../../utils/tokenStorage";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 export type NotificationPriority = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 export type NotificationType =
@@ -183,8 +184,13 @@ export function usePortalNotifications() {
       await axiosClient.patch("/notifications/read-all");
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
       setUnreadCount(0);
-    } catch {
-      toast.error("Could not mark notifications as read. Please try again.");
+    } catch (error) {
+      toast.error(
+        getApiErrorMessage(
+          error,
+          "Could not mark notifications as read. Please try again.",
+        ),
+      );
     }
   };
 

@@ -252,14 +252,20 @@ export default function BannerManagement({
                   </button>
                 </>
               )}
-              <button
-                type="button"
-                className="bm-btn-bulk danger"
-                onClick={actions.requestBulkDelete}
-                disabled={selectedIds.length === 0}
-              >
-                Bulk Delete
-              </button>
+              {hasPermission(
+                getCurrentUser(),
+                Resource.CONTENT_BANNERS,
+                Action.DELETE,
+              ) && (
+                <button
+                  type="button"
+                  className="bm-btn-bulk danger"
+                  onClick={actions.requestBulkDelete}
+                  disabled={selectedIds.length === 0}
+                >
+                  Bulk Delete
+                </button>
+              )}
             </div>
           </div>
         </div>

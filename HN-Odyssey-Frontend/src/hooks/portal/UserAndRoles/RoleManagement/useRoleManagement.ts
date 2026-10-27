@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
+import { getApiErrorMessage } from "../../../../utils/apiError";
 
 export const STANDARD_ACTIONS = ["READ", "CREATE", "UPDATE", "DELETE"];
 
@@ -12,13 +13,9 @@ export const ROLE_LEVEL = {
 } as const;
 
 // Lấy message Backend trả về (ForbiddenException, BadRequest...), không có thì dùng fallback
-const getErrorMessage = (error: unknown, fallback: string): string => {
-  const msg = (error as { response?: { data?: { message?: unknown } } })
-    ?.response?.data?.message;
-  if (typeof msg === "string" && msg.trim()) return msg;
-  if (Array.isArray(msg) && msg.length > 0) return String(msg[0]);
-  return fallback;
-};
+// Dùng hàm chung: hàm cũ đọc error.response nên không lấy được message từ axiosClient
+const getErrorMessage = (error: unknown, fallback: string): string =>
+  getApiErrorMessage(error, fallback);
 
 export interface BackendPermission {
   resource: string;
@@ -158,8 +155,13 @@ export function useRoleManagement() {
       }));
 
       setRoles(mappedRoles);
-    } catch {
-      toast.error("Không thể tải danh sách vai trò và phân quyền.");
+    } catch (error) {
+      toast.error(
+        getErrorMessage(
+          error,
+          "Không thể tải danh sách vai trò và phân quyền.",
+        ),
+      );
     } finally {
       setIsLoading(false);
     }
@@ -235,8 +237,8 @@ export function useRoleManagement() {
         }
         toast.success("Đã xóa vai trò thành công!");
         void fetchList();
-      } catch {
-        toast.warning("Vai trò này đang được áp dụng, không thể xóa.");
+      } catch (error) {
+        toast.warning(getErrorMessage(error, "Không thể xóa vai trò này."));
       }
     }
     setDeleteConfig({ isOpen: false, roleId: null });

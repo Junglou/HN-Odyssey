@@ -260,14 +260,20 @@ export default function CustomerManagement({
                 </button>
               </>
             )}
-            <button
-              type="button"
-              className="crm-btn-bulk danger"
-              onClick={bulkActions.bulkDelete}
-              disabled={selectedIds.size === 0}
-            >
-              Bulk Delete
-            </button>
+            {hasPermission(
+              getCurrentUser(),
+              Resource.CRM_CUSTOMERS,
+              Action.DELETE,
+            ) && (
+              <button
+                type="button"
+                className="crm-btn-bulk danger"
+                onClick={bulkActions.bulkDelete}
+                disabled={selectedIds.size === 0}
+              >
+                Bulk Delete
+              </button>
+            )}
           </div>
         </div>
 

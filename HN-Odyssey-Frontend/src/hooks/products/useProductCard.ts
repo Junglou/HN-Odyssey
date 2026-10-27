@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import axiosClient from "../../api/axiosClient";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 // 1. KHAI BÁO GIAO DIỆN CHẶT CHẼ THEO BACKEND DTO
 interface IWishlistToggleResponse {
@@ -103,7 +104,10 @@ export function useProductCard(
         navigate("/login");
       } else {
         toast.error(
-          err.message || "Có lỗi xảy ra khi cập nhật danh sách yêu thích.",
+          getApiErrorMessage(
+            error,
+            "Có lỗi xảy ra khi cập nhật danh sách yêu thích.",
+          ),
         );
       }
     } finally {

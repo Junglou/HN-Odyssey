@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import axiosClient from "../../../api/axiosClient";
 import tokenStorage from "../../../utils/tokenStorage";
 import { Action, Resource } from "../../../types/permissions";
+import { getApiErrorMessage } from "../../../utils/apiError";
 
 // 1. FE TYPES
 export type TicketType = "import" | "export";
@@ -176,7 +177,12 @@ export function useStockTickets() {
       }));
     } catch (error: unknown) {
       console.error("Lỗi tải danh sách phiếu:", error);
-      toast.error("Không thể tải danh sách phiếu kho từ hệ thống.");
+      toast.error(
+        getApiErrorMessage(
+          error,
+          "Không thể tải danh sách phiếu kho từ hệ thống.",
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -346,7 +352,7 @@ export function useStockTickets() {
         toast.success("Xuất file PDF thành công!");
       } catch (error: unknown) {
         console.error(error);
-        toast.error("Lỗi khi tải PDF từ hệ thống!");
+        toast.error(getApiErrorMessage(error, "Lỗi khi tải PDF từ hệ thống!"));
       }
     },
   };

@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import axiosClient from "../../../../api/axiosClient";
 import { getCurrentUser, hasPermission } from "../../../../utils/permission";
 import { Action, Resource } from "../../../../types/permissions";
+import { getApiErrorMessage } from "../../../../utils/apiError";
 
 export type ProductStatus = "Active" | "Inactive" | "Draft";
 export type FilterStatus = "all" | ProductStatus;
@@ -130,7 +131,9 @@ export function useProductManagement() {
       setTotalPages(meta.totalPages);
     } catch (error) {
       console.error(error);
-      toast.error("Không thể tải danh sách sản phẩm.");
+      toast.error(
+        getApiErrorMessage(error, "Không thể tải danh sách sản phẩm."),
+      );
     } finally {
       setIsLoading(false);
     }
@@ -273,6 +276,16 @@ export function useProductManagement() {
         return;
       }
       if (action === "delete") {
+        if (
+          !hasPermission(
+            getCurrentUser(),
+            Resource.CATALOG_PRODUCTS,
+            Action.DELETE,
+          )
+        ) {
+          toast.error("Bạn không có quyền xóa sản phẩm.");
+          return;
+        }
         setDeleteConfig({ isOpen: true, type: "bulk", productId: null });
         return;
       }

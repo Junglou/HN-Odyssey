@@ -270,14 +270,20 @@ export default function ReviewAndRatingManagement({
                 Bulk Unhide
               </button>
             )}
-            <button
-              type="button"
-              className="rarm-btn-bulk danger"
-              onClick={bulkActions.bulkDelete}
-              disabled={selectedIds.size === 0}
-            >
-              Bulk Delete
-            </button>
+            {hasPermission(
+              currentUser,
+              Resource.CRM_REVIEWS,
+              Action.DELETE,
+            ) && (
+              <button
+                type="button"
+                className="rarm-btn-bulk danger"
+                onClick={bulkActions.bulkDelete}
+                disabled={selectedIds.size === 0}
+              >
+                Bulk Delete
+              </button>
+            )}
           </div>
         </div>
 

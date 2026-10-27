@@ -15,6 +15,7 @@ import {
   TrashIcon,
   ArrowLeftIcon,
 } from "../../../../assets/icons/StockManagementIcons";
+import { getApiErrorMessage } from "../../../../utils/apiError";
 
 // Khai báo kiểu dữ liệu cho API Inventory Stock
 interface StockVariant {
@@ -290,11 +291,11 @@ function CreateTicketDrawerContent({
           ),
         );
       }
-    } catch {
+    } catch (error) {
       setFormName(`Sản phẩm: ${cleanSku}`);
       setAvailableQty(0);
       toast.warning(
-        "Lỗi kết nối. Hệ thống tự động dùng mã SKU làm tên tạm thời.",
+        `${getApiErrorMessage(error, "Không lấy được thông tin sản phẩm.")} Hệ thống tự động dùng mã SKU làm tên tạm thời.`,
       );
     }
   };
@@ -445,7 +446,12 @@ function CreateTicketDrawerContent({
       window.URL.revokeObjectURL(url);
     } catch (error: unknown) {
       console.error("Lỗi khi tải file mẫu:", error);
-      toast.error("Có lỗi xảy ra khi tải file mẫu từ hệ thống!");
+      toast.error(
+        getApiErrorMessage(
+          error,
+          "Có lỗi xảy ra khi tải file mẫu từ hệ thống!",
+        ),
+      );
     }
   };
 

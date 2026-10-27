@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import tokenStorage from "../../../utils/tokenStorage";
 import { Action, Resource } from "../../../types/permissions";
 import axiosClient from "../../../api/axiosClient";
+import { getApiErrorMessage } from "../../../utils/apiError";
 
 // 1. ĐỊNH NGHĨA INTERFACE
 export interface RequestItem {
@@ -122,7 +123,9 @@ export function useRequestTab() {
         }
       } catch (error) {
         console.error("Lỗi khi tải danh sách yêu cầu kho:", error);
-        toast.error("Lỗi khi tải danh sách yêu cầu kho!"); // Đã đổi sang toast
+        toast.error(
+          getApiErrorMessage(error, "Lỗi khi tải danh sách yêu cầu kho!"),
+        );
         if (isMounted) setData([]);
       } finally {
         if (isMounted) setIsLoading(false);

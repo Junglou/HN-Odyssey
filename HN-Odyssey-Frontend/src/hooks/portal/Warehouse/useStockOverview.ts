@@ -5,6 +5,7 @@ import axiosClient from "../../../api/axiosClient";
 import tokenStorage from "../../../utils/tokenStorage";
 import { Action, Resource } from "../../../types/permissions";
 import type { UserPayload } from "../../../types/auth";
+import { getApiErrorMessage } from "../../../utils/apiError";
 
 export type StockStatusColor = "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK";
 
@@ -136,7 +137,7 @@ export function useStockOverview() {
       ]);
     } catch (error) {
       console.error("Failed to fetch categories", error);
-      toast.error("Lỗi khi tải danh mục sản phẩm");
+      toast.error(getApiErrorMessage(error, "Lỗi khi tải danh mục sản phẩm"));
     }
   }, []);
 
@@ -166,7 +167,7 @@ export function useStockOverview() {
       }));
     } catch (error) {
       console.error("Fetch stock failed", error);
-      toast.error("Lỗi khi tải danh sách tồn kho");
+      toast.error(getApiErrorMessage(error, "Lỗi khi tải danh sách tồn kho"));
     } finally {
       setLoading(false);
     }
