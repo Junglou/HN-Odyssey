@@ -1316,7 +1316,7 @@ export class OrdersService {
           status: 'PENDING',
           timestamp: new Date(),
           actor: userId ? 'Member' : 'Guest',
-          note: `BuyNow Order Created. Ship: ${shippingFee}`,
+          note: `Buy Now order created. Shipping fee: $${shippingFee.toFixed(2)}`,
         });
 
         await order.save({ session }); // BẮT BUỘC TRUYỀN SESSION
@@ -2179,7 +2179,7 @@ export class OrdersService {
           status: finalStatusToSave,
           timestamp: new Date(),
           actor: 'SYSTEM_FIREFIGHTING',
-          note: `Tự động ghi nhận thanh toán thành công (PAID) khi đơn hàng chuyển sang ${finalStatusToSave}.`,
+          note: `Payment automatically marked as PAID when the order moved to ${finalStatusToSave}.`,
         });
       }
 
@@ -2725,7 +2725,7 @@ export class OrdersService {
       String(order._id),
       {
         status: status,
-        note: `Cập nhật tự động từ Đơn vị vận chuyển (Mã vận đơn: ${waybillCode})`,
+        note: `Auto-updated by shipping carrier (Waybill: ${waybillCode})`,
       },
       'SYSTEM_ID',
       'SYSTEM_WEBHOOK',

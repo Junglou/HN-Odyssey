@@ -56,7 +56,8 @@ export class OrdersCronService {
             String(order._id),
             {
               status: OrderStatus.CANCELLED,
-              reason: 'Hệ thống tự động hủy do hết hạn thanh toán (15 phút).',
+              reason:
+                'Automatically cancelled: payment window expired (15 min).',
             },
             'SYSTEM',
             'SYSTEM_CRON',
@@ -136,11 +137,11 @@ export class OrdersCronService {
           String(order._id),
           {
             status: OrderStatus.COMPLETED,
-            note: 'Hệ thống tự động hoàn thành sau 7 ngày giao hàng thành công.',
+            note: 'Automatically completed 7 days after successful delivery.',
             // Không cần override: DELIVERED → COMPLETED là bước hợp lệ, và câu truy vấn
             // đã lọc sẵn đơn DELIVERED + PAID nên runGuards luôn qua.
             reason:
-              'Hệ thống tự động hoàn thành và ghi nhận dòng tiền đơn COD.',
+              'Automatically completed by the system; COD payment recorded.',
           },
           'SYSTEM_ID',
           'SYSTEM_CRONJOB',

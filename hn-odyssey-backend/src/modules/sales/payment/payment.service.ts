@@ -176,7 +176,7 @@ export class PaymentService {
           String(order._id),
           {
             status: OrderStatus.CONFIRMED,
-            note: `Thanh toán thành công qua ${provider}. Mã GD: ${transactionCode}`,
+            note: `Payment successful via ${provider}. Transaction ID: ${transactionCode}`,
           },
           'SYSTEM_PAYMENT',
           `${provider}_GATEWAY`,
@@ -259,7 +259,7 @@ export class PaymentService {
     transactionCode: string,
   ) {
     const orderId = String(order._id);
-    const cancelledByExpiry = /hết hạn|timeout/i.test(
+    const cancelledByExpiry = /hết hạn|expired|timeout/i.test(
       String(order.cancel_reason ?? ''),
     );
 
@@ -278,7 +278,8 @@ export class PaymentService {
           orderId,
           {
             status: OrderStatus.PENDING,
-            reason: 'Tiền về muộn: khôi phục đơn và giữ hàng lại.',
+            reason:
+              'Late payment received: order restored and stock re-reserved.',
             is_override: true,
           },
           'SYSTEM_RECOVERY',
@@ -314,7 +315,7 @@ export class PaymentService {
             orderId,
             {
               status: OrderStatus.CONFIRMED,
-              note: `Thanh toán thành công qua ${provider} (tiền về muộn). Mã GD: ${transactionCode}`,
+              note: `Payment successful via ${provider} (received after expiry). Transaction ID: ${transactionCode}`,
             },
             'SYSTEM_PAYMENT',
             `${provider}_GATEWAY`,
@@ -355,8 +356,8 @@ export class PaymentService {
       {
         status: OrderStatus.REFUND_NEEDED,
         reason: cancelledByExpiry
-          ? 'Khách thanh toán thành công sau khi đơn hết hạn nhưng hàng đã hết. Cần hoàn tiền.'
-          : 'Khách thanh toán thành công cho đơn đã bị hủy. Cần hoàn tiền.',
+          ? 'Customer paid after the order expired, but the items are out of stock. Refund required.'
+          : 'Customer paid for an order that had already been cancelled. Refund required.',
         is_override: true,
       },
       'SYSTEM_PAYMENT',
@@ -441,7 +442,7 @@ export class PaymentService {
         id,
         {
           status: OrderStatus.CANCELLED,
-          reason: 'Phiên thanh toán hết hạn (15p)',
+          reason: 'Payment session expired (15 min)',
         },
         'SYSTEM',
         'CLEANUP_SERVICE',
@@ -544,7 +545,7 @@ export class PaymentService {
           String(order._id),
           {
             status: OrderStatus.CANCELLED,
-            reason: `Hoàn tiền thành công qua ${provider}.`,
+            reason: `Refund completed via ${provider}.`,
             is_override: true,
           },
           adminId,
