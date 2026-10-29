@@ -18,7 +18,8 @@ export interface IAlgoliaInsightEvent {
   userToken: string;
   objectIDs: string[];
   queryID?: string; // Tùy chọn nếu có tìm kiếm
-  positions?: number[]; // Bắt buộc cho click/conversion nếu dùng queryID
+  positions?: number[]; // Chỉ dùng cho click có queryID
+  eventSubtype?: 'addToCart' | 'purchase';
 }
 
 export interface IAlgoliaInsightPayload {

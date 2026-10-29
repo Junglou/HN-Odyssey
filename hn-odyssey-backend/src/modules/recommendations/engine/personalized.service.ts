@@ -32,6 +32,7 @@ interface IRecommendQuery {
 interface IRecommendResponse<T> {
   results: Array<{
     hits: T[];
+    queryID?: string; // Algolia trả queryID ở cấp result, không nằm trong từng hit
   }>;
 }
 
@@ -117,10 +118,23 @@ export class PersonalizedService {
     this.recommendClient = finalClient;
   }
 
+  // Bật queryID + gắn userToken (làm sạch giống tracking.service) để khớp với Insights event
+  private buildAnalyticsParams(
+    userToken?: string,
+  ): IRecommendQuery['queryParameters'] {
+    const cleanToken = userToken
+      ? userToken.replace(/[^a-zA-Z0-9_=-]/g, '_').substring(0, 64)
+      : undefined;
+    return cleanToken
+      ? { clickAnalytics: true, userToken: cleanToken }
+      : { clickAnalytics: true };
+  }
+
   async getTrendingItems(
     limit: number = 10,
     facetName?: string,
     facetValue?: string,
+    userToken?: string,
   ): Promise<IRecommendationResult> {
     try {
       const response = await this.recommendClient.getTrendingItems([
@@ -129,19 +143,21 @@ export class PersonalizedService {
           maxRecommendations: limit,
           facetName: facetName,
           facetValue: facetValue,
-          queryParameters: {
-            clickAnalytics: true,
-          },
+          queryParameters: this.buildAnalyticsParams(userToken),
         },
       ]);
 
-      const hits = response.results[0]?.hits || [];
-      const products = await this.fetchProductsFromHits(hits);
+      const result = response.results[0];
+      const products = await this.fetchProductsFromHits(
+        result?.hits || [],
+        result?.queryID,
+      );
 
       return {
         title: 'Đang thịnh hành',
         type: 'TRENDING_ITEMS',
         products,
+        query_id: result?.queryID,
       };
     } catch (error) {
       this.logger.error(
@@ -176,6 +192,7 @@ export class PersonalizedService {
   async getRelatedProducts(
     productId: string,
     limit: number = 10,
+    userToken?: string,
   ): Promise<IRecommendationResult> {
     try {
       const response = await this.recommendClient.getRelatedProducts([
@@ -183,14 +200,15 @@ export class PersonalizedService {
           indexName: this.indexName,
           objectID: productId,
           maxRecommendations: limit,
-          queryParameters: {
-            clickAnalytics: true,
-          },
+          queryParameters: this.buildAnalyticsParams(userToken),
         },
       ]);
 
       const hits = response.results[0]?.hits || [];
-      const products = await this.fetchProductsFromHits(hits);
+      const products = await this.fetchProductsFromHits(
+        hits,
+        response.results[0]?.queryID,
+      );
 
       return {
         title: 'Khám phá thêm các lựa chọn thay thế',
@@ -209,6 +227,7 @@ export class PersonalizedService {
   async getLookingSimilar(
     productId: string,
     limit: number = 10,
+    userToken?: string,
   ): Promise<IRecommendationResult> {
     try {
       const response = await this.recommendClient.getLookingSimilar([
@@ -216,9 +235,7 @@ export class PersonalizedService {
           indexName: this.indexName,
           objectID: productId,
           maxRecommendations: limit,
-          queryParameters: {
-            clickAnalytics: true,
-          },
+          queryParameters: this.buildAnalyticsParams(userToken),
         },
       ]);
 
@@ -231,7 +248,10 @@ export class PersonalizedService {
         return this.getFallbackLookingSimilar(productId, limit);
       }
 
-      const products = await this.fetchProductsFromHits(hits);
+      const products = await this.fetchProductsFromHits(
+        hits,
+        response.results[0]?.queryID,
+      );
 
       return {
         title: 'Sản phẩm tương tự',
@@ -315,20 +335,16 @@ export class PersonalizedService {
     }
   }
 
-  // FIX: Giữ lại queryID từ Algolia
   private async fetchProductsFromHits(
     hits: IAlgoliaRecommendHit[],
+    queryID?: string,
   ): Promise<ProductDocument[]> {
     if (!hits || hits.length === 0) return [];
 
     const ids = hits.map((hit) => new Types.ObjectId(hit.objectID));
 
     const products = await this.productModel
-      .find({
-        _id: { $in: ids },
-        status: 'ACTIVE',
-        is_deleted: false,
-      })
+      .find({ _id: { $in: ids }, status: 'ACTIVE', is_deleted: false })
       .select('-__v')
       .lean();
 
@@ -337,29 +353,17 @@ export class PersonalizedService {
       productsMap.set(p._id.toString(), p as unknown as ProductDocument),
     );
 
+    // Giữ thứ tự Algolia + gắn queryID của request vào từng sản phẩm
     const sortedProducts: ProductDocument[] = [];
     for (const hit of hits) {
       const p = productsMap.get(hit.objectID);
       if (p) {
-        // Định nghĩa type trung gian an toàn
-        type AlgoliaHitWithQueryID = IAlgoliaRecommendHit & {
-          queryID?: string;
-          __queryID?: string;
-        };
-
-        const hitWithQueryId = hit as AlgoliaHitWithQueryID;
-        const queryID = hitWithQueryId.queryID || hitWithQueryId.__queryID;
-
-        // Tạo object mới thay vì gán đè để tránh mutate
-        const productWithQueryId = {
-          ...p, // Nếu p là mongoose document
+        sortedProducts.push({
+          ...p,
           query_id: queryID,
-        } as unknown as ProductDocument;
-
-        sortedProducts.push(productWithQueryId);
+        } as unknown as ProductDocument);
       }
     }
-
     return sortedProducts;
   }
 

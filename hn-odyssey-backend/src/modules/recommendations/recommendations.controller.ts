@@ -213,11 +213,18 @@ export class RecommendationsController {
   async getDiscoverCF(
     @Req() req: RequestWithUser,
     @Query('user_id') queryUserId?: string,
+    @Query('session_id') sessionId?: string,
   ) {
     const userId = req.user?._id || queryUserId;
 
     if (!userId) {
-      const fallback = await this.personalizedService.getTrendingItems(10);
+      // userToken = session của khách, trùng với token mà các tracking event đang dùng
+      const fallback = await this.personalizedService.getTrendingItems(
+        10,
+        undefined,
+        undefined,
+        sessionId,
+      );
       return {
         test_group: 'ALGO_TRENDING',
         data: fallback.products as unknown as ProductDocument[],

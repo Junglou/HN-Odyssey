@@ -227,8 +227,8 @@ export class TrackingController {
     );
   }
 
-  @Public()
   @Post('seed-marketing-data')
+  @RequirePermissions(Resource.REPORT_MARKETING, Action.UPDATE)
   async seedMarketingData() {
     return await this.trackingSeederService.seedMarketingData();
   }

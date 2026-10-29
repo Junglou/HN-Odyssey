@@ -5,6 +5,7 @@ import type { ProductDetailState } from "./useProductDetail";
 import { useTracking, BehaviorAction } from "../common/useTracking";
 import { buildBuyNowCheckoutUrl } from "../../utils/buyNow";
 import { getApiErrorMessage } from "../../utils/apiError";
+import { getAlgoliaQueryID } from "../../utils/algoliaQueryStore";
 
 interface INormalizedError {
   status?: number;
@@ -99,6 +100,7 @@ export function useProductDetailMain() {
           variant_id: product.sku,
           quantity: quantity,
           price: product.price,
+          query_id: getAlgoliaQueryID(product.id), // nối conversion với lượt gợi ý đã click
         },
       });
       return true;
