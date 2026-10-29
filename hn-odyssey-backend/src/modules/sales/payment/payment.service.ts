@@ -156,7 +156,8 @@ export class PaymentService {
       }
 
       if (order.payment.status === 'PAID') {
-        return { RspCode: '00', Message: 'Order already confirmed' };
+        // VNPAY quy định: 02 = đơn đã được xác nhận trước đó
+        return { RspCode: '02', Message: 'Order already confirmed' };
       }
 
       if (responseCode === '00' || responseCode === '0') {
