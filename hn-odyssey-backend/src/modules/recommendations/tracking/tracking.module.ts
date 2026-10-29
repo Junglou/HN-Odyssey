@@ -35,6 +35,15 @@ import {
   AdSpendEntrySchema,
 } from 'src/modules/marketing/campaigns/schemas/ad-spend-entry.schema';
 import { MigrateAdSpendCommand } from './migrate-ad-spend.command';
+import {
+  Product,
+  ProductSchema,
+} from 'src/modules/products/catalog/schemas/product.schema';
+import {
+  Category,
+  CategorySchema,
+} from 'src/modules/products/categories/schemas/category.schema';
+import { RecommendationDemoSeedCommand } from './recommendation-demo-seed.command';
 
 @Module({
   imports: [
@@ -46,6 +55,8 @@ import { MigrateAdSpendCommand } from './migrate-ad-spend.command';
       { name: Order.name, schema: OrderSchema },
       { name: Coupon.name, schema: CouponSchema },
       { name: LoyaltyHistory.name, schema: LoyaltyHistorySchema },
+      { name: Product.name, schema: ProductSchema },
+      { name: Category.name, schema: CategorySchema },
     ]),
     ScheduleModule.forRoot(),
     forwardRef(() => UsersModule),
@@ -58,6 +69,7 @@ import { MigrateAdSpendCommand } from './migrate-ad-spend.command';
     LoyaltyFraudListener,
     TrackingSeederService,
     MigrateAdSpendCommand,
+    RecommendationDemoSeedCommand,
   ],
   exports: [TrackingService],
 })

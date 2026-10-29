@@ -148,7 +148,9 @@ export class CollaborativeFilteringService {
         return bBoost - aBoost;
       });
 
-      await this.cacheManager.set(cacheKey, finalProducts, 14400000);
+      // Mặc định 4 giờ; khi demo đặt CF_CACHE_TTL_MS=60000 trong .env để thấy gợi ý đổi sau 1 phút
+      const cacheTtl = Number(process.env.CF_CACHE_TTL_MS) || 14400000;
+      await this.cacheManager.set(cacheKey, finalProducts, cacheTtl);
 
       return finalProducts;
     } catch (error: unknown) {

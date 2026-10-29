@@ -38,6 +38,7 @@ interface BackendProduct {
   // FIX 2: Khai báo các định dạng queryID mà Algolia hay trả về
   queryID?: string;
   __queryID?: string;
+  query_id?: string; // tên trường backend thực sự trả về
 }
 
 interface DiscoverResponse {
@@ -53,7 +54,7 @@ interface AuthUser {
 }
 
 const getOrCreateSessionId = (): string => {
-  const SESSION_KEY = "hn_session_id";
+  const SESSION_KEY = "guestSessionId"; // trùng key với mọi tracking event
   let sessionId = localStorage.getItem(SESSION_KEY);
 
   if (!sessionId) {
@@ -164,7 +165,7 @@ export function useProductRecommendations() {
               discountBadge: badge,
 
               // FIX 3: Bóc queryID từ Backend truyền ra ngoài để Component Card có thể gửi Tracking
-              query_id: item.queryID || item.__queryID,
+              query_id: item.query_id || item.queryID || item.__queryID,
             };
           });
 

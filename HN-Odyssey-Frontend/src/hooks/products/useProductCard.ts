@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import axiosClient from "../../api/axiosClient";
 import { getApiErrorMessage } from "../../utils/apiError";
+import { saveAlgoliaQuery } from "../../utils/algoliaQueryStore";
 
 // 1. KHAI BÁO GIAO DIỆN CHẶT CHẼ THEO BACKEND DTO
 interface IWishlistToggleResponse {
@@ -72,6 +73,7 @@ export function useProductCard(
       })
       .catch((err) => console.error("Tracking Error:", err));
 
+    saveAlgoliaQuery(productId, query_id);
     navigate(`/products/${slug}`);
   };
 

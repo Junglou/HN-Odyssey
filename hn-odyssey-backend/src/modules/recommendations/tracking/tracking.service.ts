@@ -1576,13 +1576,19 @@ export class TrackingService {
       objectIDs: productIdsArray,
     };
 
-    // FIX 3: Gắn queryID và mảng positions vào payload
-    if (queryID) {
+    // View: không gửi queryID (Algolia không dùng queryID cho view)
+    // Click: queryID bắt buộc đi kèm positions, thiếu position thì gửi như click thường
+    // Conversion: chỉ cần queryID, không gửi positions
+    if (queryID && action === 'CLICK' && position && position > 0) {
       eventPayload.queryID = queryID;
-      // Thuật toán Algolia yêu cầu mảng positions đối với hành động Click/Conversion
-      if (position && action !== 'VIEW') {
-        eventPayload.positions = [position];
-      }
+      eventPayload.positions = [position];
+    } else if (queryID && action === 'ADD_TO_CART') {
+      eventPayload.queryID = queryID;
+    }
+
+    // Đánh dấu conversion là "thêm giỏ" để Algolia tách riêng chỉ số Add-to-cart
+    if (action === 'ADD_TO_CART') {
+      eventPayload.eventSubtype = 'addToCart';
     }
 
     const data: IAlgoliaInsightPayload = {

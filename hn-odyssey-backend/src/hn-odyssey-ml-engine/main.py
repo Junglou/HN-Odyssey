@@ -35,6 +35,8 @@ RECOMMENDATION_MATRIX = None
 USER_INDEX_MAP = {}          
 PRODUCT_IDS = []             
 IS_TRAINING = False          
+# Ma trận True/False: ô nào user ĐÃ tương tác (xem, thêm giỏ, mua, đánh giá)
+INTERACTION_MASK = None
 
 def train_model():
     """
@@ -42,7 +44,7 @@ def train_model():
     Flow: Kéo data từ Mongo -> Tính điểm -> Dựng ma trận -> Train SVD.
     """
     # Lấy các biến global để ghi đè kết quả sau khi train xong
-    global RECOMMENDATION_MATRIX, USER_INDEX_MAP, PRODUCT_IDS, IS_TRAINING
+    global RECOMMENDATION_MATRIX, USER_INDEX_MAP, PRODUCT_IDS, IS_TRAINING, INTERACTION_MASK
     
     # Khóa trạng thái để chặn các request train spam vào cùng lúc
     IS_TRAINING = True
@@ -139,6 +141,10 @@ def train_model():
         
         # Dựng Pivot Table (User - Product). Chỗ nào chưa tương tác thì fill 0.
         pivot_table = df.pivot(index='user_id', columns='product_id', values='score').fillna(0)
+        logger.info(
+            f"Ma trận huấn luyện: {pivot_table.shape[0]} user x {pivot_table.shape[1]} sản phẩm "
+            f"(đọc {len(behaviors)} hành vi từ MongoDB)"
+        )
         
         # Map User ID ra index để sau này chọc vào mảng 2 chiều cho nhanh
         USER_INDEX_MAP = {user_id: idx for idx, user_id in enumerate(pivot_table.index)}
@@ -146,6 +152,8 @@ def train_model():
         PRODUCT_IDS = list(pivot_table.columns)
         # Rút raw data ra chuẩn bị đẩy vào SVD
         matrix = pivot_table.values
+        # Ghi nhớ ô user đã tương tác (khác 0) để lúc gợi ý loại ra, chỉ đề xuất món MỚI
+        INTERACTION_MASK = matrix != 0
         
         # Xử lý Cold Start: Dữ liệu quá mỏng (dưới 2 user hoặc 2 product) thì khỏi chạy SVD, xài tạm ma trận thô.
         if matrix.shape[0] < 2 or matrix.shape[1] < 2:
@@ -154,7 +162,10 @@ def train_model():
             return
 
         # Setup SVD. Lấy tối đa 20 latent features.
-        n_components = min(20, matrix.shape[0] - 1, matrix.shape[1] - 1)
+        # Dữ liệu nhỏ (~50 SP, vài chục user): giữ ít yếu tố ẩn để model khái quát theo "gu"
+        # thay vì chép lại gần như nguyên ma trận gốc (k lớn = học thuộc, không suy ra được món mới)
+        max_components = int(os.getenv("SVD_COMPONENTS", 5))
+        n_components = min(max_components, matrix.shape[0] - 1, matrix.shape[1] - 1)
         if n_components < 1: n_components = 1
             
         svd = TruncatedSVD(n_components=n_components, random_state=42)
@@ -204,7 +215,13 @@ async def get_recommendation(user_id: str):
         
     # Xác định vị trí của user trong ma trận dự đoán
     user_idx = USER_INDEX_MAP[user_id]
-    user_predictions = RECOMMENDATION_MATRIX[user_idx]
+    # Copy ra mảng mới để không sửa vào ma trận gốc đang nằm trên RAM
+    user_predictions = np.array(RECOMMENDATION_MATRIX[user_idx], dtype=float)
+
+    # Loại các món user đã tương tác TRƯỚC khi tính ngưỡng động,
+    # để ngưỡng được tính trên các món mới chứ không bị món đã xem "đè" mất
+    if INTERACTION_MASK is not None and user_idx < INTERACTION_MASK.shape[0]:
+        user_predictions[INTERACTION_MASK[user_idx]] = -np.inf
     
    # Lấy index các sản phẩm có điểm cao nhất (argsort xong flip ngược lại mảng)
     top_indices = user_predictions.argsort()[::-1]
@@ -214,6 +231,7 @@ async def get_recommendation(user_id: str):
     # [FIX] DYNAMIC THRESHOLD (Ngưỡng thích ứng theo mật độ dữ liệu)
     # 1. Lấy điểm dự đoán cao nhất của user này (nếu có)
     max_score = user_predictions[top_indices[0]] if len(top_indices) > 0 else 0
+    logger.info(f"[{user_id}] Điểm cao nhất trong các món CHƯA xem: {max_score}")
     
     # 2. Ngưỡng động: Lấy 20% của đỉnh, nhưng chốt đáy ở mức siêu nhỏ (0.01) để vớt data mỏng.
     # Nếu ma trận hoàn toàn bằng 0, set threshold = 0 để nhả data thô cho NestJS tự filter.
@@ -228,6 +246,22 @@ async def get_recommendation(user_id: str):
         if len(recommended_ids) >= 20:
             break
             
+    # Catalog nhỏ: nếu món mới chưa đủ tối thiểu, bù thêm món đã tương tác (điểm cao trước)
+    # để widget không bị trống. Món bị đánh giá tệ (điểm âm) không được bù.
+    min_results = 4
+    if (
+        len(recommended_ids) < min_results
+        and INTERACTION_MASK is not None
+        and user_idx < INTERACTION_MASK.shape[0]
+    ):
+        original_scores = RECOMMENDATION_MATRIX[user_idx]
+        for i in np.argsort(original_scores)[::-1]:
+            if INTERACTION_MASK[user_idx][i] and original_scores[i] > 0:
+                if PRODUCT_IDS[i] not in recommended_ids:
+                    recommended_ids.append(PRODUCT_IDS[i])
+            if len(recommended_ids) >= min_results:
+                break
+
     return {
         "user_id": user_id,
         "recommended_product_ids": recommended_ids
