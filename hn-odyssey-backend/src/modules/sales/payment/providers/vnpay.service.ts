@@ -8,6 +8,7 @@ import {
   VnpayIpnData,
 } from 'src/common/interfaces/payment-strategy.interface';
 import { PaymentConfig } from '../schemas/payment-config.schema';
+import { usdToVnd, vndToUsd } from 'src/common/constants/money.constant';
 
 @Injectable()
 export class VnpayService {
@@ -18,18 +19,12 @@ export class VnpayService {
     config: PaymentConfig,
     dto: CreatePaymentUrlDto,
   ): Promise<string> {
-    const date = new Date();
-    const offsetGMT7 = 7 * 60 * 60 * 1000;
-    const vnTime = new Date(date.getTime() + offsetGMT7);
-
-    const yyyy = vnTime.getUTCFullYear();
-    const mm = String(vnTime.getUTCMonth() + 1).padStart(2, '0');
-    const dd = String(vnTime.getUTCDate()).padStart(2, '0');
-    const hh = String(vnTime.getUTCHours()).padStart(2, '0');
-    const min = String(vnTime.getUTCMinutes()).padStart(2, '0');
-    const ss = String(vnTime.getUTCSeconds()).padStart(2, '0');
-
-    const createDate = `${yyyy}${mm}${dd}${hh}${min}${ss}`;
+    const now = new Date();
+    const createDate = this.formatVnDate(now);
+    // Link thanh toán hết hạn sau 15 phút, khớp thời gian giữ hàng của đơn
+    const expireDate = this.formatVnDate(
+      new Date(now.getTime() + 15 * 60 * 1000),
+    );
 
     const vnpParams: Record<string, string | number> = {
       vnp_Version: '2.1.0',
@@ -40,10 +35,11 @@ export class VnpayService {
       vnp_TxnRef: dto.orderCode,
       vnp_OrderInfo: dto.description,
       vnp_OrderType: 'other',
-      vnp_Amount: Math.floor(dto.amount * 25400 * 100),
+      vnp_Amount: usdToVnd(dto.amount) * 100,
       vnp_ReturnUrl: config.return_url,
       vnp_IpAddr: dto.ipAddr,
       vnp_CreateDate: createDate,
+      vnp_ExpireDate: expireDate,
     };
 
     const sortedParams = this.sortObject(vnpParams);
@@ -83,7 +79,7 @@ export class VnpayService {
     const data = rawData as unknown as VnpayIpnData;
     return {
       transactionCode: data.vnp_TransactionNo,
-      amount: Number(data.vnp_Amount) / 100 / 25400,
+      amount: vndToUsd(Number(data.vnp_Amount) / 100),
       responseCode: data.vnp_ResponseCode,
       orderCode: data.vnp_TxnRef,
     };
@@ -110,6 +106,16 @@ export class VnpayService {
     const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
 
     return secureHash === signed;
+  }
+
+  // Định dạng yyyyMMddHHmmss theo giờ Việt Nam (GMT+7) — VNPAY yêu cầu
+  private formatVnDate(date: Date): string {
+    const vn = new Date(date.getTime() + 7 * 60 * 60 * 1000);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return (
+      `${vn.getUTCFullYear()}${pad(vn.getUTCMonth() + 1)}${pad(vn.getUTCDate())}` +
+      `${pad(vn.getUTCHours())}${pad(vn.getUTCMinutes())}${pad(vn.getUTCSeconds())}`
+    );
   }
 
   private sortObject(
@@ -139,22 +145,14 @@ export class VnpayService {
     const vnp_TmnCode = config.merchant_id;
     const vnp_TransactionType = '02'; // 02: Hoàn toàn phần
     const vnp_TxnRef = orderCode;
-    const vnp_Amount = Math.floor(amount * 25400 * 100);
+    const vnp_Amount = usdToVnd(amount) * 100;
     const vnp_OrderInfo = `Hoan tien don hang ${orderCode}`;
     const vnp_TransactionNo = ''; // Để trống nếu dùng vnp_TransactionDate
 
     // Ngày giờ giao dịch gốc (YYYYMMDDHHmmss)
-    const vnp_TransactionDate =
-      transDate ||
-      new Date()
-        .toISOString()
-        .replace(/[^0-9]/g, '')
-        .slice(0, 14);
+    const vnp_TransactionDate = transDate || this.formatVnDate(new Date());
     const vnp_CreateBy = userAction;
-    const vnp_CreateDate = new Date()
-      .toISOString()
-      .replace(/[^0-9]/g, '')
-      .slice(0, 14);
+    const vnp_CreateDate = this.formatVnDate(new Date());
     const vnp_IpAddr = '127.0.0.1'; // IP máy chủ gọi request
 
     // Chuỗi ký tự chuẩn VNPAY (Không mã hóa URL trước khi băm đối với API Refund)
@@ -185,9 +183,8 @@ export class VnpayService {
     try {
       // VNPAY thường dùng 1 endpoint riêng cho API Refund, bạn nên đưa cấu hình endpoint này vào DB hoặc biến môi trường
       // Mặc định Sandbox Refund Endpoint: https://sandbox.vnpayment.vn/merchant_webapi/api/transaction
-      const refundEndpoint =
-        config.api_endpoint.replace('vpcpay.html', '') +
-        'merchant_webapi/api/transaction';
+      // vpcpay.html nằm dưới /paymentv2/, còn API giao dịch nằm ở gốc domain (sandbox)
+      const refundEndpoint = `${new URL(config.api_endpoint).origin}/merchant_webapi/api/transaction`;
 
       const response = await fetch(refundEndpoint, {
         method: 'POST',

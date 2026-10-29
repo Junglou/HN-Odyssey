@@ -43,6 +43,16 @@ export class PaymentController {
     try {
       const isValid = await this.paymentService.verifyReturnUrl(query);
 
+      // Chạy local, VNPAY không gọi được IPN vào localhost → đơn không bao giờ được ghi PAID.
+      // Thanh toán thành công + chữ ký hợp lệ thì xử lý kết quả ngay tại đây.
+      // An toàn nếu IPN cũng về: handleIpn có khóa Redis và bỏ qua đơn đã PAID.
+      if (isValid && query.vnp_ResponseCode === '00') {
+        await this.paymentService.handleIpn(
+          'VNPAY',
+          query as unknown as Record<string, unknown>,
+        );
+      }
+
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       const txnRef = query.vnp_TxnRef;
       const responseCode = query.vnp_ResponseCode;
