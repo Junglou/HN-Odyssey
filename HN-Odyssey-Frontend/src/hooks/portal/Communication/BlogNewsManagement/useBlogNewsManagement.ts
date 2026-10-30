@@ -7,7 +7,7 @@ import { USER_KEY } from "../../../../utils/tokenStorage";
 import { getApiErrorMessage } from "../../../../utils/apiError";
 
 // interfaces and types
-export type BlogNewsStatus = "Published" | "Draft" | "Hidden";
+export type BlogNewsStatus = "Published" | "Draft" | "Hidden" | "Scheduled";
 
 interface CategoryTree {
   _id: string;
@@ -70,6 +70,7 @@ export interface BlogNewsRecord {
   metaTitle: string;
   metaDescription: string;
   attachedProducts: string[];
+  scheduledAt: string; // "YYYY-MM-DDTHH:mm" giờ địa phương, rỗng nếu không hẹn
 }
 
 export interface BlogNewsFormData {
@@ -82,6 +83,7 @@ export interface BlogNewsFormData {
   metaTitle: string;
   metaDescription: string;
   attachedProducts: string[];
+  scheduledAt: string;
 }
 
 interface ApiResponse<T> {
@@ -137,6 +139,13 @@ export const getRelativeImageUrl = (fullUrl: string) => {
   return fullUrl;
 };
 
+// ISO → "YYYY-MM-DDTHH:mm" theo giờ máy (định dạng của input datetime-local)
+export const toLocalDateTimeInput = (iso: string): string => {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 const mapBEToFE = (post: BEPostResponse): BlogNewsRecord => ({
   id: post._id,
   title: post.title,
@@ -162,7 +171,9 @@ const mapBEToFE = (post: BEPostResponse): BlogNewsRecord => ({
       ? "Published"
       : post.status === "HIDDEN"
         ? "Hidden"
-        : "Draft",
+        : post.status === "SCHEDULED"
+          ? "Scheduled"
+          : "Draft",
   publishDate: post.published_at
     ? new Date(post.published_at).toISOString().split("T")[0]
     : post.created_at
@@ -176,6 +187,10 @@ const mapBEToFE = (post: BEPostResponse): BlogNewsRecord => ({
     post.embedded_product_ids?.map((p: string | { _id: string }) =>
       typeof p === "string" ? p : p._id,
     ) || [],
+  scheduledAt:
+    post.status === "SCHEDULED" && post.published_at
+      ? toLocalDateTimeInput(post.published_at)
+      : "",
 });
 
 const mapFEToBE = (data: BlogNewsFormData) => ({
@@ -470,6 +485,7 @@ export function useBlogNewsManagement() {
 
       let postId: string | undefined;
       let oldStatus: BlogNewsStatus = "Draft";
+      let oldScheduledAt = "";
 
       if (drawerConfig.mode === "add") {
         const res = await axiosClient.post("/marketing/content/posts", payload);
@@ -477,12 +493,38 @@ export function useBlogNewsManagement() {
       } else if (drawerConfig.mode === "edit" && drawerConfig.editingRecord) {
         postId = drawerConfig.editingRecord.id;
         oldStatus = drawerConfig.editingRecord.status;
+        oldScheduledAt = drawerConfig.editingRecord.scheduledAt;
         await axiosClient.patch(`/marketing/content/posts/${postId}`, payload);
       }
 
       // Đổi trạng thái (nếu có) qua route riêng theo quyền PUBLISH / UNPUBLISH
       let statusNote = "";
-      if (postId && data.status !== oldStatus) {
+
+      // Lên lịch / đổi lịch / hủy lịch → posts/:id/schedule (quyền PUBLISH)
+      const isScheduleFlow =
+        data.status === "Scheduled" ||
+        (oldStatus === "Scheduled" && data.status === "Draft");
+
+      if (postId && isScheduleFlow) {
+        const scheduleChanged =
+          data.status !== oldStatus || data.scheduledAt !== oldScheduledAt;
+        if (scheduleChanged) {
+          if (canPublish) {
+            await axiosClient.patch(
+              `/marketing/content/posts/${postId}/schedule`,
+              {
+                published_at:
+                  data.status === "Scheduled" && data.scheduledAt
+                    ? new Date(data.scheduledAt).toISOString()
+                    : null, // null = hủy lịch, về Draft
+              },
+            );
+          } else {
+            statusNote =
+              " Bạn không có quyền Publish nên không thể hẹn giờ đăng.";
+          }
+        }
+      } else if (postId && data.status !== oldStatus) {
         if (data.status === "Published") {
           if (canPublish) {
             await axiosClient.patch("/marketing/content/posts/bulk/publish", {

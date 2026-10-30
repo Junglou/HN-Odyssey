@@ -48,7 +48,7 @@ const PERSONAS: PersonaConfig[] = [
 ];
 
 const RANDOM_SEED = 20261029; // cố định để mỗi lần chạy ra cùng một bộ dữ liệu
-const ALGOLIA_SESSIONS = 160; // x2 sản phẩm = 320 conversion (ngưỡng Trending: 250/30 ngày)
+const ALGOLIA_SESSIONS = 300; // x2 sản phẩm = 600 conversion; cộng các đợt trước để vượt ngưỡng FBT 1.000/90 ngày
 
 // Bộ sinh số ngẫu nhiên có seed (mulberry32)
 const createRng = (seed: number) => {

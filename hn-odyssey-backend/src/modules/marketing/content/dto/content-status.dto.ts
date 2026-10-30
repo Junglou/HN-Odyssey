@@ -1,10 +1,12 @@
 import {
   ArrayNotEmpty,
   IsArray,
+  IsDateString,
   IsEnum,
   IsIn,
   IsMongoId,
   IsOptional,
+  ValidateIf,
 } from 'class-validator';
 import { BannerStatus } from '../schemas/banner.schema';
 import { PageStatus } from '../schemas/static-page.schema';
@@ -40,4 +42,11 @@ export class BulkUnpublishPostsDto extends BulkPostIdsDto {
   @IsOptional()
   @IsIn([PostStatus.DRAFT, PostStatus.HIDDEN])
   status?: PostStatus;
+}
+
+// Lên lịch / hủy lịch đăng bài (quyền PUBLISH). published_at = null → hủy lịch, về DRAFT
+export class SchedulePostDto {
+  @ValidateIf((o: SchedulePostDto) => o.published_at !== null)
+  @IsDateString()
+  published_at: string | null;
 }

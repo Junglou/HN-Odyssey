@@ -11,6 +11,7 @@ import {
 } from "../../../../assets/icons/BlogNewsManagementIcons";
 import {
   generateSlug,
+  toLocalDateTimeInput,
   type BlogNewsFormData,
   type BlogNewsRecord,
   type BECategoryResponse,
@@ -65,6 +66,7 @@ function DrawerContent({
       metaTitle: "",
       metaDescription: "",
       attachedProducts: [],
+      scheduledAt: "",
     };
   });
 
@@ -91,6 +93,19 @@ function DrawerContent({
   const canToggleStatus =
     formData.status === "Published" ? canUnpublish : canPublish;
 
+  // Hẹn giờ đăng: cần PUBLISH, chỉ cho bài mới hoặc bài gốc đang Draft/Scheduled
+  const originalStatus = initialData?.status ?? "Draft";
+  const canSchedule =
+    canPublish &&
+    (originalStatus === "Draft" || originalStatus === "Scheduled");
+  const showScheduleField =
+    formData.status !== "Published" &&
+    (isViewMode ? !!formData.scheduledAt : canSchedule);
+  const minScheduleValue = toLocalDateTimeInput(new Date().toISOString());
+  const isScheduleValid =
+    formData.status !== "Scheduled" ||
+    (!!formData.scheduledAt && new Date(formData.scheduledAt) > new Date());
+
   const isContentEmpty =
     !formData.content ||
     formData.content.trim() === "" ||
@@ -101,7 +116,8 @@ function DrawerContent({
     formData.categoryId.trim() !== "" &&
     formData.featuredImage.trim() !== "" &&
     formData.slug.trim() !== "" &&
-    !isContentEmpty;
+    !isContentEmpty &&
+    isScheduleValid;
 
   const isSubmitDisabled = isSubmitting || !isFormValid;
 
@@ -119,6 +135,15 @@ function DrawerContent({
       }
       if (field === "categoryId" && prev.categoryId !== value) {
         newData.attachedProducts = [];
+      }
+      // Chọn giờ hẹn → Scheduled; xóa giờ hẹn → về Draft
+      if (field === "scheduledAt" && typeof value === "string") {
+        if (value) newData.status = "Scheduled";
+        else if (prev.status === "Scheduled") newData.status = "Draft";
+      }
+      // Publish ngay thì bỏ giờ hẹn
+      if (field === "status" && value === "Published") {
+        newData.scheduledAt = "";
       }
       return newData;
     });
@@ -558,11 +583,42 @@ function DrawerContent({
                   }
                 }}
               />
-              <span className="ban-toggle-label">
-                {formData.status === "Published" ? "Published" : "Draft"}
-              </span>
+              <span className="ban-toggle-label">{formData.status}</span>
             </div>
           </div>
+
+          {showScheduleField && (
+            <div className="ban-form-group">
+              <label>Schedule Publish (Optional)</label>
+              <div
+                style={{ display: "flex", gap: "8px", alignItems: "center" }}
+              >
+                <input
+                  type="datetime-local"
+                  className="ban-form-input"
+                  value={formData.scheduledAt}
+                  min={minScheduleValue}
+                  onChange={(e) => handleChange("scheduledAt", e.target.value)}
+                  disabled={isViewMode || isSubmitting}
+                />
+                {!isViewMode && formData.scheduledAt && (
+                  <button
+                    type="button"
+                    className="ban-btn-cancel"
+                    onClick={() => handleChange("scheduledAt", "")}
+                    disabled={isSubmitting}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              {!isScheduleValid && (
+                <span style={{ color: "#dc2626", fontSize: "12px" }}>
+                  Scheduled time must be in the future.
+                </span>
+              )}
+            </div>
+          )}
         </form>
 
         <div className="ban-drawer-footer">

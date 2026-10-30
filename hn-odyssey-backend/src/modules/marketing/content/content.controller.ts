@@ -40,6 +40,7 @@ import {
   BulkUnpublishPostsDto,
   ChangeBannerStatusDto,
   ChangePageStatusDto,
+  SchedulePostDto,
 } from './dto/content-status.dto';
 import { UpdatePageConfigDto } from './dto/page-config.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -373,6 +374,30 @@ export class ContentController {
       req.user.email,
     );
     return new BaseResponse(true, result.message);
+  }
+
+  // BLOG: LÊN LỊCH / HỦY LỊCH ĐĂNG (quyền PUBLISH)
+  @Patch('posts/:id/schedule')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Resource.CONTENT_POSTS, Action.PUBLISH)
+  async schedulePost(
+    @Param('id') id: string,
+    @Body() dto: SchedulePostDto,
+    @Req() req: RequestWithUser,
+  ) {
+    const data = await this.contentService.schedulePost(
+      id,
+      dto.published_at,
+      req.user._id,
+      req.user.email,
+    );
+    return new BaseResponse(
+      true,
+      dto.published_at === null
+        ? 'Đã hủy lịch đăng, bài viết về trạng thái nháp'
+        : 'Đã lên lịch đăng bài viết',
+      data,
+    );
   }
 
   @Patch('posts/bulk/delete')

@@ -126,20 +126,20 @@ export default function BlogNewsManagement({
               <div
                 className={`ban-dropdown-options ${isStatusOpen ? "open" : hasStatusOpened ? "closed" : ""}`}
               >
-                {(["All", "Published", "Draft", "Hidden"] as const).map(
-                  (opt) => (
-                    <div
-                      key={opt}
-                      className={`ban-dropdown-option ${statusFilter === opt ? "active" : ""}`}
-                      onClick={() => {
-                        actions.changeStatusFilter(opt);
-                        setIsStatusOpen(false);
-                      }}
-                    >
-                      {opt}
-                    </div>
-                  ),
-                )}
+                {(
+                  ["All", "Published", "Scheduled", "Draft", "Hidden"] as const
+                ).map((opt) => (
+                  <div
+                    key={opt}
+                    className={`ban-dropdown-option ${statusFilter === opt ? "active" : ""}`}
+                    onClick={() => {
+                      actions.changeStatusFilter(opt);
+                      setIsStatusOpen(false);
+                    }}
+                  >
+                    {opt}
+                  </div>
+                ))}
               </div>
             </div>
 

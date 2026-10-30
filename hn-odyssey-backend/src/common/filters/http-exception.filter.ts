@@ -55,7 +55,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
       const field = Object.keys(keyPattern)[0] || 'dữ liệu';
       message = `Dữ liệu bị trùng lặp: Trường [${field}] đã tồn tại trên hệ thống.`;
     }
-    // TH 3: Các lỗi kế thừa từ class Error thông thường
+    // TH 3: Lỗi validate của Mongoose (thiếu field required, sai enum...) → 400
+    else if (
+      exception instanceof Error &&
+      exception.name === 'ValidationError'
+    ) {
+      status = HttpStatus.BAD_REQUEST;
+      message = exception.message;
+    }
+    // TH 4: Các lỗi kế thừa từ class Error thông thường
     else if (exception instanceof Error) {
       message = exception.message;
       this.logger.error(
