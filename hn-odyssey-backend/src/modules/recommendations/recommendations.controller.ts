@@ -123,8 +123,14 @@ export class RecommendationsController {
   @Get('personalized/related')
   async getRelatedProducts(
     @Query('product_id') productId: string,
+    @Query('session_id') sessionId?: string,
   ): Promise<IRecommendationResult> {
-    return this.personalizedService.getRelatedProducts(productId, 10);
+    // sessionId = guestSessionId của FE, dùng làm userToken khớp với tracking event
+    return this.personalizedService.getRelatedProducts(
+      productId,
+      10,
+      sessionId,
+    );
   }
 
   @Public()

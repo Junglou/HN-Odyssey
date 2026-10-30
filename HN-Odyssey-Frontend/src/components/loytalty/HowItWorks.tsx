@@ -31,7 +31,7 @@ export default function HowItWorks() {
 
   // render
   return (
-    <section className="hiw-section">
+    <section className="hiw-section" data-chat-guide="how-it-works">
       <div className="hiw-container">
         <div className="hiw-header">
           <h2 className="hiw-title">How Explorer Rewards Works</h2>

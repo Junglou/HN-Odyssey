@@ -47,6 +47,12 @@ interface DiscoverResponse {
   products?: BackendProduct[];
 }
 
+interface RelatedResponse {
+  title?: string;
+  type?: string;
+  products?: BackendProduct[];
+}
+
 interface AuthUser {
   _id?: string | { $oid: string };
   id?: string;
@@ -79,7 +85,7 @@ const getLoggedInUserId = (): string | undefined => {
   return id ? String(id) : undefined;
 };
 
-export function useProductRecommendations() {
+export function useProductRecommendations(productId?: string) {
   const [recommendations, setRecommendations] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,22 +99,34 @@ export function useProductRecommendations() {
         const sessionId = getOrCreateSessionId();
         const userId = getLoggedInUserId();
 
-        const params: Record<string, string> = { session_id: sessionId };
-        if (userId) {
-          params.user_id = userId;
-        }
-
         let rawData: BackendProduct[] = [];
 
-        // 1. GỌI LÕI AI PYTHON CÁ NHÂN HÓA
-        try {
-          const response = await axiosClient.get<DiscoverResponse>(
-            "/recommendations/discover",
-            { params },
-          );
-          rawData = response.data?.data || response.data?.products || [];
-        } catch {
-          console.warn("Lỗi khi gọi AI, chuẩn bị Fallback...");
+        if (!userId) {
+          // 1A. KHÁCH: Algolia Related Items theo sản phẩm đang xem (model Trained, có queryID)
+          // Chờ trang tải xong productId rồi mới gọi, tránh phát request Trending thừa
+          if (!productId) return;
+          try {
+            const response = await axiosClient.get<RelatedResponse>(
+              "/recommendations/personalized/related",
+              { params: { product_id: productId, session_id: sessionId } },
+            );
+            rawData = (response.data?.products || []).filter(
+              (p) => p._id !== productId,
+            );
+          } catch {
+            console.warn("Lỗi khi gọi Related Items, chuẩn bị Fallback...");
+          }
+        } else {
+          // 1B. ĐÃ ĐĂNG NHẬP: lõi AI Python (Collaborative Filtering)
+          try {
+            const response = await axiosClient.get<DiscoverResponse>(
+              "/recommendations/discover",
+              { params: { session_id: sessionId, user_id: userId } },
+            );
+            rawData = response.data?.data || response.data?.products || [];
+          } catch {
+            console.warn("Lỗi khi gọi AI, chuẩn bị Fallback...");
+          }
         }
 
         // 2. NẾU AI TRẢ RỖNG -> KÍCH HOẠT FALLBACK LẤY HÀNG TRENDING TỪ BE
@@ -186,7 +204,7 @@ export function useProductRecommendations() {
     };
 
     fetchRecommendations();
-  }, []);
+  }, [productId]);
 
   return {
     recommendations,

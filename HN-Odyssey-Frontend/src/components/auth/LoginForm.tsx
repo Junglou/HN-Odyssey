@@ -83,6 +83,7 @@ const LoginForm = ({
 
           <p
             className="login-forget-password-text"
+            data-chat-guide="forgot-password"
             onClick={onForgotPasswordClick}
           >
             Forget your password. Need a hand?
@@ -106,12 +107,16 @@ const LoginForm = ({
           You are new? Join just here.
         </span>
 
-        <span className="login-text-link" onClick={onSupportClick}>
+        <span
+          className="login-text-link"
+          onClick={onSupportClick}
+          data-chat-guide="account-help"
+        >
           Need help accessing your account?
         </span>
       </div>
 
-      <div className="login-social-login">
+      <div className="login-social-login" data-chat-guide="social-login">
         <button
           type="button"
           className="login-social-icon-btn"

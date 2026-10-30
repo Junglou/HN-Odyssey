@@ -57,6 +57,7 @@ const OrderManagement = ({
         <div
           ref={filterRef}
           className="filter-container"
+          data-chat-guide="status-filter"
           onClick={() => setIsFilterOpen((prev) => !prev)}
         >
           <input

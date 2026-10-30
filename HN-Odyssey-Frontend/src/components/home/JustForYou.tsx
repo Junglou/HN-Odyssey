@@ -152,7 +152,7 @@ export default function JustForYou({
   const { slides, currentIndex, goToSlide } = useJustForYouSlider(dbSlides);
 
   return (
-    <section className="jfy-container">
+    <section className="jfy-container" data-chat-guide="just-for-you">
       <div className="jfy-text-wrapper">
         <h2 className="jfy-title">Just for you</h2>
         <p className="jfy-subtitle">“Created with your story in mind...”</p>

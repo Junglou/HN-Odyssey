@@ -80,7 +80,7 @@ export default function CheckoutSummary({
       </div>
 
       {/* promo code combobox */}
-      <div className="checkout-summary-promo-wrapper">
+      <div className="checkout-summary-promo-wrapper" data-chat-guide="voucher">
         <div className="checkout-summary-promo-input-group">
           <input
             type="text"

@@ -12,6 +12,7 @@ import {
   type OrderItem,
 } from 'src/common/interfaces/order.interface';
 import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
+import { usdToVnd } from 'src/common/constants/money.constant';
 
 @Injectable()
 export class OrderShippingListener {
@@ -43,7 +44,7 @@ export class OrderShippingListener {
         name: String(item.product_name),
         code: String(item.sku),
         quantity: Number(item.quantity),
-        price: Number(item.price),
+        price: usdToVnd(Number(item.price)), // GHN dùng VNĐ
         weight: Number(item.weight ?? 0.5),
       }));
 
@@ -72,14 +73,17 @@ export class OrderShippingListener {
         customerName: String(sInfo.name),
         phone: String(sInfo.phone),
         address: String(sInfo.address),
+        // GHN thu hộ bằng VNĐ; đơn đã thanh toán (online) thì không thu
         codAmount:
-          orderPlain.payment?.method === 'COD'
-            ? Number(orderPlain.total_amount)
+          orderPlain.payment?.method === 'COD' &&
+          orderPlain.payment?.status !== 'PAID'
+            ? usdToVnd(Number(orderPlain.total_amount))
             : 0,
-        weight: totalWeightKg,
+        weight: Math.ceil(totalWeightKg * 1000), // GHN tính bằng gram
         wardCode: mappedWardCode,
         districtId: mappedDistrictId,
-        note: String(orderPlain.internal_note || 'H&N Odyssey Order'),
+        // Ghi chú giao hàng in lên tem — không dùng internal_note (ghi chú nội bộ)
+        note: sInfo.note || 'Đơn hàng H&N Odyssey',
         items: shippingItems.map((i) => ({
           ...i,
           weight: Math.ceil(i.weight * 1000),
@@ -155,7 +159,7 @@ export class OrderShippingListener {
         name: String(item.product_name),
         code: String(item.sku),
         quantity: Number(item.quantity),
-        price: Number(item.price),
+        price: usdToVnd(Number(item.price)), // GHN dùng VNĐ
         weight: Number(item.weight ?? 0.5),
       }));
 
@@ -185,7 +189,7 @@ export class OrderShippingListener {
         phone: String(sInfo.phone),
         address: String(sInfo.address),
         codAmount: 0, // Đơn hoàn trả không thu hộ (COD = 0)
-        weight: totalWeightKg,
+        weight: Math.ceil(totalWeightKg * 1000), // GHN tính bằng gram
         wardCode: mappedWardCode,
         districtId: mappedDistrictId,
         note: String(`Hoàn trả hàng cho đơn ${orderPlain.order_code}`),

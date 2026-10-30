@@ -28,7 +28,7 @@ export default function CartItemList({
 }: CartItemListProps) {
   // render
   return (
-    <div className="cart-list-container">
+    <div className="cart-list-container" data-chat-guide="cart-items">
       <h2 className="cart-list-title">Shopping cart ({items.length})</h2>
 
       <div className="cart-list-outer-bg">

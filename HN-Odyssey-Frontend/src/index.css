@@ -188,3 +188,31 @@ body {
     padding-right: 3%;
   }
 }
+/* chatbot làm nổi bật vị trí đang chỉ cho khách */
+/* Chừa chỗ cho header khi cuộn tới (chỉ ảnh hưởng lúc cuộn, không đổi giao diện) */
+[data-chat-guide] {
+  scroll-margin-top: 96px;
+  scroll-margin-bottom: 24px;
+}
+/* Viền vẽ vào TRONG khối -> không bị cắt ở các section full màn hình */
+.chat-guide-highlight {
+  outline: 3px solid #f59e0b;
+  outline-offset: -3px;
+  animation: chat-guide-pulse 1s ease-in-out 3;
+}
+/* Phần tử chữ nhỏ (link, dòng chữ) thì vẽ viền ra ngoài để không đè lên chữ */
+a.chat-guide-highlight,
+p.chat-guide-highlight,
+span.chat-guide-highlight {
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+@keyframes chat-guide-pulse {
+  0%,
+  100% {
+    outline-color: #f59e0b;
+  }
+  50% {
+    outline-color: rgba(245, 158, 11, 0.25);
+  }
+}

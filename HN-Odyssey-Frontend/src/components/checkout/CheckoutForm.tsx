@@ -85,7 +85,7 @@ export default function CheckoutForm({
 
   // render
   return (
-    <div className="checkout-form-container">
+    <div className="checkout-form-container" data-chat-guide="shipping-info">
       {/* Tính năng chọn Address Book (Nếu đã đăng nhập & có địa chỉ) */}
       {isLogged && savedAddresses.length > 0 && (
         <div
@@ -362,7 +362,10 @@ export default function CheckoutForm({
 
       {/* row 6: OTP (Chỉ hiển thị cho Khách Vãng Lai) */}
       {!isLogged && (
-        <div className="checkout-form-row checkout-otp-row">
+        <div
+          className="checkout-form-row checkout-otp-row"
+          data-chat-guide="guest-otp"
+        >
           <div className="checkout-otp-group">
             <div className="checkout-input-group">
               <input

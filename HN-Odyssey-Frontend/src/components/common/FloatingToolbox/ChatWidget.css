@@ -386,3 +386,20 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* nút mở trang do bot hướng dẫn */
+.cw-nav-btn {
+  margin-top: 8px;
+  padding: 6px 14px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cw-nav-btn:hover {
+  opacity: 0.75;
+}

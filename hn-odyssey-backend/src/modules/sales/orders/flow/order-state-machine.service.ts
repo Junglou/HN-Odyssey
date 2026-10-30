@@ -157,7 +157,7 @@ export class OrderStateMachine {
       status: status,
       timestamp: new Date(),
       actor: actor,
-      note: note || `Trạng thái được cập nhật thành ${status}`,
+      note: note || `Status updated to ${status}`,
     });
   }
 }

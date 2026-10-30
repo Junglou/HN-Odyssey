@@ -127,7 +127,10 @@ export default function ProductSidebar({
   return (
     <>
       {isOpen && <div className="pl-sidebar-overlay" onClick={onClose}></div>}
-      <aside className={`pl-sidebar-container ${isOpen ? "open" : ""}`}>
+      <aside
+        className={`pl-sidebar-container ${isOpen ? "open" : ""}`}
+        data-chat-guide="filters"
+      >
         <div className="pl-sidebar-header">
           <h2 className="pl-sidebar-title">Filters</h2>
           {/* 4. CHÈN NÚT CLEAR ALL VÀO ĐÂY */}

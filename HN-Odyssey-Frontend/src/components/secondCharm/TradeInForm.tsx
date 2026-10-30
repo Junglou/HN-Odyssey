@@ -169,7 +169,7 @@ export default function TradeInForm() {
   };
 
   return (
-    <section className="sc-form-section">
+    <section className="sc-form-section" data-chat-guide="form">
       <div className="sc-form-container">
         <div className="sc-form-header">
           <h2 className="sc-form-title">Start Your Buy-Back Request</h2>

@@ -3,7 +3,7 @@ import { io, Socket } from "socket.io-client";
 import axiosClient from "../../api/axiosClient";
 import tokenStorage from "../../utils/tokenStorage";
 import type { UserProfile } from "../../types/user";
-import type { ChatProductCard } from "../../types/chatbot";
+import type { ChatNavigation, ChatProductCard } from "../../types/chatbot";
 
 export interface MessageMetadata {
   fileName?: string;
@@ -14,6 +14,7 @@ export interface MessageMetadata {
   link?: string;
   imageUrl?: string;
   products?: ChatProductCard[]; // Thẻ sản phẩm kiểu mới (tối đa 3)
+  navigation?: ChatNavigation; // Bot dẫn tới trang / vị trí trên web
 }
 
 export interface ChatMessage {
@@ -21,8 +22,9 @@ export interface ChatMessage {
   conversationId?: string;
   sender_type: "USER" | "BOT" | "AGENT" | "SYSTEM";
   content: string;
-  message_type: "TEXT" | "IMAGE" | "FILE" | "PRODUCT_CARD";
+  message_type: "TEXT" | "IMAGE" | "FILE" | "PRODUCT_CARD" | "NAVIGATION";
   metadata?: MessageMetadata;
+  isLive?: boolean; // Tin nhận realtime (không phải lịch sử) -> mới được tự chuyển trang
 }
 
 interface ServerMessage {
@@ -30,7 +32,7 @@ interface ServerMessage {
   conversation_id?: string;
   sender_type: "USER" | "BOT" | "AGENT" | "SYSTEM";
   content: string;
-  message_type?: "TEXT" | "IMAGE" | "FILE" | "PRODUCT_CARD";
+  message_type?: "TEXT" | "IMAGE" | "FILE" | "PRODUCT_CARD" | "NAVIGATION";
   metadata?: MessageMetadata;
 }
 
@@ -60,13 +62,14 @@ const SELF_TYPING_IDLE_MS = 2000; // ngừng gõ 2s -> báo "đã ngừng"
 const AGENT_TYPING_TIMEOUT_MS = 8000; // phòng mất tín hiệu ngừng gõ
 const BOT_TYPING_TIMEOUT_MS = 60000; // n8n có thể trả lời chậm
 
-const toChatMessage = (msg: ServerMessage): ChatMessage => ({
+const toChatMessage = (msg: ServerMessage, isLive = false): ChatMessage => ({
   id: msg._id || `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
   sender_type: msg.sender_type,
   content: msg.content,
   message_type: msg.message_type || "TEXT",
   metadata: msg.metadata,
   conversationId: msg.conversation_id,
+  isLive,
 });
 
 export function useChatSupport() {
@@ -131,7 +134,9 @@ export function useChatSupport() {
         const historyRes = await axiosClient.get(historyUrl);
         const historyData: ServerMessage[] = historyRes.data || [];
 
-        if (isMounted) setMessages(historyData.map(toChatMessage));
+        // Lịch sử: isLive = false -> tin NAVIGATION cũ không tự chuyển trang lại
+        if (isMounted)
+          setMessages(historyData.map((msg) => toChatMessage(msg, false)));
 
         // Bước 3: Socket.IO
         const rawApiUrl =
@@ -169,7 +174,7 @@ export function useChatSupport() {
           if (!isMounted) return;
           // Bot/nhân viên đã gửi xong -> tắt "..."
           if (newMsg.sender_type !== "USER") hideTyping();
-          setMessages((prev) => [...prev, toChatMessage(newMsg)]);
+          setMessages((prev) => [...prev, toChatMessage(newMsg, true)]);
         });
 
         socket.on("typing", (data: TypingEventPayload) => {

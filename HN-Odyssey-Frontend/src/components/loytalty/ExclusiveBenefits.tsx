@@ -28,7 +28,7 @@ export default function ExclusiveBenefits() {
 
   // render
   return (
-    <section className="eb-section">
+    <section className="eb-section" data-chat-guide="benefits">
       <div className="eb-container">
         <div className="eb-header">
           <h2 className="eb-title">Exclusive Member Benefits</h2>

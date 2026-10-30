@@ -12,12 +12,21 @@ interface RecommendationWithAlgoliaData {
   __queryID?: string;
 }
 
-export default function ProductRecommendations() {
+export default function ProductRecommendations({
+  productId,
+}: {
+  productId?: string;
+}) {
   const gridRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hasTrackedView = useRef(false);
 
-  const { recommendations } = useProductRecommendations();
+  const { recommendations } = useProductRecommendations(productId);
+
+  // Chuyển sang sản phẩm khác thì cho phép bắn lại view event của widget
+  useEffect(() => {
+    hasTrackedView.current = false;
+  }, [productId]);
 
   useEffect(() => {
     if (

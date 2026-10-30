@@ -15,11 +15,11 @@ interface IShippingOrderData {
   customerName: string;
   phone: string;
   address: string;
-  weight: number;
+  weight: number; // gram
   length?: number;
   width?: number;
   height?: number;
-  codAmount: number;
+  codAmount: number; // VNĐ
   wardCode: string;
   districtId: number;
   items: IShippingItem[];
@@ -59,9 +59,6 @@ export class GhnService {
 
   // AC1: Đẩy đơn sang GHN
   async createShippingOrder(orderData: IShippingOrderData) {
-    console.log('=== CHECK TOKEN GHN ===', this.apiToken);
-    console.log('=== CHECK SHOP ID ===', this.shopId);
-
     // XỬ LÝ ĐẢO CHIỀU ĐIỂM A VÀ ĐIỂM B
     let senderReceiverPayload = {};
 
@@ -102,7 +99,9 @@ export class GhnService {
       const response = await axios.post<IGhnResponse<GhnCreateOrderResponse>>(
         `${this.apiUrl}/shipping-order/create`,
         {
-          payment_type_id: 2, // 2: Người gửi / Người tạo đơn trả phí
+          // 1 = Shop trả phí cho GHN (phí ship đã nằm trong tổng tiền khách trả lúc checkout)
+          // 2 = Người nhận trả phí (GHN sẽ cộng phí vào tiền thu hộ → thu phí 2 lần)
+          payment_type_id: 1,
           service_type_id: 2, // 2: Chuyển phát chuẩn
           note: orderData.note || 'Hàng dễ vỡ',
           required_note: 'CHOXEMHANGKHONGTHU',

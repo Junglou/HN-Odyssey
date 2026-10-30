@@ -114,7 +114,10 @@ const MyProfile = ({ recommendations }: MyProfileProps) => {
         <div className="my-profile-internal-grid">
           <div className="grid-section section-profile-main">
             <div className="profile-main-grid">
-              <div className="grid-section section-avatar">
+              <div
+                className="grid-section section-avatar"
+                data-chat-guide="avatar"
+              >
                 <div className="avatar-frame">
                   {!user.avatar ? (
                     <div className="avatar-null">—</div>
@@ -148,7 +151,7 @@ const MyProfile = ({ recommendations }: MyProfileProps) => {
               </div>
 
               <div className="grid-section section-forms">
-                <div className="info-block">
+                <div className="info-block" data-chat-guide="profile-info">
                   <h3 className="block-title">Profile information</h3>
                   <div className="info-grid-row">
                     <div className="info-item">
@@ -180,7 +183,10 @@ const MyProfile = ({ recommendations }: MyProfileProps) => {
                     Edit user profile
                   </button>
                 </div>
-                <div className="info-block mt-between-forms">
+                <div
+                  className="info-block mt-between-forms"
+                  data-chat-guide="account-info"
+                >
                   <h3 className="block-title">Account information</h3>
                   <div className="info-grid-row">
                     <div className="info-item">
@@ -217,7 +223,10 @@ const MyProfile = ({ recommendations }: MyProfileProps) => {
               </div>
 
               <div className="grid-section section-social">
-                <div className="profile-linked-block align-with-fields">
+                <div
+                  className="profile-linked-block align-with-fields"
+                  data-chat-guide="linked-accounts"
+                >
                   <h3 className="mini-title">Linked Account</h3>
                   <ul className="profile-linked-list">
                     {linkedProviders.map(({ key, label, Icon, linked }) => (
@@ -248,6 +257,7 @@ const MyProfile = ({ recommendations }: MyProfileProps) => {
                   <a
                     className="text-link"
                     onClick={() => setIsChangePasswordOpen(true)}
+                    data-chat-guide="change-password"
                   >
                     {user.has_password === false
                       ? "Set password"

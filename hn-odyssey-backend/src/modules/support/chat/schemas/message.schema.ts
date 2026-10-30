@@ -22,7 +22,7 @@ export class Message extends Document {
 
   @Prop({
     type: String,
-    enum: ['TEXT', 'IMAGE', 'PRODUCT_CARD', 'FILE'],
+    enum: ['TEXT', 'IMAGE', 'PRODUCT_CARD', 'FILE', 'NAVIGATION'],
     default: 'TEXT',
   })
   message_type: string;
