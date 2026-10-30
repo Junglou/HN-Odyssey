@@ -462,3 +462,8 @@
     transform: translateY(0);
   }
 }
+
+.ban-status-badge.scheduled {
+  background-color: #eff6ff;
+  color: #2563eb;
+}

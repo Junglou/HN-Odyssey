@@ -177,17 +177,17 @@ export class ContentService {
           : plainText;
     }
 
-    // Sau đoạn chặn phía trên, dto.status chỉ có thể là DRAFT hoặc undefined,
-    // nên khởi tạo DRAFT và khai báo kiểu rõ ràng để còn gán được SCHEDULED
-    let initialStatus: PostStatus = PostStatus.DRAFT;
-    if (dto.published_at && new Date(dto.published_at) > new Date()) {
-      initialStatus = PostStatus.SCHEDULED;
+    // Hẹn giờ đăng = xuất bản tự động → chỉ qua posts/:id/schedule (quyền PUBLISH)
+    if (dto.published_at) {
+      throw new ForbiddenException(
+        'Không thể hẹn giờ đăng khi tạo bài. Vui lòng lưu nháp rồi dùng chức năng Schedule (cần quyền Publish).',
+      );
     }
 
     const newPost = new this.postModel({
       ...dto,
       author_id: new Types.ObjectId(userId),
-      status: initialStatus,
+      status: PostStatus.DRAFT,
     });
 
     const savedPost = await newPost.save();
@@ -511,15 +511,27 @@ export class ContentService {
     });
     if (!banner) throw new NotFoundException('Không tìm thấy Banner');
 
-    // Trạng thái chỉ đổi qua banners/bulk/status (quyền CHANGE_STATUS)
-    if (dto.status !== undefined && dto.status !== banner.status) {
+    // Tách status ra: trạng thái chỉ đổi qua banners/bulk/status (quyền CHANGE_STATUS)
+    const { status: requestedStatus, ...rest } = dto;
+    if (requestedStatus !== undefined && requestedStatus !== banner.status) {
       throw new ForbiddenException(
         'Không thể đổi trạng thái qua chức năng sửa banner. Vui lòng dùng nút Bật/Tắt.',
       );
     }
 
+    // ValidationPipe (transform) tạo sẵn các key = undefined cho field không gửi lên;
+    // bỏ chúng đi để không ghi đè dữ liệu cũ (status, display_order, ...)
+    const changes = Object.fromEntries(
+      Object.entries(rest).filter(([, value]) => value !== undefined),
+    );
+
     const wasHidden = banner.status === BannerStatus.HIDDEN;
-    Object.assign(banner, dto);
+    banner.set(changes);
+
+    // Ràng buộc ngày giống lúc tạo banner
+    if (new Date(banner.start_date) >= new Date(banner.end_date)) {
+      throw new BadRequestException('Ngày kết thúc phải lớn hơn ngày bắt đầu');
+    }
 
     // Banner đang TẮT: đổi ngày KHÔNG được tự bật lại (tránh lách quyền CHANGE_STATUS).
     // Banner đang bật (ACTIVE/WAITING): tính lại theo lịch như cũ.
@@ -616,11 +628,18 @@ export class ContentService {
       );
     }
 
-    Object.assign(post, dto);
-
-    // Nếu có đổi lịch đăng
-    if (dto.published_at && new Date(dto.published_at) > new Date()) {
-      post.status = PostStatus.SCHEDULED;
+    // Lịch đăng chỉ đổi qua posts/:id/schedule (quyền PUBLISH).
+    // Gửi lại đúng giá trị cũ thì cho qua, khác giá trị cũ thì chặn.
+    if (dto.published_at !== undefined) {
+      const newTime = dto.published_at
+        ? new Date(dto.published_at).getTime()
+        : null;
+      const oldTime = post.published_at ? post.published_at.getTime() : null;
+      if (newTime !== oldTime) {
+        throw new ForbiddenException(
+          'Không thể đổi lịch đăng qua chức năng sửa bài viết. Vui lòng dùng chức năng Schedule (cần quyền Publish).',
+        );
+      }
     }
 
     if (!dto.meta_title && dto.title) {
@@ -636,6 +655,9 @@ export class ContentService {
           ? plainText.substring(0, 150).trim() + '...'
           : plainText;
     }
+
+    // Gán SAU khi đã điền fallback SEO để meta được lưu vào post
+    Object.assign(post, dto);
 
     const updatedPost = await post.save();
 
@@ -941,6 +963,61 @@ export class ContentService {
     return {
       message: `Đã cập nhật trạng thái thành công ${result.modifiedCount} bài viết`,
     };
+  }
+
+  // BLOG: LÊN LỊCH / HỦY LỊCH ĐĂNG (quyền PUBLISH)
+  async schedulePost(
+    id: string,
+    publishedAt: string | null,
+    userId: string,
+    email: string,
+  ) {
+    const post = await this.postModel.findById(id);
+    if (!post || post.is_deleted)
+      throw new NotFoundException('Không tìm thấy bài viết');
+
+    // Chỉ bài chưa xuất bản mới lên lịch được; PUBLISHED/HIDDEN dùng Publish/Unpublish
+    if (
+      post.status !== PostStatus.DRAFT &&
+      post.status !== PostStatus.SCHEDULED
+    ) {
+      throw new BadRequestException(
+        'Chỉ lên lịch được cho bài đang Draft hoặc Scheduled.',
+      );
+    }
+
+    const oldStatus = post.status;
+
+    if (publishedAt === null) {
+      // Hủy lịch → về nháp
+      post.status = PostStatus.DRAFT;
+      post.published_at = null;
+    } else {
+      const date = new Date(publishedAt);
+      if (date <= new Date()) {
+        throw new BadRequestException('Thời gian hẹn đăng phải ở tương lai.');
+      }
+      post.status = PostStatus.SCHEDULED;
+      post.published_at = date;
+    }
+
+    const savedPost = await post.save();
+
+    await this.auditLogsService.log({
+      action: 'CHANGE_STATUS',
+      collection_name: Resource.CONTENT_POSTS,
+      actor_id: userId,
+      actor_email: email,
+      target_id: savedPost._id,
+      department: Department.MARKETING,
+      detail: {
+        from: oldStatus,
+        to: savedPost.status,
+        published_at: savedPost.published_at,
+      },
+    });
+
+    return savedPost;
   }
 
   async bulkDeletePosts(ids: string[], userId: string, email: string) {
