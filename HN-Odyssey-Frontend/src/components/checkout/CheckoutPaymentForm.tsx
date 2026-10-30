@@ -22,7 +22,10 @@ export default function CheckoutPaymentForm({
 }: CheckoutPaymentFormProps) {
   // render
   return (
-    <div className="checkout-payment-container">
+    <div
+      className="checkout-payment-container"
+      data-chat-guide="payment-method"
+    >
       {/* 1. Thanh toán khi nhận hàng (COD) */}
       <div
         className={`checkout-payment-card ${paymentData.method === "COD" ? "active" : ""}`}

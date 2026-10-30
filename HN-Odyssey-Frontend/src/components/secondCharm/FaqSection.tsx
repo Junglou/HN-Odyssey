@@ -12,7 +12,7 @@ export default function FaqSection() {
   };
 
   return (
-    <section className="sc-faq-section">
+    <section className="sc-faq-section" data-chat-guide="faq">
       <div className="sc-faq-container">
         <h2 className="sc-faq-title">Frequently Asked Questions</h2>
 

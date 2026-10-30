@@ -21,7 +21,7 @@ export default function OrderSummary({
 }: OrderSummaryProps) {
   // render
   return (
-    <div className="cart-summary-box">
+    <div className="cart-summary-box" data-chat-guide="order-summary">
       <div className="cart-summary-billing">
         <div className="cart-summary-row">
           <span>Subtotal:</span>

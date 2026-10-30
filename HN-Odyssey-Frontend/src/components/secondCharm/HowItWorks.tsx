@@ -23,7 +23,7 @@ export default function HowItWorks() {
   };
 
   return (
-    <section className="sc-hiw-section">
+    <section className="sc-hiw-section" data-chat-guide="how-it-works">
       <div className="sc-hiw-container">
         <div className="sc-hiw-header">
           <h2 className="sc-hiw-title">How It Works</h2>

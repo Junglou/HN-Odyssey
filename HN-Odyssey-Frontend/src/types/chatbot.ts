@@ -30,3 +30,11 @@ export interface ChatProductCard {
   options: ChatCardOption[];
   variants: ChatCardVariant[];
 }
+
+// Bot dẫn khách tới trang / vị trí trên website (message_type NAVIGATION)
+export interface ChatNavigation {
+  page?: string;
+  section?: string;
+  category?: string;
+  auto?: boolean;
+}

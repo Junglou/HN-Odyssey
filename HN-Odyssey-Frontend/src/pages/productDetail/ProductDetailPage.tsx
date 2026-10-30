@@ -32,7 +32,7 @@ export default function ProductDetailPage() {
         onQuantityInput={handleQuantityInput}
         onQuantityBlur={handleQuantityBlur}
       />
-      <ProductRecommendations />
+      <ProductRecommendations productId={product?.id} />
       <ProductReviews />
     </div>
   );

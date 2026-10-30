@@ -144,11 +144,19 @@ export default function Header() {
             {hasWishlistItems && <span className="action-dot"></span>}
           </div>
 
-          <div className="header-action-wrapper" onClick={handleAccountClick}>
+          <div
+            className="header-action-wrapper"
+            onClick={handleAccountClick}
+            data-chat-guide="header-account"
+          >
             <UserIcon className="action-icon" />
           </div>
 
-          <div className="header-action-wrapper" ref={cartWrapperRef}>
+          <div
+            className="header-action-wrapper"
+            ref={cartWrapperRef}
+            data-chat-guide="header-cart"
+          >
             <div className="cart-trigger-box" onClick={toggleCart}>
               <CartIcon className="action-icon" />
               {/* hiển thị tổng số lượng thay vì độ dài mảng */}
@@ -180,6 +188,7 @@ export default function Header() {
 
             <div
               className={`header-search ${isSearchOpen ? "active" : ""}`}
+              data-chat-guide="header-search"
               onClick={handleOpenSearch}
               ref={searchWrapperRef}
               style={{ position: "relative" }}

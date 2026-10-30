@@ -30,7 +30,10 @@ const AddressManagement = ({
 
       <div className="address-box-internal-grid">
         {/* CỘT 1: Box quản lý địa chỉ */}
-        <div className="grid-section section-address">
+        <div
+          className="grid-section section-address"
+          data-chat-guide="address-list"
+        >
           {address.map((items, index) => (
             <AddressBox
               key={items.id || index}
@@ -50,7 +53,10 @@ const AddressManagement = ({
           </div>
           <div className="bottom-link-container">
             {/* Gắn link nội bộ */}
-            <a className="text-link" onClick={() => navigate("/refund-policy")}>
+            <a
+              className="text-link"
+              onClick={() => navigate("/pages/return-policy")}
+            >
               Refund Policy
             </a>
             <a
@@ -59,7 +65,10 @@ const AddressManagement = ({
             >
               About Loyalty Plan
             </a>
-            <a className="text-link" onClick={() => navigate("/about-us")}>
+            <a
+              className="text-link"
+              onClick={() => navigate("/pages/about-us")}
+            >
               About us
             </a>
             <a

@@ -1,5 +1,6 @@
 // imports
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import EmojiPicker, {
   EmojiStyle,
   type EmojiClickData,
@@ -17,6 +18,11 @@ import ChatProductCarousel from "./ChatProductCarousel";
 import "./ChatWidget.css";
 import { toast } from "react-toastify";
 import { getApiErrorMessage } from "../../../utils/apiError";
+import type { ChatNavigation } from "../../../types/chatbot";
+import {
+  highlightChatGuide,
+  resolveChatNavigation,
+} from "../../../utils/chatbotNavigation";
 
 // THÊM HÀM NÀY ĐỂ FIX LỖI LINK KÉP TỪ DB CŨ
 const getValidMediaUrl = (url: string) => {
@@ -57,6 +63,44 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  // Tin NAVIGATION đã tự chuyển trang rồi -> không chạy lại
+  const handledNavIdsRef = useRef<Set<string>>(new Set());
+
+  // Mở trang + làm nổi bật vị trí bot chỉ (dùng cho cả tự động lẫn nút trong bong bóng)
+  const runNavigation = useCallback(
+    (nav?: ChatNavigation) => {
+      const target = resolveChatNavigation(nav);
+      if (!target) return;
+
+      const currentPath = location.pathname + location.search;
+      const willNavigate = !!target.path && target.path !== currentPath;
+      if (willNavigate && target.path) navigate(target.path);
+
+      // Mobile: khung chat che hết màn hình -> thu lại để khách thấy trang
+      if (window.matchMedia("(max-width: 768px)").matches) onClose();
+
+      highlightChatGuide(target.section, willNavigate ? 400 : 0);
+    },
+    [location.pathname, location.search, navigate, onClose],
+  );
+
+  // Bot vừa trả NAVIGATION (realtime) với auto = true -> tự mở trang
+  useEffect(() => {
+    const latest = messages[messages.length - 1];
+    if (
+      !latest?.isLive ||
+      latest.sender_type !== "BOT" ||
+      latest.message_type !== "NAVIGATION" ||
+      handledNavIdsRef.current.has(latest.id)
+    )
+      return;
+    handledNavIdsRef.current.add(latest.id);
+    if (latest.metadata?.navigation?.auto) {
+      runNavigation(latest.metadata.navigation);
+    }
+  }, [messages, runNavigation]);
 
   // Giải phóng URL xem trước khi đổi ảnh / bỏ ảnh / đóng khung chat
   useEffect(() => {
@@ -248,9 +292,25 @@ export default function ChatWidget({ onClose }: ChatWidgetProps) {
             >
               <div className="cw-bubble">
                 {/* text type */}
-                {msg.message_type === "TEXT" && (
+                {(msg.message_type === "TEXT" ||
+                  msg.message_type === "NAVIGATION") && (
                   <p dangerouslySetInnerHTML={formatText(msg.content)}></p>
                 )}
+
+                {/* nút mở trang / chỉ vị trí do bot hướng dẫn */}
+                {msg.message_type === "NAVIGATION" &&
+                  resolveChatNavigation(msg.metadata?.navigation) && (
+                    <button
+                      type="button"
+                      className="cw-nav-btn"
+                      onClick={() => runNavigation(msg.metadata?.navigation)}
+                    >
+                      {
+                        resolveChatNavigation(msg.metadata?.navigation)
+                          ?.buttonLabel
+                      }
+                    </button>
+                  )}
 
                 {/* image type */}
                 {msg.message_type === "IMAGE" && (

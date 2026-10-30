@@ -111,7 +111,7 @@ interface SendMessageDto {
   conversationId: string;
   content: string;
   sender_type?: 'USER' | 'AGENT';
-  message_type?: 'TEXT' | 'IMAGE' | 'PRODUCT_CARD' | 'FILE';
+  message_type?: 'TEXT' | 'IMAGE' | 'PRODUCT_CARD' | 'FILE' | 'NAVIGATION';
   metadata?: Record<string, unknown>;
   page_context?: { current_page?: string };
 }
@@ -120,7 +120,7 @@ interface AiEngineResponse {
   reply: string;
   action?: string;
   lang?: string; // 'vi' | 'en' do Bot nhận diện
-  message_type?: 'TEXT' | 'IMAGE' | 'PRODUCT_CARD' | 'FILE';
+  message_type?: 'TEXT' | 'IMAGE' | 'PRODUCT_CARD' | 'FILE' | 'NAVIGATION';
   metadata?: Record<string, unknown>;
 }
 
@@ -297,7 +297,11 @@ export class ChatService {
     type?: SendMessageDto['message_type'],
   ): NonNullable<SendMessageDto['message_type']> {
     const msgType = type || 'TEXT';
-    if (senderType === 'USER' && msgType === 'PRODUCT_CARD') return 'TEXT';
+    if (
+      senderType === 'USER' &&
+      (msgType === 'PRODUCT_CARD' || msgType === 'NAVIGATION')
+    )
+      return 'TEXT';
     return msgType;
   }
 
@@ -318,6 +322,29 @@ export class ChatService {
       if (caption) meta.caption = caption;
     }
     return meta;
+  }
+
+  // Metadata NAVIGATION do n8n trả: { page?: 'LOYALTY', section?: 'tiers', category?: 'women', auto?: boolean }
+  // Chỉ giữ mã đúng định dạng; FE còn kiểm tra lại theo whitelist trước khi chuyển trang
+  private sanitizeNavigation(
+    raw: unknown,
+  ): Record<string, string | boolean> | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const nav = raw as Record<string, unknown>;
+    const pick = (value: unknown, pattern: RegExp) =>
+      typeof value === 'string' && pattern.test(value) ? value : undefined;
+
+    const page = pick(nav.page, /^[A-Z_]{2,40}$/);
+    const section = pick(nav.section, /^[a-z-]{2,40}$/);
+    const category = pick(nav.category, /^[a-z-]{2,40}$/);
+    if (!page && !section) return null;
+
+    return {
+      ...(page && { page }),
+      ...(section && { section }),
+      ...(page === 'PRODUCTS' && category && { category }),
+      auto: nav.auto !== false,
+    };
   }
 
   // Chỉ nhận ảnh trên Cloudinary của shop (tránh n8n tải link lạ do client gửi)
@@ -858,6 +885,17 @@ export class ChatService {
         msgMetadata = { products: cards };
       } else {
         // Không có sản phẩm hợp lệ -> chỉ gửi câu trả lời dạng chữ, không gửi thẻ rỗng
+        msgType = 'TEXT';
+        msgMetadata = {};
+      }
+    }
+
+    // Dẫn đường trên website: AI chỉ đưa mã trang/mã vị trí, FE tự đổi sang route
+    if (msgType === 'NAVIGATION') {
+      const navigation = this.sanitizeNavigation(msgMetadata.navigation);
+      if (navigation) {
+        msgMetadata = { navigation };
+      } else {
         msgType = 'TEXT';
         msgMetadata = {};
       }

@@ -10,7 +10,7 @@ export default function RedeemPoints() {
 
   // render
   return (
-    <section className="redeem-section">
+    <section className="redeem-section" data-chat-guide="redeem">
       <div className="redeem-container">
         <div className="redeem-header">
           <h2 className="redeem-title">Redeem Your Points</h2>

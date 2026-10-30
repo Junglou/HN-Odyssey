@@ -29,7 +29,7 @@ export default function MembershipTiers() {
 
   // render
   return (
-    <section className="tiers-section">
+    <section className="tiers-section" data-chat-guide="tiers">
       <div className="tiers-container">
         <div className="tiers-header">
           <h2 className="tiers-title">Membership Tiers</h2>

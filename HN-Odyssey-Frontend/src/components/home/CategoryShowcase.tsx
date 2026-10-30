@@ -14,7 +14,7 @@ export default function CategoryShowcase() {
   };
 
   return (
-    <section className="cs-section-container">
+    <section className="cs-section-container" data-chat-guide="categories">
       {/* Text & Tabs (Giữ nguyên) */}
       <div className="cs-text-wrapper">
         <p className="cs-quote">

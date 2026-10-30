@@ -2,7 +2,7 @@ export class SendMessageDto {
   conversationId: string;
   content: string;
   sender_type?: 'USER' | 'AGENT';
-  message_type?: 'TEXT' | 'IMAGE' | 'PRODUCT_CARD' | 'FILE';
+  message_type?: 'TEXT' | 'IMAGE' | 'PRODUCT_CARD' | 'FILE' | 'NAVIGATION';
   metadata?: Record<string, unknown>;
   page_context?: { current_page?: string }; // Trang khách đang xem khi gửi tin
 }
