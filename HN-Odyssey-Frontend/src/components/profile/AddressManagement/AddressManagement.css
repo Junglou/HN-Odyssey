@@ -17,11 +17,11 @@
 }
 
 /* Header */
-.profile-header {
+.address-header {
   padding: 2.5rem 3rem 1rem 3rem;
   background: #fff;
 }
-.profile-title {
+.address-title {
   font-size: 2rem;
   font-weight: 700;
   margin: 0;
@@ -131,5 +131,20 @@
     grid-template-columns: auto;
     column-gap: 1rem;
     row-gap: 1rem;
+  }
+}
+
+@media (max-width: 990px) {
+  .section-address {
+    grid-template-columns: repeat(auto-fill, minmax(min(14rem, 100%), 1fr));
+  }
+}
+
+@media (max-width: 576px) {
+  .address-header {
+    padding: 1.25rem 1.25rem 0.5rem;
+  }
+  .address-title {
+    font-size: 1.5rem;
   }
 }

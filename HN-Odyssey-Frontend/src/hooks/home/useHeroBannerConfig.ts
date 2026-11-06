@@ -52,8 +52,8 @@ export function useHeroBannerConfig() {
         if (banners.length > 0) {
           const mappedSlides: SlideData[] = banners.map((b, index) => ({
             id: b._id,
-            title: b.title || "Khám phá H&N Odyssey",
-            subtitle: "Sẵn sàng cho mọi chuyến đi", // Fallback text do DB ko có trường này
+            title: b.title || "Discover H&N Odyssey",
+            subtitle: "Ready for every journey", // Fallback text do DB ko có trường này
             tags: ["New Arrivals", "Trending"], // Fallback tags
             mediaUrl: getFullImageUrl(b.image_pc),
             mediaType: (b.image_pc.match(/\.(mp4|webm)$/i)

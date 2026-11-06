@@ -69,7 +69,7 @@ const ConfirmDeleteModal = ({
 
         {/* Khu vực nút bấm */}
         <div className="cd-modal-actions">
-          <button className="cd-btn-cancel" onClick={onClose}>
+          <button className="cd-modal-btn-cancel" onClick={onClose}>
             {cancelLabel}
           </button>
           <button className="cd-btn-delete" onClick={onConfirm}>

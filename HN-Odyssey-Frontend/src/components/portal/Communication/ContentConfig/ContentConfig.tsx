@@ -39,8 +39,8 @@ function EditorDropdown({
         setIsOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () => document.removeEventListener("pointerdown", handleClickOutside);
   }, []);
 
   const selectedOption =
@@ -193,9 +193,9 @@ export default function ContentConfig({
         }
       }
     };
-    document.addEventListener("mousedown", handleClickOutsideEditor, true);
+    document.addEventListener("pointerdown", handleClickOutsideEditor, true);
     return () =>
-      document.removeEventListener("mousedown", handleClickOutsideEditor, true);
+      document.removeEventListener("pointerdown", handleClickOutsideEditor, true);
   }, [editingElementId]);
 
   useEffect(() => {

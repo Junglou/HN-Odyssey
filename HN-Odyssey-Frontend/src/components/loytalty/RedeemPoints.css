@@ -106,4 +106,8 @@
   .redeem-card {
     padding: 24px 16px;
   }
+  .redeem-card-title {
+    font-size: 16px;
+    overflow-wrap: anywhere;
+  }
 }

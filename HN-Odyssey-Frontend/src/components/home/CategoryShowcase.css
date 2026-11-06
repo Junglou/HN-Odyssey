@@ -190,3 +190,10 @@
     gap: 30px;
   }
 }
+
+@media (hover: none) {
+  .cs-image-overlay {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

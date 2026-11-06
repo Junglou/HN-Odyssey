@@ -246,6 +246,10 @@
     max-width: 250px;
   }
 
+  .newsletter-input {
+    font-size: 16px;
+  }
+
   .footer-bottom {
     grid-template-columns: 1fr;
     gap: 0;

@@ -47,6 +47,9 @@ function PriceRangeFilter({
           value={localMin}
           onChange={(e) => setLocalMin(e.target.value)}
           style={{
+            fontSize: "16px",
+            minWidth: 0,
+            boxSizing: "border-box",
             width: "100%",
             padding: "8px",
             border: "1px solid #e5e7eb",
@@ -61,6 +64,9 @@ function PriceRangeFilter({
           value={localMax}
           onChange={(e) => setLocalMax(e.target.value)}
           style={{
+            fontSize: "16px",
+            minWidth: 0,
+            boxSizing: "border-box",
             width: "100%",
             padding: "8px",
             border: "1px solid #e5e7eb",

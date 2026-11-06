@@ -157,41 +157,45 @@ export default function JustForYou({
         <h2 className="jfy-title">Just for you</h2>
         <p className="jfy-subtitle">“Created with your story in mind...”</p>
       </div>
-      <div className="jfy-slider-window">
-        <div
-          className="jfy-slider-track"
-          style={{ transform: `translateX(-${currentIndex * 100}%)` }}
-        >
-          {slides.map((slide) => (
-            <div key={slide.id} className="jfy-slide-item">
-              {slide.backgroundUrl && (
-                <SmartImage
-                  src={slide.backgroundUrl}
-                  alt=""
-                  loading="eager"
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    objectPosition: "center",
-                  }}
-                />
-              )}
-              <div
-                className="jfy-canvas-layer"
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  width: "100%",
-                  height: "100%",
-                }}
-              >
-                {slide.elements.map(renderContentElement)}
-              </div>
+      <div className="jfy-slider-outer">
+        <div className="home-canvas-scroll">
+          <div className="jfy-slider-window">
+            <div
+              className="jfy-slider-track"
+              style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+            >
+              {slides.map((slide) => (
+                <div key={slide.id} className="jfy-slide-item">
+                  {slide.backgroundUrl && (
+                    <SmartImage
+                      src={slide.backgroundUrl}
+                      alt=""
+                      loading="eager"
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        objectPosition: "center",
+                      }}
+                    />
+                  )}
+                  <div
+                    className="jfy-canvas-layer"
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      width: "100%",
+                      height: "100%",
+                    }}
+                  >
+                    {slide.elements.map(renderContentElement)}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
         <div className="jfy-dots-container">
           {slides.map((_, idx) => (

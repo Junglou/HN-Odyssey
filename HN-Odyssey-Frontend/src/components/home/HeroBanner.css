@@ -232,6 +232,21 @@
 
   .hb-media-overlay {
     z-index: 3;
+    pointer-events: none;
+  }
+
+  .hb-icon-wrapper,
+  .hb-pagination {
+    pointer-events: auto;
+  }
+
+  .hb-content-section {
+    pointer-events: none;
+  }
+
+  .hb-title,
+  .hb-tag-btn {
+    pointer-events: auto;
   }
 
   .hb-content-section {
@@ -290,4 +305,35 @@
     padding: 8px 16px;
     font-size: 13px;
   }
+}
+
+/* Chấm chuyển slide: giữ nguyên 8px nhưng vùng chạm lớn hơn */
+.hb-dot {
+  position: relative;
+}
+.hb-dot::after {
+  content: "";
+  position: absolute;
+  inset: -12px -6px;
+}
+@media screen and (max-width: 768px) {
+  .hb-pagination {
+    gap: 12px;
+  }
+}
+
+/* Icon (i): trắng có bóng nhẹ để thấy rõ trên mọi ảnh nền */
+.hb-icon-wrapper {
+  color: #ffffff;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
+}
+
+/* Cho phép vuốt ngang trong banner mà vẫn cuộn dọc trang bình thường */
+.hb-slider-window {
+  touch-action: pan-y;
+}
+
+/* Không còn icon (i): giữ chấm phân trang ở đáy ảnh */
+.hb-pagination {
+  margin-top: auto;
 }

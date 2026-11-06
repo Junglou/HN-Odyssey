@@ -104,7 +104,7 @@ export function useCart() {
         }
 
         return {
-          id: `${item.productId}_${item.sku}`,
+          id: `${item.productId}|${item.sku}`,
           name: item.productName,
           description: descriptionText,
           price: item.unitPrice,
@@ -179,7 +179,7 @@ export function useCart() {
     const currentItem = items.find((i) => i.id === id);
     if (!currentItem) return;
 
-    const [productId, sku] = id.split("_");
+    const [productId, sku] = id.split("|");
 
     try {
       const guestSessionId = getGuestSessionId();
@@ -205,7 +205,7 @@ export function useCart() {
       return;
     }
 
-    const [productId, sku] = id.split("_");
+    const [productId, sku] = id.split("|");
 
     try {
       const guestSessionId = getGuestSessionId();
@@ -224,7 +224,7 @@ export function useCart() {
 
   const confirmDelete = async () => {
     if (itemToDelete) {
-      const [productId, sku] = itemToDelete.split("_");
+      const [productId, sku] = itemToDelete.split("|");
 
       try {
         const guestSessionId = getGuestSessionId();

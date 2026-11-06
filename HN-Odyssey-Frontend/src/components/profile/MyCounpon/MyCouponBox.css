@@ -1,4 +1,5 @@
-.box-container {
+.coupon-box-container {
+  box-sizing: border-box;
   width: 100%;
   height: fit-content;
   min-width: 14rem;
@@ -7,11 +8,6 @@
   box-shadow:
     0 0 0 1px rgb(202, 200, 200),
     8px 8px 4px rgba(17, 24, 39, 0.2);
-}
-
-.lbl-text {
-  font-size: 1rem;
-  font-weight: bold;
 }
 
 .lbl-coupon-text {
@@ -112,7 +108,7 @@
   padding-left: 0.5rem;
 }
 
-.span-text {
+.coupon-span-text {
   display: -webkit-box;
   width: 100%;
   font-weight: 200;
@@ -128,4 +124,22 @@
 .title-container {
   display: flex;
   justify-content: space-between;
+}
+
+@media (max-width: 576px) {
+  .coupon-thumbnail-container {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .coupon-img-container {
+    align-items: flex-start;
+  }
+  .coupon-detail-container {
+    width: 100%;
+    padding-left: 0;
+  }
+  .coupon-detail-container .coupon-span-text {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
 }

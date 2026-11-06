@@ -34,5 +34,6 @@
   }
   .sticky-summary-wrapper {
     position: static;
+    order: -1;
   }
 }

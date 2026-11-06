@@ -406,3 +406,15 @@
   display: flex;
   flex-direction: column;
 }
+@media (max-width: 767px) {
+  /* nhóm Content không giãn hết chiều cao drawer (tránh khoảng trống lớn dưới ô soạn thảo) */
+  .sp-form-group-editor {
+    flex: none;
+  }
+  .sp-modal-body {
+    padding: 16px;
+  }
+  .sp-status-section {
+    flex-wrap: wrap;
+  }
+}

@@ -58,9 +58,9 @@ export default function FinalizeValueModal({
       }
     };
     if (isDropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("pointerdown", handleClickOutside);
     }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("pointerdown", handleClickOutside);
   }, [isDropdownOpen]);
 
   if (!isOpen || !tradeInId) return null;

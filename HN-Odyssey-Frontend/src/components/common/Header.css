@@ -23,7 +23,8 @@
   top: 0;
   left: 0;
   right: 0;
-  bottom: 0;
+  height: 100vh;
+  height: 100dvh;
   background-color: rgba(0, 0, 0, 0.4);
   z-index: 999;
   opacity: 0;
@@ -156,6 +157,7 @@
 
 /* thanh tìm kiếm */
 .header-search {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -223,6 +225,7 @@
   left: 0;
   width: 280px;
   height: 100vh;
+  height: 100dvh;
   background-color: #ffffff;
   box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
   transform: translateX(-100%);
@@ -273,6 +276,7 @@
     display: none;
     width: 0;
     opacity: 0;
+    font-size: 16px;
   }
 
   .header-search.active {
@@ -286,5 +290,115 @@
     display: block;
     width: 100%;
     opacity: 1;
+  }
+}
+@media screen and (max-width: 600px) {
+  /* giỏ hàng: bung full chiều ngang thay vì neo theo icon */
+  .header-action-wrapper.header-cart-wrapper {
+    position: static;
+  }
+  .header-cart-wrapper .cart-dropdown-wrapper {
+    left: 0;
+    right: 0;
+    width: auto;
+  }
+}
+
+/* Ô tìm kiếm mở ngay trên thanh header (logo và icon vẫn hiện).
+   Khi mở thì nhường chỗ cho ô tìm kiếm thay vì chia đôi thanh header. */
+@media screen and (max-width: 1024px) {
+  .header-main-bar:has(.header-search.active) .header-left {
+    flex: 0 0 auto;
+  }
+  .header-main-bar:has(.header-search.active) .header-actions {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  /* ô đang thu nhỏ có overflow:hidden nên danh sách gợi ý bên dưới bị cắt */
+  .header-search.active {
+    overflow: visible;
+  }
+}
+
+/* Màn hình hẹp (<= 420px) không đủ chỗ cho logo, icon và ô tìm kiếm cùng lúc:
+   tạm ẩn logo khi ô tìm kiếm đang mở */
+@media screen and (max-width: 420px) {
+  .header-main-bar:has(.header-search.active) .header-logo {
+    display: none;
+  }
+}
+
+/* Menu mobile: cuộn được khi dài, chừa chỗ cho thanh home của iPhone */
+.mobile-drawer {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Phần các mục từ thanh promo */
+.mobile-extra {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.mobile-extra-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mobile-extra-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+
+.mobile-extra-link {
+  text-decoration: none;
+  color: #111827;
+  font-weight: 500;
+  font-size: 0.95rem;
+  padding: 4px 0;
+}
+
+.mobile-extra-find {
+  font-weight: 600;
+}
+
+.mobile-lang {
+  display: flex;
+  gap: 8px;
+}
+
+.mobile-lang-btn {
+  flex: 1;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111827;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mobile-lang-btn.active {
+  background: #000000;
+  color: #ffffff;
+  border-color: #000000;
+}
+
+/* Ô tìm kiếm khi mở: ngắn lại cho gọn */
+@media screen and (max-width: 1024px) {
+  .header-search.active {
+    max-width: 150px;
   }
 }

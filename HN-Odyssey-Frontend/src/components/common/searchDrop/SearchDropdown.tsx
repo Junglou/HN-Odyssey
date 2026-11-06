@@ -1,4 +1,4 @@
-import { useHits } from "react-instantsearch";
+import { useHits, useStats } from "react-instantsearch";
 import { Link } from "react-router-dom";
 import axiosClient from "../../../api/axiosClient";
 import "./SearchDropdown.css";
@@ -20,12 +20,22 @@ interface AlgoliaProductRecord {
   __position?: number;
 }
 
+// Giá lưu bằng USD, hiển thị cùng kiểu với thẻ sản phẩm và giỏ hàng
+const formatPrice = (value?: number) =>
+  typeof value === "number"
+    ? `$${value.toLocaleString("en-US", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      })}`
+    : "";
+
 export default function SearchDropdown({
   isOpen,
   searchQuery,
   onClose,
 }: SearchDropdownProps) {
   const { hits } = useHits<AlgoliaProductRecord>();
+  const { nbHits } = useStats();
 
   if (!isOpen || !searchQuery.trim()) return null;
 
@@ -52,6 +62,13 @@ export default function SearchDropdown({
     <div className="search-dropdown-wrapper">
       {hits.length > 0 ? (
         <>
+          <div className="search-dropdown-head">
+            <span className="search-dropdown-title">Products</span>
+            <span className="search-dropdown-count">
+              {nbHits} {nbHits === 1 ? "result" : "results"}
+            </span>
+          </div>
+
           <div className="search-dropdown-items">
             {hits.slice(0, 5).map((hit) => (
               <Link
@@ -63,7 +80,7 @@ export default function SearchDropdown({
                 <div className="search-hit-img-box">
                   <SmartImage
                     src={hit.thumbnail}
-                    fallbackSrc="https://placehold.co/70x70/f3f4f6/000?text=Img"
+                    fallbackSrc="https://placehold.co/72x72/f3f4f6/000?text=Img"
                     alt={hit.name}
                     loading="eager"
                   />
@@ -71,7 +88,7 @@ export default function SearchDropdown({
                 <div className="search-hit-info">
                   <span className="search-hit-name">{hit.name}</span>
                   <span className="search-hit-price">
-                    {hit.price.toLocaleString("vi-VN")}đ
+                    {formatPrice(hit.price)}
                   </span>
                 </div>
               </Link>
@@ -84,13 +101,18 @@ export default function SearchDropdown({
               className="search-view-all-btn"
               onClick={onClose}
             >
-              Xem tất cả kết quả
+              View all results
             </Link>
           </div>
         </>
       ) : (
         <div className="search-no-results">
-          Không tìm thấy sản phẩm nào phù hợp.
+          <span className="search-no-results-title">
+            No matching products found.
+          </span>
+          <span className="search-no-results-hint">
+            Try a different keyword.
+          </span>
         </div>
       )}
     </div>

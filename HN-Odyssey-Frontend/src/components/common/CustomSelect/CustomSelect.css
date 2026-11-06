@@ -179,3 +179,27 @@
     animation: none;
   }
 }
+/* cuộn trong danh sách không kéo theo modal/trang phía sau */
+.cs-list {
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 992px) {
+  /* chống iOS tự zoom */
+  .cs-search input,
+  .cs-native-proxy {
+    font-size: 16px;
+  }
+
+  /* vùng chạm đủ lớn, danh sách không cao quá nửa màn hình */
+  .cs-option {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    box-sizing: border-box;
+    padding: 10px 14px;
+  }
+  .cs-list {
+    max-height: min(240px, 40vh);
+  }
+}

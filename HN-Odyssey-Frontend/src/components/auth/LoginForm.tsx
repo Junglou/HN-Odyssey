@@ -62,6 +62,10 @@ const LoginForm = ({
               type="text"
               className={`login-form-input ${error ? "input-error" : ""}`}
               placeholder="Email or Phone Number"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              autoComplete="username"
               value={account}
               onChange={(e) => setAccount(e.target.value)}
               required
@@ -74,6 +78,7 @@ const LoginForm = ({
               type="password"
               className="login-form-input"
               placeholder="Password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required

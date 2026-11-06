@@ -583,6 +583,7 @@
   .bm-table td {
     display: block;
     width: 100%;
+    min-width: 0;
   }
 
   .bm-table thead tr {
@@ -661,4 +662,11 @@
   pointer-events: auto;
   transform: translateY(0);
   animation: bm-slideFadeDown 0.2s ease-out forwards;
+}
+
+.bm-table thead th:first-child::after {
+  content: "Select all";
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #6b7280;
 }

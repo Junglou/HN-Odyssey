@@ -313,3 +313,67 @@
   font-weight: 700;
   color: #d97706; /* Cam */
 }
+/* Huy hiệu trạng thái đơn hàng (tab Order History) */
+.crm-order-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.crm-order-badge--pending {
+  background-color: #fef08a;
+  color: #ca8a04;
+}
+.crm-order-badge--confirmed {
+  background-color: #dbeafe;
+  color: #3b82f6;
+}
+.crm-order-badge--processing {
+  background-color: #ccfbf1;
+  color: #0f766e;
+}
+.crm-order-badge--shipping {
+  background-color: #f3e8ff;
+  color: #9333ea;
+}
+.crm-order-badge--delivered {
+  background-color: #dcfce7;
+  color: #16a34a;
+}
+.crm-order-badge--cancelled {
+  background-color: #fee2e2;
+  color: #ef4444;
+}
+.crm-order-badge--refunded {
+  background-color: #ffedd5;
+  color: #f59e0b;
+}
+.crm-order-badge--default {
+  background-color: #f3f4f6;
+  color: #6b7280;
+}
+/* Header và thanh tab không được co lại khi nội dung bên dưới dài */
+.crm-detail-header,
+.crm-tabs-header {
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .crm-tabs-header {
+    gap: 14px;
+    scrollbar-width: none;
+  }
+  .crm-tabs-header::-webkit-scrollbar {
+    display: none;
+  }
+  .crm-tab-btn {
+    font-size: 0.85rem;
+  }
+}
+/* Nút Export giữ độ rộng theo nội dung, không bị kéo dài khi thanh công cụ xếp cột */
+.crm-activity-toolbar .crm-btn-export {
+  align-self: flex-start;
+  width: auto;
+}

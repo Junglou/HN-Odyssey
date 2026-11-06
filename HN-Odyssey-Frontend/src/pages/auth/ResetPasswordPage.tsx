@@ -124,7 +124,9 @@ const ResetPasswordPage = () => {
               Reach out to support anytime for help or guidance.
             </li>
           </ul>
-          <button className="reset-explore-btn">Explore</button>
+          <button className="reset-explore-btn" onClick={() => navigate("/")}>
+            Explore
+          </button>
         </div>
       </div>
     </div>

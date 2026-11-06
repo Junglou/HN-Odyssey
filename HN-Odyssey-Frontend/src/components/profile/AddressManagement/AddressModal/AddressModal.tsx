@@ -71,6 +71,8 @@ export default function AddressModal({
               value={formData.phone}
               onChange={(e) => onChange("phone", e.target.value)}
               placeholder="09xx xxx xxx"
+              inputMode="tel"
+              autoComplete="tel"
               disabled={mode === "view"}
               required
             />

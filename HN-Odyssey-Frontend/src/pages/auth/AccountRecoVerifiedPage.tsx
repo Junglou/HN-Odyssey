@@ -61,7 +61,6 @@ const AccountRecoVerifiedPage = () => {
         newEmail: formData.newEmail,
       };
 
-      console.log("Submitting Real Payload:", payload);
       await confirmRecovery(payload);
 
       toast.success("Khôi phục tài khoản thành công! Vui lòng đăng nhập.");

@@ -337,7 +337,7 @@
 .status-Inactive .um-dot {
   background-color: #ef4444;
 }
-.status-Inactive {
+.um-status-badge.status-Inactive {
   color: #ef4444;
 }
 .status-Locked .um-dot {

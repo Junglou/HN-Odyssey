@@ -137,17 +137,17 @@
 }
 .pp-custom-select-options.open {
   pointer-events: auto;
-  animation: pp-slideFadeDown 0.2s ease-out forwards;
+  animation: ppanel-slideFadeDown 0.2s ease-out forwards;
   transform-origin: top center;
 }
 
 .pp-custom-select-options.closed {
   pointer-events: none;
-  animation: pp-slideFadeUp 0.2s ease-out forwards;
+  animation: ppanel-slideFadeUp 0.2s ease-out forwards;
   transform-origin: top center;
 }
 
-@keyframes pp-slideFadeDown {
+@keyframes ppanel-slideFadeDown {
   from {
     opacity: 0;
     transform: translateY(-5px);
@@ -158,7 +158,7 @@
   }
 }
 
-@keyframes pp-slideFadeUp {
+@keyframes ppanel-slideFadeUp {
   from {
     opacity: 1;
     transform: translateY(0);

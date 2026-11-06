@@ -277,7 +277,7 @@ const MyProfile = ({ recommendations }: MyProfileProps) => {
                   </a>
                   <a
                     className="text-link"
-                    onClick={() => navigate("/pages/return-policy")}
+                    onClick={() => navigate("/pages/return-and-warranty")}
                   >
                     Return Policy
                   </a>

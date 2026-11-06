@@ -86,8 +86,8 @@ function CustomFormDropdown({
         setIsOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () => document.removeEventListener("pointerdown", handleClickOutside);
   }, []);
 
   const selectedLabel =
@@ -175,8 +175,8 @@ export default function ProductForm({
       if (treeRef.current && !treeRef.current.contains(e.target as Node))
         setIsTreeOpen(false);
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () => document.removeEventListener("pointerdown", handleClickOutside);
   }, []);
 
   const hasPendingApproval = pricingList.some((p) => p.status === "pending");

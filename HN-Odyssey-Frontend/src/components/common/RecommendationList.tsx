@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { useTracking, BehaviorAction } from "../../hooks/common/useTracking"; // [BỔ SUNG]
+import { useTracking, BehaviorAction } from "../../hooks/common/useTracking";
 import "./RecommendationList.css";
 import SmartImage from "./SmartImage/SmartImage";
 import type { Product } from "../../types/product";
@@ -14,9 +14,9 @@ const RecommendationList = ({
   products,
 }: RecommendationListProps) => {
   const navigate = useNavigate();
-  const { trackEvent } = useTracking(); // [BỔ SUNG] Hook tracking
+  const { trackEvent } = useTracking();
 
-  // [BỔ SUNG] Hàm xử lý click Feedback AI
+  // Click vào gợi ý: gửi tracking (feedback cho AI) rồi chuyển trang
   const handleItemClick = (item: Product) => {
     trackEvent({
       action: BehaviorAction.CLICK_SEARCH_SUGGESTION,
@@ -39,27 +39,21 @@ const RecommendationList = ({
           <div
             key={item.id}
             className="reco-card"
-            onClick={() => handleItemClick(item)} // [SỬA LẠI] Dùng hàm onClick mới
-            style={{ cursor: "pointer" }}
+            role="button"
+            tabIndex={0}
+            onClick={() => handleItemClick(item)}
+            onKeyDown={(e) => e.key === "Enter" && handleItemClick(item)}
           >
-            {/* Ảnh sản phẩm */}
             <SmartImage src={item.image} alt={item.name} className="reco-img" />
 
-            {/* Thông tin */}
             <div className="reco-info">
-              {/* Tên sản phẩm */}
               <h4 className="reco-name">{item.name}</h4>
-
-              {/* Mô tả */}
-              <div className="reco-desc-block">
-                <span className="reco-label">Description: </span>
-                <span className="reco-mono-text">{item.description}</span>
-              </div>
-
-              {/* Giá */}
+              {item.description ? (
+                <p className="reco-desc">{item.description}</p>
+              ) : null}
               <div className="reco-price-block">
-                <div className="reco-label">Price: </div>
-                <div className="reco-mono-text price-val">{item.price}$</div>
+                <span className="reco-label">Price: </span>
+                <span className="reco-price">{item.price}$</span>
               </div>
             </div>
           </div>

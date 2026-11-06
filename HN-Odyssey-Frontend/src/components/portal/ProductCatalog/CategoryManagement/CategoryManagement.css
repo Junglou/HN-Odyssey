@@ -242,7 +242,7 @@
 .status-Inactive .cm-dot {
   background-color: #6b7280;
 }
-.status-Inactive {
+.cm-status-badge.status-Inactive {
   color: #6b7280;
 }
 

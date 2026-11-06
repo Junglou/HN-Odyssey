@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useRef } from "react";
 import "./TagManagement.css";
 import TableSkeleton from "../../common/TableSkeleton/TableSkeleton";
 import PortalPagination from "../../common/Pagination/PortalPagination";
+import { useClickOutside } from "../../../../hooks/common/useClickOutside";
 
 import { DotsIcon } from "../../../../assets/icons/UserManagementIcons";
 import { CleanTrashIcon } from "../../../../assets/icons/VariantManagementIcons";
@@ -39,16 +40,9 @@ export default function TagManagement({
 }: TagManagementProps) {
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
-  // tắt menu khi click ra ngoài
-  useEffect(() => {
-    const handleClickOutside = () => {
-      if (openDropdownId !== null) {
-        setOpenDropdownId(null);
-      }
-    };
-    document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
-  }, [openDropdownId]);
+  // tắt menu khi chạm ra ngoài bảng
+  const tableRef = useRef<HTMLDivElement>(null);
+  useClickOutside(tableRef, () => setOpenDropdownId(null));
 
   return (
     <div className="tm-container">
@@ -80,7 +74,7 @@ export default function TagManagement({
           />
         </div>
 
-        <div className="tm-table-wrapper">
+        <div className="tm-table-wrapper" ref={tableRef}>
           <table className="tm-table">
             <thead>
               <tr>

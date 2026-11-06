@@ -33,6 +33,27 @@ export default function HomePage() {
     fetchConfig();
   }, []);
 
+  // Chỉ căn giữa một lần cho mỗi khối để không giật lại khi người dùng đang vuốt
+  // (thanh địa chỉ trình duyệt co giãn cũng phát sự kiện resize).
+  useEffect(() => {
+    const centerAll = () => {
+      document
+        .querySelectorAll<HTMLElement>(".home-canvas-scroll")
+        .forEach((el) => {
+          if (el.scrollWidth <= el.clientWidth) {
+            delete el.dataset.centered; // lên desktop: lần sau quay lại mobile sẽ căn giữa lại
+            return;
+          }
+          if (el.dataset.centered === "1") return;
+          el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+          el.dataset.centered = "1";
+        });
+    };
+    centerAll();
+    window.addEventListener("resize", centerAll);
+    return () => window.removeEventListener("resize", centerAll);
+  }, []);
+
   // Lọc dữ liệu bằng Optional Chaining (?.)
   const justForYouSlides =
     sections?.filter((s) => s?.name?.toLowerCase()?.includes("just for you")) ||

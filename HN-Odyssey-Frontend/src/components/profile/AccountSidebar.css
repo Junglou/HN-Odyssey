@@ -333,3 +333,18 @@
     margin-right: 6px;
   }
 }
+@media (max-width: 992px) {
+  .sidebar-logout-container {
+    display: flex;
+    margin-top: 0;
+    padding-top: 0.75rem;
+  }
+  .sidebar-logout-container .line-column {
+    display: none;
+  }
+  .sidebar-logout-btn {
+    justify-content: center;
+    min-height: 44px;
+    border-color: #fca5a5;
+  }
+}

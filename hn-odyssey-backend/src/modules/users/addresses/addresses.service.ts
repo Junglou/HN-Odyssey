@@ -23,7 +23,7 @@ export interface IAddress {
 
 interface CustomerWithAddresses {
   _id: Types.ObjectId;
-  addresses: IAddress[];
+  addresses?: IAddress[];
 }
 
 @Injectable()
@@ -32,24 +32,35 @@ export class AddressesService {
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
   ) {}
 
-  async getMyAddresses(userId: string) {
+  // Model này là schema User gốc, không có trường `addresses` (chỉ Customer có).
+  // Nên đọc bằng lean() và ghi bằng updateOne({ strict: false }) để không phụ thuộc
+  // việc Mongoose có nhận ra đây là Customer hay không.
+  private async loadAddresses(userId: string): Promise<IAddress[]> {
     const user = (await this.userModel
       .findById(userId)
       .select('addresses')
       .lean()
-      .exec()) as unknown as CustomerWithAddresses;
+      .exec()) as unknown as CustomerWithAddresses | null;
     if (!user) throw new NotFoundException('Không tìm thấy người dùng');
-    return { success: true, data: user.addresses || [] };
+    return user.addresses || [];
+  }
+
+  private async saveAddresses(userId: string, addresses: IAddress[]) {
+    const result = await this.userModel
+      .updateOne({ _id: userId }, { $set: { addresses } }, { strict: false })
+      .exec();
+    if (result.matchedCount === 0) {
+      throw new NotFoundException('Không tìm thấy người dùng');
+    }
+  }
+
+  async getMyAddresses(userId: string) {
+    const addresses = await this.loadAddresses(userId);
+    return { success: true, data: addresses };
   }
 
   async createAddress(userId: string, dto: CreateAddressDto) {
-    const user = await this.userModel
-      .findById(userId)
-      .select('addresses')
-      .exec();
-    if (!user) throw new NotFoundException('Không tìm thấy người dùng');
-
-    const addresses = (user.get('addresses') as IAddress[]) || [];
+    const addresses = await this.loadAddresses(userId);
 
     // AC8: Giới hạn tối đa 10 địa chỉ để chống spam DB
     if (addresses.length >= 10) {
@@ -58,24 +69,23 @@ export class AddressesService {
       );
     }
 
-    // AC5: Nếu là địa chỉ đầu tiên -> Ép thành Mặc định
-    const isFirst = addresses.length === 0;
-    const shouldBeDefault = isFirst || dto.is_default;
+    // AC5: Địa chỉ đầu tiên luôn là mặc định
+    const shouldBeDefault = addresses.length === 0 || dto.is_default === true;
 
     const newAddress: IAddress = {
       ...dto,
-      is_default: shouldBeDefault || false,
+      is_default: shouldBeDefault,
       _id: new Types.ObjectId(),
     };
 
-    if (shouldBeDefault) {
-      // Reset toàn bộ các địa chỉ cũ về false
-      addresses.forEach((addr) => (addr.is_default = false));
-    }
+    const next: IAddress[] = [
+      ...(shouldBeDefault
+        ? addresses.map((addr) => ({ ...addr, is_default: false }))
+        : addresses),
+      newAddress,
+    ];
 
-    addresses.push(newAddress);
-    user.set('addresses', addresses);
-    await user.save();
+    await this.saveAddresses(userId, next);
 
     return {
       success: true,
@@ -89,13 +99,7 @@ export class AddressesService {
     addressId: string,
     dto: UpdateAddressDto,
   ) {
-    const user = await this.userModel
-      .findById(userId)
-      .select('addresses')
-      .exec();
-    if (!user) throw new NotFoundException('Không tìm thấy người dùng');
-
-    const addresses = (user.get('addresses') as IAddress[]) || [];
+    const addresses = await this.loadAddresses(userId);
     const index = addresses.findIndex(
       (addr) => addr._id?.toString() === addressId,
     );
@@ -105,36 +109,33 @@ export class AddressesService {
       throw new NotFoundException('Không tìm thấy địa chỉ cần cập nhật');
     }
 
-    // AC4: Xử lý nếu người dùng tích chọn "Đặt làm mặc định"
-    if (dto.is_default && !addresses[index].is_default) {
-      // Reset các địa chỉ khác về false
-      addresses.forEach((addr) => (addr.is_default = false));
-    }
+    // Chỉ lấy các trường client thực sự gửi lên
+    const changes = Object.fromEntries(
+      Object.entries(dto).filter(([, value]) => value !== undefined),
+    ) as Partial<IAddress>;
 
-    // Cập nhật các trường thông tin mới (Merge data)
-    addresses[index] = {
-      ...addresses[index],
-      ...dto,
-    };
+    const current = addresses[index];
+    // AC4: tích "Đặt làm mặc định" thì các địa chỉ khác về false.
+    // Địa chỉ đang là mặc định thì không cho bỏ tích (luôn phải có một mặc định).
+    const makeDefault = changes.is_default === true && !current.is_default;
+    if (current.is_default) changes.is_default = true;
 
-    user.set('addresses', addresses);
-    await user.save();
+    const next: IAddress[] = addresses.map((addr, i) => {
+      if (i === index) return { ...addr, ...changes };
+      return makeDefault ? { ...addr, is_default: false } : addr;
+    });
+
+    await this.saveAddresses(userId, next);
 
     return {
       success: true,
       message: 'Cập nhật địa chỉ thành công', // AC10: Message cho Toast
-      data: addresses[index],
+      data: next[index],
     };
   }
 
   async deleteAddress(userId: string, addressId: string) {
-    const user = await this.userModel
-      .findById(userId)
-      .select('addresses')
-      .exec();
-    if (!user) throw new NotFoundException('Không tìm thấy người dùng');
-
-    const addresses = (user.get('addresses') as IAddress[]) || [];
+    const addresses = await this.loadAddresses(userId);
     const index = addresses.findIndex(
       (addr) => addr._id?.toString() === addressId,
     );
@@ -151,10 +152,10 @@ export class AddressesService {
       );
     }
 
-    addresses.splice(index, 1);
-    user.set('addresses', addresses);
-    user.markModified('addresses');
-    await user.save();
+    await this.saveAddresses(
+      userId,
+      addresses.filter((_, i) => i !== index),
+    );
 
     // AC10: Trả về Message để Frontend show Toast
     return { success: true, message: 'Xóa địa chỉ thành công' };

@@ -179,11 +179,13 @@
     position: fixed;
     top: 0;
     left: -100%;
-    width: 280px;
+    width: min(280px, 85vw);
     height: 100vh;
+    height: 100dvh;
     background-color: #ffffff;
-    z-index: 100;
+    z-index: 1101;
     transition: left 0.3s ease;
+    overscroll-behavior: contain;
     padding: 24px;
     box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
     border-right: none;
@@ -196,6 +198,9 @@
 
   .pl-sidebar-close {
     display: block;
+    padding: 4px 10px;
+    font-size: 28px;
+    line-height: 1;
   }
 
   .pl-sidebar-overlay {
@@ -203,9 +208,9 @@
     position: fixed;
     top: 0;
     left: 0;
-    width: 100vw;
-    height: 100vh;
+    right: 0;
+    bottom: 0;
     background-color: rgba(0, 0, 0, 0.4);
-    z-index: 99;
+    z-index: 1100;
   }
 }

@@ -87,3 +87,49 @@
   cursor: pointer;
   margin-top: 20px;
 }
+
+@media screen and (max-width: 900px) {
+  .pl-promo-card {
+    min-height: 280px;
+  }
+  .pl-promo-content {
+    padding: 20px;
+    gap: 12px;
+  }
+  .pl-promo-title {
+    font-size: 22px;
+    overflow-wrap: anywhere;
+  }
+  .pl-promo-subtitle {
+    font-size: 14px;
+    max-width: 100%;
+  }
+  .pl-promo-btn {
+    padding: 8px 24px;
+    font-size: 14px;
+    margin-top: 8px;
+  }
+}
+
+/* Phần dùng chung với thẻ sản phẩm (trước đây nằm lẫn trong ProductCard.css) */
+.pl-promo-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+.pl-promo-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  border-color: #d1d5db;
+}
+.pl-promo-btn {
+  font-weight: 600;
+  transition:
+    background-color 0.2s,
+    transform 0.2s;
+}
+.pl-promo-btn:hover {
+  background: #333333;
+  transform: scale(1.05);
+}

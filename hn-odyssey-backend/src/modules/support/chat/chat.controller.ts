@@ -52,9 +52,10 @@ export class ChatController {
 
   @Get('analytics')
   @RequirePermissions(Resource.CRM_CHAT, Action.READ)
-  async getAnalytics() {
+  async getAnalytics(@Query('agent_id') agentId?: string) {
     // AC14: Trả về các chỉ số AHT, CSAT, Handoff Rate
-    return this.chatService.getChatStatistics();
+    // agent_id: đếm Ongoing theo nhân viên đang đăng nhập (khớp với danh sách tab Ongoing)
+    return this.chatService.getChatStatistics(agentId);
   }
 
   @Patch(':id/assign')

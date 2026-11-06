@@ -160,3 +160,16 @@
     overflow-x: hidden;
   }
 }
+
+@media (max-width: 576px) {
+  .coupon-header {
+    padding: 1.25rem 1.25rem 0.5rem;
+  }
+  .coupon-title {
+    font-size: 1.5rem;
+  }
+  .section-coupon {
+    max-height: none;
+    overflow: visible;
+  }
+}

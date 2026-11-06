@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useTradeInForm } from "../../hooks/secondCharm/useTradeInForm";
 import {
   ChevronDownSolidIcon,
@@ -36,8 +36,9 @@ function LocationDropdown({
         setIsOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () =>
+      document.removeEventListener("pointerdown", handleClickOutside);
   }, []);
 
   const selectedLabel =
@@ -106,6 +107,15 @@ export default function TradeInForm() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // tạo URL xem trước 1 lần cho mỗi bộ ảnh, và giải phóng khi đổi bộ ảnh
+  const photoUrls = useMemo(
+    () => formData.photos.map((file) => URL.createObjectURL(file)),
+    [formData.photos],
+  );
+  useEffect(() => {
+    return () => photoUrls.forEach((url) => URL.revokeObjectURL(url));
+  }, [photoUrls]);
+
   // effects
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -116,8 +126,9 @@ export default function TradeInForm() {
         setIsCategoryOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () =>
+      document.removeEventListener("pointerdown", handleClickOutside);
   }, []);
 
   // handlers
@@ -141,7 +152,7 @@ export default function TradeInForm() {
 
     for (let i = 0; i < totalBoxes; i++) {
       if (i < formData.photos.length) {
-        const fileUrl = URL.createObjectURL(formData.photos[i]);
+        const fileUrl = photoUrls[i];
         boxes.push(
           <div key={i} className="sc-upload-box has-image">
             <img src={fileUrl} alt={`preview ${i}`} />

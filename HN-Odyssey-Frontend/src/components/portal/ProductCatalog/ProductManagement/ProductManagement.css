@@ -358,7 +358,7 @@
 .status-Inactive .pm-dot {
   background-color: #ef4444;
 }
-.status-Inactive {
+.pm-status-badge.status-Inactive {
   color: #ef4444;
 }
 .status-Draft .pm-dot {

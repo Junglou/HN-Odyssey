@@ -23,7 +23,7 @@
   gap: clamp(12px, 1.5vw, 16px);
 }
 
-.coupon-title {
+.coupon-page-title {
   font-size: clamp(1.4rem, 2.5vw, 1.8rem);
   font-weight: 800;
   margin: 0 0 4px 0;

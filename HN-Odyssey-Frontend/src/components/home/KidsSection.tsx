@@ -23,7 +23,7 @@ const processStyle = (style?: React.CSSProperties): React.CSSProperties => {
     if (typeof value === "string" && value.includes("px")) {
       processed[key] = value.replace(
         /(\d+(\.\d+)?)px/g,
-        (_, num) => `${(parseFloat(num) / 1920) * 100}vw`,
+        (_, num) => `${(parseFloat(num) / 1920) * 100}cqw`,
       );
     } else {
       processed[key] = value as string | number;
@@ -36,7 +36,7 @@ const processHtmlContent = (html: string) => {
   if (!html) return "";
   return html.replace(
     /(\d+(\.\d+)?)px/g,
-    (_, num) => `${(parseFloat(num) / 1920) * 100}vw`,
+    (_, num) => `${(parseFloat(num) / 1920) * 100}cqw`,
   );
 };
 
@@ -169,13 +169,15 @@ export default function KidsSection({
           ones grow, explore, and shine in their own special way.”
         </p>
       </div>
-      <div className="ks-canvas-wrapper">
-        <div
-          className="ks-background-layer"
-          style={{ backgroundColor: configData.backgroundColor }}
-        />
-        <div className="ks-canvas-inner">
-          {configData.elements.map(renderContentElement)}
+      <div className="home-canvas-scroll">
+        <div className="ks-canvas-wrapper">
+          <div
+            className="ks-background-layer"
+            style={{ backgroundColor: configData.backgroundColor }}
+          />
+          <div className="ks-canvas-inner">
+            {configData.elements.map(renderContentElement)}
+          </div>
         </div>
       </div>
     </section>

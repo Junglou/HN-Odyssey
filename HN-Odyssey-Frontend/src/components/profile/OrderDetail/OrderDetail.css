@@ -566,3 +566,15 @@
     height: 18px;
   }
 }
+/* Khung gợi ý ở cuối trang chi tiết đơn: có lề như phần thân, các thẻ xếp thành lưới */
+.pod-reco-section {
+  width: 100%;
+  padding: 0 clamp(16px, 2.5vw, 24px) clamp(16px, 2.5vw, 24px);
+  box-sizing: border-box;
+}
+
+.pod-reco-section .reco-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 1rem;
+}

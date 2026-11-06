@@ -103,13 +103,18 @@ export default function CustomSelect({
         setQuery("");
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () =>
+      document.removeEventListener("pointerdown", handleClickOutside);
   }, [isOpen]);
 
-  // Mở ra thì con trỏ vào sẵn ô tìm kiếm
+  // Mở ra thì con trỏ vào sẵn ô tìm kiếm (chỉ trên máy có chuột;
+  // điện thoại thì không, vì bàn phím sẽ che mất danh sách)
   useEffect(() => {
-    if (isOpen && searchable) searchRef.current?.focus();
+    if (!isOpen || !searchable) return;
+    if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+      searchRef.current?.focus();
+    }
   }, [isOpen, searchable]);
 
   // Dùng phím mũi tên thì cuộn tới mục đang sáng

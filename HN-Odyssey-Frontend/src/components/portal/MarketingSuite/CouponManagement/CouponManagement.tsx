@@ -201,7 +201,7 @@ export default function CouponManagement({
     <div className="coupon-container">
       <div className="coupon-header">
         <div>
-          <h1 className="coupon-title">Coupon Management</h1>
+          <h1 className="coupon-page-title">Coupon Management</h1>
           <p className="coupon-breadcrumb">
             Marketing Suite / Coupon Management
           </p>

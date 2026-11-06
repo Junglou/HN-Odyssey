@@ -191,6 +191,7 @@ export default function ProductDetailMain({
               <input
                 type="text"
                 className="pdp-qty-input"
+                inputMode="numeric"
                 value={isOutOfStock ? 0 : quantity}
                 onChange={(e) => onQuantityInput(e.target.value)}
                 onBlur={onQuantityBlur}

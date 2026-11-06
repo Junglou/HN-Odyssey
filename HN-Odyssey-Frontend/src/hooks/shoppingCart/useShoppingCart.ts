@@ -116,9 +116,6 @@ const getUserIdFromToken = (): string | undefined => {
     );
     const payload = JSON.parse(jsonPayload);
 
-    // Log ra để kiểm tra xem Token có thực sự chứa ID không
-    console.log("Payload từ Token:", payload);
-
     // Quét toàn bộ các định dạng lưu ID phổ biến
     return payload._id || payload.id || payload.sub || payload.userId;
   } catch {

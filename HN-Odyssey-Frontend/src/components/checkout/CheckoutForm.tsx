@@ -180,6 +180,8 @@ export default function CheckoutForm({
             type="text"
             className="checkout-form-input"
             placeholder="Phone Number"
+            inputMode="tel"
+            autoComplete="tel"
             value={formData.phone}
             onChange={(e) => onChange("phone", e.target.value)}
             disabled={loading}
@@ -372,6 +374,8 @@ export default function CheckoutForm({
                 type="text"
                 className="checkout-form-input"
                 placeholder="OTP Verification Code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
                 value={formData.otp}
                 onChange={(e) => onChange("otp", e.target.value)}
                 disabled={loading}

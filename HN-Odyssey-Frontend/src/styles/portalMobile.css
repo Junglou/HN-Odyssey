@@ -1,0 +1,535 @@
+/* Portal — sửa lỗi mobile dùng chung */
+
+/* 1. Chống iOS tự zoom khi chạm vào ô nhập */
+@media (max-width: 992px) {
+  :is(
+      [class*="-page-container"],
+      .lcs-page-wrapper,
+      .bip-container,
+      .imp-container,
+      .mpp-container,
+      .op-container,
+      .rrp-container,
+      .masd-overlay
+    )
+    :is(
+      input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(
+          [type="color"]
+        ):not([type="file"]),
+      textarea,
+      select
+    ) {
+    font-size: 16px;
+  }
+  body :is(.bi-date-input, .mp-date-input, .rr-date-input, .im-date-input) {
+    width: 120px; /* chữ 16px cần rộng hơn 85px */
+  }
+}
+
+/* 2. Vùng chạm đủ lớn cho nút icon trong bảng */
+@media (max-width: 767px) {
+  body
+    :is(
+      .um-icon-btn,
+      .pm-icon-btn,
+      .crm-icon-btn,
+      .promo-icon-btn,
+      .coupon-icon-btn,
+      .bm-icon-btn,
+      .sp-icon-btn,
+      .ban-icon-btn,
+      .rm-icon-btn,
+      .tm-icon-btn,
+      .vm-icon-btn,
+      .rarm-btn-action-icon,
+      .sot-icon-btn,
+      .cm-action-btn
+    ) {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+
+/* 3. Modal giữa màn hình: có lề, cuộn được khi dài, không dùng 100vw/100vh */
+@media (max-width: 767px) {
+  body
+    :is(
+      .cd-modal-overlay,
+      .rm-modal-overlay,
+      .pum-modal-overlay,
+      .qam-modal-overlay,
+      .rt-modal-overlay,
+      .stt-modal-overlay,
+      .crm-modal-overlay,
+      .crm-reason-modal-overlay,
+      .spm-modal-overlay,
+      .tm-modal-overlay,
+      .vm-modal-overlay,
+      .usm-overlay,
+      .avm-overlay,
+      .fvm-overlay,
+      .rtm-overlay
+    ) {
+    inset: 0;
+    width: auto;
+    height: auto;
+    padding: 16px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    align-items: flex-start; /* kết hợp margin:auto: vừa thì căn giữa, dài thì cuộn từ đầu */
+  }
+  body
+    :is(
+      .cd-modal-box,
+      .rm-modal-box,
+      .pum-modal-box,
+      .qam-modal-box,
+      .rt-modal,
+      .stt-modal,
+      .crm-modal-container,
+      .crm-reason-modal-container,
+      .spm-modal-content,
+      .tm-modal-content,
+      .vm-modal-content,
+      .usm-modal,
+      .avm-modal,
+      .fvm-modal,
+      .rtm-modal
+    ) {
+    margin: auto;
+  }
+  body
+    :is(.pum-modal-box, .rm-modal-box, .qam-modal-box, .crm-modal-container) {
+    padding: 20px;
+  }
+  body .crm-detail-modal-container {
+    max-height: calc(100dvh - 32px);
+  }
+}
+
+/* 4. Drawer: dùng dvh để footer không nằm sau thanh Safari; không tràn ngang */
+body
+  :is(
+    .om-drawer,
+    .tim-drawer,
+    .td-container,
+    .vd-container,
+    .promo-modal-container
+  ) {
+  height: 100vh;
+  height: 100dvh;
+}
+body .promo-modal-container {
+  max-width: 100vw; /* clamp(400px, …) làm tràn màn 375px */
+}
+
+/* 5. Form nhiều cột -> 1 cột */
+@media (max-width: 600px) {
+  body :is(.um-form-row, .coupon-form-row, .promo-date-picker-row) {
+    flex-direction: column;
+  }
+  body :is(.crm-grid-2, .spm-input-grid, .bm-date-row) {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 6. Create Ticket drawer (Warehouse) + bảng bị cắt */
+@media (max-width: 900px) {
+  body .ctd-form-grid {
+    grid-template-columns: 1fr;
+  }
+  body .ctd-entry-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  body .ctd-form-action {
+    flex-wrap: wrap;
+  }
+  body .ctd-table-wrapper,
+  body .crm-detail-table-wrapper {
+    overflow-x: auto; /* trước đó overflow:hidden làm mất cột bên phải */
+  }
+}
+
+/* 7. Warehouse: 3 tab không vừa chiều ngang */
+@media (max-width: 767px) {
+  body .sm-tabs-nav {
+    gap: 20px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  body .sm-tabs-nav::-webkit-scrollbar {
+    display: none;
+  }
+  body .sm-tab-btn {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}
+
+/* 8. Live Chat: khung chat có chiều cao cố định để ô nhập luôn trong tầm tay */
+@media (max-width: 900px) {
+  body .lcs-container {
+    height: auto;
+    min-height: 0;
+  }
+  body .lcs-chat-area {
+    flex: none;
+    height: calc(100dvh - 140px);
+    min-height: 460px;
+  }
+  body .lcs-chat-header {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+  body .lcs-chat-messages {
+    padding: 16px;
+  }
+}
+@media (max-width: 480px) {
+  body .lcs-emoji-picker-wrapper {
+    right: 16px;
+  }
+}
+
+/* 9. Media: lưới không tràn ở màn 320px */
+body .mm-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+}
+
+/* 10. System dashboard */
+@media (max-width: 1024px) {
+  body .sys-main-grid {
+    grid-template-columns: 1fr;
+  }
+  body .sys-top-controls {
+    overflow: visible; /* overflow-x:auto cũ cắt mất menu Timeframe/Refresh */
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    padding-bottom: 0;
+  }
+}
+@media (max-width: 768px) {
+  body .sys-top-kpi-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 11. Dashboard: bớt padding chồng, header xuống dòng */
+@media (max-width: 768px) {
+  body .ov-container {
+    padding: 16px;
+  }
+  body .im-header-row {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}
+
+/* 12. Ảnh phóng to của Review: nút đóng nằm trong màn hình */
+@media (max-width: 767px) {
+  body .rarm-media-modal-overlay {
+    inset: 0;
+    width: auto;
+    height: auto;
+  }
+  body .rarm-media-modal-close {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    right: 16px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    font-size: 28px;
+  }
+}
+
+/* 13. Drawer thông báo (PortalLayout.notifications.css) */
+body .p-noti-toolbar {
+  flex-wrap: wrap;
+  padding: 10px 16px;
+}
+@media (max-width: 767px) {
+  body :is(.p-noti-tab, .p-noti-readall) {
+    min-height: 36px;
+  }
+}
+
+body .lcs-emoji-picker-wrapper {
+  width: min(320px, calc(100vw - 32px));
+}
+
+/* ===== Khung portal (PortalLayout) ===== */
+
+/* Gỡ lớp xếp chồng của vùng nội dung để drawer/modal nằm trên sidebar và nút hamburger */
+body .portal-main-content {
+  z-index: auto;
+}
+/* Drawer thông báo phải nằm trên nội dung trang (dropdown của trang dùng z-index 100) */
+body .p-noti-overlay {
+  z-index: 1500;
+}
+body .p-noti-drawer {
+  z-index: 1501;
+  height: 100vh;
+  height: 100dvh;
+}
+body .p-noti-body {
+  overscroll-behavior: contain;
+}
+
+/* Sidebar: nút Exit Portal không bị thanh Safari che; cuộn menu không kéo trang nền */
+body .portal-sidebar {
+  height: 100vh;
+  height: 100dvh;
+  overscroll-behavior: contain;
+}
+
+/* overflow-x:hidden biến khung này thành vùng cuộn và làm hỏng position:sticky */
+body .portal-container {
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: clip;
+}
+
+@media (max-width: 1024px) {
+  /* Nút hamburger: vùng chạm 44px, tránh tai thỏ */
+  body .portal-mobile-menu-toggle {
+    top: max(16px, env(safe-area-inset-top, 0px));
+    left: max(16px, env(safe-area-inset-left, 0px));
+    min-width: 44px;
+    min-height: 44px;
+  }
+  /* Trang con tự có min-height:100dvh nên cộng với padding trên của khung là luôn bị dư một đoạn cuộn */
+  body
+    :is(
+      [class*="-page-container"],
+      .bip-container,
+      .imp-container,
+      .mpp-container,
+      .op-container,
+      .rrp-container
+    ) {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  /* Khung 16px + trang con 12px làm mất khoảng 56px chiều ngang trên màn 375px */
+  body .portal-main-content {
+    padding: calc(68px + env(safe-area-inset-top, 0px)) 8px 16px;
+  }
+}
+
+/* iOS chỉ coi một div là "chạm được" khi nó có cursor:pointer;
+   thiếu thì chạm vào nền tối không đóng được drawer/modal dùng onClick */
+@media (hover: none) {
+  body
+    :is(
+      .portal-backdrop,
+      .p-noti-overlay,
+      .cd-overlay,
+      .td-overlay,
+      .vd-overlay,
+      .om-drawer-overlay,
+      .tim-drawer-overlay,
+      .coupon-modal-overlay,
+      .promo-modal-overlay,
+      .rarm-drawer-overlay,
+      .rarm-media-modal-overlay,
+      .spm-modal-overlay,
+      .tm-modal-overlay,
+      .vm-modal-overlay,
+      .crm-modal-overlay,
+      .crm-reason-modal-overlay
+    ) {
+    cursor: pointer;
+  }
+}
+
+/* Modal ở trang Profile (profileModal.shared.css) */
+@media (max-width: 767px) {
+  body .um-modal-overlay {
+    inset: 0;
+    width: auto;
+    height: auto;
+    padding: 16px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    align-items: flex-start;
+  }
+  body .um-modal-box {
+    margin: auto;
+    padding: 20px;
+  }
+}
+
+/* Lưới 1fr không cho cột co nhỏ hơn nội dung (bảng, biểu đồ) -> tràn ngang bị cắt.
+   min-width:0 cho ô con = tương đương minmax(0, 1fr). :where() có độ ưu tiên 0 nên
+   ô con nào đã tự đặt min-width vẫn giữ nguyên. */
+@media (max-width: 1024px) {
+  :where(
+      /* Khách hàng */
+      .blog-featured-wrapper,
+      .blog-featured-subgrid,
+      .blog-grid-container,
+      .checkout-recommend-card,
+      .checkout-summary-item-card,
+      .footer-bottom,
+      .cs-image-grid,
+      .eb-grid,
+      .hiw-grid,
+      .tiers-grid,
+      .redeem-grid,
+      .pdp-main-section,
+      .pl-grid,
+      .address-box-internal-grid,
+      .loyalty-internal-grid,
+      .loyalty-grid,
+      .benefit-list,
+      .coupon-internal-grid,
+      .order-box-internal-grid,
+      .order-internal-grid,
+      .my-profile-internal-grid,
+      .profile-main-grid,
+      .sc-features-grid,
+      .sc-hiw-grid,
+      .sc-shipping-grid,
+      .cart-list-item,
+      .checkout-grid,
+      .shopping-cart-grid,
+      /* Portal */
+      .bm-date-row,
+      .cc-workspace,
+      .crm-grid-2,
+      .bi-grid-2-cols,
+      .croi-grid,
+      .bkpi-grid,
+      .ikpi-grid,
+      .im-middle-grid,
+      .aco-grid,
+      .ce-grid,
+      .masd-summary,
+      .masd-date-row,
+      .mkc-grid,
+      .ov-top-row,
+      .ov-mid-row,
+      .cbs-grid,
+      .cbs-bottom,
+      .krm-grid,
+      .pa-grid,
+      .pa-body,
+      .promo-calendar-grid,
+      .om-drawer-body,
+      .tim-drawer-body,
+      .spm-input-grid,
+      .sys-payment-kpi-grid,
+      .sys-security-kpi-grid,
+      .rm-module-header,
+      .rm-submodule-row,
+      .ctd-form-grid
+    )
+    > * {
+    min-width: 0;
+  }
+}
+
+/* Bảng dạng thẻ: giá trị dài không có khoảng trắng (mã ID, URL) phải ngắt dòng, không tràn ra ngoài thẻ */
+@media (max-width: 767px) {
+  body
+    :is(.um-table, .pm-table, .crm-table, .promo-table, .bm-table, .sp-table)
+    td {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}
+/* ===== Live Chat trên điện thoại ===== */
+body .lcs-back-btn {
+  display: none; /* desktop: ẩn */
+}
+
+@media (max-width: 900px) {
+  body .lcs-back-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    margin-right: 8px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    font-size: 1.4rem;
+    line-height: 1;
+    color: #111827;
+    cursor: pointer;
+  }
+
+  /* chưa chọn hội thoại: chỉ hiện danh sách; đã chọn: chỉ hiện khung chat */
+  body .lcs-container:not(.lcs-has-active) .lcs-chat-area {
+    display: none;
+  }
+  body .lcs-container.lcs-has-active .lcs-sidebar {
+    display: none;
+  }
+  body .lcs-session-list {
+    max-height: none;
+  }
+
+  /* bong bóng tin nhắn rộng hơn; thẻ sản phẩm của bot cuộn ngang thay vì bị ép nhỏ */
+  body .lcs-message-row {
+    max-width: 92%;
+  }
+  body .lcs-message-content {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  body .lcs-message-time {
+    white-space: nowrap;
+  }
+  body .lcs-bot-products-grid {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+  body .lcs-bot-product {
+    flex: 0 0 150px;
+    width: 150px;
+  }
+  body .lcs-product-card {
+    max-width: 240px;
+  }
+}
+
+/* màn rất hẹp: bỏ avatar nhỏ cạnh bong bóng để nhường chỗ cho chữ (xóa khối này nếu muốn giữ) */
+@media (max-width: 600px) {
+  body .lcs-message-avatar {
+    display: none;
+  }
+}
+/* Thanh nền cố định phía sau nút ☰: nội dung cuộn dưới thanh, không chạy ngang qua nút */
+@media (max-width: 1024px) {
+  body .portal-container::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: calc(60px + env(safe-area-inset-top, 0px));
+    background: #f8f9fa;
+    z-index: 50;
+    pointer-events: none;
+  }
+}
+body .lcs-back-btn {
+  color: #374151;
+}

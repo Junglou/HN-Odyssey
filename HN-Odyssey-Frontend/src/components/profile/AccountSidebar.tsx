@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "./AccountSidebar.css";
 import {
@@ -35,9 +36,15 @@ const AccountSidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const handleLogout = async () => {
-    console.log("Logging out...");
+  // Mobile/tablet: cuộn chip đang chọn vào giữa hàng
+  useEffect(() => {
+    if (!window.matchMedia("(max-width: 992px)").matches) return;
+    document
+      .querySelector(".sidebar-item-pill.active")
+      ?.scrollIntoView({ inline: "center", block: "nearest" });
+  }, [location.pathname]);
 
+  const handleLogout = async () => {
     // 1. Gọi authService để dọn dẹp API và LocalStorage
     await authService.logout();
 

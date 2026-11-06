@@ -141,3 +141,10 @@
   outline: none;
   box-shadow: none;
 }
+
+@media screen and (max-width: 768px) {
+  .cart-rec-add-btn {
+    width: 64px;
+    height: 34px;
+  }
+}

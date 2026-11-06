@@ -413,7 +413,7 @@
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.88);
-  z-index: 100;
+  z-index: 10001;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -446,4 +446,49 @@
   padding: 0;
   line-height: 1;
   z-index: 110;
+}
+@media (max-width: 700px) {
+  /* đưa nút mua lên trước phần mô tả dài */
+  .pdp-action-group {
+    order: 9;
+  }
+  .pdp-details-block {
+    order: 10;
+  }
+
+  /* chống iOS zoom + vùng bấm đủ lớn */
+  .pdp-qty-input {
+    font-size: 16px;
+  }
+  .pdp-qty-btn {
+    width: 36px;
+    height: 36px;
+  }
+  .pdp-color-btn {
+    width: 32px;
+    height: 32px;
+  }
+  .pdp-size-btn {
+    height: 40px;
+  }
+  .pdp-heart-btn {
+    padding: 10px;
+  }
+
+  /* HTML mô tả không được làm tràn trang */
+  .pdp-details-content {
+    overflow-wrap: anywhere;
+  }
+  .pdp-details-content img {
+    height: auto;
+  }
+  .pdp-details-content table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .pdp-details-content iframe,
+  .pdp-details-content video {
+    max-width: 100%;
+  }
 }

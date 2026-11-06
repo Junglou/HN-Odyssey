@@ -436,7 +436,6 @@ export function useLiveChatSupport() {
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      console.log("Socket connected thành công:", socket.id);
       if (agentId) {
         socket.emit("agent_connect", agentId);
       }
@@ -759,7 +758,10 @@ export function useLiveChatSupport() {
   useEffect(() => {
     const fetchTabCounts = async () => {
       try {
-        const res = await axiosClient.get(`/support/chats/analytics`);
+        const currentUser = tokenStorage.getUser() as TokenUser | null;
+        const res = await axiosClient.get(`/support/chats/analytics`, {
+          params: { agent_id: currentUser?.id || currentUser?._id },
+        });
         const stats = res.data;
         setTabCounts({
           Waitlist: stats.WaitlistCount || 0,
@@ -852,14 +854,7 @@ export function useLiveChatSupport() {
       metadata?: Record<string, unknown>,
     ) => {
       if (!canReplyChat) return toast.error("Bạn không có quyền gửi tin nhắn.");
-      console.log(
-        "[sendMessage] sessionId:",
-        sessionId,
-        "| text:",
-        text,
-        "| socket:",
-        socketRef.current?.id ?? "NULL",
-      );
+
       if (!text.trim() && type === "TEXT") return;
       if (!socketRef.current) {
         console.warn(

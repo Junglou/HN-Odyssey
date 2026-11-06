@@ -155,6 +155,8 @@ const AccountRecoVerifiedForm = ({
                 type="text"
                 className="verified-form-input"
                 placeholder="OTP"
+                inputMode="numeric"
+                autoComplete="one-time-code"
                 value={formData.otpCode}
                 onChange={(e) => handleChange("otpCode", e.target.value)}
                 maxLength={6}
