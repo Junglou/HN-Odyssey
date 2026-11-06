@@ -196,6 +196,7 @@ export default function AccountModal({
                   name="newPhone"
                   type="text"
                   placeholder="New phone (10 digits, e.g. 09xxxxxxxx)"
+                  inputMode="tel"
                   disabled={isSubmitting}
                   aria-label="New phone"
                 />

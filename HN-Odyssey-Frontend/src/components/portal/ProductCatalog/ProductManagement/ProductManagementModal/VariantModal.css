@@ -51,7 +51,7 @@
   margin-bottom: 16px;
 }
 
-.vm-search-input {
+.vm-modal-search-input {
   width: 100%;
   padding: 10px 12px 10px 36px;
   border: 1px solid #d4d4d8;
@@ -61,7 +61,7 @@
   font-family: inherit;
 }
 
-.vm-search-input:focus {
+.vm-modal-search-input:focus {
   border-color: #27272a;
 }
 
@@ -177,7 +177,7 @@
 }
 
 /* Nút Add */
-.vm-btn-add {
+.vm-modal-btn-add {
   padding: 8px 16px;
   background-color: #3b82f6;
   color: white;
@@ -187,7 +187,7 @@
   font-weight: 600;
 }
 
-.vm-btn-add:disabled {
+.vm-modal-btn-add:disabled {
   background-color: #9ca3af;
   cursor: not-allowed;
 }

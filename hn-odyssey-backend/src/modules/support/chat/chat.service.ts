@@ -459,7 +459,16 @@ export class ChatService {
   }
 
   // AC14: Tính toán AHT & CSAT thực tế
-  async getChatStatistics() {
+  async getChatStatistics(agentId?: string) {
+    // Ongoing của riêng nhân viên này; không có agentId hợp lệ thì đếm toàn bộ hội thoại đã có người nhận
+    const ongoingMatch: FilterQuery<Conversation> = {
+      status: 'OPEN',
+      agent_id:
+        agentId && Types.ObjectId.isValid(agentId)
+          ? new Types.ObjectId(agentId)
+          : { $exists: true },
+    };
+
     const stats = await this.convModel
       .aggregate<AggregateStats>([
         {
@@ -468,10 +477,7 @@ export class ChatService {
               { $match: { status: 'OPEN', agent_id: { $exists: false } } },
               { $count: 'count' },
             ],
-            Ongoing: [
-              { $match: { status: 'OPEN', agent_id: { $exists: true } } },
-              { $count: 'count' },
-            ],
+            Ongoing: [{ $match: ongoingMatch }, { $count: 'count' }],
             Complete: [{ $match: { status: 'CLOSED' } }, { $count: 'count' }],
             // Phục vụ Analytics:
             csatData: [

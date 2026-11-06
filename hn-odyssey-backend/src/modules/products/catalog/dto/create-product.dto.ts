@@ -71,7 +71,10 @@ export class CreateProductVariantDto {
   @Min(0)
   stock?: number;
 
-  @IsOptional() @IsString() images: string[];
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  images: string[];
   @IsOptional() @IsNumber() image_index?: number; // Index ảnh trong mảng images cha
 
   @IsOptional() @IsBoolean() active?: boolean;

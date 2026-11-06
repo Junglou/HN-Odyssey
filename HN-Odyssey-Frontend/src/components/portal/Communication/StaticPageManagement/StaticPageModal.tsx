@@ -35,8 +35,9 @@ function CustomSelect({
         setIsOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () =>
+      document.removeEventListener("pointerdown", handleClickOutside);
   }, []);
 
   const selectedLabel =
@@ -191,7 +192,7 @@ function ModalContent({
     <>
       <div
         className="sp-modal-overlay"
-        onMouseDown={(e) => {
+        onPointerDown={(e) => {
           if (e.target === e.currentTarget) {
             onClose();
           }
@@ -270,6 +271,7 @@ function ModalContent({
                   setOptions={{
                     height: "350px",
                     resizingBar: false,
+                    stickyToolbar: -1,
                     buttonList: [
                       ["undo", "redo"],
                       ["font", "fontSize", "formatBlock"],

@@ -590,3 +590,13 @@
     width: 100%;
   }
 }
+
+/* Chế độ thẻ trên điện thoại: bỏ min-width của bảng, nếu không giá trị bị đẩy ra ngoài màn hình và bị cắt */
+@media (max-width: 767px) {
+  .sp-table,
+  .sp-table tbody,
+  .sp-table tr,
+  .sp-table td {
+    min-width: 0;
+  }
+}

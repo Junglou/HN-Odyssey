@@ -28,3 +28,12 @@
   transform: scale(1.05);
   opacity: 0.9;
 }
+/* khối canvas thiết kế 1920px: thu nhỏ theo chiều ngang màn hình (đơn vị cqw) */
+.home-canvas-scroll {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.home-canvas-scroll > div {
+  container-type: inline-size;
+}

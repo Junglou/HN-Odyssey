@@ -74,8 +74,8 @@ function RoleModalContent({
         setIsLevelOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () => document.removeEventListener("pointerdown", handleClickOutside);
   }, [isLevelOpen]);
 
   const isValid = formData.name.trim().length > 0;
@@ -125,7 +125,7 @@ function RoleModalContent({
   return (
     <div
       className="rm-modal-overlay"
-      onMouseDown={(e) => {
+      onPointerDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >

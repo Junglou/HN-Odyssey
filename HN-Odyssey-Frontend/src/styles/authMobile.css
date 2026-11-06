@@ -1,0 +1,82 @@
+/* Sửa mobile chung cho 6 trang auth */
+@media (max-width: 968px) {
+  :is(
+    .login-page-container,
+    .register-page-container,
+    .reset-page-container,
+    .verify-page-container,
+    .recovery-page-container,
+    .reco-verified-page-container
+  ) {
+    min-height: 100dvh;
+  }
+
+  /* form không được rộng hơn màn hình */
+  :is(
+      .login-page-container,
+      .register-page-container,
+      .reset-page-container,
+      .verify-page-container,
+      .recovery-page-container,
+      .reco-verified-page-container
+    )
+    :is(
+      .login-form-wrapper,
+      .register-form-wrapper,
+      .reset-form-wrapper,
+      .verify-form-wrapper,
+      .recovery-form-wrapper,
+      .verified-form-wrapper
+    ) {
+    min-width: 0;
+  }
+
+  /* tiêu đề nhỏ lại cho vừa 1-2 dòng */
+  :is(
+      .login-page-container,
+      .register-page-container,
+      .reset-page-container,
+      .verify-page-container,
+      .recovery-page-container,
+      .reco-verified-page-container
+    )
+    :is(
+      .login-title,
+      .register-title,
+      .reset-title,
+      .verify-title,
+      .recovery-title,
+      .verified-form-title
+    ) {
+    font-size: 1.9rem;
+    margin-bottom: 1.5rem;
+  }
+
+  /* card thông tin bên phải bớt padding */
+  :is(
+      .login-page-container,
+      .register-page-container,
+      .reset-page-container,
+      .verify-page-container,
+      .recovery-page-container,
+      .reco-verified-page-container
+    )
+    :is(
+      .login-info-card,
+      .register-info-card,
+      .reset-info-card,
+      .verify-info-card,
+      .recovery-info-card,
+      .reco-verified-info-card
+    ) {
+    width: 100%;
+    padding: 2rem 1.25rem;
+    box-sizing: border-box;
+  }
+
+  /* bỏ thanh cuộn lồng của form đăng ký, để cả trang cuộn */
+  .register-page-container .register-form-wrapper {
+    max-height: none;
+    overflow: visible;
+  }
+}

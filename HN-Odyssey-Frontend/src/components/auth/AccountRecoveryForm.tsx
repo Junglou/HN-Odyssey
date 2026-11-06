@@ -80,6 +80,9 @@ const AccountRecoveryForm = ({
               type="text"
               className="recovery-form-input"
               placeholder="Email/Phone number"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -94,6 +97,8 @@ const AccountRecoveryForm = ({
                 type="text"
                 className="recovery-form-input"
                 placeholder="OTP"
+                inputMode="numeric"
+                autoComplete="one-time-code"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
                 maxLength={6}

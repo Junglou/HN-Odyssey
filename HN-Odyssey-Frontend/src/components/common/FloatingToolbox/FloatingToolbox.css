@@ -130,3 +130,7 @@
     visibility: visible;
   }
 }
+/* ẩn hộp công cụ chat khi đang mở modal */
+body:has(.um-modal-overlay, .cart-confirm-overlay) .ft-wrapper {
+  display: none;
+}

@@ -41,8 +41,9 @@ function ModalSelect({
         setIsOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () =>
+      document.removeEventListener("pointerdown", handleClickOutside);
   }, []);
 
   const currentLabel =
@@ -178,9 +179,11 @@ export default function QuickAdjustModal({
         <div className="qam-modal-header">
           <div className="qam-header-content">
             <h2 className="qam-modal-title">Inventory Management</h2>
-            <p className="qam-modal-subtitle">
-              Target: <strong>{sku}</strong> - {productName}
-            </p>
+            <div className="qam-target">
+              <span className="qam-target-label">Target</span>
+              <strong className="qam-target-sku">{sku}</strong>
+              <span className="qam-target-name">{productName}</span>
+            </div>
             {currentStock !== undefined && (
               <p className="qam-modal-subtitle qam-mt-4">
                 Current Stock: <strong>{currentStock}</strong>

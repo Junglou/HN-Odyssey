@@ -82,6 +82,8 @@
 /* footer action */
 .blog-card-footer {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   justify-content: space-between;
   align-items: center;
   margin-top: auto;

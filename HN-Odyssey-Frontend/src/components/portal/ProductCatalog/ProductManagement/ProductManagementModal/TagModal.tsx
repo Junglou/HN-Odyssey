@@ -66,7 +66,7 @@ export default function TagModal({
             placeholder="Find tag..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="tm-search-input"
+            className="tm-modal-search-input"
           />
           <ul className="tm-tag-list">
             {filteredTags.length > 0 ? (

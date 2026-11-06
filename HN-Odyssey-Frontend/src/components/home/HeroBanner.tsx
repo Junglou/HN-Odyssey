@@ -1,12 +1,35 @@
+import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useHeroBannerConfig } from "../../hooks/home/useHeroBannerConfig";
-import { AlertCircleIcon } from "../../assets/icons/HomeIcons";
+
 import "./HeroBanner.css";
 import SmartImage from "../common/SmartImage/SmartImage";
 
 export default function HeroBanner() {
   const { slides, currentIndex, goToSlide } = useHeroBannerConfig();
   const navigate = useNavigate();
+
+  // Vuốt ngang để chuyển slide (trái = tiếp theo, phải = quay lại)
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStart.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const start = touchStart.current;
+    touchStart.current = null;
+    if (!start || slides.length < 2) return;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    // Chỉ tính là vuốt ngang khi đủ dài và rõ ràng ngang hơn dọc (không chặn cuộn trang)
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    goToSlide(
+      (currentIndex + (dx < 0 ? 1 : -1) + slides.length) % slides.length,
+    );
+  };
 
   // 1. KẾ THỪA URL CỦA BANNER KHI CLICK VÀO TAG
   const handleTagClick = (
@@ -29,7 +52,11 @@ export default function HeroBanner() {
     <section
       className={`hb-container direct-${currentIndex % 2 === 0 ? "lr" : "rl"}`}
     >
-      <div className="hb-slider-window">
+      <div
+        className="hb-slider-window"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         {slides.map((slide, idx) => (
           <div
             key={slide.id}
@@ -65,9 +92,6 @@ export default function HeroBanner() {
 
               {/* ĐÃ SỬA: Bỏ chặn click ở overlay để ấn vào ảnh có tác dụng */}
               <div className="hb-media-overlay">
-                <div className="hb-icon-wrapper">
-                  <AlertCircleIcon width={20} height={20} />
-                </div>
                 {/* CHỈ chặn click tại vị trí các dấu chấm tròn chuyển slide */}
                 <div
                   className="hb-pagination"

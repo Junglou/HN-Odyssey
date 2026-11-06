@@ -1,5 +1,5 @@
 /* overlay */
-.um-modal-overlay {
+.pum-modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -14,7 +14,7 @@
   animation: um-fadeIn 0.2s ease-out forwards;
 }
 
-.um-modal-box {
+.pum-modal-box {
   background-color: #ffffff;
   width: 100%;
   max-width: 480px;
@@ -152,7 +152,7 @@
   margin-top: 16px;
 }
 
-.um-btn-modal-submit {
+.pum-btn-modal-submit {
   background-color: #111827;
   color: #ffffff;
   border: none;
@@ -165,11 +165,11 @@
   transition: background-color 0.2s;
 }
 
-.um-btn-modal-submit:hover {
+.pum-btn-modal-submit:hover {
   background-color: #374151;
 }
 
-.um-btn-modal-cancel {
+.pum-btn-modal-cancel {
   background-color: #ffffff;
   color: #374151;
   border: 1px solid #d1d5db;
@@ -182,7 +182,7 @@
   transition: all 0.2s ease;
 }
 
-.um-btn-modal-cancel:hover {
+.pum-btn-modal-cancel:hover {
   background-color: #f3f4f6;
   border-color: #111827;
   color: #111827;

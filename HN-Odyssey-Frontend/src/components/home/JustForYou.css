@@ -42,6 +42,12 @@
   text-align: center;
 }
 
+/* vỏ ngoài: làm mốc cho thanh chấm tròn, không bị cuộn theo nội dung */
+.jfy-slider-outer {
+  position: relative;
+  width: 100%;
+}
+
 /* slider window */
 .jfy-slider-window {
   position: relative;
@@ -131,4 +137,13 @@
     /* transform: scale(0.6); */
     transform-origin: top left;
   }
+}
+
+.jfy-dot {
+  position: relative;
+}
+.jfy-dot::after {
+  content: "";
+  position: absolute;
+  inset: -12px -4px;
 }

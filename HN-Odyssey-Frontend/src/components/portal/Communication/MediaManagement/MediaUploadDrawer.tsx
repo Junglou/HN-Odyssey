@@ -100,8 +100,8 @@ function MediaFormSection({
         setIsTypeDropdownOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () => document.removeEventListener("pointerdown", handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -414,7 +414,7 @@ function DrawerContent({
   return (
     <div
       className="mm-drawer-overlay"
-      onMouseDown={(e) => {
+      onPointerDown={(e) => {
         if (e.target === e.currentTarget && !isSubmitting) {
           onClose();
         }

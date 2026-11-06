@@ -24,8 +24,8 @@ const AddressManagement = ({
 
   return (
     <div className="my-profile-card">
-      <div className="profile-header">
-        <h1 className="profile-title">Address Management</h1>
+      <div className="address-header">
+        <h1 className="address-title">Address Management</h1>
       </div>
 
       <div className="address-box-internal-grid">
@@ -55,7 +55,7 @@ const AddressManagement = ({
             {/* Gắn link nội bộ */}
             <a
               className="text-link"
-              onClick={() => navigate("/pages/return-policy")}
+              onClick={() => navigate("/pages/return-and-warranty")}
             >
               Refund Policy
             </a>
@@ -73,7 +73,7 @@ const AddressManagement = ({
             </a>
             <a
               className="text-link"
-              onClick={() => navigate("/Information-policy")}
+              onClick={() => navigate("/pages/information-policy")}
             >
               Information Policy
             </a>

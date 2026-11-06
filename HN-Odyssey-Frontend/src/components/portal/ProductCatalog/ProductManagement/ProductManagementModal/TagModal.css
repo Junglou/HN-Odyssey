@@ -57,7 +57,7 @@
   padding: 20px;
 }
 
-.tm-search-input {
+.tm-modal-search-input {
   width: 100%;
   padding: 10px 14px;
   border: 1px solid #d1d5db;
@@ -70,7 +70,7 @@
   transition: border-color 0.2s;
 }
 
-.tm-search-input:focus {
+.tm-modal-search-input:focus {
   border-color: #8d8d8d;
 }
 

@@ -3,8 +3,10 @@
   position: fixed;
   top: 0;
   left: 0;
-  width: 100vw;
-  height: 100vh;
+  right: 0;
+  bottom: 0;
+  padding: 16px;
+  box-sizing: border-box;
   background-color: rgba(0, 0, 0, 0.4);
   z-index: 3000;
   display: flex;
@@ -15,6 +17,7 @@
 
 /* khung hộp thoại */
 .cart-confirm-box {
+  box-sizing: border-box;
   background-color: #ffffff;
   width: 100%;
   max-width: 400px;

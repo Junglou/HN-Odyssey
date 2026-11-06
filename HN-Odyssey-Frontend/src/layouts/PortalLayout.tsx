@@ -276,10 +276,31 @@ const PortalLayout = () => {
     }
   }, [location.pathname, isParentActive]);
 
+  // Khóa cuộn trang nền khi menu hoặc thông báo đang mở; Esc để đóng
+  useEffect(() => {
+    if (!isMobileSidebarOpen && !isNotiOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsMobileSidebarOpen(false);
+        setIsNotiOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previous;
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isMobileSidebarOpen, isNotiOpen]);
+
   return (
     <div className="portal-container">
       <button
+        type="button"
         className="portal-mobile-menu-toggle"
+        aria-label="Open menu"
+        aria-expanded={isMobileSidebarOpen}
         onClick={() => setIsMobileSidebarOpen(true)}
       >
         <HamburgerIcon />
@@ -793,7 +814,13 @@ const PortalLayout = () => {
         </nav>
 
         <div className="sidebar-bottom">
-          <div className="notification-btn" onClick={() => setIsNotiOpen(true)}>
+          <div
+            className="notification-btn"
+            onClick={() => {
+              setIsNotiOpen(true);
+              setIsMobileSidebarOpen(false);
+            }}
+          >
             <div className="menu-item-left">
               <BellIcon /> Notifications
             </div>

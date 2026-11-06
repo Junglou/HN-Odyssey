@@ -377,7 +377,7 @@ const OrderDetail = ({
       </div>
 
       {!isCompleted && fbtProducts.length > 0 && (
-        <div style={{ marginTop: "2rem", width: "100%" }}>
+        <div className="pod-reco-section">
           <RecommendationList
             title="Frequently Bought Together"
             products={fbtProducts}
@@ -386,7 +386,7 @@ const OrderDetail = ({
       )}
 
       {isCompleted && similarProducts.length > 0 && (
-        <div style={{ marginTop: "2rem", width: "100%" }}>
+        <div className="pod-reco-section">
           <RecommendationList
             title="Similar Products"
             products={similarProducts}

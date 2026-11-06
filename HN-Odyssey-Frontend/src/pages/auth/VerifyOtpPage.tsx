@@ -146,7 +146,9 @@ const VerifyOtpPage = () => {
               Reach out to support anytime for help or guidance.
             </li>
           </ul>
-          <button className="verify-explore-btn">Explore</button>
+          <button className="verify-explore-btn" onClick={() => navigate("/")}>
+            Explore
+          </button>
         </div>
       </div>
     </div>

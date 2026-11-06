@@ -133,15 +133,30 @@ export default function CustomerDetailModal({
     }
   };
 
-  // Helper trả về CSS class cho Order status
+  // Helper trả về CSS class cho huy hiệu trạng thái đơn (cùng bảng màu với trang chi tiết đơn)
   const getOrderStatusClass = (status: string) => {
-    if (["PENDING", "PROCESSING", "SHIPPING"].includes(status))
-      return "crm-order-status--pending";
-    if (["DELIVERED", "COMPLETED"].includes(status))
-      return "crm-order-status--delivered";
-    if (["CANCELLED", "RETURNED"].includes(status))
-      return "crm-order-status--cancelled";
-    return "crm-order-status--default";
+    switch (String(status).toUpperCase()) {
+      case "PENDING":
+        return "crm-order-badge--pending";
+      case "CONFIRMED":
+        return "crm-order-badge--confirmed";
+      case "PROCESSING":
+        return "crm-order-badge--processing";
+      case "SHIPPING":
+      case "DELIVERING":
+        return "crm-order-badge--shipping";
+      case "DELIVERED":
+      case "COMPLETED":
+        return "crm-order-badge--delivered";
+      case "CANCELLED":
+      case "CANCELED":
+        return "crm-order-badge--cancelled";
+      case "RETURNED":
+      case "REFUNDED":
+        return "crm-order-badge--refunded";
+      default:
+        return "crm-order-badge--default";
+    }
   };
 
   // Helper trả về CSS class cho Account status
@@ -279,8 +294,12 @@ export default function CustomerDetailModal({
                             ${order.total_amount.toLocaleString("en-US")}
                           </td>
                           <td>{order.payment?.method || "N/A"}</td>
-                          <td className={getOrderStatusClass(order.status)}>
-                            {order.status}
+                          <td>
+                            <span
+                              className={`crm-order-badge ${getOrderStatusClass(order.status)}`}
+                            >
+                              {order.status}
+                            </span>
                           </td>
                         </tr>
                       ))}

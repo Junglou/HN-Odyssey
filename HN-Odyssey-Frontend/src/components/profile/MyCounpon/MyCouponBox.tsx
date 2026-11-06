@@ -29,7 +29,7 @@ const MyCouponBox = ({ coupon }: MyCouponBoxProps) => {
   };
 
   return (
-    <div className="box-container">
+    <div className="coupon-box-container">
       <div className="box-content">
         <div className="box-infor">
           <div className="coupon-thumbnail-container">
@@ -42,20 +42,20 @@ const MyCouponBox = ({ coupon }: MyCouponBoxProps) => {
               <span className="lbl-coupon-text">{coupon.code}</span>
               {coupon.description && (
                 <div className="price-container">
-                  <span className="span-text">
+                  <span className="coupon-span-text">
                     <strong>Description: </strong>
                     {coupon.description}
                   </span>
                 </div>
               )}
               <div className="price-container">
-                <span className="span-text">
+                <span className="coupon-span-text">
                   <strong>Discount: </strong>
                   {discountLabel}
                 </span>
               </div>
               <div className="price-container">
-                <span className="span-text">
+                <span className="coupon-span-text">
                   <strong>Used: </strong>
                   {coupon.usedCount} / {coupon.totalUses}
                 </span>
@@ -63,7 +63,7 @@ const MyCouponBox = ({ coupon }: MyCouponBoxProps) => {
               {coupon.minimumOrderValue != null &&
                 coupon.minimumOrderValue > 0 && (
                   <div className="price-container">
-                    <span className="span-text">
+                    <span className="coupon-span-text">
                       <strong>Minimum Order: </strong>$
                       {coupon.minimumOrderValue.toLocaleString("en-US", {
                         minimumFractionDigits: 2,
@@ -75,7 +75,7 @@ const MyCouponBox = ({ coupon }: MyCouponBoxProps) => {
               {coupon.maximumDiscountAmount != null &&
                 coupon.maximumDiscountAmount > 0 && (
                   <div className="price-container">
-                    <span className="span-text">
+                    <span className="coupon-span-text">
                       <strong>Max Discount: </strong>$
                       {coupon.maximumDiscountAmount.toLocaleString("en-US", {
                         minimumFractionDigits: 2,
@@ -85,13 +85,13 @@ const MyCouponBox = ({ coupon }: MyCouponBoxProps) => {
                   </div>
                 )}
               <div className="price-container">
-                <span className="span-text">
+                <span className="coupon-span-text">
                   <strong>Time: </strong>
                   {coupon.startDate} - {coupon.endDate}
                 </span>
               </div>
               <div className="price-container">
-                <span className="span-text">
+                <span className="coupon-span-text">
                   <strong>Status: </strong>
                   {getStatusLabel(coupon.status)}
                 </span>

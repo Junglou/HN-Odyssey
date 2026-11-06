@@ -10,7 +10,7 @@ import {
   type CartRecommendationApiItem,
 } from "../../utils/cartRecommendations";
 
-export const PROFILE_RECOMMEND_COUNT = 3;
+export const PROFILE_RECOMMEND_COUNT = 6;
 
 export type RecommendProduct = Product;
 

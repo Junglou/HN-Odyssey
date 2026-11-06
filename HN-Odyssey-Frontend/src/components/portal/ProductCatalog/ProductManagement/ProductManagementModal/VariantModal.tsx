@@ -141,7 +141,7 @@ export default function VariantModal({
                 </span>
                 <input
                   type="text"
-                  className="vm-search-input"
+                  className="vm-modal-search-input"
                   placeholder="Search attributes..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -217,7 +217,7 @@ export default function VariantModal({
           {step === "select-attr" && (
             <button
               type="button"
-              className="vm-btn-add"
+              className="vm-modal-btn-add"
               disabled={selectedAttrIds.length === 0}
               onClick={() => setStep("select-values")}
             >

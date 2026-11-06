@@ -32,7 +32,7 @@ export function useProductBreadcrumb() {
           const mainCat = product.categories[0];
           generatedCrumbs.push({
             label: mainCat.name,
-            path: `/store?category=${mainCat.slug}`,
+            path: `/products?category=${mainCat.slug}`,
           });
         }
 

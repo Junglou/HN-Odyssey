@@ -233,7 +233,21 @@
 }
 
 @media screen and (max-width: 600px) {
-  .cart-dropdown-wrapper {
-    right: -16px;
+  .cart-dropdown-items {
+    max-height: min(400px, 45vh);
+    padding: 16px 12px;
+  }
+  .cart-item {
+    gap: 12px;
+  }
+  .cart-item-qty-box {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .cart-item-qty-value {
+    width: 48px;
+  }
+  .cart-dropdown-footer {
+    padding: 16px;
   }
 }

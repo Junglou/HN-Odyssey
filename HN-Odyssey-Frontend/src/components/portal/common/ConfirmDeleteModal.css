@@ -67,7 +67,7 @@
 }
 
 /* Nút Cancel: Nền trắng, viền đen, bo góc theo thiết kế */
-.cd-btn-cancel {
+.cd-modal-btn-cancel {
   background-color: #ffffff;
   color: #000000;
   border: 1px solid #000000;
@@ -80,7 +80,7 @@
   transition: background-color 0.2s;
 }
 
-.cd-btn-cancel:hover {
+.cd-modal-btn-cancel:hover {
   background-color: #f9fafb;
 }
 

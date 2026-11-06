@@ -1,5 +1,6 @@
 import { useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { InstantSearch, useSearchBox } from "react-instantsearch";
 import { useHeader } from "../../hooks/common/useHeader";
 import { useCart } from "../../hooks/common/cartDrop/useCart";
@@ -28,6 +29,8 @@ function VirtualSearchBox({ currentQuery }: { currentQuery: string }) {
 }
 
 export default function Header() {
+  const { t, i18n } = useTranslation();
+  const isVietnamese = i18n.language?.startsWith("vi");
   const {
     isVisible,
     isSearchOpen,
@@ -153,7 +156,7 @@ export default function Header() {
           </div>
 
           <div
-            className="header-action-wrapper"
+            className="header-action-wrapper header-cart-wrapper"
             ref={cartWrapperRef}
             data-chat-guide="header-cart"
           >
@@ -191,7 +194,6 @@ export default function Header() {
               data-chat-guide="header-search"
               onClick={handleOpenSearch}
               ref={searchWrapperRef}
-              style={{ position: "relative" }}
             >
               <SearchIconSmall />
               <input
@@ -262,6 +264,82 @@ export default function Header() {
             Emergency Packs
           </Link>
         </nav>
+
+        {/* các mục của thanh promo (ẩn trên mobile): vẫn truy cập được từ menu */}
+        <div className="mobile-extra">
+          <div className="mobile-extra-group">
+            <span className="mobile-extra-label">
+              {t("featured_activities")}
+            </span>
+            <Link
+              to="/blog"
+              className="mobile-extra-link"
+              onClick={closeMobileMenu}
+            >
+              {t("blog_news")}
+            </Link>
+            <Link
+              to="/loyalty"
+              className="mobile-extra-link"
+              onClick={closeMobileMenu}
+            >
+              {t("loyalty_rewards")}
+            </Link>
+          </div>
+
+          <div className="mobile-extra-group">
+            <span className="mobile-extra-label">{t("odysseys")}</span>
+            <Link
+              to="/odysseys"
+              className="mobile-extra-link"
+              onClick={closeMobileMenu}
+            >
+              {t("explore_odysseys")}
+            </Link>
+          </div>
+
+          <div className="mobile-extra-group">
+            <span className="mobile-extra-label">{t("second_charm")}</span>
+            <Link
+              to="/second-charm-form"
+              className="mobile-extra-link"
+              onClick={closeMobileMenu}
+            >
+              {t("go_to_form")}
+            </Link>
+          </div>
+
+          <Link
+            to="/find-us"
+            className="mobile-extra-link mobile-extra-find"
+            onClick={closeMobileMenu}
+          >
+            {t("come_find_us")}
+          </Link>
+
+          <div className="mobile-lang">
+            <button
+              type="button"
+              className={`mobile-lang-btn ${!isVietnamese ? "active" : ""}`}
+              onClick={() => {
+                void i18n.changeLanguage("en");
+                closeMobileMenu();
+              }}
+            >
+              English
+            </button>
+            <button
+              type="button"
+              className={`mobile-lang-btn ${isVietnamese ? "active" : ""}`}
+              onClick={() => {
+                void i18n.changeLanguage("vi");
+                closeMobileMenu();
+              }}
+            >
+              Tiếng Việt
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

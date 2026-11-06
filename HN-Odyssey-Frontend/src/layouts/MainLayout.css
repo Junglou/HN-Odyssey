@@ -11,5 +11,5 @@
 }
 
 .main-content-area {
-  animation: pageFadeIn 0.4s ease-out forwards;
+  animation: pageFadeIn 0.4s ease-out;
 }

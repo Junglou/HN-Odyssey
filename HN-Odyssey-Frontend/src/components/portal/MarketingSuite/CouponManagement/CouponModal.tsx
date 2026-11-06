@@ -107,8 +107,9 @@ function CustomSelect({
       if (ref.current && !ref.current.contains(e.target as Node))
         setIsOpen(false);
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () =>
+      document.removeEventListener("pointerdown", handleClickOutside);
   }, []);
 
   const selectedLabel = options.find((o) => o.value === value)?.label || value;
@@ -181,8 +182,9 @@ function MultiSelectDropdown({
         setIsOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () =>
+      document.removeEventListener("pointerdown", handleClickOutside);
   }, []);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -604,24 +606,27 @@ function ModalContent({
               </div>
             )}
 
-            <div className="coupon-form-group">
-              <label className="coupon-form-label">
-                Usage Limit <span className="coupon-required">*</span>
-              </label>
-              <div className="coupon-form-row">
+            <div className="coupon-form-row">
+              <div className="coupon-form-col">
+                <label className="coupon-form-label">
+                  Total Uses <span className="coupon-required">*</span>
+                </label>
                 <input
                   type="number"
                   className="coupon-form-input"
-                  placeholder="Total Uses (e.g. 500)"
+                  placeholder="e.g. 500"
                   value={formData.totalUsesNum}
                   onChange={(e) => handleChange("totalUsesNum", e.target.value)}
                   disabled={isViewMode}
                   min="1"
                 />
+              </div>
+              <div className="coupon-form-col">
+                <label className="coupon-form-label">Uses Per Customer</label>
                 <input
                   type="number"
                   className="coupon-form-input"
-                  placeholder="Per Customer (Optional)"
+                  placeholder="Optional"
                   value={formData.perCustomerLimitNum}
                   onChange={(e) =>
                     handleChange("perCustomerLimitNum", e.target.value)

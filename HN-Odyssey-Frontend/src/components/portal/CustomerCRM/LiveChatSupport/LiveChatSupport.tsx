@@ -82,6 +82,22 @@ const InlineAvatarIcon = ({ size = 24 }: { size?: number }) => (
   </svg>
 );
 
+const InlineBackIcon = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <line x1="19" y1="12" x2="5" y2="12"></line>
+    <polyline points="12 19 5 12 12 5"></polyline>
+  </svg>
+);
+
 const InlineSearchIcon = () => (
   <svg
     width="16"
@@ -453,7 +469,7 @@ export default function LiveChatSupport({
         <p className="lcs-page-breadcrumb">Customer CRM / Live Chat Support</p>
       </div>
       <div
-        className={`lcs-container ${isResizing ? "is-resizing-container" : ""}`}
+        className={`lcs-container ${isResizing ? "is-resizing-container" : ""} ${activeSession ? "lcs-has-active" : ""}`}
       >
         <div
           className="lcs-sidebar"
@@ -586,6 +602,15 @@ export default function LiveChatSupport({
             <>
               <div className="lcs-chat-header">
                 <div className="lcs-chat-header-user">
+                  {/* Mobile: quay lại danh sách hội thoại (desktop ẩn nút này) */}
+                  <button
+                    type="button"
+                    className="lcs-back-btn"
+                    aria-label="Back to conversations"
+                    onClick={() => actions.selectSession("")}
+                  >
+                    <InlineBackIcon />
+                  </button>
                   <div className="lcs-avatar-circle">
                     {activeSession.customerAvatar ? (
                       <img
@@ -802,7 +827,7 @@ export default function LiveChatSupport({
                     <div className="lcs-emoji-picker-wrapper">
                       <EmojiPicker
                         onEmojiClick={onEmojiClick}
-                        width={320} // Ép chiều rộng cố định để không bị vỡ khi responsive
+                        width="100%"
                         height={400}
                         searchDisabled={false} // Có thể tắt search nếu không cần thiết
                         emojiStyle={EmojiStyle.NATIVE}

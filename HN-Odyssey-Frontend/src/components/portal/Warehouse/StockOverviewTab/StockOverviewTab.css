@@ -457,6 +457,12 @@
     flex: 1 1 100%;
     justify-content: center;
   }
+  /* trong flex cột, flex-basis là chiều cao: không để nút bị kéo cao */
+  .sot-btn-clear,
+  .sot-btn-refresh {
+    flex: 0 0 auto;
+    width: 100%;
+  }
 }
 
 /* EXTRACTED INLINE CSS & NEW STYLES */

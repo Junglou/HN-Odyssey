@@ -259,7 +259,7 @@ function DrawerContent({
   return (
     <div
       className="ban-drawer-overlay"
-      onMouseDown={(e) => {
+      onPointerDown={(e) => {
         if (e.target === e.currentTarget && !isSubmitting) {
           onClose();
         }
@@ -649,7 +649,7 @@ function DrawerContent({
         {isProductModalOpen && (
           <div
             className="ban-product-modal-overlay"
-            onMouseDown={(e) => {
+            onPointerDown={(e) => {
               if (e.target === e.currentTarget) {
                 setIsProductModalOpen(false);
               }

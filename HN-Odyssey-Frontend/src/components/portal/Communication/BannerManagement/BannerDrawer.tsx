@@ -194,7 +194,7 @@ function BannerDrawerContent({
   return (
     <div
       className="bm-drawer-overlay"
-      onMouseDown={(e) => {
+      onPointerDown={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
         }

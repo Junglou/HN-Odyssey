@@ -32,7 +32,7 @@ interface ChartCardProps {
 
 const ChartCard = memo(({ title, history, label, percent }: ChartCardProps) => (
   <div className="cr-chart-card">
-    <h3 className="cr-section-title">{title}</h3>
+    <h3 className="cpuram-section-title">{title}</h3>
 
     <div
       className="cr-chart-container"
@@ -92,7 +92,7 @@ export default function CpuRamTab({ data }: CpuRamTabProps) {
 
   return (
     <div className="cr-tab-layout">
-      <h2 className="cr-section-title mb-0">
+      <h2 className="cpuram-section-title mb-0">
         CPU & RAM Details (Real-time & History)
       </h2>
       <div className="cr-bottom-row">

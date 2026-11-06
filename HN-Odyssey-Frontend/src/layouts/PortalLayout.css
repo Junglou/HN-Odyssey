@@ -1,12 +1,3 @@
-html,
-body {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-
 .portal-container {
   display: flex;
   min-height: 100vh;
@@ -449,7 +440,7 @@ button:focus,
   flex: 1;
   display: flex;
   flex-direction: column;
-  animation: page-fade-in 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation: page-fade-in 0.5s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 @keyframes page-fade-in {

@@ -69,8 +69,9 @@ function CustomModalSelect({
         setIsOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () =>
+      document.removeEventListener("pointerdown", handleClickOutside);
   }, []);
 
   // handle
@@ -196,12 +197,12 @@ function ModalContent({
   // render
   return (
     <div
-      className="um-modal-overlay"
-      onMouseDown={(e) => {
+      className="pum-modal-overlay"
+      onPointerDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="um-modal-box">
+      <div className="pum-modal-box">
         <h2 className="um-modal-title">
           {mode === "add"
             ? "Create User"
@@ -325,12 +326,12 @@ function ModalContent({
           <div className="um-modal-actions">
             {!isViewOnly ? (
               <>
-                <button type="submit" className="um-btn-modal-submit">
+                <button type="submit" className="pum-btn-modal-submit">
                   {mode === "add" ? "Create User" : "Save Changes"}
                 </button>
                 <button
                   type="button"
-                  className="um-btn-modal-cancel"
+                  className="pum-btn-modal-cancel"
                   onClick={onClose}
                 >
                   Cancel
@@ -339,7 +340,7 @@ function ModalContent({
             ) : (
               <button
                 type="button"
-                className="um-btn-modal-cancel"
+                className="pum-btn-modal-cancel"
                 onClick={onClose}
               >
                 Close

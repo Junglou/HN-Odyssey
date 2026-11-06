@@ -17,7 +17,9 @@ export function ProfileModalPortal({
 
   if (!isOpen) return null;
 
-  const handleOverlayMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+  const handleOverlayPointerDown = (
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
     pointerStartedOnOverlay.current = event.target === event.currentTarget;
   };
 
@@ -32,7 +34,7 @@ export function ProfileModalPortal({
   return createPortal(
     <div
       className="um-modal-overlay"
-      onMouseDown={handleOverlayMouseDown}
+      onPointerDown={handleOverlayPointerDown}
       onClick={handleOverlayClick}
       role="presentation"
     >

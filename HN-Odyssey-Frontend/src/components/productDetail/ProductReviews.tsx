@@ -73,8 +73,9 @@ function CustomDropdown({
         setIsOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () =>
+      document.removeEventListener("pointerdown", handleClickOutside);
   }, []);
 
   const selectedLabel =
@@ -237,7 +238,7 @@ export default function ProductReviews() {
               <div className="pdp-emoji-picker-wrapper">
                 <EmojiPicker
                   onEmojiClick={onReviewEmojiClick}
-                  width={320}
+                  width="100%"
                   height={400}
                   searchDisabled={false}
                   emojiStyle={EmojiStyle.NATIVE}
@@ -516,7 +517,7 @@ export default function ProductReviews() {
                       <div className="pdp-emoji-picker-wrapper">
                         <EmojiPicker
                           onEmojiClick={onReplyEmojiClick}
-                          width={320}
+                          width="100%"
                           height={400}
                           searchDisabled={false}
                           emojiStyle={EmojiStyle.NATIVE}

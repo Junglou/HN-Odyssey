@@ -27,7 +27,14 @@ function GradientGauge({
   const radius = 80;
   const circumference = Math.PI * radius;
 
-  const safeValue = Math.min(Math.max(value, 0), 100);
+  // Luôn bắt đầu từ 0 rồi quét lên giá trị thật, kể cả khi gauge mount lại
+  // với dữ liệu đã có sẵn (bật/tắt tab Overview, quay lại trang)
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShown(value), 60);
+    return () => window.clearTimeout(timer);
+  }, [value]);
+  const safeValue = Math.min(Math.max(shown, 0), 100);
   const strokeDashoffset = circumference - (safeValue / 100) * circumference;
   const angle = (safeValue / 100) * 180 - 180;
   const thresholdAngle = (threshold / 100) * 180 - 180;

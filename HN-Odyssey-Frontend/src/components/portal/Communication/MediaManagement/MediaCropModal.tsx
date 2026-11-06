@@ -102,7 +102,7 @@ export default function MediaCropModal({
   return (
     <div
       className="mm-crop-overlay"
-      onMouseDown={(e) => {
+      onPointerDown={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
         }

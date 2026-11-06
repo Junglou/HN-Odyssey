@@ -267,7 +267,7 @@ export default function ManageAdSpendDrawer({
   return createPortal(
     <div
       className="masd-overlay"
-      onMouseDown={(e) => {
+      onPointerDown={(e) => {
         if (e.target === e.currentTarget && !isBusy) onClose();
       }}
     >

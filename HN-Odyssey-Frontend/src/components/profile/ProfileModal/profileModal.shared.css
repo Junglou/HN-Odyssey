@@ -370,3 +370,10 @@
     font-size: 0.9rem;
   }
 }
+@media (max-width: 992px) {
+  .um-form-group input,
+  .um-form-group select,
+  .um-modal-box .account-otp-input {
+    font-size: 16px;
+  }
+}

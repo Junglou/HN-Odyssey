@@ -232,4 +232,11 @@
     width: 100%;
     text-align: left;
   }
+  .cart-list-qty-controls button {
+    min-width: 36px;
+    min-height: 36px;
+  }
+  .cart-list-btn-black {
+    height: 40px;
+  }
 }

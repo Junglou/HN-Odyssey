@@ -148,7 +148,7 @@
 .status-Inactive .tm-dot {
   background-color: #6b7280;
 }
-.status-Inactive {
+.tm-status-badge.status-Inactive {
   color: #6b7280;
 }
 
