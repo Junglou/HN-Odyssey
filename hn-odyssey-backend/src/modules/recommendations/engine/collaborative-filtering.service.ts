@@ -15,6 +15,7 @@ import {
 } from 'src/modules/sales/orders/schemas/order.schema';
 import { ProductStatus } from 'src/common/enums/product-status.enum';
 import { OnEvent } from '@nestjs/event-emitter';
+import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
 import {
   UserBehavior,
   BehaviorAction,
@@ -162,7 +163,7 @@ export class CollaborativeFilteringService {
     }
   }
 
-  @OnEvent('order.created')
+  @OnEvent(NOTIFY_EVENTS.ORDER_CREATED)
   async handleNewOrderClearCache(payload: {
     user_id?: Types.ObjectId | string;
   }) {
