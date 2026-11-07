@@ -15,6 +15,7 @@ import { ProductStatus } from 'src/common/enums/product-status.enum';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { OnEvent } from '@nestjs/event-emitter';
+import { NOTIFY_EVENTS } from 'src/common/constants/notification-events.constant';
 
 // Thêm interface để trả về dữ liệu chuẩn cho Admin Dashboard
 export interface IReplenishmentCandidate {
@@ -261,11 +262,16 @@ export class PurchaseBasedService {
         const supplement = await this.personalizedService.getTrendingItems(
           limit - finalProducts.length,
         );
-        resultToCache = [
-          ...finalProducts,
-          // [FIX 5]: Ép kiểu cho supplement.products
-          ...(supplement.products as unknown as ProductDocument[]),
-        ];
+        // Hàng thịnh hành bù thêm: bỏ món khách đã mua và món đã có trong danh sách
+        const shownIds = new Set(finalProducts.map((p) => String(p._id)));
+        const supplementProducts = (
+          supplement.products as unknown as ProductDocument[]
+        ).filter(
+          (p) =>
+            !purchasedProductIds.includes(String(p._id)) &&
+            !shownIds.has(String(p._id)),
+        );
+        resultToCache = [...finalProducts, ...supplementProducts];
       }
 
       if (resultToCache.length > 0) {
@@ -282,7 +288,7 @@ export class PurchaseBasedService {
   }
 
   // [FIX US2-AC14]: Xóa Cache khi khách có đơn hàng mới (tương tự CF Service)
-  @OnEvent('order.created')
+  @OnEvent(NOTIFY_EVENTS.ORDER_CREATED)
   async handleNewOrderClearPurchaseCache(payload: {
     user_id?: Types.ObjectId | string;
   }) {
